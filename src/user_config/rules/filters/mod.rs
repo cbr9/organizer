@@ -1,4 +1,5 @@
 use super::deserialize::{default_regex, deserialize_regex};
+use crate::user_config::rules::actions::script::Script;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 
@@ -10,6 +11,7 @@ pub struct Filters {
     pub filename: Filename,
     #[serde(default)]
     pub extensions: Vec<String>,
+    pub script: Option<Script>,
 }
 
 impl PartialEq for Filters {
@@ -27,6 +29,7 @@ impl Default for Filters {
             regex: default_regex(),
             filename: Default::default(),
             extensions: Vec::new(),
+            script: None,
         }
     }
 }

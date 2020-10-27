@@ -61,6 +61,11 @@ impl MatchesFilters for PathBuf {
         if !contains.is_empty() && !filename.contains(contains) {
             return false;
         }
+        if let Some(script) = &filters.script {
+            if !script.run_as_filter(&self).unwrap_or_else(|_| false) {
+                return false;
+            }
+        }
         if !filters.extensions.is_empty() && !filters.extensions.contains(&extension.to_string()) {
             return false;
         }

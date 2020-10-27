@@ -140,7 +140,10 @@ impl Action {
             Action::Move(r#move) => r#move.run(path),
             Action::Rename(rename) => rename.run(path),
             Action::Trash(trash) => trash.run(path),
-            Action::Script(script) => script.run(path),
+            Action::Script(script) => {
+                script.run_as_action(path)?;
+                Ok(())
+            }
         }
     }
 }

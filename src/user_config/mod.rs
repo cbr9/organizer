@@ -4,7 +4,7 @@ use crate::{
     ARGS,
 };
 use clap::crate_name;
-use dirs::{config_dir, home_dir};
+use dirs::config_dir;
 use serde::Deserialize;
 use std::{
     borrow::Cow,
