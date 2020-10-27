@@ -9,7 +9,7 @@ pub mod trash;
 use crate::{
     path::{Expandable, Update},
     string::Placeholder,
-    subcommands::logs::Level,
+    subcommands::logs::LogMessage,
     user_config::rules::{
         actions::{
             copy::Copy, delete::Delete, echo::Echo, r#move::Move, rename::Rename, script::Script,
@@ -17,8 +17,8 @@ use crate::{
         },
         deserialize::deserialize_path,
     },
-    LOGGER,
 };
+use log::info;
 use serde::{Deserialize, Serialize};
 use std::{
     borrow::Cow,
@@ -112,11 +112,9 @@ impl IOAction {
             std::fs::rename(&path, &to)?;
         }
 
-        LOGGER.try_write(
-            &Level::Info,
-            &kind,
-            &format!("{} -> {}", &path.display(), &to.display()),
-        );
+        let message = format!("{} -> {}", &path.display(), &to.display());
+        let log_message = LogMessage::new(&kind, message);
+        info!("{}", log_message.to_string());
 
         if kind == ActionType::Rename || kind == ActionType::Move {
             *path = to;

@@ -21,3 +21,5 @@ sysinfo = "0.15.3"
 dialoguer = "0.7.1"
 lazy_static = "1.4.0"
 trash = "1.2.0"
+log = "0.4"
+fern = {version = "0.5", features = ["colored"] }
