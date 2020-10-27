@@ -1,6 +1,6 @@
 use crate::{
     user_config::{rules::actions::ActionType, UserConfig},
-    ARGS,
+    ARGS, LOGGER,
 };
 use chrono::prelude::Local;
 use colored::{ColoredString, Colorize};
@@ -15,11 +15,10 @@ use std::{
 };
 
 pub fn logs() -> Result<()> {
-    let logger = Logger::default();
     if ARGS.is_present("clear") {
-        logger.delete()
+        LOGGER.delete()
     } else {
-        logger.show_logs()
+        LOGGER.show_logs()
     }
 }
 
@@ -101,13 +100,13 @@ impl Logger {
         Self { path }
     }
 
-    pub fn try_write(&mut self, level: &Level, action: &ActionType, msg: &str) {
+    pub fn try_write(&self, level: &Level, action: &ActionType, msg: &str) {
         if let Err(e) = self.write(level, action, msg) {
             eprintln!("could not write to file: {}", e);
         }
     }
 
-    pub fn write(&mut self, level: &Level, action: &ActionType, msg: &str) -> Result<()> {
+    pub fn write(&self, level: &Level, action: &ActionType, msg: &str) -> Result<()> {
         let datetime = Local::now();
         let level = level.to_string().to_uppercase();
         let file = OpenOptions::new().append(true).open(&self.path)?;
@@ -167,8 +166,8 @@ impl Logger {
         Ok(())
     }
 
-    pub fn delete(self) -> Result<()> {
-        fs::remove_file(self.path)
+    pub fn delete(&self) -> Result<()> {
+        fs::remove_file(&self.path)
     }
 
     pub fn read(&self) -> Result<String> {

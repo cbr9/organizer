@@ -1,6 +1,12 @@
 use crate::{
     lock_file::LockFile,
-    subcommands::{config::config, logs::logs, run::run, stop::stop, watch::watch},
+    subcommands::{
+        config::config,
+        logs::{logs, Logger},
+        run::run,
+        stop::stop,
+        watch::watch,
+    },
     user_config::UserConfig,
 };
 use clap::{
@@ -25,6 +31,7 @@ lazy_static! {
     pub static ref ARGS: &'static ArgMatches = MATCHES.subcommand().unwrap().1;
     pub static ref CONFIG: UserConfig = UserConfig::new();
     pub static ref LOCK_FILE: LockFile = LockFile::new();
+    pub static ref LOGGER: Logger = Logger::default();
 }
 
 fn main() -> Result<()> {
