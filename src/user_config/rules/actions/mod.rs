@@ -11,7 +11,10 @@ use crate::{
     string::Placeholder,
     subcommands::logs::{Level, Logger},
     user_config::rules::{
-        actions::{copy::Copy, delete::Delete, echo::Echo, r#move::Move, rename::Rename, script::Script, trash::Trash},
+        actions::{
+            copy::Copy, delete::Delete, echo::Echo, r#move::Move, rename::Rename, script::Script,
+            trash::Trash,
+        },
         deserialize::deserialize_path,
     },
 };
@@ -81,10 +84,19 @@ impl IOAction {
     /// - `type`: whether this helper should move, rename or copy the given file (`path`)
     pub(super) fn helper(path: &mut Cow<Path>, action: &IOAction, kind: ActionType) -> Result<()> {
         #[cfg(debug_assertions)]
-        debug_assert!(kind == ActionType::Move || kind == ActionType::Rename || kind == ActionType::Copy);
+        debug_assert!(
+            kind == ActionType::Move || kind == ActionType::Rename || kind == ActionType::Copy
+        );
 
         let mut logger = Logger::default();
-        let to = PathBuf::from(&action.to.to_str().unwrap().expand_placeholders(path).unwrap());
+        let to = PathBuf::from(
+            &action
+                .to
+                .to_str()
+                .unwrap()
+                .expand_placeholders(path)
+                .unwrap(),
+        );
         let mut to = Cow::from(to);
         if kind == ActionType::Copy || kind == ActionType::Move {
             if !to.exists() {
@@ -131,21 +143,22 @@ pub enum Action {
     Script(Script),
 }
 
-impl Action {
-    pub fn run(&self, path: &mut Cow<Path>) -> Result<()> {
+impl AsAction for Action {
+    fn act(&self, path: &mut Cow<Path>) -> Result<()> {
         match self {
-            Action::Copy(copy) => copy.run(path),
-            Action::Delete(delete) => delete.run(path),
-            Action::Echo(echo) => echo.run(path),
-            Action::Move(r#move) => r#move.run(path),
-            Action::Rename(rename) => rename.run(path),
-            Action::Trash(trash) => trash.run(path),
-            Action::Script(script) => {
-                script.run_as_action(path)?;
-                Ok(())
-            }
+            Action::Copy(copy) => copy.act(path),
+            Action::Delete(delete) => delete.act(path),
+            Action::Echo(echo) => echo.act(path),
+            Action::Move(r#move) => r#move.act(path),
+            Action::Rename(rename) => rename.act(path),
+            Action::Trash(trash) => trash.act(path),
+            Action::Script(script) => script.act(path),
         }
     }
+}
+
+pub trait AsAction {
+    fn act(&self, path: &mut Cow<Path>) -> Result<()>;
 }
 
 #[derive(Eq, PartialEq)]
@@ -189,7 +202,7 @@ impl Actions {
     pub fn run(&self, path: PathBuf) {
         let mut path = Cow::from(path);
         for action in self.iter() {
-            action.run(&mut path).ok();
+            action.act(&mut path).ok();
         }
     }
 }
@@ -232,11 +245,16 @@ mod tests {
     fn rename_with_rename_conflict() -> Result<()> {
         let mut target = Cow::from(test_file_or_dir("test2.txt"));
         let expected = expected_path(&target, &Default::default());
-        target.update(&ConflictOption::Rename, &Default::default()).unwrap();
+        target
+            .update(&ConflictOption::Rename, &Default::default())
+            .unwrap();
         if target == expected {
             Ok(())
         } else {
-            Err(Error::new(ErrorKind::Other, "filepath after rename is not as expected"))
+            Err(Error::new(
+                ErrorKind::Other,
+                "filepath after rename is not as expected",
+            ))
         }
     }
 
@@ -244,11 +262,16 @@ mod tests {
     fn rename_with_overwrite_conflict() -> Result<()> {
         let mut target = Cow::from(test_file_or_dir("test2.txt"));
         let expected = target.clone();
-        target.update(&ConflictOption::Overwrite, &Default::default()).unwrap();
+        target
+            .update(&ConflictOption::Overwrite, &Default::default())
+            .unwrap();
         if target == expected {
             Ok(())
         } else {
-            Err(Error::new(ErrorKind::Other, "filepath after rename is not as expected"))
+            Err(Error::new(
+                ErrorKind::Other,
+                "filepath after rename is not as expected",
+            ))
         }
     }
 
@@ -256,7 +279,9 @@ mod tests {
     #[should_panic] // unwrapping a None value
     fn rename_with_skip_conflict() {
         let mut target = Cow::from(test_file_or_dir("test2.txt"));
-        target.update(&ConflictOption::Skip, &Default::default()).unwrap();
+        target
+            .update(&ConflictOption::Skip, &Default::default())
+            .unwrap();
     }
 
     #[test]
@@ -265,6 +290,8 @@ mod tests {
         let mut target = Cow::from(test_file_or_dir("test_dir2").join("test1.txt"));
         #[cfg(debug_assertions)]
         debug_assert!(!target.exists());
-        target.update(&ConflictOption::Rename, &Default::default()).unwrap();
+        target
+            .update(&ConflictOption::Rename, &Default::default())
+            .unwrap();
     }
 }

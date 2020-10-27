@@ -1,11 +1,13 @@
+use crate::user_config::rules::actions::AsAction;
 use crate::{
     string::Placeholder,
     user_config::{rules::filters::AsFilter, UserConfig},
 };
 use serde::{Deserialize, Serialize};
+use std::borrow::Cow;
 use std::{
     fs,
-    io::Result,
+    io::{Error, ErrorKind, Result},
     path::{Path, PathBuf},
     process::{Command, Output, Stdio},
     str::FromStr,
@@ -17,14 +19,28 @@ pub struct Script {
     content: String,
 }
 
+impl AsAction for Script {
+    fn act(&self, path: &mut Cow<Path>) -> Result<()> {
+        match self.helper(path) {
+            Ok(_) => Ok(()),
+            Err(e) => Err(e),
+        }
+    }
+}
+
 impl AsFilter for Script {
     fn matches(&self, path: &Path) -> bool {
-        let output = self.run_as_action(path).unwrap().stdout;
-        let output = String::from_utf8_lossy(&output);
-        let parsed = bool::from_str(&output.trim().to_lowercase());
-        println!("{:?}", parsed);
-        match parsed {
-            Ok(boolean) => boolean,
+        let output = self.helper(&mut Cow::from(path));
+        match output {
+            Ok(output) => {
+                let output = String::from_utf8_lossy(&output.stdout);
+                let parsed = bool::from_str(&output.trim().to_lowercase());
+                println!("{:?}", parsed);
+                match parsed {
+                    Ok(boolean) => boolean,
+                    Err(_) => false,
+                }
+            }
             Err(_) => false,
         }
     }
@@ -42,7 +58,7 @@ impl Script {
         Ok(script)
     }
 
-    pub fn run_as_action(&self, path: &Path) -> Result<Output> {
+    fn helper(&self, path: &mut Cow<Path>) -> Result<Output> {
         let script = self.write(path)?;
         let output = Command::new(&self.exec)
             .arg(&script)
@@ -56,31 +72,3 @@ impl Script {
         Ok(output)
     }
 }
-// #[cfg(test)]
-// mod tests {
-//     use crate::{
-//         path::IsHidden,
-//         user_config::rules::{actions::script::Script, filters::Filters},
-//     };
-//     use std::{
-//         io::{Error, ErrorKind, Result},
-//         path::PathBuf,
-//     };
-//
-//     #[test]
-//     fn check_filter_python() -> Result<()> {
-//         let substr = "Downloads";
-//         let mut filters = Filters::default();
-//         let script = Script {
-//             exec: "python".into(),
-//             content: format!("'{}' in str('{{path}}')", substr),
-//         };
-//         filters.script = Some(script);
-//         let path = PathBuf::from("$HOME/Downloads/test.pdf");
-//         if path.matches_filters(&filters) {
-//             Ok(())
-//         } else {
-//             Err(Error::from(ErrorKind::Other))
-//         }
-//     }
-// }

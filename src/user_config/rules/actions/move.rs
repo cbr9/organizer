@@ -1,3 +1,4 @@
+use crate::user_config::rules::actions::AsAction;
 use crate::user_config::rules::{
     actions::{ActionType, IOAction},
     deserialize::string_or_struct,
@@ -16,8 +17,8 @@ impl Deref for Move {
     }
 }
 
-impl Move {
-    pub(super) fn run(&self, path: &mut Cow<Path>) -> Result<()> {
+impl AsAction for Move {
+    fn act(&self, path: &mut Cow<Path>) -> Result<()> {
         IOAction::helper(path, self.deref(), ActionType::Move)
     }
 }

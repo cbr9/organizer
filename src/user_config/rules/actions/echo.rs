@@ -1,5 +1,7 @@
 use crate::string::Placeholder;
+use crate::user_config::rules::actions::AsAction;
 use serde::{Deserialize, Serialize};
+use std::borrow::Cow;
 use std::{io::Result, ops::Deref, path::Path};
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
@@ -13,8 +15,8 @@ impl Deref for Echo {
     }
 }
 
-impl Echo {
-    pub(super) fn run(&self, path: &Path) -> Result<()> {
+impl AsAction for Echo {
+    fn act(&self, path: &mut Cow<Path>) -> Result<()> {
         println!("{}", self.deref().expand_placeholders(path)?);
         Ok(())
     }

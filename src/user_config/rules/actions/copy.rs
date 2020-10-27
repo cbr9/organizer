@@ -4,6 +4,7 @@ use crate::user_config::rules::{
 };
 use serde::{Deserialize, Serialize};
 use std::{borrow::Cow, io::Result, ops::Deref, path::Path};
+use crate::user_config::rules::actions::AsAction;
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
 pub struct Copy(#[serde(deserialize_with = "string_or_struct")] IOAction);
@@ -16,8 +17,8 @@ impl Deref for Copy {
     }
 }
 
-impl Copy {
-    pub(super) fn run(&self, path: &mut Cow<Path>) -> Result<()> {
+impl AsAction for Copy {
+    fn act(&self, path: &mut Cow<Path>) -> Result<()> {
         IOAction::helper(path, self.deref(), ActionType::Copy)
     }
 }

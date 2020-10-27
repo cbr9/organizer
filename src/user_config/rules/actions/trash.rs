@@ -1,4 +1,6 @@
+use crate::user_config::rules::actions::AsAction;
 use serde::{Deserialize, Serialize};
+use std::borrow::Cow;
 use std::{
     io::{Error, ErrorKind, Result},
     ops::Deref,
@@ -16,8 +18,8 @@ impl Deref for Trash {
     }
 }
 
-impl Trash {
-    pub(super) fn run(&self, path: &Path) -> Result<()> {
+impl AsAction for Trash {
+    fn act(&self, path: &mut Cow<Path>) -> Result<()> {
         if self.0 {
             return match trash::delete(path) {
                 Ok(_) => Ok(()),
