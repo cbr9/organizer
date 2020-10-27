@@ -32,32 +32,38 @@ mod tests {
     #[test]
     fn deserialize_string() -> Result<(), YamlError> {
         let extension: Result<Extension, YamlError> = serde_yaml::from_str("pdf");
-        extension.and_then(|_| Ok(()))
+        match extension {
+            Ok(_) => Ok(()),
+            Err(e) => Err(e),
+        }
     }
 
     #[test]
     fn deserialize_seq() -> Result<(), YamlError> {
         let extension: Result<Extension, YamlError> = serde_yaml::from_str("[pdf, doc, docx]");
-        extension.and_then(|_| Ok(()))
+        match extension {
+            Ok(_) => Ok(()),
+            Err(e) => Err(e),
+        }
     }
 
     #[test]
     fn single_match_pdf() -> Result<(), Error> {
         let extension = Extension(vec!["pdf".into()]);
         let path = PathBuf::from("$HOME/Downloads/test.pdf").expand_vars();
-        extension
-            .matches(&path)
-            .then_some(())
-            .ok_or_else(|| Error::from(ErrorKind::Other))
+        match extension.matches(&path) {
+            true => Ok(()),
+            false => Err(Error::from(ErrorKind::Other)),
+        }
     }
 
     #[test]
     fn multiple_match_pdf() -> Result<(), Error> {
         let extension = Extension(vec!["pdf".into(), "doc".into(), "docx".into()]);
         let path = PathBuf::from("$HOME/Downloads/test.pdf").expand_vars();
-        extension
-            .matches(&path)
-            .then_some(())
-            .ok_or_else(|| Error::from(ErrorKind::Other))
+        match extension.matches(&path) {
+            true => Ok(()),
+            false => Err(Error::from(ErrorKind::Other)),
+        }
     }
 }

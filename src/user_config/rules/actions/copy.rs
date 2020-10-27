@@ -1,10 +1,10 @@
+use crate::user_config::rules::actions::AsAction;
 use crate::user_config::rules::{
     actions::{ActionType, IOAction},
     deserialize::string_or_struct,
 };
 use serde::{Deserialize, Serialize};
 use std::{borrow::Cow, io::Result, ops::Deref, path::Path};
-use crate::user_config::rules::actions::AsAction;
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
 pub struct Copy(#[serde(deserialize_with = "string_or_struct")] IOAction);

@@ -93,8 +93,12 @@ impl Expandable for PathBuf {
                 let component: &Path = component.as_ref();
                 let component = component.to_str().unwrap();
                 if component.starts_with('$') {
-                    env::var(component.replace('$', ""))
-                        .unwrap_or_else(|_| panic!("error: environment variable '{}' could not be found", component))
+                    env::var(component.replace('$', "")).unwrap_or_else(|_| {
+                        panic!(
+                            "error: environment variable '{}' could not be found",
+                            component
+                        )
+                    })
                 } else {
                     component.to_string()
                 }
@@ -109,7 +113,12 @@ impl Expandable for PathBuf {
 /// Returns the stem and extension of `path` if they exist and can be parsed, otherwise returns an Error
 fn get_stem_and_extension(path: &Path) -> (String, String) {
     let stem = path.file_stem().unwrap().to_str().unwrap().to_string();
-    let extension = path.extension().unwrap_or_default().to_str().unwrap().to_string();
+    let extension = path
+        .extension()
+        .unwrap_or_default()
+        .to_str()
+        .unwrap()
+        .to_string();
 
     (stem, extension)
 }

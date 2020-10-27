@@ -5,7 +5,9 @@ use std::{
 };
 
 use colored::Colorize;
-use notify::{op, raw_watcher, RawEvent, RecommendedWatcher, RecursiveMode, Watcher as OtherWatcher};
+use notify::{
+    op, raw_watcher, RawEvent, RecommendedWatcher, RecursiveMode, Watcher as OtherWatcher,
+};
 
 use crate::{
     subcommands::run::run,
@@ -51,10 +53,7 @@ impl Watcher {
     pub fn new() -> Self {
         let (sender, receiver) = channel();
         let watcher = raw_watcher(sender).unwrap();
-        Watcher {
-            watcher,
-            receiver,
-        }
+        Watcher { watcher, receiver }
     }
 
     pub fn run(&mut self) -> Result<()> {
@@ -89,11 +88,7 @@ impl Watcher {
                         // FIXME: if using recursive = true, this will panic, because the parent won't be a key in path2rules
                         'rules: for (rule, i) in path2rules.get(parent).unwrap() {
                             let folder = rule.folders.get(*i).unwrap();
-                            let Options {
-                                watch,
-                                ignore,
-                                ..
-                            } = &folder.options;
+                            let Options { watch, ignore, .. } = &folder.options;
                             if ignore.contains(&parent.to_path_buf()) {
                                 continue;
                             }
@@ -117,7 +112,8 @@ impl Daemon {
             Some(pid) => {
                 {
                     // force sys to go out of scope before watch() is run
-                    let sys = System::new_with_specifics(RefreshKind::with_processes(RefreshKind::new()));
+                    let sys =
+                        System::new_with_specifics(RefreshKind::with_processes(RefreshKind::new()));
                     sys.get_process(pid).unwrap().kill(Signal::Kill);
                 }
                 watch()

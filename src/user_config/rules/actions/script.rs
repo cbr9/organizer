@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::{
     fs,
-    io::{Error, ErrorKind, Result},
+    io::Result,
     path::{Path, PathBuf},
     process::{Command, Output, Stdio},
     str::FromStr,

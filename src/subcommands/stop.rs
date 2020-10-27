@@ -21,7 +21,10 @@ pub fn stop() -> Result<()> {
                     sys.get_process(pid).unwrap().kill(Signal::Kill);
                 }
                 None => {
-                    println!("No instance was found running with configuration: {}", path.display());
+                    println!(
+                        "No instance was found running with configuration: {}",
+                        path.display()
+                    );
                 }
             }
         }

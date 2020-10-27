@@ -93,10 +93,12 @@ impl Logger {
     }
 
     pub fn new(path: PathBuf) -> Self {
-        OpenOptions::new().append(true).create_new(true).open(&path).ok();
-        Self {
-            path,
-        }
+        OpenOptions::new()
+            .append(true)
+            .create_new(true)
+            .open(&path)
+            .ok();
+        Self { path }
     }
 
     pub fn try_write(&mut self, level: &Level, action: &ActionType, msg: &str) {

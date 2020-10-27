@@ -43,7 +43,8 @@ impl UserConfig {
         }
 
         let content = fs::read_to_string(&path).unwrap();
-        let mut config: UserConfig = serde_yaml::from_str(&content).expect("could not parse config file");
+        let mut config: UserConfig =
+            serde_yaml::from_str(&content).expect("could not parse config file");
         config.path = path;
         config
     }
@@ -51,17 +52,23 @@ impl UserConfig {
     pub fn create(path: &Path) {
         let mut path = Cow::from(path);
         if path.exists() {
-            path.update(&ConflictOption::Rename, &Default::default()).unwrap(); // safe unwrap (can only return an error if if_exists == Skip)
+            path.update(&ConflictOption::Rename, &Default::default())
+                .unwrap(); // safe unwrap (can only return an error if if_exists == Skip)
         }
         match path.parent() {
             Some(parent) => {
                 if !parent.exists() {
-                    std::fs::create_dir_all(parent)
-                        .unwrap_or_else(|_| panic!("error: could not create config directory ({})", parent.display()));
+                    std::fs::create_dir_all(parent).unwrap_or_else(|_| {
+                        panic!(
+                            "error: could not create config directory ({})",
+                            parent.display()
+                        )
+                    });
                 }
                 let output = include_str!("../../examples/config.yml");
-                std::fs::write(&path, output)
-                    .unwrap_or_else(|_| panic!("error: could not create config file ({})", path.display()));
+                std::fs::write(&path, output).unwrap_or_else(|_| {
+                    panic!("error: could not create config file ({})", path.display())
+                });
                 println!("New config file created at {}", path.display());
             }
             None => panic!("config file's parent folder should be defined"),
@@ -70,7 +77,11 @@ impl UserConfig {
 
     pub fn path() -> PathBuf {
         match ARGS.value_of("config") {
-            Some(path) => PathBuf::from(path).expand_user().expand_vars().canonicalize().unwrap(),
+            Some(path) => PathBuf::from(path)
+                .expand_user()
+                .expand_vars()
+                .canonicalize()
+                .unwrap(),
             None => Self::default_path(),
         }
     }

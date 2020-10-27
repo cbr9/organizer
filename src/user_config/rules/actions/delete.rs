@@ -1,7 +1,7 @@
-use serde::{Deserialize, Serialize};
-use std::{fs, io::Result, ops::Deref, path::Path};
 use crate::user_config::rules::actions::AsAction;
+use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
+use std::{fs, io::Result, ops::Deref, path::Path};
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
 pub struct Delete(bool);

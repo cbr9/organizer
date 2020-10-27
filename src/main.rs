@@ -1,5 +1,3 @@
-#![feature(bool_to_option)]
-
 use crate::{
     lock_file::LockFile,
     subcommands::{config::config, logs::logs, run::run, stop::stop, watch::watch},

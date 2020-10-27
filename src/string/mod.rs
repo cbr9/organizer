@@ -35,7 +35,10 @@ impl Placeholder for String {
         let mut new = self.clone();
         let regex = Regex::new(r"\{\w+(?:\.\w+)*}").unwrap();
         for span in regex.find_iter(self) {
-            let placeholders = span.as_str().trim_matches(|x| x == '{' || x == '}').split('.');
+            let placeholders = span
+                .as_str()
+                .trim_matches(|x| x == '{' || x == '}')
+                .split('.');
             let mut current_value = path.to_path_buf();
             for placeholder in placeholders.into_iter() {
                 current_value = match placeholder {
@@ -94,7 +97,12 @@ impl Placeholder for String {
                         .into(),
                     "to_uppercase" => current_value.to_str().unwrap().to_uppercase().into(),
                     "to_lowercase" => current_value.to_str().unwrap().to_lowercase().into(),
-                    "capitalize" => current_value.to_str().unwrap().to_string().capitalize().into(),
+                    "capitalize" => current_value
+                        .to_str()
+                        .unwrap()
+                        .to_string()
+                        .capitalize()
+                        .into(),
                     _ => panic!("unknown placeholder"),
                 }
             }

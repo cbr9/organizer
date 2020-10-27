@@ -28,7 +28,8 @@ impl<'de> Deserialize<'de> for Regex {
         D: Deserializer<'de>,
     {
         let buf = String::deserialize(deserializer)?;
-        let regex = regex::Regex::new(&buf).expect("error: could not parse config file (invalid regex)");
+        let regex =
+            regex::Regex::new(&buf).expect("error: could not parse config file (invalid regex)");
         Ok(Self(regex))
     }
 }
