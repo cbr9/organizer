@@ -83,6 +83,7 @@ impl IOAction {
     /// - `sep`: counter separator (e.g. in "file (1).test", `sep` would be a whitespace; in "file-(1).test", it would be a hyphen)
     /// - `type`: whether this helper should move, rename or copy the given file (`path`)
     pub(super) fn helper(path: &mut Cow<Path>, action: &IOAction, kind: ActionType) -> Result<()> {
+        // TODO: refactor this mess
         #[cfg(debug_assertions)]
         debug_assert!(
             kind == ActionType::Move || kind == ActionType::Rename || kind == ActionType::Copy
