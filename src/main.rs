@@ -1,9 +1,13 @@
+#![feature(bool_to_option)]
+
 use crate::{
     lock_file::LockFile,
     subcommands::{config::config, logs::logs, run::run, stop::stop, watch::watch},
     user_config::UserConfig,
 };
-use clap::{crate_authors, crate_description, crate_name, crate_version, load_yaml, App, ArgMatches};
+use clap::{
+    crate_authors, crate_description, crate_name, crate_version, load_yaml, App, ArgMatches,
+};
 use lazy_static::lazy_static;
 use std::{env, io::Result};
 
