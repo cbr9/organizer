@@ -76,13 +76,6 @@ impl FromStr for IOAction {
 }
 
 impl IOAction {
-    /// Helper function for the move, rename and copy actions.
-    /// # Args:
-    /// - `path`: a reference to a Cow smart pointer containing the original file
-    /// - `to`: the destination path of `path`
-    /// - `if_exists`: variable that helps resolve any naming conflicts between `path` and `to`
-    /// - `sep`: counter separator (e.g. in "file (1).test", `sep` would be a whitespace; in "file-(1).test", it would be a hyphen)
-    /// - `type`: whether this helper should move, rename or copy the given file (`path`)
     pub(super) fn helper(path: &mut Cow<Path>, action: &IOAction, kind: ActionType) -> Result<()> {
         // TODO: refactor this mess
         #[cfg(debug_assertions)]
