@@ -22,7 +22,7 @@ impl AsFilter for Extension {
 #[cfg(test)]
 mod tests {
     use super::Extension;
-    use crate::{path::Expandable, user_config::rules::filters::AsFilter};
+    use crate::user_config::rules::filters::AsFilter;
     use serde_yaml::Error as YamlError;
     use std::{
         io::{Error, ErrorKind},
@@ -50,7 +50,7 @@ mod tests {
     #[test]
     fn single_match_pdf() -> Result<(), Error> {
         let extension = Extension(vec!["pdf".into()]);
-        let path = PathBuf::from("$HOME/Downloads/test.pdf").expand_vars();
+        let path = PathBuf::from("$HOME/Downloads/test.pdf");
         match extension.matches(&path) {
             true => Ok(()),
             false => Err(Error::from(ErrorKind::Other)),
@@ -60,7 +60,7 @@ mod tests {
     #[test]
     fn multiple_match_pdf() -> Result<(), Error> {
         let extension = Extension(vec!["pdf".into(), "doc".into(), "docx".into()]);
-        let path = PathBuf::from("$HOME/Downloads/test.pdf").expand_vars();
+        let path = PathBuf::from("$HOME/Downloads/test.pdf");
         match extension.matches(&path) {
             true => Ok(()),
             false => Err(Error::from(ErrorKind::Other)),
