@@ -15,10 +15,7 @@ impl Deref for Regex {
 
 impl AsFilter for Regex {
     fn matches(&self, path: &Path) -> bool {
-        if self.is_match(path.to_str().unwrap()) {
-            return true;
-        }
-        false
+        self.is_match(path.to_str().unwrap())
     }
 }
 
@@ -38,9 +35,9 @@ impl<'de> Deserialize<'de> for Regex {
 mod tests {
     use super::*;
     use serde_yaml::Error as YamlError;
-
     #[test]
     fn deserialize() -> Result<(), YamlError> {
+        // only needs to test the deserialize implementation, because it's just a wrapper around a struct from a different crate
         let regex: Result<Regex, YamlError> = serde_yaml::from_str(".*");
         regex.and_then(|_| Ok(()))
     }
