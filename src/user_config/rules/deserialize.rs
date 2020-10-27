@@ -1,12 +1,11 @@
 use core::result::Result::Ok;
 use std::path::PathBuf;
 
-use regex::Regex;
 use serde::{de, export, Deserialize, Deserializer};
 
 use crate::path::Expandable;
 use serde::{
-    de::{MapAccess, Visitor},
+    de::{MapAccess, SeqAccess, Visitor},
     export::{fmt, PhantomData},
 };
 use std::str::FromStr;
@@ -17,17 +16,6 @@ where
 {
     let buf = String::deserialize(deserializer)?;
     Ok(PathBuf::from(&buf).expand_user().expand_vars())
-}
-
-pub(in crate::user_config) fn deserialize_regex<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Regex, D::Error> {
-    let buf = String::deserialize(deserializer)?;
-    let regex = Regex::new(&buf).expect("error: could not parse config file (invalid regex)");
-    Ok(regex)
-}
-
-#[allow(clippy::trivial_regex)]
-pub(in crate::user_config) fn default_regex() -> Regex {
-    Regex::new("").unwrap()
 }
 
 pub(super) fn string_or_struct<'de, T, D>(deserializer: D) -> Result<T, D::Error>
@@ -72,4 +60,44 @@ where
     }
 
     deserializer.deserialize_any(StringOrStruct(PhantomData))
+}
+
+pub(super) fn string_or_seq<'de, D>(deserializer: D) -> Result<Vec<String>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    // This is a Visitor that forwards string types to T's `FromStr` impl and
+    // forwards map types to T's `Deserialize` impl. The `PhantomData` is to
+    // keep the compiler from complaining about T being an unused generic type
+    // parameter. We need T in order to know the Value type for the Visitor
+    // impl.
+    struct StringOrSeq(PhantomData<fn() -> String>);
+
+    impl<'de> Visitor<'de> for StringOrSeq {
+        type Value = Vec<String>;
+
+        fn expecting(&self, formatter: &mut export::Formatter) -> fmt::Result {
+            formatter.write_str("string or seq")
+        }
+
+        fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            Ok(vec![value.into()])
+        }
+
+        fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+        where
+            A: SeqAccess<'de>,
+        {
+            let mut vec = Vec::new();
+            while let Some(val) = seq.next_element()? {
+                vec.push(val)
+            }
+            Ok(vec)
+        }
+    }
+
+    deserializer.deserialize_any(StringOrSeq(PhantomData))
 }

@@ -40,6 +40,8 @@ impl Deref for WrappedFolder {
     }
 }
 
+pub type Folders = Vec<WrappedFolder>;
+
 #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
 pub struct Options {
     /// defines whether or not subdirectories must be scanned

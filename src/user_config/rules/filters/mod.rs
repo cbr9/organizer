@@ -1,47 +1,54 @@
-use super::deserialize::{default_regex, deserialize_regex};
-use crate::user_config::rules::actions::script::Script;
-use regex::Regex;
-use serde::{Deserialize, Serialize};
+pub mod extension;
+pub mod filename;
+pub mod regex;
+
+use crate::user_config::rules::{actions::script::Script, filters::regex::Regex};
+use extension::Extension;
+use filename::Filename;
+use serde::Deserialize;
+use std::{ops::Deref, path::Path};
 
 #[derive(Debug, Clone, Deserialize)]
-pub struct Filters {
-    #[serde(deserialize_with = "deserialize_regex", default = "default_regex")]
-    pub regex: Regex,
-    #[serde(default)]
-    pub filename: Filename,
-    #[serde(default)]
-    pub extensions: Vec<String>,
-    pub script: Option<Script>,
+#[serde(rename_all(deserialize = "lowercase", serialize = "lowercase"))]
+pub enum Filter {
+    Regex(Regex),
+    Filename(Filename),
+    Extension(Extension),
+    Script(Script),
 }
 
-impl PartialEq for Filters {
-    fn eq(&self, other: &Self) -> bool {
-        self.regex.to_string() == other.regex.to_string()
-            && self.filename == other.filename
-            && self.extensions == other.extensions
-    }
+pub trait AsFilter {
+    fn matches(&self, path: &Path) -> bool;
 }
 
-#[allow(clippy::trivial_regex)]
-impl Default for Filters {
-    fn default() -> Self {
-        Filters {
-            regex: default_regex(),
-            filename: Default::default(),
-            extensions: Vec::new(),
-            script: None,
+impl AsFilter for Filter {
+    fn matches(&self, path: &Path) -> bool {
+        match self {
+            Filter::Regex(regex) => regex.matches(path),
+            Filter::Filename(filename) => filename.matches(path),
+            Filter::Extension(extension) => extension.matches(path),
+            Filter::Script(script) => script.matches(path),
         }
     }
 }
 
-#[derive(Eq, PartialEq, Deserialize, Serialize, Debug, Clone, Default)]
-pub struct Filename {
-    #[serde(default)]
-    pub startswith: String,
-    #[serde(default)]
-    pub endswith: String,
-    #[serde(default)]
-    pub contains: String,
-    #[serde(default)]
-    pub case_sensitive: bool,
+#[derive(Debug, Clone, Deserialize)]
+pub struct Filters(Vec<Filter>);
+
+impl Deref for Filters {
+    type Target = Vec<Filter>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl Filters {
+    pub fn r#match(&self, path: &Path) -> bool {
+        let mut matches = true;
+        for filter in self.iter() {
+            matches = matches && filter.matches(path)
+        }
+        matches
+    }
 }

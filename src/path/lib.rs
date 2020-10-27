@@ -74,103 +74,102 @@ pub mod vars {
         tested.expand_vars();
     }
 }
-
-#[cfg(test)]
-mod filters {
-    use crate::{path::MatchesFilters, user_config::rules::filters::Filters};
-    use std::{
-        io::{Error, ErrorKind, Result},
-        path::PathBuf,
-    };
-
-    #[test]
-    fn test_temporary_files() -> Result<()> {
-        let crdownload = PathBuf::from("$HOME/Downloads/unsplash.jpg.crdownload");
-        let tmp = PathBuf::from("$HOME/Downloads/unsplash.jpg.tmp");
-        let part = PathBuf::from("$HOME/Downloads/unsplash.jpg.part");
-        let download = PathBuf::from("$HOME/Downloads/unsplash.jpg.crdownload");
-        let filters = Filters::default();
-        for file in [crdownload, tmp, part, download].iter() {
-            if file.matches_filters(&filters) {
-                return Err(Error::new(ErrorKind::Other, "temporary file matched filters"));
-            }
-        }
-        Ok(())
-    }
-
-    #[test]
-    fn test_filters_extensions() -> Result<()> {
-        let file = PathBuf::from("/home/cabero/Documents/matricula.pdf");
-        let mut filters = Filters::default();
-        filters.extensions.push("pdf".to_string());
-        if file.matches_filters(&filters) {
-            Ok(())
-        } else {
-            Err(Error::new(
-                ErrorKind::Other,
-                "file did not match the filters correctly".to_string(),
-            ))
-        }
-    }
-    #[test]
-    fn test_filters_empty_filters() -> Result<()> {
-        let file = PathBuf::from("/home/cabero/Documents/matricula.pdf");
-        let filters = Filters::default();
-        if file.matches_filters(&filters) {
-            Err(Error::new(
-                ErrorKind::Other,
-                "file matched an empty set of filters".to_string(),
-            ))
-        } else {
-            Ok(())
-        }
-    }
-    #[test]
-    fn test_filters_filename_startswith() -> Result<()> {
-        let file = PathBuf::from("/home/cabero/Documents/matricula.pdf");
-        let mut filters = Filters::default();
-        filters.filename.startswith = "matricula".into();
-        if file.matches_filters(&filters) {
-            // the default regex is an empty one, so it should match everything
-            // but we check for this possibility before trying to match
-            Ok(())
-        } else {
-            Err(Error::new(
-                ErrorKind::Other,
-                "file did not match the filters correctly".to_string(),
-            ))
-        }
-    }
-    #[test]
-    fn test_filters_filename_contains() -> Result<()> {
-        let file = PathBuf::from("/home/cabero/Documents/matricula.pdf");
-        let mut filters = Filters::default();
-        filters.filename.contains = "icula".into();
-        if file.matches_filters(&filters) {
-            // the default regex is an empty one, so it should match everything
-            // but we check for this possibility before trying to match
-            Ok(())
-        } else {
-            Err(Error::new(
-                ErrorKind::Other,
-                "file did not match the filters correctly".to_string(),
-            ))
-        }
-    }
-    #[test]
-    fn test_filters_filename_endswith() -> Result<()> {
-        let file = PathBuf::from("/home/cabero/Documents/matricula.pdf");
-        let mut filters = Filters::default();
-        filters.filename.contains = "ula.pdf".into();
-        if file.matches_filters(&filters) {
-            // the default regex is an empty one, so it should match everything
-            // but we check for this possibility before trying to match
-            Ok(())
-        } else {
-            Err(Error::new(
-                ErrorKind::Other,
-                "file did not match the filters correctly".to_string(),
-            ))
-        }
-    }
-}
+// #[cfg(test)]
+// mod filters {
+//     use crate::{path::IsHidden, user_config::rules::filters::Filters};
+//     use std::{
+//         io::{Error, ErrorKind, Result},
+//         path::PathBuf,
+//     };
+//
+//     #[test]
+//     fn test_temporary_files() -> Result<()> {
+//         let crdownload = PathBuf::from("$HOME/Downloads/unsplash.jpg.crdownload");
+//         let tmp = PathBuf::from("$HOME/Downloads/unsplash.jpg.tmp");
+//         let part = PathBuf::from("$HOME/Downloads/unsplash.jpg.part");
+//         let download = PathBuf::from("$HOME/Downloads/unsplash.jpg.crdownload");
+//         let filters = Filters::default();
+//         for file in [crdownload, tmp, part, download].iter() {
+//             if file.matches_filters(&filters) {
+//                 return Err(Error::new(ErrorKind::Other, "temporary file matched filters"));
+//             }
+//         }
+//         Ok(())
+//     }
+//
+//     #[test]
+//     fn test_filters_extensions() -> Result<()> {
+//         let file = PathBuf::from("/home/cabero/Documents/matricula.pdf");
+//         let mut filters = Filters::default();
+//         filters.extensions.push("pdf".to_string());
+//         if file.matches_filters(&filters) {
+//             Ok(())
+//         } else {
+//             Err(Error::new(
+//                 ErrorKind::Other,
+//                 "file did not match the filters correctly".to_string(),
+//             ))
+//         }
+//     }
+//     #[test]
+//     fn test_filters_empty_filters() -> Result<()> {
+//         let file = PathBuf::from("/home/cabero/Documents/matricula.pdf");
+//         let filters = Filters::default();
+//         if file.matches_filters(&filters) {
+//             Err(Error::new(
+//                 ErrorKind::Other,
+//                 "file matched an empty set of filters".to_string(),
+//             ))
+//         } else {
+//             Ok(())
+//         }
+//     }
+//     #[test]
+//     fn test_filters_filename_startswith() -> Result<()> {
+//         let file = PathBuf::from("/home/cabero/Documents/matricula.pdf");
+//         let mut filters = Filters::default();
+//         filters.filename.startswith = "matricula".into();
+//         if file.matches_filters(&filters) {
+//             // the default regex is an empty one, so it should match everything
+//             // but we check for this possibility before trying to match
+//             Ok(())
+//         } else {
+//             Err(Error::new(
+//                 ErrorKind::Other,
+//                 "file did not match the filters correctly".to_string(),
+//             ))
+//         }
+//     }
+//     #[test]
+//     fn test_filters_filename_contains() -> Result<()> {
+//         let file = PathBuf::from("/home/cabero/Documents/matricula.pdf");
+//         let mut filters = Filters::default();
+//         filters.filename.contains = "icula".into();
+//         if file.matches_filters(&filters) {
+//             // the default regex is an empty one, so it should match everything
+//             // but we check for this possibility before trying to match
+//             Ok(())
+//         } else {
+//             Err(Error::new(
+//                 ErrorKind::Other,
+//                 "file did not match the filters correctly".to_string(),
+//             ))
+//         }
+//     }
+//     #[test]
+//     fn test_filters_filename_endswith() -> Result<()> {
+//         let file = PathBuf::from("/home/cabero/Documents/matricula.pdf");
+//         let mut filters = Filters::default();
+//         filters.filename.contains = "ula.pdf".into();
+//         if file.matches_filters(&filters) {
+//             // the default regex is an empty one, so it should match everything
+//             // but we check for this possibility before trying to match
+//             Ok(())
+//         } else {
+//             Err(Error::new(
+//                 ErrorKind::Other,
+//                 "file did not match the filters correctly".to_string(),
+//             ))
+//         }
+//     }
+// }

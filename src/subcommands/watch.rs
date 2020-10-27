@@ -8,7 +8,6 @@ use colored::Colorize;
 use notify::{op, raw_watcher, RawEvent, RecommendedWatcher, RecursiveMode, Watcher as OtherWatcher};
 
 use crate::{
-    path::MatchesFilters,
     subcommands::run::run,
     user_config::{rules::folder::Options, UserConfig},
     CONFIG, LOCK_FILE, MATCHES,
@@ -98,7 +97,7 @@ impl Watcher {
                             if ignore.contains(&parent.to_path_buf()) {
                                 continue;
                             }
-                            if *watch && path.matches_filters(&rule.filters) {
+                            if *watch && rule.filters.r#match(&path) {
                                 rule.actions.run(path);
                                 break 'rules;
                             }

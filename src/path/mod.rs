@@ -6,10 +6,7 @@ use std::{
 
 use crate::{
     subcommands::run::resolve_conflict,
-    user_config::rules::{
-        actions::{ConflictOption, Sep},
-        filters::{Filename, Filters},
-    },
+    user_config::rules::actions::{ConflictOption, Sep},
     MATCHES,
 };
 use std::{
@@ -19,59 +16,11 @@ use std::{
 
 pub mod lib;
 
-pub trait MatchesFilters {
-    fn matches_filters(&self, filters: &Filters) -> bool;
+pub trait IsHidden {
     fn is_hidden(&self) -> bool;
 }
 
-impl MatchesFilters for PathBuf {
-    fn matches_filters(&self, filters: &Filters) -> bool {
-        if *filters == Filters::default() {
-            // empty filters
-            return false;
-        }
-        let extension = self.extension().unwrap_or_default().to_str().unwrap_or_default();
-        let temporary_file_extensions = ["crdownload", "part", "tmp", "download"];
-        if !extension.is_empty() && temporary_file_extensions.contains(&extension) {
-            return false;
-        }
-
-        let as_str = self.to_str().unwrap();
-        if !filters.regex.to_string().is_empty() && !filters.regex.is_match(&as_str) {
-            return false;
-        }
-
-        let Filename {
-            startswith,
-            endswith,
-            contains,
-            case_sensitive,
-        } = &filters.filename;
-
-        let mut filename = self.file_name().unwrap().to_str().unwrap().to_string();
-        if !case_sensitive {
-            filename = filename.to_lowercase();
-        }
-        if !startswith.is_empty() && !filename.starts_with(startswith) {
-            return false;
-        }
-        if !endswith.is_empty() && !filename.ends_with(endswith) {
-            return false;
-        }
-        if !contains.is_empty() && !filename.contains(contains) {
-            return false;
-        }
-        if let Some(script) = &filters.script {
-            if !script.run_as_filter(&self).unwrap_or_else(|_| false) {
-                return false;
-            }
-        }
-        if !filters.extensions.is_empty() && !filters.extensions.contains(&extension.to_string()) {
-            return false;
-        }
-        true
-    }
-
+impl IsHidden for PathBuf {
     #[cfg(any(target_os = "linux", target_os = "macos"))]
     fn is_hidden(&self) -> bool {
         self.file_name().unwrap().to_str().unwrap().starts_with('.')

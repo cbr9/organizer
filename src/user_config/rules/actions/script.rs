@@ -1,8 +1,11 @@
-use crate::{string::Placeholder, user_config::UserConfig};
+use crate::{
+    string::Placeholder,
+    user_config::{rules::filters::AsFilter, UserConfig},
+};
 use serde::{Deserialize, Serialize};
 use std::{
     fs,
-    io::{Error, ErrorKind, Result},
+    io::Result,
     path::{Path, PathBuf},
     process::{Command, Output, Stdio},
     str::FromStr,
@@ -12,6 +15,19 @@ use std::{
 pub struct Script {
     exec: String,
     content: String,
+}
+
+impl AsFilter for Script {
+    fn matches(&self, path: &Path) -> bool {
+        let output = self.run_as_action(path).unwrap().stdout;
+        let output = String::from_utf8_lossy(&output);
+        let parsed = bool::from_str(&output.trim().to_lowercase());
+        println!("{:?}", parsed);
+        match parsed {
+            Ok(boolean) => boolean,
+            Err(_) => false,
+        }
+    }
 }
 
 impl Script {
@@ -39,44 +55,32 @@ impl Script {
         fs::remove_file(script)?;
         Ok(output)
     }
-
-    pub fn run_as_filter(&self, path: &Path) -> Result<bool> {
-        let output = self.run_as_action(path)?.stdout;
-        let output = String::from_utf8_lossy(&output);
-        let parsed = bool::from_str(&output.trim().to_lowercase());
-        println!("{:?}", parsed);
-        match parsed {
-            Ok(boolean) => Ok(boolean),
-            Err(_) => Ok(false),
-        }
-    }
 }
-
-#[cfg(test)]
-mod tests {
-    use crate::{
-        path::MatchesFilters,
-        user_config::rules::{actions::script::Script, filters::Filters},
-    };
-    use std::{
-        io::{Error, ErrorKind, Result},
-        path::PathBuf,
-    };
-
-    #[test]
-    fn check_filter_python() -> Result<()> {
-        let substr = "Downloads";
-        let mut filters = Filters::default();
-        let script = Script {
-            exec: "python".into(),
-            content: format!("'{}' in str('{{path}}')", substr),
-        };
-        filters.script = Some(script);
-        let path = PathBuf::from("$HOME/Downloads/test.pdf");
-        if path.matches_filters(&filters) {
-            Ok(())
-        } else {
-            Err(Error::from(ErrorKind::Other))
-        }
-    }
-}
+// #[cfg(test)]
+// mod tests {
+//     use crate::{
+//         path::IsHidden,
+//         user_config::rules::{actions::script::Script, filters::Filters},
+//     };
+//     use std::{
+//         io::{Error, ErrorKind, Result},
+//         path::PathBuf,
+//     };
+//
+//     #[test]
+//     fn check_filter_python() -> Result<()> {
+//         let substr = "Downloads";
+//         let mut filters = Filters::default();
+//         let script = Script {
+//             exec: "python".into(),
+//             content: format!("'{}' in str('{{path}}')", substr),
+//         };
+//         filters.script = Some(script);
+//         let path = PathBuf::from("$HOME/Downloads/test.pdf");
+//         if path.matches_filters(&filters) {
+//             Ok(())
+//         } else {
+//             Err(Error::from(ErrorKind::Other))
+//         }
+//     }
+// }

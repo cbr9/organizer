@@ -3,7 +3,7 @@ use std::{fs, io::Result, path::Path};
 
 use dialoguer::{theme::ColorfulTheme, Select};
 
-use crate::{path::MatchesFilters, user_config::rules::actions::ConflictOption};
+use crate::{path::IsHidden, user_config::rules::actions::ConflictOption};
 
 pub fn run() -> Result<()> {
     let path2rules = CONFIG.to_map();
@@ -20,7 +20,7 @@ pub fn run() -> Result<()> {
                         continue 'rules;
                     }
                     let filters = &rule.filters;
-                    if path.matches_filters(filters) {
+                    if filters.r#match(&path) {
                         rule.actions.run(path);
                         continue 'files;
                     }
