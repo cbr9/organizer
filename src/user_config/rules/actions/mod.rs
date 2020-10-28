@@ -103,9 +103,10 @@ impl IOAction {
         }
 
         if to.exists() {
-            let result = to.update(&action.if_exists, &action.sep);
-            if let Err(e) = result {
-                return Err(e);
+            match to.update(&action.if_exists, &action.sep) {
+                // FIXME: avoid the into_owned() call
+                Ok(new_path) => to = new_path.into_owned(),
+                Err(e) => return Err(e),
             }
         }
         Ok(to)
@@ -124,7 +125,7 @@ pub enum Action {
     Script(Script),
 }
 
-impl AsAction for Action {
+impl Action {
     fn act<'a>(&self, path: Cow<'a, Path>) -> Result<Cow<'a, Path>> {
         match self {
             Action::Copy(copy) => copy.act(path),
@@ -134,18 +135,6 @@ impl AsAction for Action {
             Action::Rename(rename) => rename.act(path),
             Action::Trash(trash) => trash.act(path),
             Action::Script(script) => script.act(path),
-        }
-    }
-
-    fn kind(&self) -> ActionType {
-        match self {
-            Action::Move(r#move) => r#move.kind(),
-            Action::Copy(copy) => copy.kind(),
-            Action::Rename(rename) => rename.kind(),
-            Action::Delete(delete) => delete.kind(),
-            Action::Echo(echo) => echo.kind(),
-            Action::Trash(trash) => trash.kind(),
-            Action::Script(script) => script.kind(),
         }
     }
 }

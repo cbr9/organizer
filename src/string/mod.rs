@@ -28,6 +28,7 @@ impl Capitalize<String> for String {
 
 impl Placeholder for &str {
     fn expand_placeholders(&self, path: &Path) -> Result<Cow<'_, str>> {
+        // TODO: check invalid placeholders like {stem.extension} or {extension.path}
         let regex = Regex::new(r"\{\w+(?:\.\w+)*}").unwrap();
         if regex.is_match(self) {
             let mut new = self.to_string();
@@ -39,7 +40,9 @@ impl Placeholder for &str {
                 let mut current_value = path.to_path_buf();
                 for placeholder in placeholders.into_iter() {
                     current_value = match placeholder {
-                        "path" => current_value,
+                        "path" => current_value.canonicalize().ok().ok_or_else(|| {
+                            Self::placeholder_error(placeholder, &current_value, span.as_str())
+                        })?,
                         "parent" => current_value
                             .parent()
                             .ok_or_else(|| {
@@ -85,7 +88,7 @@ impl Placeholder for &str {
 
     fn placeholder_error(placeholder: &str, current_value: &Path, span: &str) -> Error {
         let message = format!(
-            "tried retrieving {} from {}, which does not exist (full placeholder: {})",
+            "tried to retrieve the {} from {}, but it does not contain it (placeholder: {})",
             placeholder,
             current_value.display(),
             span
