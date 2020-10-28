@@ -1,8 +1,8 @@
-use crate::user_config::rules::actions::AsAction;
 use crate::user_config::rules::{
-    actions::{ActionType, IOAction},
+    actions::{ActionType, AsAction, IOAction},
     deserialize::string_or_struct,
 };
+use log::info;
 use serde::{Deserialize, Serialize};
 use std::{borrow::Cow, io::Result, ops::Deref, path::Path};
 
@@ -18,7 +18,19 @@ impl Deref for Move {
 }
 
 impl AsAction for Move {
-    fn act(&self, path: &mut Cow<Path>) -> Result<()> {
-        IOAction::helper(path, self.deref(), ActionType::Move)
+    fn act<'a>(&self, path: Cow<'a, Path>) -> Result<Cow<'a, Path>> {
+        let to = IOAction::helper(&path, self, ActionType::Move)?;
+        std::fs::rename(&path, &to)?;
+        info!(
+            "({}) {} -> {}",
+            self.kind().to_string(),
+            path.display(),
+            to.display()
+        );
+        Ok(Cow::Owned(to))
+    }
+
+    fn kind(&self) -> ActionType {
+        ActionType::Move
     }
 }

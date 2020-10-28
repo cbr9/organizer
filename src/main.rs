@@ -1,19 +1,21 @@
-use crate::subcommands::logs::LogMessage;
-use crate::user_config::rules::actions::ActionType;
 use crate::{
     lock_file::LockFile,
     subcommands::{config::config, logs::logs, run::run, stop::stop, watch::watch},
     user_config::UserConfig,
 };
 use clap::{
-    crate_authors, crate_description, crate_name, crate_version, load_yaml, App, ArgMatches,
+    crate_authors,
+    crate_description,
+    crate_name,
+    crate_version,
+    load_yaml,
+    App,
+    ArgMatches,
 };
 use colored::Colorize;
 use fern::colors::{Color, ColoredLevelConfig};
 use lazy_static::lazy_static;
-use log::info;
-use std::env;
-use std::{io::Error, path::PathBuf};
+use std::{env, io::Error, path::PathBuf};
 
 pub mod lock_file;
 pub mod path;

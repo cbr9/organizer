@@ -1,27 +1,5 @@
-use crate::{user_config::rules::actions::ActionType, ARGS, LOG_FILE};
-use colored::Colorize;
-use std::ops::Deref;
-use std::{fs, io::Result};
-
-pub struct LogMessage<'a> {
-    pub(crate) action: &'a ActionType,
-    pub(crate) message: String,
-}
-
-impl<'a> LogMessage<'a> {
-    pub fn new<T: Into<String>>(action: &'a ActionType, message: T) -> Self {
-        Self {
-            action,
-            message: message.into(),
-        }
-    }
-}
-
-impl<'a> ToString for LogMessage<'a> {
-    fn to_string(&self) -> String {
-        format!("({}) {}", self.action.to_string().bold(), self.message)
-    }
-}
+use crate::{ARGS, LOG_FILE};
+use std::{fs, io::Result, ops::Deref};
 
 pub fn logs() -> Result<()> {
     if ARGS.is_present("clear") {

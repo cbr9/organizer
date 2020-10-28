@@ -9,16 +9,20 @@ pub mod trash;
 use crate::{
     path::{Expandable, Update},
     string::Placeholder,
-    subcommands::logs::LogMessage,
     user_config::rules::{
         actions::{
-            copy::Copy, delete::Delete, echo::Echo, r#move::Move, rename::Rename, script::Script,
+            copy::Copy,
+            delete::Delete,
+            echo::Echo,
+            r#move::Move,
+            rename::Rename,
+            script::Script,
             trash::Trash,
         },
         deserialize::deserialize_path,
     },
 };
-use log::info;
+use log::error;
 use serde::{Deserialize, Serialize};
 use std::{
     borrow::Cow,
@@ -76,50 +80,35 @@ impl FromStr for IOAction {
 }
 
 impl IOAction {
-    pub(super) fn helper(path: &mut Cow<Path>, action: &IOAction, kind: ActionType) -> Result<()> {
+    pub(super) fn helper(path: &Path, action: &IOAction, kind: ActionType) -> Result<PathBuf> {
         // TODO: refactor this mess
         #[cfg(debug_assertions)]
-        debug_assert!(
-            kind == ActionType::Move || kind == ActionType::Rename || kind == ActionType::Copy
-        );
+        debug_assert!([ActionType::Move, ActionType::Rename, ActionType::Copy].contains(&kind));
 
-        let to = PathBuf::from(
-            &action
-                .to
-                .to_str()
-                .unwrap()
-                .expand_placeholders(path)
-                .unwrap(),
-        );
-        let mut to = Cow::from(to);
+        let mut to: PathBuf = action
+            .to
+            .to_str()
+            .unwrap()
+            .expand_placeholders(path)?
+            .deref()
+            .into();
         if kind == ActionType::Copy || kind == ActionType::Move {
             if !to.exists() {
                 fs::create_dir_all(&to)?;
             }
-            to.to_mut().push(
+            to.push(
                 path.file_name()
                     .ok_or_else(|| Error::new(ErrorKind::Other, "path has no filename"))?,
             );
         }
 
-        if to.exists() && to.update(&action.if_exists, &action.sep).is_err() {
-            return Ok(());
+        if to.exists() {
+            let result = to.update(&action.if_exists, &action.sep);
+            if let Err(e) = result {
+                return Err(e);
+            }
         }
-
-        if kind == ActionType::Copy {
-            std::fs::copy(&path, &to)?;
-        } else if kind == ActionType::Rename || kind == ActionType::Move {
-            std::fs::rename(&path, &to)?;
-        }
-
-        let message = format!("{} -> {}", &path.display(), &to.display());
-        let log_message = LogMessage::new(&kind, message);
-        info!("{}", log_message.to_string());
-
-        if kind == ActionType::Rename || kind == ActionType::Move {
-            *path = to;
-        }
-        Ok(())
+        Ok(to)
     }
 }
 
@@ -136,7 +125,7 @@ pub enum Action {
 }
 
 impl AsAction for Action {
-    fn act(&self, path: &mut Cow<Path>) -> Result<()> {
+    fn act<'a>(&self, path: Cow<'a, Path>) -> Result<Cow<'a, Path>> {
         match self {
             Action::Copy(copy) => copy.act(path),
             Action::Delete(delete) => delete.act(path),
@@ -147,10 +136,23 @@ impl AsAction for Action {
             Action::Script(script) => script.act(path),
         }
     }
+
+    fn kind(&self) -> ActionType {
+        match self {
+            Action::Move(r#move) => r#move.kind(),
+            Action::Copy(copy) => copy.kind(),
+            Action::Rename(rename) => rename.kind(),
+            Action::Delete(delete) => delete.kind(),
+            Action::Echo(echo) => echo.kind(),
+            Action::Trash(trash) => trash.kind(),
+            Action::Script(script) => script.kind(),
+        }
+    }
 }
 
 pub trait AsAction {
-    fn act(&self, path: &mut Cow<Path>) -> Result<()>;
+    fn act<'a>(&self, path: Cow<'a, Path>) -> Result<Cow<'a, Path>>;
+    fn kind(&self) -> ActionType;
 }
 
 #[derive(Eq, PartialEq)]
@@ -194,7 +196,13 @@ impl Actions {
     pub fn run(&self, path: PathBuf) {
         let mut path = Cow::from(path);
         for action in self.iter() {
-            action.act(&mut path).ok();
+            path = match action.act(path) {
+                Ok(new_path) => new_path,
+                Err(e) => {
+                    error!("{}", e);
+                    break;
+                }
+            }
         }
     }
 }
@@ -235,12 +243,12 @@ mod tests {
 
     #[test]
     fn rename_with_rename_conflict() -> Result<()> {
-        let mut target = Cow::from(test_file_or_dir("test2.txt"));
-        let expected = expected_path(&target, &Default::default());
-        target
+        let original = Cow::from(test_file_or_dir("test2.txt"));
+        let expected = expected_path(&original, &Default::default());
+        let new_path = original
             .update(&ConflictOption::Rename, &Default::default())
             .unwrap();
-        if target == expected {
+        if new_path == expected {
             Ok(())
         } else {
             Err(Error::new(
@@ -252,12 +260,12 @@ mod tests {
 
     #[test]
     fn rename_with_overwrite_conflict() -> Result<()> {
-        let mut target = Cow::from(test_file_or_dir("test2.txt"));
-        let expected = target.clone();
-        target
+        let original = Cow::from(test_file_or_dir("test2.txt"));
+        let expected = original.clone();
+        let new_path = original
             .update(&ConflictOption::Overwrite, &Default::default())
             .unwrap();
-        if target == expected {
+        if new_path == expected {
             Ok(())
         } else {
             Err(Error::new(
@@ -270,7 +278,7 @@ mod tests {
     #[test]
     #[should_panic] // unwrapping a None value
     fn rename_with_skip_conflict() {
-        let mut target = Cow::from(test_file_or_dir("test2.txt"));
+        let target = Cow::from(test_file_or_dir("test2.txt"));
         target
             .update(&ConflictOption::Skip, &Default::default())
             .unwrap();
@@ -279,7 +287,7 @@ mod tests {
     #[test]
     #[should_panic] // trying to modify a path that does not exist
     fn new_path_to_non_existing_file() {
-        let mut target = Cow::from(test_file_or_dir("test_dir2").join("test1.txt"));
+        let target = Cow::from(test_file_or_dir("test_dir2").join("test1.txt"));
         #[cfg(debug_assertions)]
         debug_assert!(!target.exists());
         target

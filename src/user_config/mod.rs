@@ -50,11 +50,13 @@ impl UserConfig {
     }
 
     pub fn create(path: &Path) {
-        let mut path = Cow::from(path);
-        if path.exists() {
+        let path = if path.exists() {
             path.update(&ConflictOption::Rename, &Default::default())
-                .unwrap(); // safe unwrap (can only return an error if if_exists == Skip)
-        }
+                .unwrap() // safe unwrap (can only return an error if if_exists == Skip)
+        } else {
+            Cow::Borrowed(path)
+        };
+
         match path.parent() {
             Some(parent) => {
                 if !parent.exists() {

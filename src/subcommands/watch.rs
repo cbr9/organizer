@@ -6,13 +6,20 @@ use std::{
 
 use colored::Colorize;
 use notify::{
-    op, raw_watcher, RawEvent, RecommendedWatcher, RecursiveMode, Watcher as OtherWatcher,
+    op,
+    raw_watcher,
+    RawEvent,
+    RecommendedWatcher,
+    RecursiveMode,
+    Watcher as OtherWatcher,
 };
 
 use crate::{
     subcommands::run::run,
     user_config::{rules::folder::Options, UserConfig},
-    CONFIG, LOCK_FILE, MATCHES,
+    CONFIG,
+    LOCK_FILE,
+    MATCHES,
 };
 use std::collections::HashSet;
 use sysinfo::{ProcessExt, RefreshKind, Signal, System, SystemExt};

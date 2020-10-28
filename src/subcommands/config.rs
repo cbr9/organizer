@@ -1,6 +1,7 @@
 use crate::{
     user_config::{rules::folder::Options, UserConfig},
-    ARGS, CONFIG,
+    ARGS,
+    CONFIG,
 };
 use clap::crate_name;
 use colored::Colorize;

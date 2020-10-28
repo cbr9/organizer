@@ -1,7 +1,7 @@
-use crate::user_config::rules::actions::AsAction;
+use crate::user_config::rules::actions::{ActionType, AsAction};
+use log::info;
 use serde::{Deserialize, Serialize};
-use std::borrow::Cow;
-use std::{fs, io::Result, ops::Deref, path::Path};
+use std::{borrow::Cow, fs, io::Result, ops::Deref, path::Path};
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
 pub struct Delete(bool);
@@ -15,10 +15,15 @@ impl Deref for Delete {
 }
 
 impl AsAction for Delete {
-    fn act(&self, path: &mut Cow<Path>) -> Result<()> {
+    fn act<'a>(&self, path: Cow<'a, Path>) -> Result<Cow<'a, Path>> {
         if self.0 {
-            return fs::remove_file(path);
+            fs::remove_file(&path)?;
+            info!("({}) {}", self.kind().to_string(), path.display());
         }
-        Ok(())
+        Ok(path)
+    }
+
+    fn kind(&self) -> ActionType {
+        ActionType::Delete
     }
 }

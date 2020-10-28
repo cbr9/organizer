@@ -34,10 +34,10 @@ impl IsHidden for PathBuf {
 }
 
 pub trait Update {
-    fn update(&mut self, if_exists: &ConflictOption, sep: &Sep) -> Result<()>;
+    fn update(&self, if_exists: &ConflictOption, sep: &Sep) -> Result<Cow<Path>>;
 }
 
-impl Update for Cow<'_, Path> {
+impl Update for Path {
     ///  When trying to rename a file to a path that already exists, calling update() on the
     ///  target path will return a new valid path.
     ///  # Args
@@ -46,21 +46,22 @@ impl Update for Cow<'_, Path> {
     /// * `is_watching`: whether this function is being run from a watcher or not
     /// # Return
     /// This function will return `Some(new_path)` if `if_exists` is not set to skip, otherwise it returns `None`
-    fn update(&mut self, if_exists: &ConflictOption, sep: &Sep) -> Result<()> {
+    fn update(&self, if_exists: &ConflictOption, sep: &Sep) -> Result<Cow<Path>> {
         debug_assert!(self.exists());
 
         match if_exists {
             ConflictOption::Skip => Err(Error::from(ErrorKind::AlreadyExists)),
-            ConflictOption::Overwrite => Ok(()),
+            ConflictOption::Overwrite => Ok(Cow::Borrowed(self)),
             ConflictOption::Rename => {
                 let (stem, extension) = get_stem_and_extension(&self);
+                let mut new = self.to_path_buf();
                 let mut n = 1;
-                while self.exists() {
+                while new.exists() {
                     let new_filename = format!("{}{}({:?}).{}", stem, sep.as_str(), n, extension);
-                    self.to_mut().set_file_name(new_filename);
+                    new.set_file_name(new_filename);
                     n += 1;
                 }
-                Ok(())
+                Ok(Cow::Owned(new))
             }
             ConflictOption::Ask => {
                 debug_assert_ne!(ConflictOption::default(), ConflictOption::Ask);
@@ -111,14 +112,9 @@ impl Expandable for PathBuf {
 /// * `path`: A reference to a std::path::PathBuf
 /// # Return
 /// Returns the stem and extension of `path` if they exist and can be parsed, otherwise returns an Error
-fn get_stem_and_extension(path: &Path) -> (String, String) {
-    let stem = path.file_stem().unwrap().to_str().unwrap().to_string();
-    let extension = path
-        .extension()
-        .unwrap_or_default()
-        .to_str()
-        .unwrap()
-        .to_string();
+fn get_stem_and_extension(path: &Path) -> (&str, &str) {
+    let stem = path.file_stem().unwrap().to_str().unwrap();
+    let extension = path.extension().unwrap_or_default().to_str().unwrap();
 
     (stem, extension)
 }
