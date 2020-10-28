@@ -8,6 +8,7 @@ use crate::{
         UserConfig,
     },
 };
+use colored::Colorize;
 use log::info;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -30,7 +31,7 @@ impl AsAction for Script {
     fn act<'a>(&self, path: Cow<'a, Path>) -> Result<Cow<'a, Path>> {
         match self.helper(&path) {
             Ok(_) => {
-                info!("({}) run script on {}", self.exec, path.display());
+                info!("({}) run script on {}", self.exec.bold(), path.display());
                 Ok(path)
             }
             Err(e) => Err(e),

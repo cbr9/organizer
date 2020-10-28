@@ -2,6 +2,7 @@ use crate::{
     string::Placeholder,
     user_config::rules::actions::{ActionType, AsAction},
 };
+use colored::Colorize;
 use log::info;
 use serde::{Deserialize, Serialize};
 use std::{borrow::Cow, io::Result, ops::Deref, path::Path};
@@ -21,7 +22,7 @@ impl AsAction for Echo {
     fn act<'a>(&self, path: Cow<'a, Path>) -> Result<Cow<'a, Path>> {
         info!(
             "({}) {}",
-            self.kind().to_string(),
+            self.kind().to_string().bold(),
             self.as_str().expand_placeholders(&path)?
         );
         Ok(path)

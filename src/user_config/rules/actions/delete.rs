@@ -1,4 +1,5 @@
 use crate::user_config::rules::actions::{ActionType, AsAction};
+use colored::Colorize;
 use log::info;
 use serde::{Deserialize, Serialize};
 use std::{borrow::Cow, fs, io::Result, ops::Deref, path::Path};
@@ -18,7 +19,7 @@ impl AsAction for Delete {
     fn act<'a>(&self, path: Cow<'a, Path>) -> Result<Cow<'a, Path>> {
         if self.0 {
             fs::remove_file(&path)?;
-            info!("({}) {}", self.kind().to_string(), path.display());
+            info!("({}) {}", self.kind().to_string().bold(), path.display());
         }
         Ok(path)
     }

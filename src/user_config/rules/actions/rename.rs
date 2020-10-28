@@ -2,6 +2,7 @@ use crate::user_config::rules::{
     actions::{ActionType, AsAction, IOAction},
     deserialize::string_or_struct,
 };
+use colored::Colorize;
 use log::info;
 use serde::{Deserialize, Serialize};
 use std::{borrow::Cow, fs, io::Result, ops::Deref, path::Path};
@@ -23,7 +24,7 @@ impl AsAction for Rename {
         fs::rename(&path, &to)?;
         info!(
             "({}) {} -> {}",
-            self.kind().to_string(),
+            self.kind().to_string().bold(),
             path.display(),
             to.display()
         );

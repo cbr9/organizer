@@ -1,4 +1,5 @@
 use crate::user_config::rules::actions::{ActionType, AsAction};
+use colored::Colorize;
 use log::info;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -24,7 +25,7 @@ impl AsAction for Trash {
         if self.0 {
             return match trash::delete(&path) {
                 Ok(_) => {
-                    info!("({}) {}", self.kind().to_string(), path.display());
+                    info!("({}) {}", self.kind().to_string().bold(), path.display());
                     Ok(path)
                 }
                 Err(e) => Err(Error::new(ErrorKind::Other, e.to_string())),
