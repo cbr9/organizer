@@ -11,7 +11,7 @@ pub mod vars {
         user_config::rules::actions::Sep,
     };
     use dirs::home_dir;
-    use std::{ops::Deref, path::Path};
+    use std::{borrow::Borrow, ops::Deref, path::Path};
 
     pub fn project_dir() -> PathBuf {
         // 'cargo test' must be run from the project directory, where Cargo.toml is
@@ -28,9 +28,9 @@ pub mod vars {
         tests_dir().join("files").join(filename)
     }
 
-    pub fn expected_path(file: &Path, sep: &Sep) -> PathBuf {
+    pub fn expected_path(file: &impl Borrow<Path>, sep: &Sep) -> PathBuf {
         let (stem, extension) = get_stem_and_extension(file);
-        let parent = file.parent().unwrap();
+        let parent = file.borrow().parent().unwrap();
         parent.join(format!("{}{}(1).{}", stem, sep.deref(), extension))
     }
 

@@ -10,7 +10,8 @@ use crate::{
     MATCHES,
 };
 use std::{
-    borrow::Cow,
+    borrow::{Borrow, Cow},
+    env::VarError,
     io::{Error, ErrorKind},
 };
 
@@ -78,33 +79,49 @@ impl Update for Path {
 }
 
 pub trait Expandable {
-    fn expand_user(&self) -> PathBuf;
-    fn expand_vars(&self) -> PathBuf;
+    fn expand_user(&self) -> Cow<Path>;
+    fn expand_vars(&self) -> Cow<Path>;
 }
 
 impl Expandable for PathBuf {
-    fn expand_user(&self) -> Self {
-        let str = self.to_str().unwrap().to_string();
-        Self::from(str.replace("~", "$HOME"))
+    #[cfg(any(target_os = "linux", target_os = "macos"))]
+    fn expand_user(&self) -> Cow<Path> {
+        let str = self.to_str().unwrap();
+        if str.contains('~') {
+            match env::var("HOME") {
+                Ok(home) => {
+                    let new = str.replace("~", &home);
+                    Cow::Owned(new.into())
+                }
+                Err(_) => panic!("cannot determine home directory"),
+            }
+        } else {
+            Cow::Borrowed(self)
+        }
     }
 
-    fn expand_vars(&self) -> Self {
-        self.components()
-            .map(|component| {
-                let component: &Path = component.as_ref();
-                let component = component.to_str().unwrap();
-                if component.starts_with('$') {
-                    env::var(component.replace('$', "")).unwrap_or_else(|_| {
-                        panic!(
-                            "error: environment variable '{}' could not be found",
-                            component
-                        )
-                    })
-                } else {
-                    component.to_string()
-                }
-            })
-            .collect()
+    fn expand_vars(&self) -> Cow<Path> {
+        if self.to_str().unwrap().contains('$') {
+            self.components()
+                .map(|component| {
+                    let component: &Path = component.as_ref();
+                    let component = component.to_str().unwrap();
+                    if component.starts_with('$') {
+                        env::var(component.replace('$', "")).unwrap_or_else(|_| {
+                            panic!(
+                                "error: environment variable '{}' could not be found",
+                                component
+                            )
+                        })
+                    } else {
+                        component.to_string()
+                    }
+                })
+                .collect::<PathBuf>()
+                .into()
+        } else {
+            Cow::Borrowed(self)
+        }
     }
 }
 
@@ -112,9 +129,14 @@ impl Expandable for PathBuf {
 /// * `path`: A reference to a std::path::PathBuf
 /// # Return
 /// Returns the stem and extension of `path` if they exist and can be parsed, otherwise returns an Error
-fn get_stem_and_extension(path: &Path) -> (&str, &str) {
-    let stem = path.file_stem().unwrap().to_str().unwrap();
-    let extension = path.extension().unwrap_or_default().to_str().unwrap();
+fn get_stem_and_extension(path: &impl Borrow<Path>) -> (&str, &str) {
+    let stem = path.borrow().file_stem().unwrap().to_str().unwrap();
+    let extension = path
+        .borrow()
+        .extension()
+        .unwrap_or_default()
+        .to_str()
+        .unwrap();
 
     (stem, extension)
 }
