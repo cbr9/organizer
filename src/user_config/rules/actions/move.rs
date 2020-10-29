@@ -26,7 +26,7 @@ impl AsAction for Move {
             "({}) {} -> {}",
             self.kind().to_string().bold(),
             path.display(),
-            to.display()
+            to.canonicalize().unwrap().display()
         );
         Ok(Cow::Owned(to))
     }

@@ -31,7 +31,7 @@ lazy_static! {
         .name(crate_name!())
         .get_matches();
     pub static ref ARGS: &'static ArgMatches = MATCHES.subcommand().unwrap().1;
-    pub static ref CONFIG: UserConfig = UserConfig::new();
+    pub static ref CONFIG: UserConfig = UserConfig::default();
     pub static ref LOCK_FILE: LockFile = LockFile::new();
     pub static ref LOG_FILE: PathBuf = UserConfig::dir().join("output.log");
 }

@@ -4,11 +4,12 @@ use crate::{
     ARGS,
 };
 use clap::crate_name;
-use dirs::config_dir;
+use dirs::{config_dir, home_dir};
 use serde::Deserialize;
 use std::{
     borrow::Cow,
     collections::HashMap,
+    env,
     fs,
     path::{Path, PathBuf},
 };
@@ -19,11 +20,18 @@ pub mod rules;
 /// ### Fields
 /// * `path`: the path the user's config, either the default one or some other passed with the --with-config argument
 /// * `rules`: a list of parsed rules defined by the user
-#[derive(Deserialize, Clone, Debug, Default)]
+#[derive(Deserialize, Clone, Debug)]
 pub struct UserConfig {
     pub rules: Vec<Rule>,
     #[serde(skip)]
     pub path: PathBuf,
+}
+
+impl Default for UserConfig {
+    fn default() -> Self {
+        let path = UserConfig::path();
+        Self::new(path)
+    }
 }
 
 impl UserConfig {
@@ -35,8 +43,16 @@ impl UserConfig {
     /// ### Errors
     /// This constructor fails in the following cases:
     /// - The configuration file does not exist
-    pub fn new() -> Self {
-        let path = UserConfig::path();
+    fn new(path: PathBuf) -> Self {
+        if path == UserConfig::default_path() {
+            let home = home_dir();
+            match home_dir() {
+                None => panic!("error: cannot determine home directory"),
+                Some(_) => env::set_current_dir(&home.unwrap()).unwrap(),
+            };
+        } else {
+            env::set_current_dir(&path.parent().unwrap()).unwrap();
+        };
 
         if !path.exists() {
             Self::create(&path);

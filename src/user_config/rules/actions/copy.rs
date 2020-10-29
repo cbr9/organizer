@@ -26,7 +26,7 @@ impl AsAction for Copy {
             "({}) {} -> {}",
             self.kind().to_string().bold(),
             path.display(),
-            to.display()
+            to.canonicalize().unwrap().display()
         );
         Ok(path)
     }
