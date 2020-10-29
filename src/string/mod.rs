@@ -5,8 +5,6 @@ use std::{
     path::Path,
 };
 
-mod lib;
-
 pub trait Capitalize<T> {
     fn capitalize(&self) -> T;
 }
@@ -94,5 +92,91 @@ impl Placeholder for &str {
             span
         );
         Error::new(ErrorKind::Other, message)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        path::Expandable,
+        string::{Capitalize, Placeholder},
+    };
+    use std::{
+        borrow::Cow,
+        io::{Error, ErrorKind, Result},
+        path::{Path, PathBuf},
+    };
+
+    #[test]
+    fn capitalize_word() -> Result<()> {
+        let tested = String::from("house");
+        let expected = String::from("House");
+        if tested.capitalize() == expected {
+            Ok(())
+        } else {
+            Err(Error::from(ErrorKind::Other))
+        }
+    }
+    #[test]
+    fn capitalize_single_char() -> Result<()> {
+        let tested = String::from("h");
+        let expected = String::from("H");
+        if tested.capitalize() == expected {
+            Ok(())
+        } else {
+            Err(Error::from(ErrorKind::Other))
+        }
+    }
+    #[test]
+    fn single_placeholder() -> Result<()> {
+        let tested = "/home/cabero/Downloads/{parent.name}";
+        let new_path = tested
+            .expand_placeholders(&Path::new("/home/cabero/Documents/test.pdf"))
+            .unwrap();
+        let expected = String::from("/home/cabero/Downloads/Documents");
+        if new_path == expected {
+            Ok(())
+        } else {
+            Err(Error::from(ErrorKind::Other))
+        }
+    }
+    #[test]
+    fn multiple_placeholders() -> Result<()> {
+        let tested = "/home/cabero/{extension}/{parent.name}";
+        let new_path = tested
+            .expand_placeholders(&Path::new("/home/cabero/Documents/test.pdf"))
+            .unwrap();
+        let expected = String::from("/home/cabero/pdf/Documents");
+        if new_path == expected {
+            Ok(())
+        } else {
+            Err(Error::from(ErrorKind::Other))
+        }
+    }
+
+    #[test]
+    fn multiple_placeholders_sentence() -> Result<()> {
+        let tested = "To run this program, you have to change directory into $HOME/{extension}/{parent.name}";
+        let path = PathBuf::from("$HOME/Documents/test.pdf").expand_vars();
+        let new_path = tested.expand_placeholders(&path).unwrap();
+        let expected = String::from(
+            "To run this program, you have to change directory into $HOME/pdf/Documents",
+        );
+        if new_path == expected {
+            Ok(())
+        } else {
+            Err(Error::from(ErrorKind::Other))
+        }
+    }
+
+    #[test]
+    fn no_placeholder() -> Result<()> {
+        let tested = "/home/cabero/Documents/test.pdf";
+        let dummy_path = PathBuf::from(tested);
+        let new = tested.expand_placeholders(&dummy_path)?;
+        match new {
+            Cow::Borrowed(_) => Ok(()),
+            Cow::Owned(_) => Err(Error::from(ErrorKind::Other)),
+        }
     }
 }

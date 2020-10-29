@@ -219,14 +219,17 @@ impl Default for ConflictOption {
 
 #[cfg(test)]
 mod tests {
-    use std::io::{Error, ErrorKind, Result};
+    use std::{
+        fs,
+        io::{Error, ErrorKind, Result},
+    };
 
     use crate::{
         path::{
             lib::vars::{expected_path, test_file_or_dir},
             Update,
         },
-        user_config::rules::actions::ConflictOption,
+        user_config::rules::actions::{ActionType, ConflictOption, IOAction},
     };
     use std::borrow::Cow;
 
@@ -282,5 +285,68 @@ mod tests {
         target
             .update(&ConflictOption::Rename, &Default::default())
             .unwrap();
+    }
+
+    #[test]
+    fn prepare_path_copy() -> Result<()> {
+        let path = test_file_or_dir("test1.txt");
+        let target = test_file_or_dir("test_dir");
+        let expected = test_file_or_dir("test_dir").join("test1 (1).txt");
+        if expected.exists() {
+            fs::remove_file(&expected)?;
+        }
+        let action = IOAction {
+            to: target,
+            if_exists: Default::default(),
+            sep: Default::default(),
+        };
+        let new_path = IOAction::helper(&path, &action, ActionType::Copy)?;
+        if new_path == expected {
+            Ok(())
+        } else {
+            Err(Error::from(ErrorKind::Other))
+        }
+    }
+
+    #[test]
+    fn prepare_path_move() -> Result<()> {
+        let path = test_file_or_dir("test1.txt");
+        let target = test_file_or_dir("test_dir");
+        let expected = test_file_or_dir("test_dir").join("test1 (1).txt");
+        if expected.exists() {
+            fs::remove_file(&expected)?;
+        }
+        let action = IOAction {
+            to: target,
+            if_exists: Default::default(),
+            sep: Default::default(),
+        };
+        let new_path = IOAction::helper(&path, &action, ActionType::Move)?;
+        if new_path == expected {
+            Ok(())
+        } else {
+            Err(Error::from(ErrorKind::Other))
+        }
+    }
+
+    #[test]
+    fn prepare_path_rename() -> Result<()> {
+        let path = test_file_or_dir("test1.txt");
+        let target = test_file_or_dir("test_dir").join("test1.txt");
+        let expected = test_file_or_dir("test_dir").join("test1 (1).txt");
+        if expected.exists() {
+            fs::remove_file(&expected)?;
+        }
+        let action = IOAction {
+            to: target,
+            if_exists: Default::default(),
+            sep: Default::default(),
+        };
+        let new_path = IOAction::helper(&path, &action, ActionType::Rename)?;
+        if new_path == expected {
+            Ok(())
+        } else {
+            Err(Error::from(ErrorKind::Other))
+        }
     }
 }
