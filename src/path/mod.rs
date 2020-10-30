@@ -112,9 +112,14 @@ impl Expandable for PathBuf {
 /// * `path`: A reference to a std::path::PathBuf
 /// # Return
 /// Returns the stem and extension of `path` if they exist and can be parsed, otherwise returns an Error
-fn get_stem_and_extension(path: &Path) -> (&str, &str) {
-    let stem = path.file_stem().unwrap().to_str().unwrap();
-    let extension = path.extension().unwrap_or_default().to_str().unwrap();
+fn get_stem_and_extension(path: &impl AsRef<Path>) -> (&str, &str) {
+    let stem = path.as_ref().file_stem().unwrap().to_str().unwrap();
+    let extension = path
+        .as_ref()
+        .extension()
+        .unwrap_or_default()
+        .to_str()
+        .unwrap();
 
     (stem, extension)
 }
