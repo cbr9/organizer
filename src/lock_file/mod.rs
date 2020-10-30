@@ -24,10 +24,15 @@ impl GetProcessBy<Pid> for LockFile {
     fn get_process_by(&self, val: Pid) -> Option<(Pid, PathBuf)> {
         self.get_running_watchers()
             .iter()
-            .filter(|(running_pid, _)| val == *running_pid)
-            .collect::<Vec<_>>()
-            .first()
-            .map(|(pid, config)| (*pid, config.clone()))
+            .filter_map(|(pid, path)| {
+                let matches = *pid == val;
+                if matches {
+                    Some((*pid, path.clone()))
+                } else {
+                    None
+                }
+            })
+            .next()
     }
 }
 
@@ -35,10 +40,15 @@ impl<'a> GetProcessBy<&'a Path> for LockFile {
     fn get_process_by(&self, val: &'a Path) -> Option<(Pid, PathBuf)> {
         self.get_running_watchers()
             .iter()
-            .filter(|(_, config)| config == val)
-            .collect::<Vec<_>>()
-            .first()
-            .map(|(pid, config)| (*pid, config.clone()))
+            .filter_map(|(pid, path)| {
+                let matches = path == val;
+                if matches {
+                    Some((*pid, path.clone()))
+                } else {
+                    None
+                }
+            })
+            .next()
     }
 }
 
