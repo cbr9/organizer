@@ -3,31 +3,65 @@ use std::{fs, io::Result, path::Path};
 
 use dialoguer::{theme::ColorfulTheme, Select};
 
-use crate::{path::IsHidden, user_config::rules::actions::ConflictOption};
+use crate::{
+    path::IsHidden,
+    user_config::rules::{actions::ConflictOption, folder::Options},
+};
 
 pub fn run() -> Result<()> {
     let path2rules = CONFIG.to_map();
+    let mut files = Vec::new();
+    for (path, _) in path2rules.iter() {
+        files.extend(fs::read_dir(path)?)
+    }
 
-    for (path, rules) in path2rules.iter() {
-        let files = fs::read_dir(&path)?;
-        'files: for file in files {
-            let path = file.unwrap().path();
-            if path.is_file() {
-                'rules: for (rule, index) in rules.iter() {
-                    let folder = rule.folders.get(*index).unwrap();
-                    let options = &folder.options;
-                    if path.is_hidden() && !options.hidden_files {
-                        continue 'rules;
-                    }
-                    let filters = &rule.filters;
-                    if filters.r#match(&path) {
-                        rule.actions.run(path);
-                        continue 'files;
-                    }
+    for file in files {
+        let path = file.unwrap().path();
+        if path.is_file() {
+            let parent = path.parent().unwrap();
+
+            // FIXME: if using recursive = true, this will panic, because the parent won't be a key in path2rules
+            'rules: for (rule, i) in path2rules.get(parent).unwrap() {
+                let folder = rule.folders.get(*i).unwrap();
+                let Options {
+                    ignore,
+                    hidden_files,
+                    ..
+                } = &folder.options;
+                if ignore.contains(&parent.to_path_buf()) {
+                    continue 'rules;
+                }
+                if path.is_hidden() && !*hidden_files {
+                    continue 'rules;
+                }
+                if rule.filters.r#match(&path) {
+                    rule.actions.run(path);
+                    break 'rules;
                 }
             }
         }
     }
+
+    // for (path, rules) in path2rules.iter() {
+    //     let files = fs::read_dir(&path)?;
+    //     'files: for file in files {
+    //         let path = file.unwrap().path();
+    //         if path.is_file() {
+    //             'rules: for (rule, index) in rules.iter() {
+    //                 let folder = rule.folders.get(*index).unwrap();
+    //                 let options = &folder.options;
+    //                 if path.is_hidden() && !options.hidden_files {
+    //                     continue 'rules;
+    //                 }
+    //                 let filters = &rule.filters;
+    //                 if filters.r#match(&path) {
+    //                     rule.actions.run(path);
+    //                     continue 'files;
+    //                 }
+    //             }
+    //         }
+    //     }
+    // }
 
     Ok(())
 }

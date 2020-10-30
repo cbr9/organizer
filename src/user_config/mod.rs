@@ -45,10 +45,9 @@ impl UserConfig {
     /// - The configuration file does not exist
     fn new(path: PathBuf) -> Self {
         if path == UserConfig::default_path() {
-            let home = home_dir();
             match home_dir() {
                 None => panic!("error: cannot determine home directory"),
-                Some(_) => env::set_current_dir(&home.unwrap()).unwrap(),
+                Some(home) => env::set_current_dir(&home).unwrap(),
             };
         } else {
             env::set_current_dir(&path.parent().unwrap()).unwrap();

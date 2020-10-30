@@ -15,7 +15,7 @@ pub struct Folder {
 impl From<PathBuf> for Folder {
     fn from(path: PathBuf) -> Self {
         Self {
-            path: path.expand_user().expand_vars(),
+            path: path.expand_user().expand_vars().canonicalize().unwrap(),
             options: Default::default(),
         }
     }
