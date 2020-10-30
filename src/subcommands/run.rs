@@ -4,9 +4,10 @@ use std::{fs, io::Result, path::Path};
 use dialoguer::{theme::ColorfulTheme, Select};
 
 use crate::{
-    path::IsHidden,
+    subcommands::watch::process_file,
     user_config::rules::{actions::ConflictOption, folder::Options},
 };
+use std::borrow::Borrow;
 
 pub fn run() -> Result<()> {
     let path2rules = CONFIG.to_map();
@@ -17,29 +18,7 @@ pub fn run() -> Result<()> {
 
     for file in files {
         let path = file.unwrap().path();
-        if path.is_file() {
-            let parent = path.parent().unwrap();
-
-            // FIXME: if using recursive = true, this will panic, because the parent won't be a key in path2rules
-            'rules: for (rule, i) in path2rules.get(parent).unwrap() {
-                let folder = rule.folders.get(*i).unwrap();
-                let Options {
-                    ignore,
-                    hidden_files,
-                    ..
-                } = &folder.options;
-                if ignore.contains(&parent.to_path_buf()) {
-                    continue 'rules;
-                }
-                if path.is_hidden() && !*hidden_files {
-                    continue 'rules;
-                }
-                if rule.filters.r#match(&path) {
-                    rule.actions.run(path);
-                    break 'rules;
-                }
-            }
-        }
+        process_file(path, path2rules.borrow(), false);
     }
     Ok(())
 }

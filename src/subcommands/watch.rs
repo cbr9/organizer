@@ -16,14 +16,54 @@ use notify::{
 
 use crate::{
     lock_file::GetProcessBy,
+    path::IsHidden,
     subcommands::run::run,
-    user_config::{rules::folder::Options, UserConfig},
+    user_config::{
+        rules::{folder::Options, rule::Rule},
+        UserConfig,
+    },
     CONFIG,
     LOCK_FILE,
     MATCHES,
 };
-use std::collections::HashSet;
+use std::{
+    collections::{HashMap, HashSet},
+    path::{Path, PathBuf},
+};
 use sysinfo::{ProcessExt, RefreshKind, Signal, System, SystemExt};
+
+pub fn process_file(
+    path: PathBuf,
+    path2rules: &HashMap<&Path, Vec<(&Rule, usize)>>,
+    from_watch: bool,
+) {
+    if path.is_file() {
+        let parent = path.parent().unwrap();
+        // FIXME: if using recursive = true, this will panic, because the parent won't be a key in path2rules
+        'rules: for (rule, i) in path2rules.get(parent).unwrap() {
+            if rule.filters.r#match(&path) {
+                let folder = rule.folders.get(*i).unwrap();
+                let Options {
+                    ignore,
+                    hidden_files,
+                    watch,
+                    ..
+                } = &folder.options;
+                if ignore.contains(&parent.to_path_buf()) {
+                    continue 'rules;
+                }
+                if path.is_hidden() && !*hidden_files {
+                    continue 'rules;
+                }
+                if !from_watch || *watch {
+                    // simplified from `if (from_watch && *watch) || !from_watch`
+                    rule.actions.run(path);
+                    break 'rules;
+                }
+            }
+        }
+    }
+}
 
 pub fn watch() -> Result<()> {
     // REPLACE
@@ -91,21 +131,7 @@ impl Watcher {
             }) = self.receiver.recv()
             {
                 if let op::CREATE = op {
-                    if path.is_file() {
-                        let parent = path.parent().unwrap();
-                        // FIXME: if using recursive = true, this will panic, because the parent won't be a key in path2rules
-                        'rules: for (rule, i) in path2rules.get(parent).unwrap() {
-                            let folder = rule.folders.get(*i).unwrap();
-                            let Options { watch, ignore, .. } = &folder.options;
-                            if ignore.contains(&parent.to_path_buf()) {
-                                continue;
-                            }
-                            if *watch && rule.filters.r#match(&path) {
-                                rule.actions.run(path);
-                                break 'rules;
-                            }
-                        }
-                    }
+                    process_file(path, &path2rules, true);
                 }
             }
         }
