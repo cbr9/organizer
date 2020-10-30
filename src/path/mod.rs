@@ -10,8 +10,7 @@ use crate::{
     MATCHES,
 };
 use std::{
-    borrow::{Borrow, Cow},
-    env::VarError,
+    borrow::Cow,
     io::{Error, ErrorKind},
 };
 
@@ -79,28 +78,28 @@ impl Update for Path {
 }
 
 pub trait Expandable {
-    fn expand_user(&self) -> Cow<Path>;
-    fn expand_vars(&self) -> Cow<Path>;
+    fn expand_user(self) -> PathBuf;
+    fn expand_vars(self) -> PathBuf;
 }
 
 impl Expandable for PathBuf {
     #[cfg(any(target_os = "linux", target_os = "macos"))]
-    fn expand_user(&self) -> Cow<Path> {
+    fn expand_user(self) -> PathBuf {
         let str = self.to_str().unwrap();
         if str.contains('~') {
             match env::var("HOME") {
                 Ok(home) => {
                     let new = str.replace("~", &home);
-                    Cow::Owned(new.into())
+                    new.into()
                 }
-                Err(_) => panic!("cannot determine home directory"),
+                Err(e) => panic!("error: {}", e),
             }
         } else {
-            Cow::Borrowed(self)
+            self
         }
     }
 
-    fn expand_vars(&self) -> Cow<Path> {
+    fn expand_vars(self) -> PathBuf {
         if self.to_str().unwrap().contains('$') {
             self.components()
                 .map(|component| {
@@ -118,9 +117,8 @@ impl Expandable for PathBuf {
                     }
                 })
                 .collect::<PathBuf>()
-                .into()
         } else {
-            Cow::Borrowed(self)
+            self
         }
     }
 }
