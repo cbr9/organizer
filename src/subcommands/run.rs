@@ -41,28 +41,6 @@ pub fn run() -> Result<()> {
             }
         }
     }
-
-    // for (path, rules) in path2rules.iter() {
-    //     let files = fs::read_dir(&path)?;
-    //     'files: for file in files {
-    //         let path = file.unwrap().path();
-    //         if path.is_file() {
-    //             'rules: for (rule, index) in rules.iter() {
-    //                 let folder = rule.folders.get(*index).unwrap();
-    //                 let options = &folder.options;
-    //                 if path.is_hidden() && !options.hidden_files {
-    //                     continue 'rules;
-    //                 }
-    //                 let filters = &rule.filters;
-    //                 if filters.r#match(&path) {
-    //                     rule.actions.run(path);
-    //                     continue 'files;
-    //                 }
-    //             }
-    //         }
-    //     }
-    // }
-
     Ok(())
 }
 

@@ -1,4 +1,4 @@
-use crate::{user_config::UserConfig, LOCK_FILE, MATCHES};
+use crate::{lock_file::GetProcessBy, user_config::UserConfig, LOCK_FILE, MATCHES};
 use clap::crate_name;
 use std::io::Result;
 use sysinfo::{ProcessExt, RefreshKind, Signal, System, SystemExt};
@@ -16,8 +16,8 @@ pub fn stop() -> Result<()> {
             }
         } else {
             let path = UserConfig::path();
-            match LOCK_FILE.get_process_by_path(&path) {
-                Some(pid) => {
+            match LOCK_FILE.get_process_by(path.as_path()) {
+                Some((pid, _)) => {
                     sys.get_process(pid).unwrap().kill(Signal::Kill);
                 }
                 None => {

@@ -16,6 +16,32 @@ pub struct LockFile {
     sep: String,
 }
 
+pub trait GetProcessBy<T> {
+    fn get_process_by(&self, val: T) -> Option<(Pid, PathBuf)>;
+}
+
+impl GetProcessBy<Pid> for LockFile {
+    fn get_process_by(&self, val: Pid) -> Option<(Pid, PathBuf)> {
+        self.get_running_watchers()
+            .iter()
+            .filter(|(running_pid, _)| val == *running_pid)
+            .collect::<Vec<_>>()
+            .first()
+            .map(|(pid, config)| (*pid, config.clone()))
+    }
+}
+
+impl<'a> GetProcessBy<&'a Path> for LockFile {
+    fn get_process_by(&self, val: &'a Path) -> Option<(Pid, PathBuf)> {
+        self.get_running_watchers()
+            .iter()
+            .filter(|(_, config)| config == val)
+            .collect::<Vec<_>>()
+            .first()
+            .map(|(pid, config)| (*pid, config.clone()))
+    }
+}
+
 impl LockFile {
     pub fn new() -> Self {
         let path = UserConfig::dir().join(format!("{}.lock", crate_name!()));
@@ -96,23 +122,5 @@ impl LockFile {
         fs::write(&self.path, running_processes)?;
         self.set_readonly(true)?;
         Ok(())
-    }
-
-    pub fn get_process_by_path(&self, path: &Path) -> Option<Pid> {
-        self.get_running_watchers()
-            .iter()
-            .filter(|(_, config)| config == path)
-            .collect::<Vec<_>>()
-            .first()
-            .map(|(pid, _)| *pid)
-    }
-
-    pub fn get_process_by_pid(&self, pid: Pid) -> Option<PathBuf> {
-        self.get_running_watchers()
-            .iter()
-            .filter(|(running_pid, _)| pid == *running_pid)
-            .collect::<Vec<_>>()
-            .first()
-            .map(|(_, config)| config.clone())
     }
 }

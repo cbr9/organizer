@@ -15,6 +15,7 @@ use notify::{
 };
 
 use crate::{
+    lock_file::GetProcessBy,
     subcommands::run::run,
     user_config::{rules::folder::Options, UserConfig},
     CONFIG,
@@ -115,8 +116,8 @@ pub(crate) struct Daemon;
 
 impl Daemon {
     pub fn replace() -> Result<()> {
-        match LOCK_FILE.get_process_by_path(&CONFIG.path) {
-            Some(pid) => {
+        match LOCK_FILE.get_process_by(CONFIG.path.as_path()) {
+            Some((pid, _)) => {
                 {
                     // force sys to go out of scope before watch() is run
                     let sys =
