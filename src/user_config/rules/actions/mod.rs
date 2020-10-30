@@ -51,6 +51,7 @@ impl Default for Sep {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Eq, PartialEq, Default)]
+#[serde(deny_unknown_fields)]
 pub struct IOAction {
     #[serde(deserialize_with = "deserialize_path")]
     pub to: PathBuf,

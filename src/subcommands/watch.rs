@@ -92,6 +92,7 @@ impl Watcher {
                 if let op::CREATE = op {
                     if path.is_file() {
                         let parent = path.parent().unwrap();
+                        println!("{}", parent.display());
                         // FIXME: if using recursive = true, this will panic, because the parent won't be a key in path2rules
                         'rules: for (rule, i) in path2rules.get(parent).unwrap() {
                             let folder = rule.folders.get(*i).unwrap();
@@ -100,6 +101,7 @@ impl Watcher {
                                 continue;
                             }
                             if *watch && rule.filters.r#match(&path) {
+                                println!("{:?}", rule);
                                 rule.actions.run(path);
                                 break 'rules;
                             }

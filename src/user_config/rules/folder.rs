@@ -1,11 +1,12 @@
-use super::deserialize::{deserialize_path, string_or_struct};
+use super::deserialize::{deserialize_full_path, string_or_struct};
 use crate::path::Expandable;
 use serde::{Deserialize, Serialize};
 use std::{ops::Deref, path::PathBuf, str::FromStr};
 
 #[derive(Deserialize, Serialize, Debug, PartialEq, Eq, Clone)]
+#[serde(deny_unknown_fields)]
 pub struct Folder {
-    #[serde(deserialize_with = "deserialize_path")]
+    #[serde(deserialize_with = "deserialize_full_path")]
     pub path: PathBuf,
     #[serde(default)]
     pub options: Options,

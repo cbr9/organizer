@@ -18,6 +18,15 @@ where
     Ok(PathBuf::from(&buf).expand_user().expand_vars())
 }
 
+pub(in crate::user_config) fn deserialize_full_path<'de, D>(
+    deserializer: D,
+) -> Result<PathBuf, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    Ok(deserialize_path(deserializer)?.canonicalize().unwrap())
+}
+
 pub(super) fn string_or_struct<'de, T, D>(deserializer: D) -> Result<T, D::Error>
 where
     T: Deserialize<'de> + FromStr<Err = ()>,
