@@ -11,5 +11,6 @@
 
 ### Currently supported filters
 - Regex
+- Script
 - Filename
 - Extensions
