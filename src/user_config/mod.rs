@@ -24,44 +24,9 @@ pub mod rules;
 /// * `rules`: a list of parsed rules defined by the user
 #[derive(Deserialize, Clone, Debug)]
 pub struct UserConfig {
-    pub rules: Rules,
+    pub rules: Vec<Rule>,
     #[serde(skip)]
     pub path: PathBuf,
-}
-
-#[derive(Deserialize, Clone, Debug)]
-pub struct Rules(pub(crate) Vec<Rule>);
-
-impl Deref for Rules {
-    type Target = Vec<Rule>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl DerefMut for Rules {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
-
-impl Rules {
-    /// returns a hashmap where the keys are paths and the values are tuples of rules
-    /// and indices, which indicate the index of the key's corresponding folder in the rule's folders' list
-    /// (i.e. the key is the ith folder in the corresponding rule)
-    pub fn to_map(&self) -> HashMap<&Path, Vec<(&Rule, usize)>> {
-        let mut map = HashMap::new();
-        for rule in self.iter() {
-            for (i, folder) in rule.folders.iter().enumerate() {
-                if !map.contains_key(folder.path.as_path()) {
-                    map.insert(folder.path.as_path(), Vec::new());
-                }
-                map.get_mut(folder.path.as_path()).unwrap().push((rule, i));
-            }
-        }
-        map
-    }
 }
 
 impl Default for UserConfig {
@@ -152,5 +117,20 @@ impl UserConfig {
 
     pub fn default_path() -> PathBuf {
         Self::dir().join("config.yml")
+    }
+    /// returns a hashmap where the keys are paths and the values are tuples of rules
+    /// and indices, which indicate the index of the key's corresponding folder in the rule's folders' list
+    /// (i.e. the key is the ith folder in the corresponding rule)
+    pub fn to_map(&self) -> HashMap<&Path, Vec<(&Rule, usize)>> {
+        let mut map = HashMap::new();
+        for rule in self.iter() {
+            for (i, folder) in rule.folders.iter().enumerate() {
+                if !map.contains_key(folder.path.as_path()) {
+                    map.insert(folder.path.as_path(), Vec::new());
+                }
+                map.get_mut(folder.path.as_path()).unwrap().push((rule, i));
+            }
+        }
+        map
     }
 }

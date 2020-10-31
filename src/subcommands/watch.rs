@@ -138,8 +138,7 @@ impl Watcher {
 
         // PROCESS SIGNALS
         LOCK_FILE.append(process::id() as i32, &config.path)?;
-        let rules = &config.rules;
-        let path2rules = rules.to_map();
+        let path2rules = config.to_map();
 
         loop {
             if let Ok(RawEvent {

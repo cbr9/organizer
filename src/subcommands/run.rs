@@ -10,7 +10,7 @@ use crate::{
 };
 
 pub fn run() -> Result<()> {
-    let path2rules = CONFIG.rules.to_map();
+    let path2rules = CONFIG.to_map();
 
     let dirs: Vec<_> = path2rules
         .par_iter()
