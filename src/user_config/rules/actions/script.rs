@@ -22,6 +22,7 @@ use std::{
 };
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(deny_unknown_fields)]
 pub struct Script {
     exec: String,
     content: String,
@@ -62,7 +63,7 @@ impl AsFilter for Script {
 }
 
 impl Script {
-    pub fn write(&self, path: &Path) -> Result<PathBuf> {
+    fn write(&self, path: &Path) -> Result<PathBuf> {
         let content = self.content.as_str();
         let content = content.expand_placeholders(path)?;
         let dir = UserConfig::dir().join("scripts");
