@@ -5,7 +5,7 @@ use dialoguer::{theme::ColorfulTheme, Select};
 
 use crate::{
     subcommands::watch::process_file,
-    user_config::rules::{actions::ConflictOption, folder::Options},
+    user_config::rules::actions::io_action::ConflictOption,
 };
 use std::borrow::Borrow;
 

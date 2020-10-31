@@ -6,7 +6,7 @@ use std::{
 
 use crate::{
     subcommands::run::resolve_conflict,
-    user_config::rules::actions::{ConflictOption, Sep},
+    user_config::rules::actions::io_action::{ConflictOption, Sep},
     MATCHES,
 };
 use std::{

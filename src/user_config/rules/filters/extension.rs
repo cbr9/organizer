@@ -1,6 +1,6 @@
 use crate::user_config::rules::{deserialize::string_or_seq, filters::AsFilter};
 use serde::Deserialize;
-use std::{ffi::OsStr, ops::Deref, path::Path};
+use std::{ops::Deref, path::Path};
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct Extension(#[serde(deserialize_with = "string_or_seq")] Vec<String>);

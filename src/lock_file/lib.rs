@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use crate::{lock_file::LockFile, user_config::UserConfig};
+    use crate::{lock_file::LockFile, user_config::UserConfig, LOCK_FILE};
     use std::{
         convert::TryInto,
         fs,
@@ -21,9 +21,8 @@ mod tests {
         let pid = 1000000000i32;
         let sys = System::new_with_specifics(RefreshKind::with_processes(RefreshKind::new()));
         assert!(sys.get_process(pid).is_none());
-        let lock_file = LockFile::new();
         let path = UserConfig::default_path();
-        lock_file.append(pid.try_into().unwrap(), &path).unwrap();
+        LOCK_FILE.append(pid.try_into().unwrap(), &path).unwrap();
     }
 
     #[test]

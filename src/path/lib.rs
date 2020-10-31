@@ -8,7 +8,7 @@ pub mod vars {
 
     use crate::{
         path::{get_stem_and_extension, Expandable},
-        user_config::rules::actions::Sep,
+        user_config::rules::actions::{io_action::Sep, Sep},
     };
     use dirs::home_dir;
     use std::{borrow::Borrow, ops::Deref, path::Path};

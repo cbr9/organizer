@@ -25,8 +25,7 @@ impl GetProcessBy<Pid> for LockFile {
         self.get_running_watchers()
             .iter()
             .filter_map(|(pid, path)| {
-                let matches = *pid == val;
-                if matches {
+                if *pid == val {
                     Some((*pid, path.clone()))
                 } else {
                     None
@@ -41,8 +40,7 @@ impl<'a> GetProcessBy<&'a Path> for LockFile {
         self.get_running_watchers()
             .iter()
             .filter_map(|(pid, path)| {
-                let matches = path == val;
-                if matches {
+                if path == val {
                     Some((*pid, path.clone()))
                 } else {
                     None

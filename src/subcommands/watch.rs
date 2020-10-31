@@ -30,7 +30,7 @@ use std::{
     collections::{HashMap, HashSet},
     path::{Path, PathBuf},
 };
-use sysinfo::{ProcessExt, RefreshKind, Signal, System, SystemExt};
+use sysinfo::{Process, ProcessExt, RefreshKind, Signal, System, SystemExt};
 
 pub fn process_file(
     path: PathBuf,
@@ -72,16 +72,20 @@ pub fn watch() -> Result<()> {
     } else {
         // FIXME: currently two instances can't be launched because we're not checking whether or not the new one has the same config as the running one
         let path = UserConfig::path();
-        if LOCK_FILE.get_running_watchers().is_empty() {
-            run()?;
-            LOCK_FILE.append(process::id() as i32, &path)?;
-            let mut watcher = Watcher::new();
-            watcher.run()?;
-        } else if path == UserConfig::default_path() {
-            println!("An existing instance is already running. Use --replace to restart it");
-        } else {
-            println!("An existing instance is already running with the desired configuration. Use --replace --config {} to restart it", path.display());
+        let watchers = LOCK_FILE.get_running_watchers();
+        let running_configs = watchers.iter().map(|(_, path)| path).collect::<Vec<_>>();
+        if running_configs.contains(&&path) {
+            return if path == UserConfig::default_path() {
+                println!("An existing instance is already running. Use --replace to restart it");
+                Ok(())
+            } else {
+                println!("An existing instance is already running with the selected configuration. Use --replace --config {} to restart it", path.display());
+                Ok(())
+            };
         }
+        run()?;
+        let mut watcher = Watcher::new();
+        watcher.run()?;
     }
     Ok(())
 }
@@ -121,7 +125,9 @@ impl Watcher {
             };
             self.watcher.watch(path, is_recursive).unwrap();
         }
+
         // PROCESS SIGNALS
+        LOCK_FILE.append(process::id() as i32, &CONFIG.path)?;
         let path2rules = CONFIG.to_map();
         loop {
             if let Ok(RawEvent {
@@ -144,11 +150,13 @@ impl Daemon {
     pub fn replace() -> Result<()> {
         match LOCK_FILE.get_process_by(CONFIG.path.as_path()) {
             Some((pid, _)) => {
-                {
-                    // force sys to go out of scope before watch() is run
-                    let sys =
-                        System::new_with_specifics(RefreshKind::with_processes(RefreshKind::new()));
-                    sys.get_process(pid).unwrap().kill(Signal::Kill);
+                let sys =
+                    System::new_with_specifics(RefreshKind::with_processes(RefreshKind::new()));
+                match sys.get_process(pid) {
+                    None => {}
+                    Some(process) => {
+                        process.kill(Signal::Kill);
+                    }
                 }
                 watch()
             }

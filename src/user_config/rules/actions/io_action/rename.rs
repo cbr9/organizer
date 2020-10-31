@@ -1,16 +1,16 @@
 use crate::user_config::rules::{
-    actions::{ActionType, AsAction, IOAction},
+    actions::{io_action::IOAction, ActionType, AsAction},
     deserialize::string_or_struct,
 };
 use colored::Colorize;
 use log::info;
 use serde::{Deserialize, Serialize};
-use std::{borrow::Cow, io::Result, ops::Deref, path::Path};
+use std::{borrow::Cow, fs, io::Result, ops::Deref, path::Path};
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-pub struct Move(#[serde(deserialize_with = "string_or_struct")] IOAction);
+pub struct Rename(#[serde(deserialize_with = "string_or_struct")] IOAction);
 
-impl Deref for Move {
+impl Deref for Rename {
     type Target = IOAction;
 
     fn deref(&self) -> &Self::Target {
@@ -18,10 +18,10 @@ impl Deref for Move {
     }
 }
 
-impl AsAction for Move {
+impl AsAction for Rename {
     fn act<'a>(&self, path: Cow<'a, Path>) -> Result<Cow<'a, Path>> {
-        let to = IOAction::helper(&path, self, ActionType::Move)?;
-        std::fs::rename(&path, &to)?;
+        let to = IOAction::helper(&path, self, ActionType::Rename)?;
+        fs::rename(&path, &to)?;
         info!(
             "({}) {} -> {}",
             self.kind().to_string().bold(),
@@ -32,6 +32,6 @@ impl AsAction for Move {
     }
 
     fn kind(&self) -> ActionType {
-        ActionType::Move
+        ActionType::Rename
     }
 }

@@ -1,10 +1,11 @@
 use crate::{
     path::{Expandable, Update},
-    user_config::rules::{actions::ConflictOption, rule::Rule},
+    user_config::rules::rule::Rule,
     ARGS,
 };
 use clap::crate_name;
 use dirs::{config_dir, home_dir};
+use rules::actions::io_action::ConflictOption;
 use serde::Deserialize;
 use std::{
     borrow::Cow,
