@@ -11,7 +11,6 @@ pub trait Capitalize<T> {
 
 pub trait Placeholder {
     fn expand_placeholders(&self, path: &Path) -> Result<Cow<'_, str>>;
-    fn placeholder_error(placeholder: &str, current_value: &Path, span: &str) -> Error;
 }
 
 impl Capitalize<String> for String {
@@ -39,30 +38,30 @@ impl Placeholder for &str {
                 for placeholder in placeholders.into_iter() {
                     current_value = match placeholder {
                         "path" => current_value.canonicalize().ok().ok_or_else(|| {
-                            Self::placeholder_error(placeholder, &current_value, span.as_str())
+                            placeholder_error(placeholder, &current_value, span.as_str())
                         })?,
                         "parent" => current_value
                             .parent()
                             .ok_or_else(|| {
-                                Self::placeholder_error(placeholder, &current_value, span.as_str())
+                                placeholder_error(placeholder, &current_value, span.as_str())
                             })?
                             .into(),
                         "name" => current_value
                             .file_name()
                             .ok_or_else(|| {
-                                Self::placeholder_error(placeholder, &current_value, span.as_str())
+                                placeholder_error(placeholder, &current_value, span.as_str())
                             })?
                             .into(),
                         "stem" => current_value
                             .file_stem()
                             .ok_or_else(|| {
-                                Self::placeholder_error(placeholder, &current_value, span.as_str())
+                                placeholder_error(placeholder, &current_value, span.as_str())
                             })?
                             .into(),
                         "extension" => current_value
                             .extension()
                             .ok_or_else(|| {
-                                Self::placeholder_error(placeholder, &current_value, span.as_str())
+                                placeholder_error(placeholder, &current_value, span.as_str())
                             })?
                             .into(),
                         "to_uppercase" => current_value.to_str().unwrap().to_uppercase().into(),
@@ -83,16 +82,16 @@ impl Placeholder for &str {
             Ok(Cow::Borrowed(self))
         }
     }
+}
 
-    fn placeholder_error(placeholder: &str, current_value: &Path, span: &str) -> Error {
-        let message = format!(
-            "tried to retrieve the {} from {}, but it does not contain it (placeholder: {})",
-            placeholder,
-            current_value.display(),
-            span
-        );
-        Error::new(ErrorKind::Other, message)
-    }
+fn placeholder_error(placeholder: &str, current_value: &Path, span: &str) -> Error {
+    let message = format!(
+        "tried to retrieve the {} from {}, but it does not contain it (placeholder: {})",
+        placeholder,
+        current_value.display(),
+        span
+    );
+    Error::new(ErrorKind::Other, message)
 }
 
 #[cfg(test)]

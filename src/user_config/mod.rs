@@ -12,7 +12,6 @@ use std::{
     collections::HashMap,
     env,
     fs,
-    ops::{Deref, DerefMut},
     path::{Path, PathBuf},
 };
 
@@ -59,9 +58,8 @@ impl UserConfig {
             Self::create(&path);
         }
 
-        let content = fs::read_to_string(&path).unwrap();
-        let mut config: UserConfig =
-            serde_yaml::from_str(&content).expect("could not parse config file");
+        let content = fs::read_to_string(&path).unwrap(); // if there is some problem with the config file, we should not try to fix it
+        let mut config: UserConfig = serde_yaml::from_str(&content).unwrap();
         config.path = path;
         config
     }
@@ -123,7 +121,7 @@ impl UserConfig {
     /// (i.e. the key is the ith folder in the corresponding rule)
     pub fn to_map(&self) -> HashMap<&Path, Vec<(&Rule, usize)>> {
         let mut map = HashMap::new();
-        for rule in self.iter() {
+        for rule in self.rules.iter() {
             for (i, folder) in rule.folders.iter().enumerate() {
                 if !map.contains_key(folder.path.as_path()) {
                     map.insert(folder.path.as_path(), Vec::new());
