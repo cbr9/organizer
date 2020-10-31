@@ -1,12 +1,6 @@
 use crate::user_config::rules::filters::{extension::Extension, AsFilter};
-use serde::{
-    de::{MapAccess, SeqAccess, Visitor},
-    export,
-    export::PhantomData,
-    Deserialize,
-    Deserializer,
-};
-use std::{ops::Deref, path::Path, result, str::FromStr};
+use serde::{Deserialize, Deserializer};
+use std::{ops::Deref, path::Path, str::FromStr};
 
 #[derive(Debug, Clone)]
 pub struct Regex(Vec<regex::Regex>);

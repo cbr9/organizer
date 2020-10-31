@@ -7,7 +7,7 @@ use serde::{
     Deserialize,
     Deserializer,
 };
-use std::{fmt, fmt::Write, ops::Deref, path::Path};
+use std::{fmt, ops::Deref, path::Path};
 
 #[derive(Debug, Clone)]
 pub struct Extension(Vec<String>);

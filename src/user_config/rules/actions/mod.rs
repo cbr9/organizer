@@ -4,27 +4,20 @@ pub mod io_action;
 pub mod script;
 pub mod trash;
 
-use crate::{
-    path::{Expandable, Update},
-    string::Placeholder,
-    user_config::rules::actions::{
-        delete::Delete,
-        echo::Echo,
-        io_action::{Copy, IOAction, Move, Rename},
-        script::Script,
-        trash::Trash,
-    },
+use crate::user_config::rules::actions::{
+    delete::Delete,
+    echo::Echo,
+    io_action::{Copy, IOAction, Move, Rename},
+    script::Script,
+    trash::Trash,
 };
 use log::error;
 use serde::{Deserialize, Serialize};
 use std::{
     borrow::Cow,
-    fs,
-    io::{Error, ErrorKind, Result},
+    io::Result,
     ops::Deref,
     path::{Path, PathBuf},
-    result,
-    str::FromStr,
 };
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -112,20 +105,14 @@ impl Actions {
 
 #[cfg(test)]
 mod tests {
-    use std::{
-        fs,
-        io::{Error, ErrorKind, Result},
-    };
+    use std::io::{Error, ErrorKind, Result};
 
     use crate::{
         path::{
             lib::vars::{expected_path, test_file_or_dir},
             Update,
         },
-        user_config::rules::actions::{
-            io_action::{ConflictOption, IOAction},
-            ActionType,
-        },
+        user_config::rules::actions::io_action::ConflictOption,
     };
     use std::borrow::Cow;
 

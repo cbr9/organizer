@@ -1,10 +1,7 @@
 use crate::{
     path::{Expandable, Update},
     string::Placeholder,
-    user_config::rules::{
-        actions::{Action, ActionType, AsAction},
-        folder::Folder,
-    },
+    user_config::rules::actions::{ActionType, AsAction},
 };
 use colored::Colorize;
 use log::info;
@@ -47,18 +44,15 @@ impl Default for Sep {
 }
 
 #[derive(Debug, Clone, Serialize, Eq, PartialEq, Default)]
-#[serde(deny_unknown_fields)]
 pub struct IOAction {
     pub to: PathBuf,
-    #[serde(default)]
     pub if_exists: ConflictOption,
-    #[serde(default)]
     pub sep: Sep,
 }
 
-pub struct Move;
-pub struct Rename;
-pub struct Copy;
+pub(super) struct Move;
+pub(super) struct Rename;
+pub(super) struct Copy;
 
 impl AsAction<Move> for IOAction {
     fn act<'a>(&self, path: Cow<'a, Path>) -> Result<Cow<'a, Path>> {
@@ -259,7 +253,11 @@ mod tests {
         if expected.exists() {
             fs::remove_file(&expected)?;
         }
-        let action = IOAction::new(target, None, None);
+        let action = IOAction {
+            to: target,
+            if_exists: Default::default(),
+            sep: Default::default(),
+        };
         let new_path = IOAction::helper(&path, &action, ActionType::Copy)?;
         if new_path == expected {
             Ok(())

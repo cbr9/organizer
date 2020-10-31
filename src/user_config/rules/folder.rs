@@ -1,33 +1,18 @@
 use crate::path::Expandable;
 use serde::{
     de,
-    de::{Error, MapAccess, Visitor},
+    de::{MapAccess, Visitor},
     export,
     export::PhantomData,
     Deserialize,
     Deserializer,
     Serialize,
 };
-use std::{fmt, ops::Deref, path::PathBuf, result, str::FromStr};
-
-fn deserialize_path<'de, D>(deserializer: D) -> Result<PathBuf, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let buf = String::deserialize(deserializer)?;
-    let path = PathBuf::from(&buf).expand_user().expand_vars();
-    match path.canonicalize() {
-        Ok(path) => Ok(path),
-        Err(e) => Err(D::Error::custom(e)),
-    }
-}
+use std::{fmt, path::PathBuf, result, str::FromStr};
 
 #[derive(Serialize, Debug, PartialEq, Eq, Clone)]
-#[serde(deny_unknown_fields)]
 pub struct Folder {
-    #[serde(deserialize_with = "deserialize_path")]
     pub path: PathBuf,
-    #[serde(default)]
     pub options: Options,
 }
 

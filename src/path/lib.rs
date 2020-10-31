@@ -11,7 +11,7 @@ pub mod vars {
         user_config::rules::actions::io_action::Sep,
     };
     use dirs::home_dir;
-    use std::{borrow::Borrow, ops::Deref, path::Path};
+    use std::{ops::Deref, path::Path};
 
     pub fn project_dir() -> PathBuf {
         // 'cargo test' must be run from the project directory, where Cargo.toml is
