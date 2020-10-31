@@ -7,15 +7,12 @@ pub mod trash;
 use crate::{
     path::{Expandable, Update},
     string::Placeholder,
-    user_config::rules::{
-        actions::{
-            delete::Delete,
-            echo::Echo,
-            io_action::{copy::Copy, r#move::Move, rename::Rename},
-            script::Script,
-            trash::Trash,
-        },
-        deserialize::deserialize_path,
+    user_config::rules::actions::{
+        delete::Delete,
+        echo::Echo,
+        io_action::{Copy, IOAction, Move, Rename},
+        script::Script,
+        trash::Trash,
     },
 };
 use log::error;
@@ -33,9 +30,9 @@ use std::{
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all(serialize = "lowercase", deserialize = "lowercase"))]
 pub enum Action {
-    Move(Move),
-    Copy(Copy),
-    Rename(Rename),
+    Move(IOAction),
+    Copy(IOAction),
+    Rename(IOAction),
     Delete(Delete),
     Echo(Echo),
     Trash(Trash),
@@ -45,18 +42,18 @@ pub enum Action {
 impl Action {
     fn act<'a>(&self, path: Cow<'a, Path>) -> Result<Cow<'a, Path>> {
         match self {
-            Action::Copy(copy) => copy.act(path),
+            Action::Copy(copy) => AsAction::<Copy>::act(copy, path),
+            Action::Move(r#move) => AsAction::<Move>::act(r#move, path),
+            Action::Rename(rename) => AsAction::<Rename>::act(rename, path),
             Action::Delete(delete) => delete.act(path),
             Action::Echo(echo) => echo.act(path),
-            Action::Move(r#move) => r#move.act(path),
-            Action::Rename(rename) => rename.act(path),
             Action::Trash(trash) => trash.act(path),
             Action::Script(script) => script.act(path),
         }
     }
 }
 
-pub trait AsAction {
+pub trait AsAction<T> {
     fn act<'a>(&self, path: Cow<'a, Path>) -> Result<Cow<'a, Path>>;
     fn kind(&self) -> ActionType;
 }
@@ -128,8 +125,6 @@ mod tests {
         user_config::rules::actions::{
             io_action::{ConflictOption, IOAction},
             ActionType,
-            ConflictOption,
-            IOAction,
         },
     };
     use std::borrow::Cow;
@@ -186,68 +181,5 @@ mod tests {
         target
             .update(&ConflictOption::Rename, &Default::default())
             .unwrap();
-    }
-
-    #[test]
-    fn prepare_path_copy() -> Result<()> {
-        let path = test_file_or_dir("test1.txt");
-        let target = test_file_or_dir("test_dir");
-        let expected = test_file_or_dir("test_dir").join("test1 (1).txt");
-        if expected.exists() {
-            fs::remove_file(&expected)?;
-        }
-        let action = IOAction {
-            to: target,
-            if_exists: Default::default(),
-            sep: Default::default(),
-        };
-        let new_path = IOAction::helper(&path, &action, ActionType::Copy)?;
-        if new_path == expected {
-            Ok(())
-        } else {
-            Err(Error::from(ErrorKind::Other))
-        }
-    }
-
-    #[test]
-    fn prepare_path_move() -> Result<()> {
-        let path = test_file_or_dir("test1.txt");
-        let target = test_file_or_dir("test_dir");
-        let expected = test_file_or_dir("test_dir").join("test1 (1).txt");
-        if expected.exists() {
-            fs::remove_file(&expected)?;
-        }
-        let action = IOAction {
-            to: target,
-            if_exists: Default::default(),
-            sep: Default::default(),
-        };
-        let new_path = IOAction::helper(&path, &action, ActionType::Move)?;
-        if new_path == expected {
-            Ok(())
-        } else {
-            Err(Error::from(ErrorKind::Other))
-        }
-    }
-
-    #[test]
-    fn prepare_path_rename() -> Result<()> {
-        let path = test_file_or_dir("test1.txt");
-        let target = test_file_or_dir("test_dir").join("test1.txt");
-        let expected = test_file_or_dir("test_dir").join("test1 (1).txt");
-        if expected.exists() {
-            fs::remove_file(&expected)?;
-        }
-        let action = IOAction {
-            to: target,
-            if_exists: Default::default(),
-            sep: Default::default(),
-        };
-        let new_path = IOAction::helper(&path, &action, ActionType::Rename)?;
-        if new_path == expected {
-            Ok(())
-        } else {
-            Err(Error::from(ErrorKind::Other))
-        }
     }
 }

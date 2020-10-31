@@ -28,7 +28,7 @@ pub struct Script {
     content: String,
 }
 
-impl AsAction for Script {
+impl AsAction<Self> for Script {
     fn act<'a>(&self, path: Cow<'a, Path>) -> Result<Cow<'a, Path>> {
         match self.helper(&path) {
             Ok(_) => {

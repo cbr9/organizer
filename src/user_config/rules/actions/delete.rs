@@ -15,7 +15,7 @@ impl Deref for Delete {
     }
 }
 
-impl AsAction for Delete {
+impl AsAction<Self> for Delete {
     fn act<'a>(&self, path: Cow<'a, Path>) -> Result<Cow<'a, Path>> {
         if self.0 {
             fs::remove_file(&path)?;

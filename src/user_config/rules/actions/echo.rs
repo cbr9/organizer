@@ -18,7 +18,7 @@ impl Deref for Echo {
     }
 }
 
-impl AsAction for Echo {
+impl AsAction<Self> for Echo {
     fn act<'a>(&self, path: Cow<'a, Path>) -> Result<Cow<'a, Path>> {
         info!(
             "({}) {}",

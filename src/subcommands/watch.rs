@@ -30,7 +30,7 @@ use std::{
     collections::{HashMap, HashSet},
     path::{Path, PathBuf},
 };
-use sysinfo::{Process, ProcessExt, RefreshKind, Signal, System, SystemExt};
+use sysinfo::{ProcessExt, RefreshKind, Signal, System, SystemExt};
 
 pub fn process_file(
     path: PathBuf,

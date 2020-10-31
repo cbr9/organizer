@@ -13,6 +13,7 @@ pub fn run() -> Result<()> {
     let path2rules = CONFIG.to_map();
     let mut files = Vec::new();
     for (path, _) in path2rules.iter() {
+        let path = path.to_path_buf();
         files.extend(fs::read_dir(path)?)
     }
 

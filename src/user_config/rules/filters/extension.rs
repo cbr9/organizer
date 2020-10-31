@@ -1,15 +1,59 @@
-use crate::user_config::rules::{deserialize::string_or_seq, filters::AsFilter};
-use serde::Deserialize;
-use std::{ops::Deref, path::Path};
+use crate::user_config::rules::filters::AsFilter;
+use serde::{
+    de,
+    de::{SeqAccess, Visitor},
+    export,
+    export::PhantomData,
+    Deserialize,
+    Deserializer,
+};
+use std::{fmt, fmt::Write, ops::Deref, path::Path};
 
-#[derive(Debug, Clone, Deserialize)]
-pub struct Extension(#[serde(deserialize_with = "string_or_seq")] Vec<String>);
+#[derive(Debug, Clone)]
+pub struct Extension(Vec<String>);
 
 impl Deref for Extension {
     type Target = Vec<String>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
+    }
+}
+
+impl<'de> Deserialize<'de> for Extension {
+    fn deserialize<D>(deserializer: D) -> Result<Self, <D as Deserializer<'de>>::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct StringOrSeq(PhantomData<fn() -> Extension>);
+
+        impl<'de> Visitor<'de> for StringOrSeq {
+            type Value = Extension;
+
+            fn expecting(&self, formatter: &mut export::Formatter) -> fmt::Result {
+                formatter.write_str("string or seq")
+            }
+
+            fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                Ok(Extension(vec![value.into()]))
+            }
+
+            fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+            where
+                A: SeqAccess<'de>,
+            {
+                let mut vec = Vec::new();
+                while let Some(val) = seq.next_element()? {
+                    vec.push(val)
+                }
+                Ok(Extension(vec))
+            }
+        }
+
+        deserializer.deserialize_any(StringOrSeq(PhantomData))
     }
 }
 

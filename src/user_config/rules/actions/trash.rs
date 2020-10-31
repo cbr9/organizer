@@ -20,7 +20,7 @@ impl Deref for Trash {
     }
 }
 
-impl AsAction for Trash {
+impl AsAction<Self> for Trash {
     fn act<'a>(&self, path: Cow<'a, Path>) -> Result<Cow<'a, Path>> {
         if self.0 {
             return match trash::delete(&path) {
