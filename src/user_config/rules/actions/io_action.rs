@@ -137,14 +137,13 @@ impl<'de> Deserialize<'de> for IOAction {
                 let mut if_exists: Option<ConflictOption> = None;
                 let mut sep: Option<Sep> = None;
                 while let Some(key) = map.next_key::<String>()? {
-                    if key == "to" {
-                        to = Some(map.next_value()?);
-                    } else if key == "if_exists" {
-                        if_exists = Some(map.next_value()?);
-                    } else if key == "sep" {
-                        sep = Some(map.next_value()?);
-                    } else {
-                        return Err(serde::de::Error::custom(&format!("Invalid key: {}", key)));
+                    match key.as_str() {
+                        "to" => to = Some(map.next_value()?),
+                        "if_exists" => if_exists = Some(map.next_value()?),
+                        "sep" => sep = Some(map.next_value()?),
+                        _ => {
+                            return Err(serde::de::Error::custom(&format!("Invalid key: {}", key)))
+                        }
                     }
                 }
                 if to.is_none() {
@@ -208,7 +207,6 @@ impl IOAction {
                 Err(e) => return Err(e),
             }
         }
-        {}
         Ok(to)
     }
 }
