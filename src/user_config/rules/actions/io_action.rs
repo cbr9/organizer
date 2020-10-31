@@ -60,15 +60,11 @@ impl AsAction<Move> for IOAction {
         std::fs::rename(&path, &to)?;
         info!(
             "({}) {} -> {}",
-            AsAction::<Move>::kind(self).to_string().bold(),
+            ActionType::Move.to_string().bold(),
             path.display(),
             to.display()
         );
         Ok(Cow::Owned(to))
-    }
-
-    fn kind(&self) -> ActionType {
-        ActionType::Move
     }
 }
 
@@ -78,15 +74,11 @@ impl AsAction<Rename> for IOAction {
         fs::rename(&path, &to)?;
         info!(
             "({}) {} -> {}",
-            AsAction::<Rename>::kind(self).to_string().bold(),
+            ActionType::Rename.to_string().bold(),
             path.display(),
             to.display()
         );
         Ok(Cow::Owned(to))
-    }
-
-    fn kind(&self) -> ActionType {
-        ActionType::Rename
     }
 }
 
@@ -96,15 +88,11 @@ impl AsAction<Copy> for IOAction {
         std::fs::copy(&path, &to)?;
         info!(
             "({}) {} -> {}",
-            AsAction::<Copy>::kind(self).to_string().bold(),
+            ActionType::Copy.to_string().bold(),
             path.display(),
             to.display()
         );
         Ok(path)
-    }
-
-    fn kind(&self) -> ActionType {
-        ActionType::Copy
     }
 }
 

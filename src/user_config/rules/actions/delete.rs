@@ -19,12 +19,12 @@ impl AsAction<Self> for Delete {
     fn act<'a>(&self, path: Cow<'a, Path>) -> Result<Cow<'a, Path>> {
         if self.0 {
             fs::remove_file(&path)?;
-            info!("({}) {}", self.kind().to_string().bold(), path.display());
+            info!(
+                "({}) {}",
+                ActionType::Delete.to_string().bold(),
+                path.display()
+            );
         }
         Ok(path)
-    }
-
-    fn kind(&self) -> ActionType {
-        ActionType::Delete
     }
 }

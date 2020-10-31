@@ -25,16 +25,16 @@ impl AsAction<Self> for Trash {
         if self.0 {
             return match trash::delete(&path) {
                 Ok(_) => {
-                    info!("({}) {}", self.kind().to_string().bold(), path.display());
+                    info!(
+                        "({}) {}",
+                        ActionType::Trash.to_string().bold(),
+                        path.display()
+                    );
                     Ok(path)
                 }
                 Err(e) => Err(Error::new(ErrorKind::Other, e.to_string())),
             };
         }
         Ok(path)
-    }
-
-    fn kind(&self) -> ActionType {
-        ActionType::Trash
     }
 }

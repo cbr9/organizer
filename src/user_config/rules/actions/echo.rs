@@ -22,13 +22,9 @@ impl AsAction<Self> for Echo {
     fn act<'a>(&self, path: Cow<'a, Path>) -> Result<Cow<'a, Path>> {
         info!(
             "({}) {}",
-            self.kind().to_string().bold(),
+            ActionType::Echo.to_string().bold(),
             self.as_str().expand_placeholders(&path)?
         );
         Ok(path)
-    }
-
-    fn kind(&self) -> ActionType {
-        ActionType::Echo
     }
 }

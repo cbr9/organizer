@@ -1,10 +1,7 @@
 use crate::{
     string::Placeholder,
     user_config::{
-        rules::{
-            actions::{ActionType, AsAction},
-            filters::AsFilter,
-        },
+        rules::{actions::AsAction, filters::AsFilter},
         UserConfig,
     },
 };
@@ -37,10 +34,6 @@ impl AsAction<Self> for Script {
             }
             Err(e) => Err(e),
         }
-    }
-
-    fn kind(&self) -> ActionType {
-        ActionType::Script
     }
 }
 

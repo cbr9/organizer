@@ -32,11 +32,11 @@ pub enum Action {
     Script(Script),
 }
 
-impl Action {
+impl AsAction<Action> for Action {
     fn act<'a>(&self, path: Cow<'a, Path>) -> Result<Cow<'a, Path>> {
         match self {
-            Action::Copy(copy) => AsAction::<Copy>::act(copy, path),
-            Action::Move(r#move) => AsAction::<Move>::act(r#move, path),
+            Action::Copy(copy) => AsAction::<Copy>::act(copy, path), // IOAction has three different implementations of AsAction
+            Action::Move(r#move) => AsAction::<Move>::act(r#move, path), // so they must be called with turbo-fish syntax
             Action::Rename(rename) => AsAction::<Rename>::act(rename, path),
             Action::Delete(delete) => delete.act(path),
             Action::Echo(echo) => echo.act(path),
@@ -46,9 +46,8 @@ impl Action {
     }
 }
 
-pub trait AsAction<T> {
+pub(super) trait AsAction<T> {
     fn act<'a>(&self, path: Cow<'a, Path>) -> Result<Cow<'a, Path>>;
-    fn kind(&self) -> ActionType;
 }
 
 #[derive(Eq, PartialEq)]
