@@ -10,7 +10,7 @@ use crate::{
 };
 
 pub fn run() -> Result<()> {
-    let path2rules = CONFIG.to_map();
+    let path2rules = CONFIG.rules.to_map();
 
     let dirs: Vec<_> = path2rules
         .par_iter()
@@ -23,7 +23,7 @@ pub fn run() -> Result<()> {
     dirs.into_par_iter().for_each(|dir| {
         dir.collect::<Vec<_>>().into_par_iter().for_each(|file| {
             let path = file.unwrap().path();
-            process_file(path, &path2rules, false)
+            process_file(&path, &path2rules, false)
         });
     });
 

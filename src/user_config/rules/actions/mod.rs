@@ -13,12 +13,7 @@ use crate::user_config::rules::actions::{
 };
 use log::error;
 use serde::{Deserialize, Serialize};
-use std::{
-    borrow::Cow,
-    io::Result,
-    ops::Deref,
-    path::{Path, PathBuf},
-};
+use std::{borrow::Cow, io::Result, ops::Deref, path::Path};
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all(serialize = "lowercase", deserialize = "lowercase"))]
@@ -88,7 +83,7 @@ impl Deref for Actions {
 }
 
 impl Actions {
-    pub fn run(&self, path: PathBuf) {
+    pub fn run(&self, path: &Path) {
         let mut path = Cow::from(path);
         for action in self.iter() {
             path = match action.act(path) {

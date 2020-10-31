@@ -33,7 +33,6 @@ lazy_static! {
     pub static ref ARGS: &'static ArgMatches = MATCHES.subcommand().unwrap().1;
     pub static ref CONFIG: UserConfig = UserConfig::default();
     pub static ref LOCK_FILE: LockFile = LockFile::new();
-    pub static ref WATCHERS: Vec<(i32, PathBuf)> = LOCK_FILE.get_running_watchers();
     pub static ref LOG_FILE: PathBuf = UserConfig::dir().join("output.log");
 }
 

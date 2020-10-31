@@ -24,3 +24,6 @@ rayon = "1.5"
 trash = "1.2.0"
 log = "0.4"
 fern = {version = "0.5", features = ["colored"] }
+
+[features]
+hot-reload = []

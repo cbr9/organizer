@@ -1,10 +1,13 @@
 use std::{
+    fs,
     io::Result,
     process,
+    result,
     sync::mpsc::{channel, Receiver},
 };
 
 use colored::Colorize;
+use log::{error, info};
 use notify::{
     op,
     raw_watcher,
@@ -27,13 +30,15 @@ use crate::{
     MATCHES,
 };
 use std::{
+    borrow::Cow,
     collections::{HashMap, HashSet},
-    path::{Path, PathBuf},
+    ops::Deref,
+    path::Path,
 };
 use sysinfo::{ProcessExt, RefreshKind, Signal, System, SystemExt};
 
 pub fn process_file(
-    path: PathBuf,
+    path: &Path,
     path2rules: &HashMap<&Path, Vec<(&Rule, usize)>>,
     from_watch: bool,
 ) {
@@ -85,7 +90,7 @@ pub fn watch() -> Result<()> {
         }
         run()?;
         let mut watcher = Watcher::new();
-        watcher.run()?;
+        watcher.run(Cow::Borrowed(CONFIG.deref()))?;
     }
     Ok(())
 }
@@ -108,16 +113,21 @@ impl Watcher {
         Watcher { watcher, receiver }
     }
 
-    pub fn run(&mut self) -> Result<()> {
+    pub fn run(&mut self, config: Cow<UserConfig>) -> Result<()> {
         let mut folders = HashSet::new();
-        for rule in CONFIG.rules.iter() {
+        for rule in config.rules.iter() {
             for folder in rule.folders.iter() {
                 let recursive = &folder.options.recursive;
                 let path = &folder.path;
                 folders.insert((path, recursive));
             }
         }
-        for (path, recursive) in folders {
+        if cfg!(feature = "hot-reload") {
+            self.watcher
+                .watch(config.path.parent().unwrap(), RecursiveMode::NonRecursive)
+                .unwrap();
+        }
+        for (path, recursive) in folders.into_iter() {
             let is_recursive = if *recursive {
                 RecursiveMode::Recursive
             } else {
@@ -127,8 +137,10 @@ impl Watcher {
         }
 
         // PROCESS SIGNALS
-        LOCK_FILE.append(process::id() as i32, &CONFIG.path)?;
-        let path2rules = CONFIG.to_map();
+        LOCK_FILE.append(process::id() as i32, &config.path)?;
+        let rules = &config.rules;
+        let path2rules = rules.to_map();
+
         loop {
             if let Ok(RawEvent {
                 path: Some(path),
@@ -136,8 +148,34 @@ impl Watcher {
                 ..
             }) = self.receiver.recv()
             {
-                if let op::CREATE = op {
-                    process_file(path, &path2rules, true);
+                match op {
+                    op::CREATE => {
+                        if cfg!(not(feature = "hot-reload"))
+                            || (cfg!(feature = "hot-reload")
+                                && path.parent().unwrap() != config.path.parent().unwrap())
+                        {
+                            process_file(&path, &path2rules, true)
+                        }
+                    }
+                    op::CLOSE_WRITE => {
+                        if cfg!(feature = "hot-reload") && path == config.path {
+                            let content = fs::read_to_string(&path).unwrap();
+                            let new_config: result::Result<UserConfig, serde_yaml::Error> =
+                                serde_yaml::from_str(&content);
+                            match new_config {
+                                Ok(mut new_config) => {
+                                    new_config.path = config.path.clone();
+                                    info!("reloaded configuration: {}", new_config.path.display());
+                                    break self.run(Cow::Owned(new_config));
+                                }
+                                Err(e) => error!(
+                                    "cannot reload config (rules will stay as they were): {}",
+                                    e
+                                ),
+                            }
+                        }
+                    }
+                    _ => {}
                 }
             }
         }
