@@ -1,5 +1,5 @@
 use crate::user_config::rules::filters::{extension::Extension, AsFilter};
-use serde::{Deserialize, Deserializer};
+use serde::{de::Error, Deserialize, Deserializer};
 use std::{ops::Deref, path::Path, str::FromStr};
 
 #[derive(Debug, Clone)]
@@ -52,11 +52,15 @@ impl<'de> Deserialize<'de> for Regex {
     where
         D: Deserializer<'de>,
     {
-        let vec = Extension::deserialize(deserializer)? // the Extension deserializer is a plain String or Vec deserializer
-            .iter()
-            .map(|str| regex::Regex::new(str).unwrap())
-            .collect::<Vec<_>>();
-        Ok(Regex(vec))
+        let vec = Extension::deserialize(deserializer)?; // the Extension deserializer is a plain String or Vec deserializer
+        let mut regexes = Vec::new();
+        for str in vec.iter() {
+            match regex::Regex::new(str) {
+                Ok(regex) => regexes.push(regex),
+                Err(_) => return Err(D::Error::custom("invalid regex")),
+            }
+        }
+        Ok(Regex(regexes))
     }
 }
 
