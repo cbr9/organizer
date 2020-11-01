@@ -1,8 +1,8 @@
 mod lib;
 
-use crate::user_config::UserConfig;
 use clap::crate_name;
 use std::{
+    env::temp_dir,
     fs,
     fs::{File, OpenOptions},
     io::{prelude::*, Result},
@@ -52,15 +52,11 @@ impl<'a> GetProcessBy<&'a Path> for LockFile {
 
 impl LockFile {
     pub fn new() -> Self {
-        let path = UserConfig::dir().join(format!("{}.lock", crate_name!()));
-        if !path.exists() {
-            File::create(&path).expect("could not create lock file");
-        }
         let f = LockFile {
-            path,
+            path: temp_dir().join(format!("{}.lock", crate_name!())),
             sep: "---".into(),
         };
-        f.clear_dead_processes()
+        f.update()
             .expect("error: could not modify lock file (permission error?)");
         f
     }
@@ -82,7 +78,10 @@ impl LockFile {
             File::create(&self.path)?;
         }
         self.set_readonly(false)?;
-        let mut f = OpenOptions::new().append(true).open(&self.path)?;
+        let mut f = OpenOptions::new()
+            .append(true)
+            .create(true)
+            .open(&self.path)?;
         let result = writeln!(f, "{}", self.section(&pid, config));
         self.set_readonly(true)?;
         result
@@ -115,7 +114,7 @@ impl LockFile {
         }
     }
 
-    fn clear_dead_processes(&self) -> Result<()> {
+    fn update(&self) -> Result<()> {
         self.set_readonly(false)?;
         let mut running_processes = String::new();
         let sys = System::new_with_specifics(RefreshKind::with_processes(RefreshKind::new()));
