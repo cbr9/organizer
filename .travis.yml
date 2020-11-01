@@ -2,6 +2,8 @@ language: rust
 
 rust:
   - stable
+  - beta
+  - nightly
 
 script: | 
   cargo build --verbose &&
@@ -17,12 +19,14 @@ branches:
     - alpha-2.0
 
 cache: cargo
+sudo: required # travis-ci/travis-ci#9061
 
 matrix:
   fast_finish: true
+  allow_failures:
+    - rust: nightly
   include:
-      sudo: required # travis-ci/travis-ci#9061
-      before_script:
+      - before_script:
         - rustup component add rustfmt-preview
         - rustup component add clippy-preview
 
@@ -49,6 +53,5 @@ after_success: |
   cd ../.. &&
   rm -rf kcov-master &&
   for file in target/debug/organize-*; do [ -x "${file}" ] || continue; mkdir -p "target/cov/$(basename $file)"; ./kcov-build/usr/local/bin/kcov --exclude-pattern=/.cargo,/usr/lib --verify "target/cov/$(basename $file)" "$file"; done &&
-  bash <(curl -s https://codecov.io/bash) &&
-  echo "Uploaded code coverage"
+  bash <(curl -s https://codecov.io/bash) || echo 'Codecov failed to upload'
 
