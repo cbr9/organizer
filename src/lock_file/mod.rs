@@ -10,6 +10,7 @@ use std::{
 };
 use sysinfo::{Pid, RefreshKind, System, SystemExt};
 
+/// File where watchers are registered with their PID and configuration
 #[derive(Default)]
 pub struct LockFile {
     path: PathBuf,
@@ -76,9 +77,6 @@ impl LockFile {
     }
 
     pub fn get_running_watchers(&self) -> Vec<(Pid, PathBuf)> {
-        if !self.path.exists() {
-            return Vec::new();
-        }
         let content = fs::read_to_string(&self.path);
         match content {
             Ok(content) => {
