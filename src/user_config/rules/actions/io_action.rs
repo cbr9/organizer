@@ -1,5 +1,5 @@
 use crate::{
-    path::{Expandable, Update},
+    path::{expand::Expandable, update::Update},
     string::placeholder::{visit_placeholder_string, Placeholder},
     user_config::rules::actions::{ActionType, AsAction},
 };
@@ -224,7 +224,7 @@ impl Default for ConflictOption {
 #[cfg(test)]
 mod tests {
     use crate::{
-        path::lib::vars::test_file_or_dir,
+        path::helpers::test_file_or_dir,
         user_config::rules::actions::{io_action::IOAction, ActionType},
     };
     use std::{

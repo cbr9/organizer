@@ -19,7 +19,7 @@ use notify::{
 
 use crate::{
     lock_file::GetProcessBy,
-    path::IsHidden,
+    path::is_hidden::IsHidden,
     subcommands::run::run,
     user_config::{
         rules::{folder::Options, rule::Rule},

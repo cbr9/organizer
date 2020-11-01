@@ -1,125 +1,44 @@
-use std::{
-    env,
-    io::Result,
-    path::{Path, PathBuf},
-};
+pub mod expand;
+pub mod is_hidden;
+pub mod update;
 
-use crate::user_config::rules::actions::io_action::{ConflictOption, Sep};
-use std::{
-    borrow::Cow,
-    io::{Error, ErrorKind},
-};
+#[cfg(test)]
+pub mod helpers {
+    // TODO: Refactor these helpers
+    use crate::user_config::rules::actions::io_action::Sep;
+    use std::{
+        env,
+        io::{Error, ErrorKind, Result},
+        ops::Deref,
+        path::{Path, PathBuf},
+    };
 
-pub mod lib;
-
-pub trait IsHidden {
-    fn is_hidden(&self) -> bool;
-}
-
-impl IsHidden for Path {
-    #[cfg(any(target_os = "linux", target_os = "macos"))]
-    fn is_hidden(&self) -> bool {
-        self.file_name().unwrap().to_str().unwrap().starts_with('.')
+    pub fn project_dir() -> PathBuf {
+        // 'cargo test' must be run from the project directory, where Cargo.toml is
+        // even if you run it from some other folder inside the project
+        // 'cargo test' will move to the project root
+        env::current_dir().unwrap()
     }
 
-    #[cfg(target_os = "windows")]
-    fn is_hidden(&self) -> bool {
-        // must use winapi
-        unimplemented!()
-    }
-}
-
-pub trait Update {
-    fn update(&self, if_exists: &ConflictOption, sep: &Sep) -> Result<Cow<Path>>;
-}
-
-impl Update for Path {
-    ///  When trying to rename a file to a path that already exists, calling update() on the
-    ///  target path will return a new valid path.
-    ///  # Args
-    /// * `if_exists`: option to resolve the naming conflict
-    /// * `sep`: if `if_exists` is set to rename, `sep` will go between the filename and the added counter
-    /// * `is_watching`: whether this function is being run from a watcher or not
-    /// # Return
-    /// This function will return `Some(new_path)` if `if_exists` is not set to skip, otherwise it returns `None`
-    fn update(&self, if_exists: &ConflictOption, sep: &Sep) -> Result<Cow<Path>> {
-        debug_assert!(self.exists());
-
-        match if_exists {
-            ConflictOption::Skip => Err(Error::from(ErrorKind::AlreadyExists)),
-            ConflictOption::Overwrite => Ok(Cow::Borrowed(self)),
-            ConflictOption::Rename => {
-                let (stem, extension) = get_stem_and_extension(&self);
-                let mut new = self.to_path_buf();
-                let mut n = 1;
-                while new.exists() {
-                    let new_filename = format!("{}{}({:?}).{}", stem, sep.as_str(), n, extension);
-                    new.set_file_name(new_filename);
-                    n += 1;
-                }
-                Ok(Cow::Owned(new))
-            }
-        }
-    }
-}
-
-pub trait Expandable {
-    fn expand_user(self) -> PathBuf;
-    fn expand_vars(self) -> PathBuf;
-}
-
-impl Expandable for PathBuf {
-    #[cfg(any(target_os = "linux", target_os = "macos"))]
-    fn expand_user(self) -> PathBuf {
-        let str = self.to_str().unwrap();
-        if str.contains('~') {
-            match env::var("HOME") {
-                Ok(home) => {
-                    let new = str.replace("~", &home);
-                    new.into()
-                }
-                Err(e) => panic!("error: {}", e),
-            }
-        } else {
-            self
-        }
+    pub fn tests_dir() -> PathBuf {
+        project_dir().join("tests")
     }
 
-    fn expand_vars(self) -> PathBuf {
-        if self.to_string_lossy().contains('$') {
-            self.components()
-                .map(|component| {
-                    let component: &Path = component.as_ref();
-                    let component = component.to_string_lossy();
-                    if component.starts_with('$') {
-                        env::var(component.replace('$', "")).unwrap_or_else(|_| {
-                            panic!(
-                                "error: environment variable '{}' could not be found",
-                                component
-                            )
-                        })
-                    } else {
-                        component.to_string()
-                    }
-                })
-                .collect::<PathBuf>()
-        } else {
-            self
-        }
+    pub fn test_file_or_dir(filename: &str) -> PathBuf {
+        tests_dir().join("files").join(filename)
     }
-}
 
-/// # Arguments
-/// * `path`: A reference to a std::path::PathBuf
-/// # Return
-/// Returns the stem and extension of `path` if they exist and can be parsed, otherwise returns an Error
-fn get_stem_and_extension(path: &impl AsRef<Path>) -> (Cow<str>, Cow<str>) {
-    let stem = path.as_ref().file_stem().unwrap().to_string_lossy();
-    let extension = path
-        .as_ref()
-        .extension()
-        .unwrap_or_default()
-        .to_string_lossy();
-
-    (stem, extension)
+    pub fn expected_path(file: &impl AsRef<Path>, sep: &Sep) -> Result<PathBuf> {
+        let extension = file
+            .as_ref()
+            .extension()
+            .unwrap_or_default()
+            .to_string_lossy();
+        let stem = match file.as_ref().file_stem() {
+            Some(stem) => stem.to_string_lossy(),
+            None => return Err(Error::from(ErrorKind::InvalidInput)),
+        };
+        let parent = file.as_ref().parent().unwrap();
+        Ok(parent.join(format!("{}{}(1).{}", stem, sep.deref(), extension)))
+    }
 }

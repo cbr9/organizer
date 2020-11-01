@@ -103,8 +103,8 @@ mod tests {
 
     use crate::{
         path::{
-            lib::vars::{expected_path, test_file_or_dir},
-            Update,
+            helpers::{expected_path, test_file_or_dir},
+            update::Update,
         },
         user_config::rules::actions::io_action::ConflictOption,
     };
@@ -113,7 +113,7 @@ mod tests {
     #[test]
     fn rename_with_rename_conflict() -> Result<()> {
         let original = Cow::from(test_file_or_dir("test2.txt"));
-        let expected = expected_path(&original, &Default::default());
+        let expected = expected_path(&original, &Default::default())?;
         let new_path = original
             .update(&ConflictOption::Rename, &Default::default())
             .unwrap();

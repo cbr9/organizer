@@ -1,5 +1,5 @@
 use crate::{
-    path::{Expandable, Update},
+    path::{expand::Expandable, update::Update},
     user_config::rules::rule::Rule,
     ARGS,
 };

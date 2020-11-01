@@ -1,4 +1,4 @@
-use crate::path::Expandable;
+use crate::path::expand::Expandable;
 use serde::{
     de,
     de::{MapAccess, Visitor},

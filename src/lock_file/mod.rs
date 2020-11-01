@@ -4,7 +4,7 @@ use clap::crate_name;
 use std::{
     env::temp_dir,
     fs,
-    fs::{File, OpenOptions},
+    fs::OpenOptions,
     io::{prelude::*, Result},
     path::{Path, PathBuf},
 };
@@ -52,42 +52,33 @@ impl<'a> GetProcessBy<&'a Path> for LockFile {
 
 impl LockFile {
     pub fn new() -> Self {
-        let f = LockFile {
+        let lock_file = LockFile {
             path: temp_dir().join(format!("{}.lock", crate_name!())),
             sep: "---".into(),
         };
-        f.update()
+        lock_file
+            .update()
             .expect("error: could not modify lock file (permission error?)");
-        f
+        lock_file
     }
 
     fn section(&self, pid: &Pid, config: &Path) -> String {
         format!("{}\n{}\n{}", pid, config.display(), self.sep)
     }
 
-    fn set_readonly(&self, readonly: bool) -> Result<()> {
-        let f = File::open(&self.path)?;
-        let mut perms = f.metadata()?.permissions();
-        perms.set_readonly(readonly);
-        f.set_permissions(perms)?;
-        Ok(())
-    }
-
     pub fn append(&self, pid: Pid, config: &Path) -> Result<()> {
-        if !self.path.exists() {
-            File::create(&self.path)?;
-        }
-        self.set_readonly(false)?;
         let mut f = OpenOptions::new()
             .append(true)
             .create(true)
             .open(&self.path)?;
         let result = writeln!(f, "{}", self.section(&pid, config));
-        self.set_readonly(true)?;
         result
     }
 
     pub fn get_running_watchers(&self) -> Vec<(Pid, PathBuf)> {
+        if !self.path.exists() {
+            return Vec::new();
+        }
         let content = fs::read_to_string(&self.path);
         match content {
             Ok(content) => {
@@ -115,7 +106,6 @@ impl LockFile {
     }
 
     fn update(&self) -> Result<()> {
-        self.set_readonly(false)?;
         let mut running_processes = String::new();
         let sys = System::new_with_specifics(RefreshKind::with_processes(RefreshKind::new()));
 
@@ -127,7 +117,6 @@ impl LockFile {
             }
         }
         fs::write(&self.path, running_processes)?;
-        self.set_readonly(true)?;
         Ok(())
     }
 }
