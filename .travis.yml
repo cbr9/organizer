@@ -2,8 +2,6 @@ language: rust
 
 rust:
   - stable
-  - beta
-  - nightly
 
 script: | 
   cargo build --verbose &&
@@ -23,13 +21,9 @@ sudo: required # travis-ci/travis-ci#9061
 
 matrix:
   fast_finish: true
-  allow_failures:
-    - rust: nightly
   include:
       - before_script:
-        - cargo install cargo-kcov
         - rustup component add rustfmt-preview
-        - rustup component add rustfmt --toolchain beta-x86_64-unknown-linux-gnu
         - rustup component add clippy-preview
 
 addons: # required for kcov
@@ -43,5 +37,3 @@ addons: # required for kcov
       - binutils-dev
       - libiberty-dev
 
-after_success: |
-  cargo kcov && bash <(curl -s https://codecov.io/bash)
