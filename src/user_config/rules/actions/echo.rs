@@ -1,17 +1,17 @@
 use crate::{
-    string::Placeholder,
+    string::{Placeholder, PlaceholderStr},
     user_config::rules::actions::{ActionType, AsAction},
 };
 use colored::Colorize;
 use log::info;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use std::{borrow::Cow, io::Result, ops::Deref, path::Path};
 
-#[derive(Debug, Clone, Deserialize, Serialize, Default)]
-pub struct Echo(String);
+#[derive(Debug, Clone, Deserialize, Default)]
+pub struct Echo(PlaceholderStr);
 
 impl Deref for Echo {
-    type Target = String;
+    type Target = PlaceholderStr;
 
     fn deref(&self) -> &Self::Target {
         &self.0

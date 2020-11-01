@@ -1,6 +1,6 @@
 use crate::{
     path::{Expandable, Update},
-    string::Placeholder,
+    string::{visit_placeholder_str, Placeholder, PlaceholderStr},
     user_config::rules::actions::{ActionType, AsAction},
 };
 use colored::Colorize;
@@ -114,14 +114,15 @@ impl<'de> Deserialize<'de> for IOAction {
             where
                 E: de::Error,
             {
-                Ok(IOAction::from_str(value).unwrap())
+                let string = visit_placeholder_str::<E>(value)?;
+                Ok(IOAction::from_str(string.as_str()).unwrap())
             }
 
             fn visit_map<M>(self, mut map: M) -> result::Result<Self::Value, M::Error>
             where
                 M: MapAccess<'de>,
             {
-                let mut to: Option<String> = None;
+                let mut to: Option<PlaceholderStr> = None;
                 let mut if_exists: Option<ConflictOption> = None;
                 let mut sep: Option<Sep> = None;
                 while let Some(key) = map.next_key::<String>()? {
@@ -166,14 +167,11 @@ impl FromStr for IOAction {
 
 impl IOAction {
     fn helper(path: &Path, action: &IOAction, kind: ActionType) -> Result<PathBuf> {
-        // TODO: refactor this mess
-        #[cfg(debug_assertions)]
         debug_assert!([ActionType::Move, ActionType::Rename, ActionType::Copy].contains(&kind));
 
         let mut to: PathBuf = action
             .to
-            .to_str()
-            .unwrap()
+            .to_string_lossy()
             .expand_placeholders(path)?
             .deref()
             .into();
@@ -211,7 +209,6 @@ pub enum ConflictOption {
     Overwrite,
     Skip,
     Rename,
-    Ask, // not available when watching
 }
 
 impl Default for ConflictOption {

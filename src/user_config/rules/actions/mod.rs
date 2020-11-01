@@ -12,10 +12,10 @@ use crate::user_config::rules::actions::{
     trash::Trash,
 };
 use log::error;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use std::{borrow::Cow, io::Result, ops::Deref, path::Path};
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all(serialize = "lowercase", deserialize = "lowercase"))]
 pub enum Action {
     Move(IOAction),
@@ -71,7 +71,7 @@ impl ToString for ActionType {
     }
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct Actions(Vec<Action>);
 
 impl Deref for Actions {

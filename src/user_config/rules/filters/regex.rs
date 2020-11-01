@@ -3,7 +3,7 @@ use serde::{Deserialize, Deserializer};
 use std::{ops::Deref, path::Path, str::FromStr};
 
 #[derive(Debug, Clone)]
-pub struct Regex(Vec<regex::Regex>);
+pub struct Regex(pub Vec<regex::Regex>);
 
 impl Deref for Regex {
     type Target = Vec<regex::Regex>;
@@ -21,6 +21,18 @@ impl AsFilter for Regex {
             }
         }
         false
+    }
+}
+
+impl Regex {}
+
+impl From<Vec<&str>> for Regex {
+    fn from(vec: Vec<&str>) -> Self {
+        let vec = vec
+            .iter()
+            .map(|str| regex::Regex::new(str).unwrap())
+            .collect::<Vec<_>>();
+        Self(vec)
     }
 }
 

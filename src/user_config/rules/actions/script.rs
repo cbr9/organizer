@@ -1,5 +1,5 @@
 use crate::{
-    string::Placeholder,
+    string::{Placeholder, PlaceholderStr},
     user_config::{
         rules::{actions::AsAction, filters::AsFilter},
         UserConfig,
@@ -7,7 +7,7 @@ use crate::{
 };
 use colored::Colorize;
 use log::info;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use std::{
     borrow::Cow,
     fs,
@@ -18,11 +18,11 @@ use std::{
     str::FromStr,
 };
 
-#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[derive(Debug, Clone, Deserialize, Default)]
 #[serde(deny_unknown_fields)]
 pub struct Script {
     exec: String,
-    content: String,
+    content: PlaceholderStr,
 }
 
 impl AsAction<Self> for Script {

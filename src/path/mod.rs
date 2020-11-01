@@ -4,11 +4,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use crate::{
-    subcommands::run::resolve_conflict,
-    user_config::rules::actions::io_action::{ConflictOption, Sep},
-    MATCHES,
-};
+use crate::user_config::rules::actions::io_action::{ConflictOption, Sep};
 use std::{
     borrow::Cow,
     io::{Error, ErrorKind},
@@ -63,16 +59,6 @@ impl Update for Path {
                 }
                 Ok(Cow::Owned(new))
             }
-            ConflictOption::Ask => {
-                debug_assert_ne!(ConflictOption::default(), ConflictOption::Ask);
-                let cmd = MATCHES.subcommand_name().unwrap();
-                let if_exists = if cmd == "watch" {
-                    Default::default()
-                } else {
-                    resolve_conflict(&self)
-                };
-                self.update(&if_exists, sep)
-            }
         }
     }
 }
@@ -100,11 +86,11 @@ impl Expandable for PathBuf {
     }
 
     fn expand_vars(self) -> PathBuf {
-        if self.to_str().unwrap().contains('$') {
+        if self.to_string_lossy().contains('$') {
             self.components()
                 .map(|component| {
                     let component: &Path = component.as_ref();
-                    let component = component.to_str().unwrap();
+                    let component = component.to_string_lossy();
                     if component.starts_with('$') {
                         env::var(component.replace('$', "")).unwrap_or_else(|_| {
                             panic!(
@@ -127,14 +113,13 @@ impl Expandable for PathBuf {
 /// * `path`: A reference to a std::path::PathBuf
 /// # Return
 /// Returns the stem and extension of `path` if they exist and can be parsed, otherwise returns an Error
-fn get_stem_and_extension(path: &impl AsRef<Path>) -> (&str, &str) {
-    let stem = path.as_ref().file_stem().unwrap().to_str().unwrap();
+fn get_stem_and_extension(path: &impl AsRef<Path>) -> (Cow<str>, Cow<str>) {
+    let stem = path.as_ref().file_stem().unwrap().to_string_lossy();
     let extension = path
         .as_ref()
         .extension()
         .unwrap_or_default()
-        .to_str()
-        .unwrap();
+        .to_string_lossy();
 
     (stem, extension)
 }

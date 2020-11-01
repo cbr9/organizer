@@ -1,20 +1,78 @@
+use lazy_static::lazy_static;
 use regex::Regex;
+use serde::{de::Error, Deserialize, Deserializer};
 use std::{
     borrow::Cow,
-    io::{Error, ErrorKind, Result},
+    io::{ErrorKind, Result},
+    ops::Deref,
     path::Path,
+    result,
 };
 
-pub trait Capitalize<T> {
-    fn capitalize(&self) -> T;
+lazy_static! {
+    // forgive me god for this monstrosity
+    pub static ref POTENTIAL_REGEX: Regex = Regex::new(r"\{\w+(?:\.\w+)*}").unwrap();
+    pub static ref VALID_REGEX: Regex = {
+        let vec = vec![
+            r"\{(?:(?:path|parent)(?:\.path|\.parent)*)(?:\.name(?:\.to_lowercase|\.to_uppercase|\.capitalize)?)?\}", // match placeholders that involve directories
+            r"\{path(?:\.name(?:\.extension|\.stem)?(?:\.to_lowercase|\.to_uppercase|\.capitalize)?)?\}", // match placeholders that involve files and start with path
+            r"\{name(?:\.extension|\.stem)?(?:\.to_lowercase|\.to_uppercase|\.capitalize)?\}", // match placeholders that involve files and start with name
+            r"\{(?:(?:extension|stem)(?:\.to_lowercase|\.to_uppercase|\.capitalize)?)\}" // match placeholders that involve files and only deal with extension/stem
+        ];
+        let whole = vec.iter().enumerate().map(|(i, str)| {
+            if i == vec.len()-1 {
+                format!("(?:{})", str)
+            } else {
+                format!("(?:{})|", str)
+            }
+        }).collect::<Vec<_>>().join("");
+        Regex::new(whole.as_str()).unwrap()
+    };
+}
+
+pub trait Capitalize {
+    fn capitalize(&self) -> String;
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct PlaceholderStr(String);
+
+impl<'de> Deserialize<'de> for PlaceholderStr {
+    fn deserialize<D>(deserializer: D) -> result::Result<Self, <D as Deserializer<'de>>::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let v = String::deserialize(deserializer)?;
+        visit_placeholder_str(v.as_str())
+    }
+}
+
+pub fn visit_placeholder_str<E>(v: &str) -> result::Result<PlaceholderStr, E>
+where
+    E: Error,
+{
+    if !(POTENTIAL_REGEX.is_match(v) ^ VALID_REGEX.is_match(v)) {
+        // if there are no matches or there are only valid ones
+        Ok(PlaceholderStr(v.to_string()))
+    } else {
+        Err(E::custom("invalid placeholder")) // if there are matches but they're invalid
+    }
+}
+
+impl Deref for PlaceholderStr {
+    type Target = String;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
 }
 
 pub trait Placeholder {
     fn expand_placeholders(&self, path: &Path) -> Result<Cow<'_, str>>;
 }
 
-impl Capitalize<String> for String {
-    fn capitalize(&self) -> String {
+impl Capitalize for String {
+    fn capitalize(&self) -> Self {
         if self.is_empty() {
             return self.clone();
         }
@@ -23,13 +81,12 @@ impl Capitalize<String> for String {
     }
 }
 
-impl Placeholder for &str {
+impl Placeholder for str {
     fn expand_placeholders(&self, path: &Path) -> Result<Cow<'_, str>> {
-        // TODO: check invalid placeholders like {stem.extension} or {extension.path}
-        let regex = Regex::new(r"\{\w+(?:\.\w+)*}").unwrap();
-        if regex.is_match(self) {
+        if VALID_REGEX.is_match(self) {
+            // if the first condition is false, the second one won't be evaluated and REGEX won't be initialized
             let mut new = self.to_string();
-            for span in regex.find_iter(self) {
+            for span in VALID_REGEX.find_iter(self) {
                 let placeholders = span
                     .as_str()
                     .trim_matches(|x| x == '{' || x == '}')
@@ -84,14 +141,14 @@ impl Placeholder for &str {
     }
 }
 
-fn placeholder_error(placeholder: &str, current_value: &Path, span: &str) -> Error {
+fn placeholder_error(placeholder: &str, current_value: &Path, span: &str) -> std::io::Error {
     let message = format!(
         "tried to retrieve the {} from {}, but it does not contain it (placeholder: {})",
         placeholder,
         current_value.display(),
         span
     );
-    Error::new(ErrorKind::Other, message)
+    std::io::Error::new(ErrorKind::Other, message)
 }
 
 #[cfg(test)]
@@ -176,6 +233,16 @@ mod tests {
         match new {
             Cow::Borrowed(_) => Ok(()),
             Cow::Owned(_) => Err(Error::from(ErrorKind::Other)),
+        }
+    }
+    #[test]
+    fn invalid_placeholder() -> Result<()> {
+        let tested = "/home/cabero/{extension}/{name}";
+        let dummy_path = PathBuf::from(tested);
+        let new = tested.expand_placeholders(&dummy_path);
+        match new {
+            Err(_) => Ok(()),
+            Ok(_) => Err(Error::from(ErrorKind::Other)),
         }
     }
 }

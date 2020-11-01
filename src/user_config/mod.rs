@@ -5,6 +5,7 @@ use crate::{
 };
 use clap::crate_name;
 use dirs::{config_dir, home_dir};
+use log::error;
 use rules::actions::io_action::ConflictOption;
 use serde::Deserialize;
 use std::{
@@ -59,9 +60,16 @@ impl UserConfig {
         }
 
         let content = fs::read_to_string(&path).unwrap(); // if there is some problem with the config file, we should not try to fix it
-        let mut config: UserConfig = serde_yaml::from_str(&content).unwrap();
-        config.path = path;
-        config
+        match serde_yaml::from_str::<UserConfig>(&content) {
+            Ok(mut config) => {
+                config.path = path;
+                config
+            }
+            Err(e) => {
+                error!("{}", e);
+                std::process::exit(1);
+            }
+        }
     }
 
     pub fn create(path: &Path) {
