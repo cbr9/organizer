@@ -1,5 +1,5 @@
 ![Travis (.org) branch](https://img.shields.io/travis/cbr9/organize/alpha-2.0)
-![Codecov branch](https://img.shields.io/codecov/c/github/cbr9/organize/alpha-2.0?flag=organize&token=c880b4ff-2e7e-4f2b-ab9a-0f5909fb3751)
+[![codecov](https://codecov.io/gh/cbr9/organize/branch/alpha-2.0/graph/badge.svg?token=9K4VVDHUMH)](https://codecov.io/gh/cbr9/organize)
 ### Currently supported actions
 - Copy
 - Move 
