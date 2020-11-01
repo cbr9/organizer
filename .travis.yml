@@ -21,12 +21,20 @@ matrix:
   allow_failures:
     - env: NAME='cargo-travis'
   include:
-    - before_script:
+    - env: NAME='cargo-travis'
+      before_script:
         - rustup component add rustfmt-preview
         - rustup component add clippy-preview
       script:
         - cargo fmt 
         - cargo clippy --verbose
-
+      addons: # required for kcov
+        apt:
+          packages:
+            - libcurl4-openssl-dev
+            - libelf-dev
+            - libdw-dev
+            - binutils-dev
+            - cmake
 
 
