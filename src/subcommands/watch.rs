@@ -78,8 +78,8 @@ pub fn watch() -> Result<()> {
         // FIXME: currently two instances can't be launched because we're not checking whether or not the new one has the same config as the running one
         let path = UserConfig::path();
         let watchers = LOCK_FILE.get_running_watchers();
-        let running_configs = watchers.iter().map(|(_, path)| path).collect::<Vec<_>>();
-        if running_configs.contains(&&path) {
+        let mut running_configs = watchers.iter().map(|(_, path)| path);
+        if running_configs.any(|config| config == &path) {
             return if path == UserConfig::default_path() {
                 println!("An existing instance is already running. Use --replace to restart it");
                 Ok(())
