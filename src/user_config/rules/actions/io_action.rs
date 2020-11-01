@@ -1,13 +1,13 @@
 use crate::{
     path::{Expandable, Update},
-    string::{visit_placeholder_str, Placeholder, PlaceholderStr},
+    string::placeholder::{visit_placeholder_string, Placeholder},
     user_config::rules::actions::{ActionType, AsAction},
 };
 use colored::Colorize;
 use log::info;
 use serde::{
     de,
-    de::{MapAccess, Visitor},
+    de::{Error, MapAccess, Visitor},
     export,
     export::PhantomData,
     Deserialize,
@@ -19,7 +19,8 @@ use std::{
     convert::Infallible,
     fmt,
     fs,
-    io::{Error, ErrorKind, Result},
+    io,
+    io::{ErrorKind, Result},
     ops::Deref,
     path::{Path, PathBuf},
     result,
@@ -114,7 +115,8 @@ impl<'de> Deserialize<'de> for IOAction {
             where
                 E: de::Error,
             {
-                let string = visit_placeholder_str::<E>(value)?;
+                let string =
+                    visit_placeholder_string(value).map_err(|e| E::custom(e.to_string()))?;
                 Ok(IOAction::from_str(string.as_str()).unwrap())
             }
 
@@ -122,7 +124,7 @@ impl<'de> Deserialize<'de> for IOAction {
             where
                 M: MapAccess<'de>,
             {
-                let mut to: Option<PlaceholderStr> = None;
+                let mut to: Option<String> = None;
                 let mut if_exists: Option<ConflictOption> = None;
                 let mut sep: Option<Sep> = None;
                 while let Some(key) = map.next_key::<String>()? {
@@ -138,7 +140,9 @@ impl<'de> Deserialize<'de> for IOAction {
                 if to.is_none() {
                     return Err(serde::de::Error::custom("Missing path"));
                 }
-                let mut action = IOAction::from_str(to.unwrap().as_str()).unwrap();
+                let to = visit_placeholder_string(to.unwrap().as_str())
+                    .map_err(|e| M::Error::custom(e.to_string()))?;
+                let mut action = IOAction::from_str(to.as_str()).unwrap();
                 if let Some(if_exists) = if_exists {
                     action.if_exists = if_exists;
                 }
@@ -182,7 +186,7 @@ impl IOAction {
             to = to.canonicalize().unwrap();
             to.push(
                 path.file_name()
-                    .ok_or_else(|| Error::new(ErrorKind::Other, "path has no filename"))?,
+                    .ok_or_else(|| io::Error::new(ErrorKind::Other, "path has no filename"))?,
             );
         }
 

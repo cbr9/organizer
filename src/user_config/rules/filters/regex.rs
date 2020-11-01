@@ -24,8 +24,6 @@ impl AsFilter for Regex {
     }
 }
 
-impl Regex {}
-
 impl From<Vec<&str>> for Regex {
     fn from(vec: Vec<&str>) -> Self {
         let vec = vec

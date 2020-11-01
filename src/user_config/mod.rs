@@ -17,6 +17,7 @@ use std::{
 };
 
 pub mod rules;
+// TODO: add tests for the custom deserializers
 
 /// Represents the user's configuration file
 /// ### Fields

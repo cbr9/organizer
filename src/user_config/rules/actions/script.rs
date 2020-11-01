@@ -1,5 +1,5 @@
 use crate::{
-    string::{Placeholder, PlaceholderStr},
+    string::placeholder::{deserialize_placeholder_string, Placeholder},
     user_config::{
         rules::{actions::AsAction, filters::AsFilter},
         UserConfig,
@@ -7,15 +7,9 @@ use crate::{
 };
 use colored::Colorize;
 use log::info;
-use serde::{
-    de::{Error, MapAccess, Visitor},
-    export::Formatter,
-    Deserialize,
-    Deserializer,
-};
+use serde::{de::Error, Deserialize, Deserializer};
 use std::{
     borrow::Cow,
-    fmt,
     fs,
     io::Result,
     ops::Deref,
@@ -25,10 +19,12 @@ use std::{
     str::FromStr,
 };
 
-#[derive(Debug, Clone, Default)]
+#[derive(Deserialize, Debug, Clone, Default)]
 pub struct Script {
+    #[serde(deserialize_with = "deserialize_exec")]
     exec: String,
-    content: PlaceholderStr,
+    #[serde(deserialize_with = "deserialize_placeholder_string")]
+    content: String,
 }
 
 impl AsAction<Self> for Script {
@@ -44,64 +40,21 @@ impl AsAction<Self> for Script {
     }
 }
 
-impl<'de> Deserialize<'de> for Script {
-    fn deserialize<D>(deserializer: D) -> result::Result<Self, <D as Deserializer<'de>>::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        struct ScriptVisitor;
-        impl<'de> Visitor<'de> for ScriptVisitor {
-            type Value = Script;
-
-            fn expecting(&self, formatter: &mut Formatter) -> fmt::Result {
-                formatter.write_str("map")
-            }
-
-            fn visit_map<A>(self, mut map: A) -> result::Result<Self::Value, A::Error>
-            where
-                A: MapAccess<'de>,
-            {
-                let mut exec: Option<String> = None;
-                let mut content: Option<PlaceholderStr> = None;
-                while let Some(key) = map.next_key::<String>()? {
-                    match key.as_str() {
-                        "exec" => exec = Some(map.next_value()?),
-                        "content" => content = Some(map.next_value()?),
-                        _ => {
-                            return Err(A::Error::custom(
-                                "unexpected field, expected exec or content",
-                            ))
-                        }
-                    }
-                }
-
-                match &exec {
-                    None => return Err(A::Error::custom("missing field 'exec'")),
-                    Some(exec) => {
-                        let mut command = std::process::Command::new(exec);
-                        match command.spawn() {
-                            Ok(mut child) => child.kill().unwrap(),
-                            Err(_) => {
-                                return Err(A::Error::custom(format!(
-                                    "interpreter '{}' could not be run",
-                                    exec
-                                )))
-                            }
-                        }
-                    }
-                }
-
-                if content.is_none() {
-                    return Err(A::Error::custom("missing field 'content'"));
-                }
-
-                Ok(Script {
-                    exec: exec.unwrap(),
-                    content: content.unwrap(),
-                })
-            }
+fn deserialize_exec<'de, D>(deserializer: D) -> result::Result<String, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let str = String::deserialize(deserializer)?;
+    let mut command = std::process::Command::new(&str);
+    match command.spawn() {
+        Ok(mut child) => {
+            child.kill().unwrap_or_else(|_| ());
+            Ok(str)
         }
-        deserializer.deserialize_map(ScriptVisitor)
+        Err(_) => Err(D::Error::custom(format!(
+            "interpreter '{}' could not be run",
+            str
+        ))),
     }
 }
 

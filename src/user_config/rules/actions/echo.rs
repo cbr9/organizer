@@ -1,5 +1,5 @@
 use crate::{
-    string::{Placeholder, PlaceholderStr},
+    string::placeholder::{deserialize_placeholder_string, Placeholder},
     user_config::rules::actions::{ActionType, AsAction},
 };
 use colored::Colorize;
@@ -8,10 +8,10 @@ use serde::Deserialize;
 use std::{borrow::Cow, io::Result, ops::Deref, path::Path};
 
 #[derive(Debug, Clone, Deserialize, Default)]
-pub struct Echo(PlaceholderStr);
+pub struct Echo(#[serde(deserialize_with = "deserialize_placeholder_string")] String);
 
 impl Deref for Echo {
-    type Target = PlaceholderStr;
+    type Target = String;
 
     fn deref(&self) -> &Self::Target {
         &self.0
