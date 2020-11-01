@@ -22,10 +22,18 @@ matrix:
     - env: NAME='cargo-travis'
   include:
     - env: NAME='cargo-travis'
+      sudo: required # travis-ci/travis-ci#9061
       before_script:
+        - cargo install cargo-update || echo "cargo-update already installed"
+        - cargo install cargo-travis || echo "cargo-travis already installed"
+        - cargo install-update -a
         - rustup component add rustfmt-preview
         - rustup component add clippy-preview
       script:
+        - |
+            cargo build    --verbose &&
+            cargo coverage --verbose &&
+            bash <(curl -s https://codecov.io/bash) -s target/kcov
         - cargo fmt 
         - cargo clippy --verbose
       addons: # required for kcov
