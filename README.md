@@ -1,3 +1,5 @@
+**NOTE**: This version is unmaintained, as all development efforts are put into the 2.0 version.
+
 # organizer
 This is a productivity tool designed to keep your filesystem in order.
 For example, you can use this to keep your downloads folder clean. You can even manage several folders, so you can keep not only your downloads folder clean, but also your home directory.
