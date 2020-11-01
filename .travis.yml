@@ -2,8 +2,6 @@ language: rust
 
 rust:
   - stable
-  - beta
-  - nightly
 
 script: | 
   cargo build --verbose &&
@@ -17,26 +15,18 @@ branches:
     - alpha-2.0
 
 cache: cargo
+
 matrix:
   fast_finish: true
   allow_failures:
     - env: NAME='cargo-travis'
   include:
-    - rust: nightly-2018-01-12
-      before_script:
-        - cargo install cargo-update || echo "cargo-update already installed"
-        - cargo install cargo-travis || echo "cargo-travis already installed"
-        - cargo install-update -a
-        - rustup component add rustfmt-preview || echo "rust fmt is already installed"
-        - rustup component add clippy-preview || echo "clippy is already installed"
+    - before_script:
+        - rustup component add rustfmt-preview
+        - rustup component add clippy-preview
       script:
-        - |
-          cargo build    --verbose &&
-          cargo coverage --verbose &&
-          bash <(curl -s https://codecov.io/bash) -s target/kcov
-        - cargo fmt -- --write-mode=diff
-        - cargo clippy -- -D clippy
-
+        - cargo fmt 
+        - cargo clippy --verbose
 
 
 
