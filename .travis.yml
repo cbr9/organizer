@@ -3,11 +3,7 @@ language: rust
 rust:
   - stable
 
-script: | 
-  cargo build --verbose &&
-  cargo test --verbose &&
-  cargo fmt &&
-  cargo clippy --verbose
+script: cargo build --verbose && cargo test --verbose && cargo fmt && cargo clippy --verbose
 
 branches:
   only:
@@ -25,6 +21,7 @@ matrix:
       - before_script:
         - rustup component add rustfmt-preview
         - rustup component add clippy-preview
+        - rm -r target/debug/deps/organize-*
 
 addons: # required for kcov
   apt:
