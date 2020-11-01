@@ -15,9 +15,7 @@ impl Capitalize for String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::{
-        io::{Error, ErrorKind, Result},
-    };
+    use std::io::{Error, ErrorKind, Result};
 
     #[test]
     fn capitalize_word() -> Result<()> {
