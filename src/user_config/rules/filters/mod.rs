@@ -45,10 +45,6 @@ impl Deref for Filters {
 
 impl Filters {
     pub fn r#match(&self, path: &Path) -> bool {
-        let mut matches = true;
-        for filter in self.iter() {
-            matches = matches && filter.matches(path)
-        }
-        matches
+        self.iter().all(|filter| filter.matches(path))
     }
 }
