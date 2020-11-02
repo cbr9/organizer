@@ -9,10 +9,11 @@ use log::error;
 use rules::actions::io_action::ConflictOption;
 use serde::Deserialize;
 use std::{
-    borrow::Cow,
+    borrow::{Borrow, Cow},
     collections::HashMap,
     env,
     fs,
+    ops::Deref,
     path::{Path, PathBuf},
 };
 
@@ -125,12 +126,25 @@ impl UserConfig {
     pub fn default_path() -> PathBuf {
         Self::dir().join("config.yml")
     }
-    /// returns a hashmap where the keys are paths and the values are tuples of rules
-    /// and indices, which indicate the index of the key's corresponding folder in the rule's folders' list
-    /// (i.e. the key is the ith folder in the corresponding rule)
-    pub fn to_map(&self) -> HashMap<&Path, Vec<(&Rule, usize)>> {
+}
+
+pub struct PathToRules<'a>(HashMap<&'a Path, Vec<(&'a Rule, usize)>>);
+
+impl<'a> Deref for PathToRules<'a> {
+    type Target = HashMap<&'a Path, Vec<(&'a Rule, usize)>>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl<'a> PathToRules<'a> {
+    pub fn from<T>(config: &'a T) -> Self
+    where
+        T: Borrow<UserConfig>,
+    {
         let mut map = HashMap::new();
-        for rule in self.rules.iter() {
+        for rule in config.borrow().rules.iter() {
             for (i, folder) in rule.folders.iter().enumerate() {
                 if !map.contains_key(folder.path.as_path()) {
                     map.insert(folder.path.as_path(), Vec::new());
@@ -138,6 +152,38 @@ impl UserConfig {
                 map.get_mut(folder.path.as_path()).unwrap().push((rule, i));
             }
         }
-        map
+        Self(map)
+    }
+
+    pub fn get<T>(&'a self, path: T) -> &'a Vec<(&'a Rule, usize)>
+    where
+        T: AsRef<Path>,
+    {
+        let path = path.as_ref();
+        self.0.get(path).unwrap_or_else(|| {
+            // if the path is some subdirectory not represented in the hashmap
+            let components = path.components().collect::<Vec<_>>();
+            let mut paths = Vec::new();
+            for i in 0..components.len() {
+                let slice = components[0..i]
+                    .iter()
+                    .map(|comp| comp.as_os_str().to_string_lossy())
+                    .collect::<Vec<_>>();
+                let str: String = slice.join(&std::path::MAIN_SEPARATOR.to_string());
+                paths.push(PathBuf::from(str.replace("//", "/")))
+            }
+            let path = paths
+                .iter()
+                .rev()
+                .find_map(|path| {
+                    if self.0.contains_key(path.as_path()) {
+                        Some(path)
+                    } else {
+                        None
+                    }
+                })
+                .unwrap();
+            self.0.get(path.as_path()).unwrap()
+        })
     }
 }

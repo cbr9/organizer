@@ -44,7 +44,10 @@ impl Deref for Filters {
 }
 
 impl Filters {
-    pub fn r#match(&self, path: &Path) -> bool {
-        self.iter().all(|filter| filter.matches(path))
+    pub fn r#match<T>(&self, path: T) -> bool
+    where
+        T: AsRef<Path>,
+    {
+        self.iter().all(|filter| filter.matches(path.as_ref()))
     }
 }

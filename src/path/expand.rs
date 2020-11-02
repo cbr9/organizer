@@ -4,8 +4,9 @@ use std::{
 };
 
 pub trait Expandable {
-    fn expand_user(self) -> PathBuf;
-    fn expand_vars(self) -> PathBuf;
+    // TODO: implement for str
+    fn expand_user(self) -> Self;
+    fn expand_vars(self) -> Self;
 }
 
 impl Expandable for PathBuf {

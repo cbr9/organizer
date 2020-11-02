@@ -21,32 +21,19 @@ use crate::{
     lock_file::GetProcessBy,
     path::is_hidden::IsHidden,
     subcommands::run::run,
-    user_config::{
-        rules::{folder::Options, rule::Rule},
-        UserConfig,
-    },
+    user_config::{rules::folder::Options, PathToRules, UserConfig},
     CONFIG,
     LOCK_FILE,
     MATCHES,
 };
-use std::{
-    borrow::Cow,
-    collections::{HashMap, HashSet},
-    ops::Deref,
-    path::Path,
-};
+use std::{borrow::Borrow, collections::HashMap, ops::Deref, path::Path};
 use sysinfo::{ProcessExt, RefreshKind, Signal, System, SystemExt};
 
-pub fn process_file(
-    path: &Path,
-    path2rules: &HashMap<&Path, Vec<(&Rule, usize)>>,
-    from_watch: bool,
-) {
+pub fn process_file(path: &Path, path2rules: &PathToRules, from_watch: bool) {
     if path.is_file() {
         let parent = path.parent().unwrap();
-        // FIXME: if using recursive = true, this will panic, because the parent won't be a key in path2rules
-        'rules: for (rule, i) in path2rules.get(parent).unwrap() {
-            if rule.filters.r#match(&path) {
+        'rules: for (rule, i) in path2rules.get(path) {
+            if rule.filters.r#match(path) {
                 let folder = rule.folders.get(*i).unwrap();
                 let Options {
                     ignore,
@@ -62,7 +49,7 @@ pub fn process_file(
                 }
                 if !from_watch || *watch {
                     // simplified from `if (from_watch && *watch) || !from_watch`
-                    rule.actions.run(path);
+                    rule.actions.run(&path);
                     break 'rules;
                 }
             }
@@ -90,7 +77,7 @@ pub fn watch() -> Result<()> {
         }
         run()?;
         let mut watcher = Watcher::new();
-        watcher.run(Cow::Borrowed(CONFIG.deref()))?;
+        watcher.run(CONFIG.deref())?;
     }
     Ok(())
 }
@@ -113,32 +100,47 @@ impl Watcher {
         Watcher { watcher, receiver }
     }
 
-    pub fn run(&mut self, config: Cow<UserConfig>) -> Result<()> {
-        let mut folders = HashSet::new();
+    pub fn run<T>(&mut self, config: T) -> Result<()>
+    where
+        T: Borrow<UserConfig>,
+    {
+        let config = config.borrow();
+        let mut folders = HashMap::new();
         for rule in config.rules.iter() {
             for folder in rule.folders.iter() {
-                let recursive = &folder.options.recursive;
+                let recursive = if folder.options.recursive {
+                    RecursiveMode::Recursive
+                } else {
+                    RecursiveMode::NonRecursive
+                };
                 let path = &folder.path;
-                folders.insert((path, recursive));
+                match folders.get(path) {
+                    None => {
+                        folders.insert(path, recursive);
+                    }
+                    Some(value) => {
+                        if recursive == RecursiveMode::Recursive
+                            && value == &RecursiveMode::NonRecursive
+                        {
+                            folders.insert(path, recursive);
+                        }
+                    }
+                }
             }
         }
+
         if cfg!(feature = "hot-reload") {
             self.watcher
                 .watch(config.path.parent().unwrap(), RecursiveMode::NonRecursive)
                 .unwrap();
         }
         for (path, recursive) in folders.into_iter() {
-            let is_recursive = if *recursive {
-                RecursiveMode::Recursive
-            } else {
-                RecursiveMode::NonRecursive
-            };
-            self.watcher.watch(path, is_recursive).unwrap();
+            self.watcher.watch(path, recursive).unwrap();
         }
 
         // PROCESS SIGNALS
         LOCK_FILE.append(process::id() as i32, &config.path)?;
-        let path2rules = config.to_map();
+        let path2rules = PathToRules::from(config);
 
         loop {
             if let Ok(RawEvent {
@@ -165,7 +167,7 @@ impl Watcher {
                                 Ok(mut new_config) => {
                                     new_config.path = config.path.clone();
                                     info!("reloaded configuration: {}", new_config.path.display());
-                                    break self.run(Cow::Owned(new_config));
+                                    break self.run(new_config);
                                 }
                                 Err(e) => error!(
                                     "cannot reload config (rules will stay as they were): {}",

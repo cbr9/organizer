@@ -108,7 +108,7 @@ pub struct Options {
     /// defines whether or not subdirectories must be scanned
     #[serde(default)]
     pub recursive: bool,
-    #[serde(default)]
+    #[serde(default = "default_watch")]
     pub watch: bool,
     #[serde(default)]
     pub ignore: Vec<PathBuf>,
@@ -116,11 +116,15 @@ pub struct Options {
     pub hidden_files: bool,
 }
 
+fn default_watch() -> bool {
+    true
+}
+
 impl Default for Options {
     fn default() -> Self {
         Self {
             recursive: false,
-            watch: true,
+            watch: default_watch(),
             hidden_files: false,
             ignore: Vec::new(),
         }

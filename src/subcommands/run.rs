@@ -1,11 +1,12 @@
-use crate::CONFIG;
 use rayon::prelude::*;
 use std::{fs, io::Result};
 
-use crate::subcommands::watch::process_file;
+use crate::{subcommands::watch::process_file, user_config::PathToRules, CONFIG};
+use std::{borrow::Cow, ops::Deref};
 
 pub fn run() -> Result<()> {
-    let path2rules = CONFIG.to_map();
+    let cow = Cow::Borrowed(CONFIG.deref());
+    let path2rules = PathToRules::from(&cow);
 
     path2rules
         .par_iter()
