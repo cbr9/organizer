@@ -119,17 +119,17 @@ fn placeholder_error(placeholder: &str, current_value: &Path, span: &str) -> std
 }
 
 #[cfg(test)]
-mod tests {
+pub mod tests {
     use super::*;
     use std::{
         fmt::{Debug, Display},
         io,
-        io::Error,
+        io::{Error, Result},
         path::PathBuf,
         result,
     };
 
-    trait SwapResult<T, E>
+    pub trait SwapResult<T, E>
     where
         E: Debug + Display,
     {
@@ -145,206 +145,143 @@ mod tests {
         }
     }
 
-    type Result = io::Result<()>;
-
     #[test]
-    fn deserialize_invalid_ph_extension_name() -> Result {
+    fn deserialize_invalid_ph_extension_name() -> Result<()> {
         let str = "$HOME/{extension.name}";
-        visit_placeholder_string(str)
-            .map(|_| ())
-            .map_err(|_| Error::from(ErrorKind::Other))
-            .swap()
+        visit_placeholder_string(str).map(|_| ()).swap()
     }
     #[test]
-    fn deserialize_invalid_ph_extension_stem() -> Result {
+    fn deserialize_invalid_ph_extension_stem() -> Result<()> {
         let str = "$HOME/{extension.stem}";
-        visit_placeholder_string(str)
-            .map(|_| ())
-            .map_err(|_| Error::from(ErrorKind::Other))
-            .swap()
+        visit_placeholder_string(str).map(|_| ()).swap()
     }
     #[test]
-    fn deserialize_invalid_ph_extension_extension() -> Result {
+    fn deserialize_invalid_ph_extension_extension() -> Result<()> {
         let str = "$HOME/{extension.extension}";
-        visit_placeholder_string(str)
-            .map(|_| ())
-            .map_err(|_| Error::from(ErrorKind::Other))
-            .swap()
+        visit_placeholder_string(str).map(|_| ()).swap()
     }
     #[test]
-    fn deserialize_invalid_ph_stem_extension() -> Result {
+    fn deserialize_invalid_ph_stem_extension() -> Result<()> {
         let str = "$HOME/{stem.extension}";
-        visit_placeholder_string(str)
-            .map(|_| ())
-            .map_err(|_| Error::from(ErrorKind::Other))
-            .swap()
+        visit_placeholder_string(str).map(|_| ()).swap()
     }
     #[test]
-    fn deserialize_invalid_ph_stem_stem() -> Result {
+    fn deserialize_invalid_ph_stem_stem() -> Result<()> {
         let str = "$HOME/{stem.stem}";
-        visit_placeholder_string(str)
-            .map(|_| ())
-            .map_err(|_| Error::from(ErrorKind::Other))
-            .swap()
+        visit_placeholder_string(str).map(|_| ()).swap()
     }
     #[test]
-    fn deserialize_invalid_ph_parent_stem() -> Result {
+    fn deserialize_invalid_ph_parent_stem() -> Result<()> {
         let str = "$HOME/{parent.stem}";
-        visit_placeholder_string(str)
-            .map(|_| ())
-            .map_err(|_| Error::from(ErrorKind::Other))
-            .swap()
+        visit_placeholder_string(str).map(|_| ()).swap()
     }
     #[test]
-    fn deserialize_invalid_ph_parent_extension() -> Result {
+    fn deserialize_invalid_ph_parent_extension() -> Result<()> {
         let str = "$HOME/{parent.extension}";
-        visit_placeholder_string(str)
-            .map(|_| ())
-            .map_err(|_| Error::from(ErrorKind::Other))
-            .swap()
+        visit_placeholder_string(str).map(|_| ()).swap()
     }
     #[test]
-    fn deserialize_valid_ph_extension() -> Result {
+    fn deserialize_valid_ph_extension() -> Result<()> {
         let str = "$HOME/{extension}";
-        visit_placeholder_string(str)
-            .map(|_| ())
-            .map_err(|_| Error::from(ErrorKind::Other))
+        visit_placeholder_string(str).map(|_| ())
     }
     #[test]
-    fn deserialize_valid_ph_stem() -> Result {
+    fn deserialize_valid_ph_stem() -> Result<()> {
         let str = "$HOME/{stem}";
-        visit_placeholder_string(str)
-            .map(|_| ())
-            .map_err(|_| Error::from(ErrorKind::Other))
+        visit_placeholder_string(str).map(|_| ())
     }
     #[test]
-    fn deserialize_valid_ph_filename() -> Result {
+    fn deserialize_valid_ph_filename() -> Result<()> {
         let str = "$HOME/{filename}";
-        visit_placeholder_string(str)
-            .map(|_| ())
-            .map_err(|_| Error::from(ErrorKind::Other))
+        visit_placeholder_string(str).map(|_| ())
     }
     #[test]
-    fn deserialize_valid_ph_path() -> Result {
+    fn deserialize_valid_ph_path() -> Result<()> {
         let str = "$HOME/{path}";
-        visit_placeholder_string(str)
-            .map(|_| ())
-            .map_err(|_| Error::from(ErrorKind::Other))
+        visit_placeholder_string(str).map(|_| ())
     }
     #[test]
-    fn deserialize_valid_ph_parent() -> Result {
+    fn deserialize_valid_ph_parent() -> Result<()> {
         let str = "$HOME/{parent}";
-        visit_placeholder_string(str)
-            .map(|_| ())
-            .map_err(|_| Error::from(ErrorKind::Other))
+        visit_placeholder_string(str).map(|_| ())
     }
     #[test]
-    fn deserialize_valid_ph_extension_uppercase() -> Result {
+    fn deserialize_valid_ph_extension_uppercase() -> Result<()> {
         let str = "$HOME/{extension.to_uppercase}";
-        visit_placeholder_string(str)
-            .map(|_| ())
-            .map_err(|_| Error::from(ErrorKind::Other))
+        visit_placeholder_string(str).map(|_| ())
     }
     #[test]
-    fn deserialize_valid_ph_stem_uppercase() -> Result {
+    fn deserialize_valid_ph_stem_uppercase() -> Result<()> {
         let str = "$HOME/{stem.to_uppercase}";
-        visit_placeholder_string(str)
-            .map(|_| ())
-            .map_err(|_| Error::from(ErrorKind::Other))
+        visit_placeholder_string(str).map(|_| ())
     }
     #[test]
-    fn deserialize_valid_ph_filename_uppercase() -> Result {
+    fn deserialize_valid_ph_filename_uppercase() -> Result<()> {
         let str = "$HOME/{filename.to_uppercase}";
-        visit_placeholder_string(str)
-            .map(|_| ())
-            .map_err(|_| Error::from(ErrorKind::Other))
+        visit_placeholder_string(str).map(|_| ())
     }
     #[test]
-    fn deserialize_valid_ph_path_uppercase() -> Result {
+    fn deserialize_valid_ph_path_uppercase() -> Result<()> {
         let str = "$HOME/{path.to_uppercase}";
-        visit_placeholder_string(str)
-            .map(|_| ())
-            .map_err(|_| Error::from(ErrorKind::Other))
+        visit_placeholder_string(str).map(|_| ())
     }
     #[test]
-    fn deserialize_valid_ph_parent_uppercase() -> Result {
+    fn deserialize_valid_ph_parent_uppercase() -> Result<()> {
         let str = "$HOME/{parent.to_uppercase}";
-        visit_placeholder_string(str)
-            .map(|_| ())
-            .map_err(|_| Error::from(ErrorKind::Other))
+        visit_placeholder_string(str).map(|_| ())
     }
     #[test]
-    fn deserialize_valid_ph_filename_extension() -> Result {
+    fn deserialize_valid_ph_filename_extension() -> Result<()> {
         let str = "$HOME/{filename.extension}";
-        visit_placeholder_string(str)
-            .map(|_| ())
-            .map_err(|_| Error::from(ErrorKind::Other))
+        visit_placeholder_string(str).map(|_| ())
     }
     #[test]
-    fn deserialize_valid_ph_filename_stem() -> Result {
+    fn deserialize_valid_ph_filename_stem() -> Result<()> {
         let str = "$HOME/{filename.stem}";
-        visit_placeholder_string(str)
-            .map(|_| ())
-            .map_err(|_| Error::from(ErrorKind::Other))
+        visit_placeholder_string(str).map(|_| ())
     }
     #[test]
-    fn deserialize_valid_ph_parent_filename() -> Result {
+    fn deserialize_valid_ph_parent_filename() -> Result<()> {
         let str = "$HOME/{parent.filename}";
-        visit_placeholder_string(str)
-            .map(|_| ())
-            .map_err(|_| Error::from(ErrorKind::Other))
+        visit_placeholder_string(str).map(|_| ())
     }
     #[test]
-    fn deserialize_valid_ph_parent_parent() -> Result {
+    fn deserialize_valid_ph_parent_parent() -> Result<()> {
         let str = "$HOME/{parent.parent}";
-        visit_placeholder_string(str)
-            .map(|_| ())
-            .map_err(|_| Error::from(ErrorKind::Other))
+        visit_placeholder_string(str).map(|_| ())
     }
     #[test]
-    fn deserialize_valid_ph_parent_parent_parent() -> Result {
+    fn deserialize_valid_ph_parent_parent_parent() -> Result<()> {
         let str = "$HOME/{parent.parent.parent}";
-        visit_placeholder_string(str)
-            .map(|_| ())
-            .map_err(|_| Error::from(ErrorKind::Other))
+        visit_placeholder_string(str).map(|_| ())
     }
     #[test]
-    fn deserialize_valid_ph_parent_parent_parent_filename() -> Result {
+    fn deserialize_valid_ph_parent_parent_parent_filename() -> Result<()> {
         let str = "$HOME/{parent.parent.parent.filename}";
-        visit_placeholder_string(str)
-            .map(|_| ())
-            .map_err(|_| Error::from(ErrorKind::Other))
+        visit_placeholder_string(str).map(|_| ())
     }
     #[test]
-    fn deserialize_valid_ph_path_parent() -> Result {
+    fn deserialize_valid_ph_path_parent() -> Result<()> {
         let str = "$HOME/{path.parent}";
-        visit_placeholder_string(str)
-            .map(|_| ())
-            .map_err(|_| Error::from(ErrorKind::Other))
+        visit_placeholder_string(str).map(|_| ())
     }
     #[test]
-    fn deserialize_valid_ph_path_filename() -> Result {
+    fn deserialize_valid_ph_path_filename() -> Result<()> {
         let str = "$HOME/{path.filename}";
-        visit_placeholder_string(str)
-            .map(|_| ())
-            .map_err(|_| Error::from(ErrorKind::Other))
+        visit_placeholder_string(str).map(|_| ())
     }
     #[test]
-    fn deserialize_valid_ph_path_stem() -> Result {
+    fn deserialize_valid_ph_path_stem() -> Result<()> {
         let str = "$HOME/{path.stem}";
-        visit_placeholder_string(str)
-            .map(|_| ())
-            .map_err(|_| Error::from(ErrorKind::Other))
+        visit_placeholder_string(str).map(|_| ())
     }
     #[test]
-    fn deserialize_valid_ph_path_extension() -> Result {
+    fn deserialize_valid_ph_path_extension() -> Result<()> {
         let str = "$HOME/{path.extension}";
-        visit_placeholder_string(str)
-            .map(|_| ())
-            .map_err(|_| Error::from(ErrorKind::Other))
+        visit_placeholder_string(str).map(|_| ())
     }
     #[test]
-    fn single_placeholder() -> Result {
+    fn single_placeholder() -> Result<()> {
         let with_ph = "$HOME/Downloads/{parent.filename}";
         let expected = String::from("$HOME/Downloads/Documents");
         let path = Path::new("$HOME/Documents/test.pdf");
@@ -355,7 +292,7 @@ mod tests {
         }
     }
     #[test]
-    fn multiple_placeholders() -> Result {
+    fn multiple_placeholders() -> Result<()> {
         let with_ph = "$HOME/{extension}/{parent.filename}";
         let expected = String::from("$HOME/pdf/Documents");
         let path = Path::new("$HOME/Documents/test.pdf");
@@ -366,7 +303,7 @@ mod tests {
         }
     }
     #[test]
-    fn multiple_placeholders_sentence() -> Result {
+    fn multiple_placeholders_sentence() -> Result<()> {
         let with_ph = "To run this program, you have to change directory into $HOME/{extension}/{parent.filename}";
         let path = PathBuf::from("$HOME/Documents/test.pdf");
         let new_str = with_ph.expand_placeholders(&path)?;
@@ -377,7 +314,7 @@ mod tests {
         }
     }
     #[test]
-    fn no_placeholder() -> Result {
+    fn no_placeholder() -> Result<()> {
         let tested = "/home/cabero/Documents/test.pdf";
         let dummy_path = PathBuf::from(tested);
         let new = tested.expand_placeholders(&dummy_path)?;

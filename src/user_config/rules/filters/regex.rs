@@ -15,12 +15,17 @@ impl Deref for Regex {
 
 impl AsFilter for Regex {
     fn matches(&self, path: &Path) -> bool {
-        for regex in self.iter() {
-            if regex.is_match(path.to_str().unwrap()) {
-                return true;
+        match path.file_name() {
+            None => false,
+            Some(filename) => {
+                for regex in self.iter() {
+                    if regex.is_match(&filename.to_string_lossy()) {
+                        return true;
+                    }
+                }
+                false
             }
         }
-        false
     }
 }
 
@@ -65,18 +70,49 @@ impl<'de> Deserialize<'de> for Regex {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde_yaml::Error as YamlError;
+    use crate::{
+        string::placeholder::tests::SwapResult,
+        user_config::rules::filters::extension::tests::BoolToResult,
+    };
+    use std::io::{Error, ErrorKind, Result};
+
     #[test]
-    fn deserialize_single() -> Result<(), YamlError> {
+    fn deserialize_single() -> Result<()> {
         // only needs to test the deserialize implementation, because it's just a wrapper around a struct from a different crate
-        let regex: Result<Regex, YamlError> = serde_yaml::from_str(".*");
-        regex.and_then(|_| Ok(()))
+        serde_yaml::from_str::<Regex>(".*").map_or_else(
+            |e| Err(Error::new(ErrorKind::Other, e.to_string())),
+            |_| Ok(()),
+        )
     }
 
     #[test]
-    fn deserialize_mult() -> Result<(), YamlError> {
+    fn deserialize_mult() -> Result<()> {
         // only needs to test the deserialize implementation, because it's just a wrapper around a struct from a different crate
-        let regex: Result<Regex, YamlError> = serde_yaml::from_str("[.*]");
-        regex.and_then(|_| Ok(()))
+        serde_yaml::from_str::<Regex>("[.*]").map_or_else(
+            |e| Err(Error::new(ErrorKind::Other, e.to_string())),
+            |_| Ok(()),
+        )
+    }
+
+    #[test]
+    fn match_single() -> Result<()> {
+        let regex = Regex::from_str(r".*unsplash.*")
+            .map_err(|e| Error::new(ErrorKind::Other, e.to_string()))?;
+        let path = Path::new("$HOME/Pictures/test_unsplash_img.jpg");
+        regex.matches(path).into_result()
+    }
+
+    #[test]
+    fn match_multiple() -> Result<()> {
+        let regex = Regex::from(vec![r".*unsplash.*", r"\w"]);
+        let path = Path::new("$HOME/Pictures/test_unsplash_img.jpg");
+        regex.matches(path).into_result()
+    }
+
+    #[test]
+    fn no_match_multiple() -> Result<()> {
+        let regex = Regex::from(vec![r".*unsplash.*", r"\d"]);
+        let path = Path::new("$HOME/Documents/deep_learning.pdf");
+        regex.matches(path).into_result().swap()
     }
 }

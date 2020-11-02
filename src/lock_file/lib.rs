@@ -1,11 +1,11 @@
 #[cfg(test)]
 mod tests {
-    use crate::{lock_file::LockFile, user_config::UserConfig, LOCK_FILE};
-    use std::{
-        convert::TryInto,
-        fs,
-        io::{Error, ErrorKind, Result},
+    use crate::{
+        lock_file::LockFile,
+        user_config::{rules::filters::extension::tests::BoolToResult, UserConfig},
+        LOCK_FILE,
     };
+    use std::{convert::TryInto, fs, io::Result};
     use sysinfo::{ProcessExt, RefreshKind, Signal, System, SystemExt};
 
     fn stop() {
@@ -31,13 +31,6 @@ mod tests {
         simulate_watch();
         let lock_file = LockFile::new();
         let content = fs::read_to_string(&lock_file.path).expect("couldnt read lockfile");
-        if content.is_empty() {
-            Ok(())
-        } else {
-            Err(Error::new(
-                ErrorKind::Other,
-                "processes are not being cleared from lockfile properly",
-            ))
-        }
+        content.is_empty().into_result()
     }
 }

@@ -67,50 +67,70 @@ impl AsFilter for Extension {
 }
 
 #[cfg(test)]
-mod tests {
+pub mod tests {
     use super::Extension;
     use crate::user_config::rules::filters::AsFilter;
-    use serde_yaml::Error as YamlError;
     use std::{
-        io::{Error, ErrorKind},
+        io::{Error, ErrorKind, Result},
         path::PathBuf,
     };
 
-    #[test]
-    fn deserialize_string() -> Result<(), YamlError> {
-        let extension: Result<Extension, YamlError> = serde_yaml::from_str("pdf");
-        match extension {
-            Ok(_) => Ok(()),
-            Err(e) => Err(e),
+    pub trait BoolToResult {
+        fn into_result(self) -> Result<()>;
+    }
+
+    impl BoolToResult for bool {
+        fn into_result(self) -> Result<()> {
+            match self {
+                true => Ok(()),
+                false => Err(Error::from(ErrorKind::Other)),
+            }
         }
     }
 
     #[test]
-    fn deserialize_seq() -> Result<(), YamlError> {
-        let extension: Result<Extension, YamlError> = serde_yaml::from_str("[pdf, doc, docx]");
-        match extension {
-            Ok(_) => Ok(()),
-            Err(e) => Err(e),
-        }
+    fn deserialize_string() -> Result<()> {
+        serde_yaml::from_str::<Extension>("pdf").map_or_else(
+            |e| Err(Error::new(ErrorKind::Other, e.to_string())),
+            |_| Ok(()),
+        )
     }
 
     #[test]
-    fn single_match_pdf() -> Result<(), Error> {
+    fn deserialize_seq() -> Result<()> {
+        serde_yaml::from_str::<Extension>("[pdf, doc, docx]").map_or_else(
+            |e| Err(Error::new(ErrorKind::Other, e.to_string())),
+            |_| Ok(()),
+        )
+    }
+
+    #[test]
+    #[should_panic]
+    fn deserialize_map() {
+        serde_yaml::from_str::<Extension>("extension: pdf")
+            .map_or_else(|_| Err(Error::from(ErrorKind::Other)), |_| Ok(()))
+            .unwrap()
+    }
+
+    #[test]
+    fn single_match_pdf() -> Result<()> {
         let extension = Extension(vec!["pdf".into()]);
         let path = PathBuf::from("$HOME/Downloads/test.pdf");
-        match extension.matches(&path) {
-            true => Ok(()),
-            false => Err(Error::from(ErrorKind::Other)),
-        }
+        extension.matches(&path).into_result()
     }
 
     #[test]
-    fn multiple_match_pdf() -> Result<(), Error> {
+    fn multiple_match_pdf() -> Result<()> {
         let extension = Extension(vec!["pdf".into(), "doc".into(), "docx".into()]);
         let path = PathBuf::from("$HOME/Downloads/test.pdf");
-        match extension.matches(&path) {
-            true => Ok(()),
-            false => Err(Error::from(ErrorKind::Other)),
-        }
+        extension.matches(&path).into_result()
+    }
+
+    #[test]
+    #[should_panic]
+    fn no_match() {
+        let extension = Extension(vec!["pdf".into(), "doc".into(), "docx".into()]);
+        let path = PathBuf::from("$HOME/Downloads/test.jpg");
+        extension.matches(&path).into_result().unwrap()
     }
 }
