@@ -22,6 +22,7 @@ pub mod path;
 pub mod string;
 pub mod subcommands;
 pub mod user_config;
+pub mod utils;
 
 lazy_static! {
     pub static ref MATCHES: ArgMatches = App::from(load_yaml!("cli.yml"))

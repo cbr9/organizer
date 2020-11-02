@@ -121,64 +121,53 @@ fn placeholder_error(placeholder: &str, current_value: &Path, span: &str) -> std
 #[cfg(test)]
 pub mod tests {
     use super::*;
+    use crate::utils::tests::IntoResult;
     use std::{
-        fmt::{Debug, Display},
-        io,
         io::{Error, Result},
         path::PathBuf,
-        result,
     };
 
-    pub trait SwapResult<T, E>
-    where
-        E: Debug + Display,
-    {
-        fn swap(&self) -> result::Result<T, E>;
-    }
-
-    impl SwapResult<(), io::Error> for result::Result<(), io::Error> {
-        fn swap(&self) -> Self {
-            match self {
-                Ok(_) => Err(Error::from(ErrorKind::Other)),
-                Err(_) => Ok(()),
-            }
-        }
-    }
-
     #[test]
-    fn deserialize_invalid_ph_extension_name() -> Result<()> {
+    #[should_panic]
+    fn deserialize_invalid_ph_extension_name() {
         let str = "$HOME/{extension.name}";
-        visit_placeholder_string(str).map(|_| ()).swap()
+        visit_placeholder_string(str).map(|_| ()).unwrap()
     }
     #[test]
-    fn deserialize_invalid_ph_extension_stem() -> Result<()> {
+    #[should_panic]
+    fn deserialize_invalid_ph_extension_stem() {
         let str = "$HOME/{extension.stem}";
-        visit_placeholder_string(str).map(|_| ()).swap()
+        visit_placeholder_string(str).map(|_| ()).unwrap()
     }
     #[test]
-    fn deserialize_invalid_ph_extension_extension() -> Result<()> {
+    #[should_panic]
+    fn deserialize_invalid_ph_extension_extension() {
         let str = "$HOME/{extension.extension}";
-        visit_placeholder_string(str).map(|_| ()).swap()
+        visit_placeholder_string(str).map(|_| ()).unwrap()
     }
     #[test]
-    fn deserialize_invalid_ph_stem_extension() -> Result<()> {
+    #[should_panic]
+    fn deserialize_invalid_ph_stem_extension() {
         let str = "$HOME/{stem.extension}";
-        visit_placeholder_string(str).map(|_| ()).swap()
+        visit_placeholder_string(str).map(|_| ()).unwrap()
     }
     #[test]
-    fn deserialize_invalid_ph_stem_stem() -> Result<()> {
+    #[should_panic]
+    fn deserialize_invalid_ph_stem_stem() {
         let str = "$HOME/{stem.stem}";
-        visit_placeholder_string(str).map(|_| ()).swap()
+        visit_placeholder_string(str).map(|_| ()).unwrap()
     }
     #[test]
-    fn deserialize_invalid_ph_parent_stem() -> Result<()> {
+    #[should_panic]
+    fn deserialize_invalid_ph_parent_stem() {
         let str = "$HOME/{parent.stem}";
-        visit_placeholder_string(str).map(|_| ()).swap()
+        visit_placeholder_string(str).map(|_| ()).unwrap()
     }
     #[test]
-    fn deserialize_invalid_ph_parent_extension() -> Result<()> {
+    #[should_panic]
+    fn deserialize_invalid_ph_parent_extension() {
         let str = "$HOME/{parent.extension}";
-        visit_placeholder_string(str).map(|_| ()).swap()
+        visit_placeholder_string(str).map(|_| ()).unwrap()
     }
     #[test]
     fn deserialize_valid_ph_extension() -> Result<()> {
@@ -286,10 +275,7 @@ pub mod tests {
         let expected = String::from("$HOME/Downloads/Documents");
         let path = Path::new("$HOME/Documents/test.pdf");
         let new_str = with_ph.expand_placeholders(path)?;
-        match new_str == expected {
-            true => Ok(()),
-            false => Err(Error::from(ErrorKind::Other)),
-        }
+        (new_str == expected).into_result()
     }
     #[test]
     fn multiple_placeholders() -> Result<()> {
@@ -297,10 +283,7 @@ pub mod tests {
         let expected = String::from("$HOME/pdf/Documents");
         let path = Path::new("$HOME/Documents/test.pdf");
         let new_str = with_ph.expand_placeholders(path)?;
-        match new_str == expected {
-            true => Ok(()),
-            false => Err(Error::from(ErrorKind::Other)),
-        }
+        (new_str == expected).into_result()
     }
     #[test]
     fn multiple_placeholders_sentence() -> Result<()> {
@@ -308,10 +291,7 @@ pub mod tests {
         let path = PathBuf::from("$HOME/Documents/test.pdf");
         let new_str = with_ph.expand_placeholders(&path)?;
         let expected = "To run this program, you have to change directory into $HOME/pdf/Documents";
-        match new_str == expected {
-            true => Ok(()),
-            false => Err(Error::from(ErrorKind::Other)),
-        }
+        (new_str == expected).into_result()
     }
     #[test]
     fn no_placeholder() -> Result<()> {

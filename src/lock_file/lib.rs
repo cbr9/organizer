@@ -2,7 +2,8 @@
 mod tests {
     use crate::{
         lock_file::LockFile,
-        user_config::{rules::filters::extension::tests::BoolToResult, UserConfig},
+        user_config::UserConfig,
+        utils::tests::IntoResult,
         LOCK_FILE,
     };
     use std::{convert::TryInto, fs, io::Result};

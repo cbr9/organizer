@@ -70,15 +70,11 @@ impl<'de> Deserialize<'de> for Regex {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        string::placeholder::tests::SwapResult,
-        user_config::rules::filters::extension::tests::BoolToResult,
-    };
+    use crate::utils::tests::IntoResult;
     use std::io::{Error, ErrorKind, Result};
 
     #[test]
     fn deserialize_single() -> Result<()> {
-        // only needs to test the deserialize implementation, because it's just a wrapper around a struct from a different crate
         serde_yaml::from_str::<Regex>(".*").map_or_else(
             |e| Err(Error::new(ErrorKind::Other, e.to_string())),
             |_| Ok(()),
@@ -87,7 +83,6 @@ mod tests {
 
     #[test]
     fn deserialize_mult() -> Result<()> {
-        // only needs to test the deserialize implementation, because it's just a wrapper around a struct from a different crate
         serde_yaml::from_str::<Regex>("[.*]").map_or_else(
             |e| Err(Error::new(ErrorKind::Other, e.to_string())),
             |_| Ok(()),
@@ -110,9 +105,10 @@ mod tests {
     }
 
     #[test]
-    fn no_match_multiple() -> Result<()> {
+    #[should_panic]
+    fn no_match_multiple() {
         let regex = Regex::from(vec![r".*unsplash.*", r"\d"]);
         let path = Path::new("$HOME/Documents/deep_learning.pdf");
-        regex.matches(path).into_result().swap()
+        regex.matches(path).into_result().unwrap()
     }
 }

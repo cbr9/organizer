@@ -156,6 +156,19 @@ impl<'de> Deserialize<'de> for IOAction {
     }
 }
 
+impl<T> From<T> for IOAction
+where
+    T: Into<PathBuf>,
+{
+    fn from(val: T) -> Self {
+        Self {
+            to: val.into(),
+            if_exists: Default::default(),
+            sep: Default::default(),
+        }
+    }
+}
+
 impl FromStr for IOAction {
     type Err = Infallible;
 
@@ -170,13 +183,16 @@ impl FromStr for IOAction {
 }
 
 impl IOAction {
-    fn helper(path: &Path, action: &IOAction, kind: ActionType) -> Result<PathBuf> {
+    fn helper<T>(path: T, action: &IOAction, kind: ActionType) -> Result<PathBuf>
+    where
+        T: AsRef<Path>,
+    {
         debug_assert!([ActionType::Move, ActionType::Rename, ActionType::Copy].contains(&kind));
 
         let mut to: PathBuf = action
             .to
             .to_string_lossy()
-            .expand_placeholders(path)?
+            .expand_placeholders(path.as_ref())?
             .deref()
             .into();
         if kind == ActionType::Copy || kind == ActionType::Move {
@@ -185,7 +201,8 @@ impl IOAction {
             }
             to = to.canonicalize().unwrap();
             to.push(
-                path.file_name()
+                path.as_ref()
+                    .file_name()
                     .ok_or_else(|| io::Error::new(ErrorKind::Other, "path has no filename"))?,
             );
         }
@@ -224,74 +241,46 @@ impl Default for ConflictOption {
 #[cfg(test)]
 mod tests {
     use crate::{
-        path::helpers::test_file_or_dir,
         user_config::rules::actions::{io_action::IOAction, ActionType},
+        utils::tests::{project, IntoResult},
     };
-    use std::{
-        fs,
-        io::{Error, ErrorKind, Result},
-    };
+    use std::io::Result;
 
     #[test]
     fn prepare_path_copy() -> Result<()> {
-        let path = test_file_or_dir("test1.txt");
-        let target = test_file_or_dir("test_dir");
-        let expected = test_file_or_dir("test_dir").join("test1 (1).txt");
-        if expected.exists() {
-            fs::remove_file(&expected)?;
-        }
-        let action = IOAction {
-            to: target,
-            if_exists: Default::default(),
-            sep: Default::default(),
-        };
-        let new_path = IOAction::helper(&path, &action, ActionType::Copy)?;
-        if new_path == expected {
-            Ok(())
-        } else {
-            Err(Error::from(ErrorKind::Other))
-        }
+        let original = project().join("tests").join("files").join("test1.txt");
+        let target = project().join("tests").join("files").join("test_dir");
+        let expected = target.join("test1 (1).txt");
+        assert!(target.join(original.file_name().unwrap()).exists());
+        assert!(!expected.exists());
+        let action = IOAction::from(target);
+        let new_path = IOAction::helper(&original, &action, ActionType::Copy)?;
+        (new_path == expected).into_result()
     }
 
     #[test]
     fn prepare_path_move() -> Result<()> {
-        let path = test_file_or_dir("test1.txt");
-        let target = test_file_or_dir("test_dir");
-        let expected = test_file_or_dir("test_dir").join("test1 (1).txt");
-        if expected.exists() {
-            fs::remove_file(&expected)?;
-        }
-        let action = IOAction {
-            to: target,
-            if_exists: Default::default(),
-            sep: Default::default(),
-        };
-        let new_path = IOAction::helper(&path, &action, ActionType::Move)?;
-        if new_path == expected {
-            Ok(())
-        } else {
-            Err(Error::from(ErrorKind::Other))
-        }
+        let original = project().join("tests").join("files").join("test1.txt");
+        let target = project().join("tests").join("files").join("test_dir");
+        let expected = target.join("test1 (1).txt");
+        assert!(target.join(original.file_name().unwrap()).exists());
+        assert!(!expected.exists());
+        let action = IOAction::from(target);
+        let new_path = IOAction::helper(&original, &action, ActionType::Move)?;
+        (new_path == expected).into_result()
     }
 
     #[test]
     fn prepare_path_rename() -> Result<()> {
-        let path = test_file_or_dir("test1.txt");
-        let target = test_file_or_dir("test_dir").join("test1.txt");
-        let expected = test_file_or_dir("test_dir").join("test1 (1).txt");
-        if expected.exists() {
-            fs::remove_file(&expected)?;
-        }
-        let action = IOAction {
-            to: target,
-            if_exists: Default::default(),
-            sep: Default::default(),
-        };
-        let new_path = IOAction::helper(&path, &action, ActionType::Rename)?;
-        if new_path == expected {
-            Ok(())
-        } else {
-            Err(Error::from(ErrorKind::Other))
-        }
+        let original = project().join("tests").join("files").join("test1.txt");
+        let target = original
+            .with_file_name("test_dir")
+            .join(original.file_name().unwrap());
+        let expected = target.with_file_name("test1 (1).txt");
+        assert!(target.exists());
+        assert!(!expected.exists());
+        let action = IOAction::from(target);
+        let new_path = IOAction::helper(&original, &action, ActionType::Rename)?;
+        (new_path == expected).into_result()
     }
 }

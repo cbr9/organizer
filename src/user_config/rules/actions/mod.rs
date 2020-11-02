@@ -99,67 +99,52 @@ impl Actions {
 
 #[cfg(test)]
 mod tests {
-    use std::io::{Error, ErrorKind, Result};
+    use std::io::Result;
 
     use crate::{
-        path::{
-            helpers::{expected_path, test_file_or_dir},
-            update::Update,
-        },
+        path::update::Update,
         user_config::rules::actions::io_action::ConflictOption,
+        utils::tests::{project, IntoResult},
     };
-    use std::borrow::Cow;
 
     #[test]
     fn rename_with_rename_conflict() -> Result<()> {
-        let original = Cow::from(test_file_or_dir("test2.txt"));
-        let expected = expected_path(&original, &Default::default())?;
+        let original = project().join("tests").join("files").join("test2.txt");
+        let expected = original.with_file_name("test2 (1).txt");
         let new_path = original
             .update(&ConflictOption::Rename, &Default::default())
             .unwrap();
-        if new_path == expected {
-            Ok(())
-        } else {
-            Err(Error::new(
-                ErrorKind::Other,
-                "filepath after rename is not as expected",
-            ))
-        }
+        (new_path == expected).into_result()
     }
 
     #[test]
     fn rename_with_overwrite_conflict() -> Result<()> {
-        let original = Cow::from(test_file_or_dir("test2.txt"));
-        let expected = original.clone();
+        let original = project().join("tests").join("files").join("test2.txt");
         let new_path = original
             .update(&ConflictOption::Overwrite, &Default::default())
             .unwrap();
-        if new_path == expected {
-            Ok(())
-        } else {
-            Err(Error::new(
-                ErrorKind::Other,
-                "filepath after rename is not as expected",
-            ))
-        }
+        (new_path == original).into_result()
     }
 
     #[test]
     #[should_panic] // unwrapping a None value
     fn rename_with_skip_conflict() {
-        let target = Cow::from(test_file_or_dir("test2.txt"));
-        target
+        let original = project().join("tests").join("files").join("test2.txt");
+        original
             .update(&ConflictOption::Skip, &Default::default())
             .unwrap();
     }
 
     #[test]
     #[should_panic] // trying to modify a path that does not exist
-    fn new_path_to_non_existing_file() {
-        let target = Cow::from(test_file_or_dir("test_dir2").join("test1.txt"));
-        #[cfg(debug_assertions)]
-        debug_assert!(!target.exists());
-        target
+    fn new_path_for_non_existing_file() {
+        let original = project()
+            .join("tests")
+            .join("files")
+            .join("test_dir2")
+            .join("test1.txt");
+        debug_assert!(!original.exists());
+        original
             .update(&ConflictOption::Rename, &Default::default())
             .unwrap();
     }

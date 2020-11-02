@@ -26,6 +26,7 @@ impl Expandable for PathBuf {
     }
 
     fn expand_vars(self) -> PathBuf {
+        // TODO: avoid panic, return a serde error
         if self.to_string_lossy().contains('$') {
             self.components()
                 .map(|component| {
@@ -52,38 +53,21 @@ impl Expandable for PathBuf {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::path::helpers::{project_dir, tests_dir};
+    use crate::utils::tests::{project, IntoResult};
     use dirs::home_dir;
-    use std::{
-        env,
-        io::{Error, ErrorKind, Result},
-    };
+    use std::{env, io::Result};
 
     #[test]
     fn home() -> Result<()> {
-        let tested = PathBuf::from("$HOME/Documents");
+        let original = PathBuf::from("$HOME/Documents");
         let expected = home_dir().unwrap().join("Documents");
-        if tested.expand_vars() == expected {
-            Ok(())
-        } else {
-            Err(Error::new(
-                ErrorKind::InvalidData,
-                "the environment variable wasn't properly expanded",
-            ))
-        }
+        (original.expand_vars() == expected).into_result()
     }
     #[test]
     fn new_var() -> Result<()> {
-        env::set_var("PROJECT_DIR", project_dir());
-        let tested = PathBuf::from("$PROJECT_DIR/tests");
-        if tested.expand_vars() == tests_dir() {
-            Ok(())
-        } else {
-            Err(Error::new(
-                ErrorKind::InvalidData,
-                "the environment variable wasn't properly expanded",
-            ))
-        }
+        env::set_var("PROJECT_DIR", project());
+        let original = PathBuf::from("$PROJECT_DIR/tests");
+        (original.expand_vars() == project().join("tests")).into_result()
     }
     #[test]
     #[should_panic]

@@ -21,7 +21,7 @@ impl Deref for Extension {
 }
 
 impl<'de> Deserialize<'de> for Extension {
-    fn deserialize<D>(deserializer: D) -> Result<Self, <D as Deserializer<'de>>::Error>
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
     {
@@ -69,24 +69,11 @@ impl AsFilter for Extension {
 #[cfg(test)]
 pub mod tests {
     use super::Extension;
-    use crate::user_config::rules::filters::AsFilter;
+    use crate::{user_config::rules::filters::AsFilter, utils::tests::IntoResult};
     use std::{
         io::{Error, ErrorKind, Result},
         path::PathBuf,
     };
-
-    pub trait BoolToResult {
-        fn into_result(self) -> Result<()>;
-    }
-
-    impl BoolToResult for bool {
-        fn into_result(self) -> Result<()> {
-            match self {
-                true => Ok(()),
-                false => Err(Error::from(ErrorKind::Other)),
-            }
-        }
-    }
 
     #[test]
     fn deserialize_string() -> Result<()> {
@@ -95,7 +82,6 @@ pub mod tests {
             |_| Ok(()),
         )
     }
-
     #[test]
     fn deserialize_seq() -> Result<()> {
         serde_yaml::from_str::<Extension>("[pdf, doc, docx]").map_or_else(
@@ -103,7 +89,6 @@ pub mod tests {
             |_| Ok(()),
         )
     }
-
     #[test]
     #[should_panic]
     fn deserialize_map() {
@@ -111,21 +96,18 @@ pub mod tests {
             .map_or_else(|_| Err(Error::from(ErrorKind::Other)), |_| Ok(()))
             .unwrap()
     }
-
     #[test]
     fn single_match_pdf() -> Result<()> {
         let extension = Extension(vec!["pdf".into()]);
         let path = PathBuf::from("$HOME/Downloads/test.pdf");
         extension.matches(&path).into_result()
     }
-
     #[test]
     fn multiple_match_pdf() -> Result<()> {
         let extension = Extension(vec!["pdf".into(), "doc".into(), "docx".into()]);
         let path = PathBuf::from("$HOME/Downloads/test.pdf");
         extension.matches(&path).into_result()
     }
-
     #[test]
     #[should_panic]
     fn no_match() {
