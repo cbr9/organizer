@@ -1,9 +1,9 @@
 use crate::user_config::rules::filters::{extension::Extension, AsFilter};
-use serde::{de::Error, Deserialize, Deserializer};
+use serde::{de::Error, ser::SerializeSeq, Deserialize, Deserializer, Serialize, Serializer};
 use std::{ops::Deref, path::Path, str::FromStr};
 
-#[derive(Debug, Clone)]
-pub struct Regex(pub Vec<regex::Regex>);
+#[derive(Debug, Serialize, Clone)]
+pub struct Regex(#[serde(serialize_with = "serialize_seq_regex")] pub Vec<regex::Regex>);
 
 impl Deref for Regex {
     type Target = Vec<regex::Regex>;
@@ -48,6 +48,19 @@ impl FromStr for Regex {
             Err(e) => Err(e),
         }
     }
+}
+
+fn serialize_seq_regex<S>(val: &Vec<regex::Regex>, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    struct VecVisitor;
+    let mut vec = serializer.serialize_seq(Some(val.len()))?;
+    for element in val {
+        let str = element.to_string();
+        vec.serialize_element(&str);
+    }
+    vec.end()
 }
 
 impl<'de> Deserialize<'de> for Regex {

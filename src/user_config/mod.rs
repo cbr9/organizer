@@ -1,13 +1,14 @@
 use crate::{
     path::{expand::Expandable, update::Update},
+    settings::Settings,
     user_config::rules::rule::Rule,
     ARGS,
 };
 use clap::crate_name;
 use dirs::{config_dir, home_dir};
 use log::error;
-use rules::actions::io_action::ConflictOption;
-use serde::Deserialize;
+use rules::{actions::io_action::ConflictOption, options::Options};
+use serde::{Deserialize, Serialize};
 use std::{
     borrow::{Borrow, Cow},
     collections::HashMap,
@@ -24,11 +25,18 @@ pub mod rules;
 /// ### Fields
 /// * `path`: the path the user's config, either the default one or some other passed with the --with-config argument
 /// * `rules`: a list of parsed rules defined by the user
-#[derive(Deserialize, Clone, Debug)]
+#[derive(Deserialize, Serialize, Clone, Debug)]
 pub struct UserConfig {
     pub rules: Vec<Rule>,
+    pub defaults: Option<Options>,
     #[serde(skip)]
     pub path: PathBuf,
+}
+
+impl AsRef<Self> for UserConfig {
+    fn as_ref(&self) -> &UserConfig {
+        self
+    }
 }
 
 impl Default for UserConfig {
@@ -47,7 +55,7 @@ impl UserConfig {
     /// ### Errors
     /// This constructor fails in the following cases:
     /// - The configuration file does not exist
-    fn new(path: PathBuf) -> Self {
+    pub(crate) fn new(path: PathBuf) -> Self {
         if path == UserConfig::default_path() {
             match home_dir() {
                 None => panic!("error: cannot determine home directory"),
@@ -64,6 +72,17 @@ impl UserConfig {
         let content = fs::read_to_string(&path).unwrap(); // if there is some problem with the config file, we should not try to fix it
         match serde_yaml::from_str::<UserConfig>(&content) {
             Ok(mut config) => {
+                let rules = config.rules.clone();
+                let settings = Settings::new().unwrap();
+                for (i, rule) in rules.iter().enumerate() {
+                    for (j, folder) in rule.folders.iter().enumerate() {
+                        let options = folder.fill_options(&settings, &config, &rule);
+                        config.rules[i].folders[j].options = options;
+                    }
+                    config.rules[i].options = None;
+                }
+                config.defaults = None;
+                println!("{:?}", config);
                 config.path = path;
                 config
             }

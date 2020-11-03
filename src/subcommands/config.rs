@@ -1,5 +1,6 @@
 use crate::{
-    user_config::{rules::folder::Options, UserConfig},
+    settings::Settings,
+    user_config::{rules::options::Options, UserConfig},
     ARGS,
     CONFIG,
 };
@@ -16,11 +17,16 @@ pub fn config() -> Result<()> {
             watch,
             ignore,
             hidden_files,
-        } = Options::default();
-        println!("recursive: {}", recursive.to_string().purple());
-        println!("watch: {}", watch.to_string().purple());
-        println!("hidden_files: {}", hidden_files.to_string().purple());
-        println!("ignored_directories: {:?}", ignore);
+            apply,
+        } = Settings::new().unwrap().defaults;
+        println!("recursive: {}", recursive.unwrap().to_string().purple());
+        println!("watch: {}", watch.unwrap().to_string().purple());
+        println!(
+            "hidden_files: {}",
+            hidden_files.unwrap().to_string().purple()
+        );
+        println!("ignored_directories: {:?}", ignore.unwrap());
+        println!("apply: {:?}", apply.unwrap().to_string());
     } else if ARGS.is_present("new") {
         let config_file = env::current_dir()?.join(format!("{}.yml", crate_name!()));
         UserConfig::create(&config_file);

@@ -1,5 +1,6 @@
 use crate::{
     lock_file::LockFile,
+    settings::Settings,
     subcommands::{config::config, logs::logs, run::run, stop::stop, watch::watch},
     user_config::UserConfig,
 };
@@ -15,10 +16,12 @@ use clap::{
 use colored::Colorize;
 use fern::colors::{Color, ColoredLevelConfig};
 use lazy_static::lazy_static;
-use std::{env, io::Error, path::PathBuf};
+use settings::test;
+use std::{env, io::Error, ops::Deref, path::PathBuf};
 
 pub mod lock_file;
 pub mod path;
+mod settings;
 pub mod string;
 pub mod subcommands;
 pub mod user_config;
@@ -35,6 +38,7 @@ lazy_static! {
     pub static ref CONFIG: UserConfig = UserConfig::default();
     pub static ref LOCK_FILE: LockFile = LockFile::new();
     pub static ref LOG_FILE: PathBuf = UserConfig::dir().join("output.log");
+    // FIXME: CONFIG, LOCK_FILE AND LOG_FILE SHOULD NOT BE STATIC, IT'S A WASTE OF MEMORY
 }
 
 fn main() -> Result<(), Error> {
@@ -45,7 +49,6 @@ fn main() -> Result<(), Error> {
         eprintln!("Windows is not supported yet");
         return Ok(());
     }
-
     match MATCHES.subcommand_name().unwrap() {
         "config" => config(),
         "run" => run(),

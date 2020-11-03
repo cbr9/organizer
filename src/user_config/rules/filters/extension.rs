@@ -6,10 +6,12 @@ use serde::{
     export::PhantomData,
     Deserialize,
     Deserializer,
+    Serialize,
 };
+
 use std::{fmt, ops::Deref, path::Path};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Serialize, Clone)]
 pub struct Extension(Vec<String>);
 
 impl Deref for Extension {

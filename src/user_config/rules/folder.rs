@@ -1,4 +1,11 @@
-use crate::path::expand::Expandable;
+use crate::{
+    path::expand::Expandable,
+    settings::Settings,
+    user_config::{
+        rules::{options::Options, rule::Rule},
+        UserConfig,
+    },
+};
 use serde::{
     de,
     de::{MapAccess, Visitor},
@@ -13,7 +20,33 @@ use std::{fmt, path::PathBuf, result, str::FromStr};
 #[derive(Serialize, Debug, PartialEq, Eq, Clone)]
 pub struct Folder {
     pub path: PathBuf,
-    pub options: Options,
+    pub options: Option<Options>,
+}
+
+impl Folder {
+    pub fn fill_options<S, C, R>(&self, settings: &S, config: &C, rule: &R) -> Option<Options>
+    where
+        S: AsRef<Settings>,
+        C: AsRef<UserConfig>,
+        R: AsRef<Rule>,
+    {
+        let mut options = settings.as_ref().defaults.clone();
+        println!("Settings: {:?}", options);
+        if let Some(config_defaults) = &config.as_ref().defaults {
+            options = &options + config_defaults;
+            println!("Settings + Config: {:?}", options);
+        }
+        if let Some(rule_options) = &rule.as_ref().options {
+            options = &options + rule_options;
+            println!("Settings + Config + Rule: {:?}", options);
+        }
+        if let Some(folder_options) = &self.options {
+            options = &options + folder_options;
+            println!("Settings + Config + Rule + Folder: {:?}", options);
+        }
+        println!("New options: {:?}", options);
+        Some(options)
+    }
 }
 
 impl<'de> Deserialize<'de> for Folder {
@@ -21,7 +54,7 @@ impl<'de> Deserialize<'de> for Folder {
     where
         D: Deserializer<'de>,
     {
-        struct StringOrStruct(PhantomData<fn() -> Self>);
+        struct StringOrStruct;
 
         impl<'de> Visitor<'de> for StringOrStruct {
             type Value = Folder;
@@ -66,12 +99,12 @@ impl<'de> Deserialize<'de> for Folder {
                     }
                 };
                 if let Some(options) = options {
-                    folder.options = options;
+                    folder.options = Some(options);
                 }
                 Ok(folder)
             }
         }
-        deserializer.deserialize_any(StringOrStruct(PhantomData))
+        deserializer.deserialize_any(StringOrStruct)
     }
 }
 
@@ -83,50 +116,11 @@ impl FromStr for Folder {
         match path.expand_user().expand_vars().canonicalize() {
             Ok(path) => Ok(Self {
                 path,
-                options: Default::default(),
+                options: None,
             }),
             Err(e) => Err(e),
         }
     }
 }
 
-// #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
-// pub struct WrappedFolder(Folder);
-//
-// impl Deref for WrappedFolder {
-//     type Target = Folder;
-//
-//     fn deref(&self) -> &Self::Target {
-//         &self.0
-//     }
-// }
-//
 pub type Folders = Vec<Folder>;
-
-#[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
-pub struct Options {
-    /// defines whether or not subdirectories must be scanned
-    #[serde(default)]
-    pub recursive: bool,
-    #[serde(default = "default_watch")]
-    pub watch: bool,
-    #[serde(default)]
-    pub ignore: Vec<PathBuf>,
-    #[serde(default)]
-    pub hidden_files: bool,
-}
-
-fn default_watch() -> bool {
-    true
-}
-
-impl Default for Options {
-    fn default() -> Self {
-        Self {
-            recursive: false,
-            watch: default_watch(),
-            hidden_files: false,
-            ignore: Vec::new(),
-        }
-    }
-}

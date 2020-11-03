@@ -6,5 +6,6 @@
 - Validate config (check out https://github.com/paazmaya/grunt-yaml-validator or https://github.com/MathiasPius/yaml-validator)
 - Implement command to test configuration
 - More filters
-- Better options
+- Better options:
+    - Should have a 4-level structure, descending from the settings file, down to the config file global options, the rule level, and finally to the folder level
 - Allow for a settings.yml file that makes it possible to configure defaults (and other things)

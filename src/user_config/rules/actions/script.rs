@@ -7,7 +7,7 @@ use crate::{
 };
 use colored::Colorize;
 use log::info;
-use serde::{de::Error, Deserialize, Deserializer};
+use serde::{de::Error, Deserialize, Deserializer, Serialize};
 use std::{
     borrow::Cow,
     fs,
@@ -19,7 +19,7 @@ use std::{
     str::FromStr,
 };
 
-#[derive(Deserialize, Debug, Clone, Default)]
+#[derive(Deserialize, Serialize, Debug, Clone, Default)]
 pub struct Script {
     #[serde(deserialize_with = "deserialize_exec")]
     exec: String,

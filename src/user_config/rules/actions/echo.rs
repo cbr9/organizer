@@ -4,10 +4,10 @@ use crate::{
 };
 use colored::Colorize;
 use log::info;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::{borrow::Cow, io::Result, ops::Deref, path::Path};
 
-#[derive(Debug, Clone, Deserialize, Default)]
+#[derive(Debug, Serialize, Clone, Deserialize, Default)]
 pub struct Echo(#[serde(deserialize_with = "deserialize_placeholder_string")] String);
 
 impl Deref for Echo {

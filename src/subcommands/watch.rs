@@ -21,7 +21,7 @@ use crate::{
     lock_file::GetProcessBy,
     path::is_hidden::IsHidden,
     subcommands::run::run,
-    user_config::{rules::folder::Options, PathToRules, UserConfig},
+    user_config::{rules::options::Options, PathToRules, UserConfig},
     CONFIG,
     LOCK_FILE,
     MATCHES,
@@ -33,25 +33,24 @@ pub fn process_file(path: &Path, path2rules: &PathToRules, from_watch: bool) {
     if path.is_file() {
         let parent = path.parent().unwrap();
         'rules: for (rule, i) in path2rules.get(path) {
-            if rule.filters.r#match(path) {
-                let folder = rule.folders.get(*i).unwrap();
-                let Options {
-                    ignore,
-                    hidden_files,
-                    watch,
-                    ..
-                } = &folder.options;
-                if ignore.contains(&parent.to_path_buf()) {
-                    continue 'rules;
-                }
-                if path.is_hidden() && !*hidden_files {
-                    continue 'rules;
-                }
-                if !from_watch || *watch {
-                    // simplified from `if (from_watch && *watch) || !from_watch`
-                    rule.actions.run(&path);
-                    break 'rules;
-                }
+            let folder = rule.folders.get(*i).unwrap();
+            let Options {
+                ignore,
+                hidden_files,
+                watch,
+                apply,
+                ..
+            } = folder.options.as_ref().unwrap();
+            if ignore.as_ref().unwrap().contains(&parent.to_path_buf()) {
+                continue 'rules;
+            }
+            if path.is_hidden() && !hidden_files.unwrap() {
+                continue 'rules;
+            }
+            if (!from_watch || watch.unwrap()) && rule.filters.r#match(path, apply.unwrap()) {
+                // simplified from `if (from_watch && *watch) || !from_watch`
+                rule.actions.run(&path);
+                break 'rules;
             }
         }
     }
@@ -108,7 +107,7 @@ impl Watcher {
         let mut folders = HashMap::new();
         for rule in config.rules.iter() {
             for folder in rule.folders.iter() {
-                let recursive = if folder.options.recursive {
+                let recursive = if folder.options.as_ref().unwrap().recursive.unwrap() {
                     RecursiveMode::Recursive
                 } else {
                     RecursiveMode::NonRecursive
