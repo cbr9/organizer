@@ -31,20 +31,15 @@ impl Folder {
         R: AsRef<Rule>,
     {
         let mut options = settings.as_ref().defaults.clone();
-        println!("Settings: {:?}", options);
         if let Some(config_defaults) = &config.as_ref().defaults {
             options = &options + config_defaults;
-            println!("Settings + Config: {:?}", options);
         }
         if let Some(rule_options) = &rule.as_ref().options {
             options = &options + rule_options;
-            println!("Settings + Config + Rule: {:?}", options);
         }
         if let Some(folder_options) = &self.options {
             options = &options + folder_options;
-            println!("Settings + Config + Rule + Folder: {:?}", options);
         }
-        println!("New options: {:?}", options);
         Some(options)
     }
 }

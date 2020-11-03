@@ -1,8 +1,13 @@
-use crate::user_config::{rules::options::Options, UserConfig};
+use crate::user_config::{
+    rules::options::{
+        apply::{Apply, ApplyWrapper},
+        Options,
+    },
+    UserConfig,
+};
 use serde::{Deserialize, Serialize};
 use std::{fs, io::Error, path::PathBuf};
 use toml::de::Error as TomlError;
-use crate::user_config::rules::options::Apply;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct Settings {
@@ -26,7 +31,7 @@ impl Default for Settings {
                 hidden_files: Some(false),
                 recursive: Some(false),
                 watch: Some(true),
-                apply: Some(Apply::All)
+                apply: Some(ApplyWrapper::from(Apply::All)),
             },
         }
     }
@@ -36,7 +41,17 @@ impl Settings {
     pub fn new() -> Result<Self, TomlError> {
         let path = UserConfig::dir().join("settings.toml");
         match fs::read_to_string(&path) {
-            Ok(content) => toml::from_str::<Settings>(&content),
+            Ok(content) => {
+                let settings = toml::from_str::<Settings>(&content);
+                match settings {
+                    Ok(mut settings) => {
+                        let defaults = Settings::default();
+                        settings.defaults = &defaults.defaults + &settings.defaults;
+                        Ok(settings)
+                    }
+                    Err(e) => Err(e),
+                }
+            }
             Err(_) => {
                 let default = Settings::default();
                 let serialized = toml::to_string(&default).unwrap();

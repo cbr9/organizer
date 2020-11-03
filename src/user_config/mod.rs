@@ -74,6 +74,7 @@ impl UserConfig {
             Ok(mut config) => {
                 let rules = config.rules.clone();
                 let settings = Settings::new().unwrap();
+                println!("{:?}", settings);
                 for (i, rule) in rules.iter().enumerate() {
                     for (j, folder) in rule.folders.iter().enumerate() {
                         let options = folder.fill_options(&settings, &config, &rule);
@@ -81,8 +82,8 @@ impl UserConfig {
                     }
                     config.rules[i].options = None;
                 }
-                config.defaults = None;
                 println!("{:?}", config);
+                config.defaults = None;
                 config.path = path;
                 config
             }

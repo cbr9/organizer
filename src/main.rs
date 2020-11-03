@@ -16,7 +16,6 @@ use clap::{
 use colored::Colorize;
 use fern::colors::{Color, ColoredLevelConfig};
 use lazy_static::lazy_static;
-use settings::test;
 use std::{env, io::Error, ops::Deref, path::PathBuf};
 
 pub mod lock_file;
@@ -38,6 +37,7 @@ lazy_static! {
     pub static ref CONFIG: UserConfig = UserConfig::default();
     pub static ref LOCK_FILE: LockFile = LockFile::new();
     pub static ref LOG_FILE: PathBuf = UserConfig::dir().join("output.log");
+    pub static ref SETTINGS: Settings = Settings::new().unwrap_or_else(|_| Settings::default());
     // FIXME: CONFIG, LOCK_FILE AND LOG_FILE SHOULD NOT BE STATIC, IT'S A WASTE OF MEMORY
 }
 
@@ -49,6 +49,7 @@ fn main() -> Result<(), Error> {
         eprintln!("Windows is not supported yet");
         return Ok(());
     }
+
     match MATCHES.subcommand_name().unwrap() {
         "config" => config(),
         "run" => run(),

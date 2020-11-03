@@ -47,9 +47,14 @@ pub fn process_file(path: &Path, path2rules: &PathToRules, from_watch: bool) {
             if path.is_hidden() && !hidden_files.unwrap() {
                 continue 'rules;
             }
-            if (!from_watch || watch.unwrap()) && rule.filters.r#match(path, apply.unwrap()) {
+            if (!from_watch || watch.unwrap())
+                && rule
+                    .filters
+                    .r#match(path, &apply.as_ref().unwrap().filters.as_ref().unwrap())
+            {
                 // simplified from `if (from_watch && *watch) || !from_watch`
-                rule.actions.run(&path);
+                rule.actions
+                    .run(&path, &apply.as_ref().unwrap().actions.as_ref().unwrap());
                 break 'rules;
             }
         }

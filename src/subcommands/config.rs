@@ -19,14 +19,38 @@ pub fn config() -> Result<()> {
             hidden_files,
             apply,
         } = Settings::new().unwrap().defaults;
-        println!("recursive: {}", recursive.unwrap().to_string().purple());
-        println!("watch: {}", watch.unwrap().to_string().purple());
+        println!(
+            "recursive: {}",
+            recursive.unwrap().to_string().bright_purple()
+        );
+        println!("watch: {}", watch.unwrap().to_string().bright_purple());
         println!(
             "hidden_files: {}",
-            hidden_files.unwrap().to_string().purple()
+            hidden_files.unwrap().to_string().bright_purple()
         );
         println!("ignored_directories: {:?}", ignore.unwrap());
-        println!("apply: {:?}", apply.unwrap().to_string());
+        println!(
+            "apply (actions): {}",
+            apply
+                .as_ref()
+                .unwrap()
+                .actions
+                .as_ref()
+                .unwrap()
+                .to_string()
+                .bright_purple()
+        );
+        println!(
+            "apply (filters): {}",
+            apply
+                .as_ref()
+                .unwrap()
+                .filters
+                .as_ref()
+                .unwrap()
+                .to_string()
+                .bright_purple()
+        );
     } else if ARGS.is_present("new") {
         let config_file = env::current_dir()?.join(format!("{}.yml", crate_name!()));
         UserConfig::create(&config_file);

@@ -5,7 +5,10 @@ pub mod regex;
 use crate::user_config::rules::{
     actions::script::Script,
     filters::regex::Regex,
-    options::{Apply, Options},
+    options::{
+        apply::{Apply, ApplyWrapper},
+        Options,
+    },
 };
 use extension::Extension;
 use filename::Filename;
