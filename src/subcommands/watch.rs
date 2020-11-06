@@ -19,9 +19,14 @@ use notify::{
 
 use crate::{
     lock_file::GetProcessBy,
-    path::is_hidden::IsHidden,
+    path::{get_rules::GetRules, is_hidden::IsHidden},
     subcommands::run::run,
-    user_config::{rules::options::Options, PathToRules, UserConfig},
+    user_config::{
+        rules::{options::Options, rule::Rule},
+        AsMap,
+        PathToRules,
+        UserConfig,
+    },
     CONFIG,
     LOCK_FILE,
     MATCHES,
@@ -32,7 +37,7 @@ use sysinfo::{ProcessExt, RefreshKind, Signal, System, SystemExt};
 pub fn process_file(path: &Path, path2rules: &PathToRules, from_watch: bool) {
     if path.is_file() {
         let parent = path.parent().unwrap();
-        'rules: for (rule, i) in path2rules.get(path) {
+        'rules: for (rule, i) in path.get_rules(path2rules) {
             let folder = rule.folders.get(*i).unwrap();
             let Options {
                 ignore,
@@ -144,7 +149,7 @@ impl Watcher {
 
         // PROCESS SIGNALS
         LOCK_FILE.append(process::id() as i32, &config.path)?;
-        let path2rules = PathToRules::from(config);
+        let path2rules: HashMap<&Path, Vec<(&Rule, usize)>> = config.rules.map();
 
         loop {
             if let Ok(RawEvent {

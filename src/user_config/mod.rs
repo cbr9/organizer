@@ -7,14 +7,16 @@ use crate::{
 use clap::crate_name;
 use dirs::{config_dir, home_dir};
 use log::error;
+use notify::RecursiveMode;
 use rules::{actions::io_action::ConflictOption, options::Options};
 use serde::{Deserialize, Serialize};
 use std::{
-    borrow::{Borrow, Cow},
-    collections::HashMap,
+    any::Any,
+    borrow::{Borrow, BorrowMut, Cow},
+    collections::{hash_map::RandomState, HashMap},
     env,
     fs,
-    ops::Deref,
+    ops::{Deref, DerefMut},
     path::{Path, PathBuf},
 };
 
@@ -27,10 +29,75 @@ pub mod rules;
 /// * `rules`: a list of parsed rules defined by the user
 #[derive(Deserialize, Serialize, Clone, Debug)]
 pub struct UserConfig {
-    pub rules: Vec<Rule>,
+    pub rules: Rules,
     pub defaults: Option<Options>,
     #[serde(skip)]
     pub path: PathBuf,
+}
+
+#[derive(Deserialize, Serialize, Clone, Debug)]
+pub struct Rules(Vec<Rule>);
+
+impl Deref for Rules {
+    type Target = Vec<Rule>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for Rules {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+pub trait AsMap<'a, V> {
+    fn map(&'a self) -> HashMap<&'a Path, V>;
+}
+
+impl<'a> AsMap<'a, Vec<(&'a Rule, usize)>> for Rules {
+    fn map(&'a self) -> HashMap<&'a Path, Vec<(&'a Rule, usize)>, RandomState> {
+        let mut map = HashMap::new();
+        for rule in self.iter() {
+            for (i, folder) in rule.folders.iter().enumerate() {
+                if !map.contains_key(folder.path.as_path()) {
+                    map.insert(folder.path.as_path(), Vec::new());
+                }
+                map.get_mut(folder.path.as_path()).unwrap().push((rule, i));
+            }
+        }
+        map
+    }
+}
+
+impl<'a> AsMap<'a, RecursiveMode> for Rules {
+    fn map(&'a self) -> HashMap<&'a Path, RecursiveMode, RandomState> {
+        let mut folders = HashMap::new();
+        for rule in self.iter() {
+            for folder in rule.folders.iter() {
+                let recursive = if folder.options.as_ref().unwrap().recursive.unwrap() {
+                    RecursiveMode::Recursive
+                } else {
+                    RecursiveMode::NonRecursive
+                };
+                let path = folder.path.as_path();
+                match folders.get(path) {
+                    None => {
+                        folders.insert(path, recursive);
+                    }
+                    Some(value) => {
+                        if recursive == RecursiveMode::Recursive
+                            && value == &RecursiveMode::NonRecursive
+                        {
+                            folders.insert(path, recursive);
+                        }
+                    }
+                }
+            }
+        }
+        folders
+    }
 }
 
 impl AsRef<Self> for UserConfig {
@@ -45,6 +112,9 @@ impl Default for UserConfig {
         Self::new(path)
     }
 }
+
+pub(crate) type PathToRules<'a> = HashMap<&'a Path, Vec<(&'a Rule, usize)>, RandomState>;
+pub(crate) type PathToRecursive<'a> = HashMap<&'a Path, RecursiveMode, RandomState>;
 
 impl UserConfig {
     /// Creates a new UserConfig instance.
@@ -74,7 +144,6 @@ impl UserConfig {
             Ok(mut config) => {
                 let rules = config.rules.clone();
                 let settings = Settings::new().unwrap();
-                println!("{:?}", settings);
                 for (i, rule) in rules.iter().enumerate() {
                     for (j, folder) in rule.folders.iter().enumerate() {
                         let options = folder.fill_options(&settings, &config, &rule);
@@ -82,7 +151,6 @@ impl UserConfig {
                     }
                     config.rules[i].options = None;
                 }
-                println!("{:?}", config);
                 config.defaults = None;
                 config.path = path;
                 config
@@ -147,63 +215,63 @@ impl UserConfig {
         Self::dir().join("config.yml")
     }
 }
-
-pub struct PathToRules<'a>(HashMap<&'a Path, Vec<(&'a Rule, usize)>>);
-
-impl<'a> Deref for PathToRules<'a> {
-    type Target = HashMap<&'a Path, Vec<(&'a Rule, usize)>>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl<'a> PathToRules<'a> {
-    pub fn from<T>(config: &'a T) -> Self
-    where
-        T: Borrow<UserConfig>,
-    {
-        let mut map = HashMap::new();
-        for rule in config.borrow().rules.iter() {
-            for (i, folder) in rule.folders.iter().enumerate() {
-                if !map.contains_key(folder.path.as_path()) {
-                    map.insert(folder.path.as_path(), Vec::new());
-                }
-                map.get_mut(folder.path.as_path()).unwrap().push((rule, i));
-            }
-        }
-        Self(map)
-    }
-
-    pub fn get<T>(&'a self, path: T) -> &'a Vec<(&'a Rule, usize)>
-    where
-        T: AsRef<Path>,
-    {
-        let path = path.as_ref();
-        self.0.get(path).unwrap_or_else(|| {
-            // if the path is some subdirectory not represented in the hashmap
-            let components = path.components().collect::<Vec<_>>();
-            let mut paths = Vec::new();
-            for i in 0..components.len() {
-                let slice = components[0..i]
-                    .iter()
-                    .map(|comp| comp.as_os_str().to_string_lossy())
-                    .collect::<Vec<_>>();
-                let str: String = slice.join(&std::path::MAIN_SEPARATOR.to_string());
-                paths.push(PathBuf::from(str.replace("//", "/")))
-            }
-            let path = paths
-                .iter()
-                .rev()
-                .find_map(|path| {
-                    if self.0.contains_key(path.as_path()) {
-                        Some(path)
-                    } else {
-                        None
-                    }
-                })
-                .unwrap();
-            self.0.get(path.as_path()).unwrap()
-        })
-    }
-}
+//
+// pub struct PathToRules<'a>(HashMap<&'a Path, Vec<(&'a Rule, usize)>>);
+//
+// impl<'a> Deref for PathToRules<'a> {
+//     type Target = HashMap<&'a Path, Vec<(&'a Rule, usize)>>;
+//
+//     fn deref(&self) -> &Self::Target {
+//         &self.0
+//     }
+// }
+//
+// impl<'a> PathToRules<'a> {
+//     pub fn from<T>(config: &'a T) -> Self
+//     where
+//         T: Borrow<UserConfig>,
+//     {
+//         let mut map = HashMap::new();
+//         for rule in config.borrow().rules.iter() {
+//             for (i, folder) in rule.folders.iter().enumerate() {
+//                 if !map.contains_key(folder.path.as_path()) {
+//                     map.insert(folder.path.as_path(), Vec::new());
+//                 }
+//                 map.get_mut(folder.path.as_path()).unwrap().push((rule, i));
+//             }
+//         }
+//         Self(map)
+//     }
+//
+//     pub fn get<T>(&'a self, path: T) -> &'a Vec<(&'a Rule, usize)>
+//     where
+//         T: AsRef<Path>,
+//     {
+//         let path = path.as_ref();
+//         self.0.get(path).unwrap_or_else(|| {
+//             // if the path is some subdirectory not represented in the hashmap
+//             let components = path.components().collect::<Vec<_>>();
+//             let mut paths = Vec::new();
+//             for i in 0..components.len() {
+//                 let slice = components[0..i]
+//                     .iter()
+//                     .map(|comp| comp.as_os_str().to_string_lossy())
+//                     .collect::<Vec<_>>();
+//                 let str: String = slice.join(&std::path::MAIN_SEPARATOR.to_string());
+//                 paths.push(PathBuf::from(str.replace("//", "/")))
+//             }
+//             let path = paths
+//                 .iter()
+//                 .rev()
+//                 .find_map(|path| {
+//                     if self.0.contains_key(path.as_path()) {
+//                         Some(path)
+//                     } else {
+//                         None
+//                     }
+//                 })
+//                 .unwrap();
+//             self.0.get(path.as_path()).unwrap()
+//         })
+//     }
+// }
