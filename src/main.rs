@@ -1,86 +1,63 @@
 use crate::{
-    lock_file::LockFile,
-    settings::Settings,
-    subcommands::{config::config, logs::logs, run::run, stop::stop, watch::watch},
-    user_config::UserConfig,
+	cmd::{logs::Logs, App, Cmd},
+	user_config::UserConfig,
 };
-use clap::{
-    crate_authors,
-    crate_description,
-    crate_name,
-    crate_version,
-    load_yaml,
-    App,
-    ArgMatches,
-};
+use clap::Clap;
 use colored::Colorize;
 use fern::colors::{Color, ColoredLevelConfig};
 use lazy_static::lazy_static;
-use std::{env, io::Error, ops::Deref, path::PathBuf};
+use log::error;
+use std::{borrow::Cow, path::PathBuf};
 
+pub mod cmd;
 pub mod lock_file;
 pub mod path;
 mod settings;
 pub mod string;
-pub mod subcommands;
 pub mod user_config;
 pub mod utils;
 
 lazy_static! {
-    pub static ref MATCHES: ArgMatches = App::from(load_yaml!("cli.yml"))
-        .author(crate_authors!())
-        .about(crate_description!())
-        .version(crate_version!())
-        .name(crate_name!())
-        .get_matches();
-    pub static ref ARGS: &'static ArgMatches = MATCHES.subcommand().unwrap().1;
-    pub static ref CONFIG: UserConfig = UserConfig::default();
-    pub static ref LOCK_FILE: LockFile = LockFile::new();
-    pub static ref LOG_FILE: PathBuf = UserConfig::dir().join("output.log");
-    pub static ref SETTINGS: Settings = Settings::new().unwrap_or_else(|_| Settings::default());
-    // FIXME: CONFIG, LOCK_FILE AND LOG_FILE SHOULD NOT BE STATIC, IT'S A WASTE OF MEMORY
+	pub static ref DEFAULT_CONFIG: PathBuf = UserConfig::default_path();
+	pub static ref DEFAULT_CONFIG_STR: Cow<'static, str> = DEFAULT_CONFIG.to_string_lossy();
 }
 
-fn main() -> Result<(), Error> {
-    debug_assert!(MATCHES.subcommand().is_some());
-    setup_logger().unwrap();
+fn main() {
+	setup_logger().unwrap();
 
-    if cfg!(target_os = "windows") {
-        eprintln!("Windows is not supported yet");
-        return Ok(());
-    }
+	if cfg!(target_os = "windows") {
+		eprintln!("Windows is not supported yet");
+		return;
+	}
 
-    match MATCHES.subcommand_name().unwrap() {
-        "config" => config(),
-        "run" => run(),
-        "watch" => watch(),
-        "stop" => stop(),
-        "logs" => logs(),
-        _ => panic!("unknown subcommand"),
-    }
+	let app: App = App::parse();
+	match app.run() {
+		Ok(_) => {}
+		Err(e) => {
+			error!("{}", e);
+			std::process::exit(0)
+		}
+	}
 }
 
 fn setup_logger() -> Result<(), fern::InitError> {
-    let colors = ColoredLevelConfig::new()
-        .info(Color::BrightGreen)
-        .warn(Color::BrightYellow)
-        .error(Color::BrightRed);
+	let colors = ColoredLevelConfig::new()
+		.info(Color::BrightGreen)
+		.warn(Color::BrightYellow)
+		.error(Color::BrightRed);
 
-    fern::Dispatch::new()
-        .format(move |out, message, record| {
-            out.finish(format_args!(
-                "{} {}: {}",
-                chrono::Local::now()
-                    .format("[%Y-%m-%d][%H:%M:%S]")
-                    .to_string()
-                    .dimmed(),
-                colors.color(record.level()),
-                message
-            ))
-        })
-        .level(log::LevelFilter::Debug)
-        .chain(std::io::stdout())
-        .chain(fern::log_file(UserConfig::dir().join("output.log"))?)
-        .apply()?;
-    Ok(())
+	fern::Dispatch::new()
+		.format(move |out, message, record| {
+			out.finish(format_args!(
+				"{} {}: {}",
+				chrono::Local::now().format("[%Y-%m-%d][%H:%M:%S]").to_string().dimmed(),
+				colors.color(record.level()),
+				message
+			))
+		})
+		.level(log::LevelFilter::Debug)
+		.chain(std::io::stdout())
+		.chain(fern::log_file(Logs::path())?)
+		.apply()?;
+	Ok(())
 }

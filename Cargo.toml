@@ -25,6 +25,7 @@ trash = "1.2.0"
 log = "0.4"
 fern = {version = "0.5", features = ["colored"] }
 toml = "0.5.7"
+anyhow = "1.0.34"
 
 [features]
 hot-reload = []
