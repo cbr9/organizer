@@ -1,10 +1,10 @@
 use crate::{
 	cmd::Cmd,
-	lock_file::{GetProcessBy, LockFile},
 	DEFAULT_CONFIG_STR,
 };
 use anyhow::Result;
 use clap::{crate_name, Clap};
+use lib::lock_file::{GetProcessBy, LockFile};
 use std::path::PathBuf;
 use sysinfo::{ProcessExt, RefreshKind, Signal, System, SystemExt};
 

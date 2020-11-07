@@ -1,14 +1,14 @@
 use crate::cmd::{config::Config, logs::Logs, run::Run, stop::Stop, watch::Watch};
-use anyhow::Result;
 use clap::Clap;
 
-pub mod config;
-pub mod logs;
-pub mod run;
-pub mod stop;
-pub mod watch;
+mod config;
+pub(super) mod logs;
+mod run;
+mod stop;
+mod watch;
 
 #[derive(Clap)]
+#[clap(about, author, version)]
 pub enum App {
 	Watch(Watch),
 	Run(Run),
@@ -18,11 +18,11 @@ pub enum App {
 }
 
 pub trait Cmd {
-	fn run(self) -> Result<()>;
+	fn run(self) -> anyhow::Result<()>;
 }
 
 impl Cmd for App {
-	fn run(self) -> Result<()> {
+	fn run(self) -> anyhow::Result<()> {
 		match self {
 			App::Watch(watch) => watch.run(),
 			App::Run(run) => run.run(),

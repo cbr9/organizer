@@ -1,6 +1,9 @@
-use crate::{cmd::Cmd, user_config::UserConfig};
+use crate::Cmd;
+use colored::Colorize;
 use anyhow::Result;
 use clap::Clap;
+use fern::colors::{Color, ColoredLevelConfig};
+use lib::config::UserConfig;
 use std::{fs, path::PathBuf};
 
 #[derive(Debug, Clap)]
@@ -26,5 +29,27 @@ impl Cmd for Logs {
 impl Logs {
 	pub fn path() -> PathBuf {
 		UserConfig::dir().join("output.log")
+	}
+
+	pub(crate) fn setup() -> Result<(), fern::InitError> {
+		let colors = ColoredLevelConfig::new()
+			.info(Color::BrightGreen)
+			.warn(Color::BrightYellow)
+			.error(Color::BrightRed);
+
+		fern::Dispatch::new()
+			.format(move |out, message, record| {
+				out.finish(format_args!(
+					"{} {}: {}",
+					chrono::Local::now().format("[%Y-%m-%d][%H:%M:%S]").to_string().dimmed(),
+					colors.color(record.level()),
+					message
+				))
+			})
+			.level(log::LevelFilter::Debug)
+			.chain(std::io::stdout())
+			.chain(fern::log_file(Self::path())?)
+			.apply()?;
+		Ok(())
 	}
 }

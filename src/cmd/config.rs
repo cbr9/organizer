@@ -1,14 +1,13 @@
 use crate::{
 	cmd::Cmd,
-	settings::Settings,
-	user_config::{
-		rules::options::{apply::ApplyWrapper, Options},
-		UserConfig,
-	},
 };
 use anyhow::Result;
 use clap::{crate_name, Clap};
 use colored::Colorize;
+use lib::{
+	config::{ApplyWrapper, Options, UserConfig},
+	settings::Settings,
+};
 use std::{env, process};
 
 #[derive(Clap, Debug)]

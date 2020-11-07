@@ -6,22 +6,18 @@ use std::{
 
 use colored::Colorize;
 use log::{error, info};
-use notify::{op, raw_watcher, watcher, RawEvent, RecommendedWatcher, RecursiveMode, Watcher as OtherWatcher};
+use notify::{op, raw_watcher, RawEvent, RecommendedWatcher, RecursiveMode, Watcher};
 
-use crate::{
-	cmd::{run::Run, Cmd},
-	lock_file::{GetProcessBy, LockFile},
-	path::{get_rules::GetRules, is_hidden::IsHidden},
-	user_config::{rules::options::Options, AsMap, PathToRecursive, PathToRules, UserConfig},
-	DEFAULT_CONFIG_STR,
-};
+use crate::{cmd::run::Run, Cmd, DEFAULT_CONFIG_STR};
 use clap::Clap;
+use lib::{
+	config::{AsMap, Options, PathToRecursive, PathToRules, UserConfig},
+	lock_file::{GetProcessBy, LockFile},
+	path::{GetRules, IsHidden},
+};
 use std::{
 	borrow::Borrow,
-	error::Error,
-	ops::Deref,
 	path::{Path, PathBuf},
-	time::Duration,
 };
 use sysinfo::{ProcessExt, RefreshKind, Signal, System, SystemExt};
 

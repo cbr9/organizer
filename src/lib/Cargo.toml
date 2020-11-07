@@ -1,10 +1,8 @@
 [package]
-name = "organize"
-version = "0.2.0"
+name = "lib"
+version = "0.1.0"
 authors = ["KBR9 <cabero96@protonmail.com>"]
 edition = "2018"
-description = "file automation for the power user"
-repository = "https://github.com/cbr9/organize"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -12,24 +10,14 @@ repository = "https://github.com/cbr9/organize"
 notify = "4.0.15"
 crossbeam-channel = "0.5.0"
 regex = "1.4.1"
-clap = { version = "3.0.0-beta.2", features = ["yaml"] }
 serde = { version = "1.0.117", features = ["derive"] }
 dirs = "3.0.1"
 serde_yaml = "0.8.13"
-chrono = "0.4.19"
 colored = "2.0.0"
 sysinfo = "0.15.3"
 lazy_static = "1.4.0"
 rayon = "1.5"
 trash = "1.2.0"
 log = "0.4"
-fern = {version = "0.5", features = ["colored"] }
 toml = "0.5.7"
 anyhow = "1.0.34"
-lib = { path = "src/lib" }
-
-[features]
-hot-reload = []
-
-[workspace]
-members = [ "src/lib/" ]
