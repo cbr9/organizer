@@ -14,50 +14,68 @@ pub struct Options {
 	pub apply: Option<ApplyWrapper>,
 }
 
-pub fn combine_options<T>(lhs: Option<T>, rhs: Option<T>) -> Option<T> {
-	match (&lhs, &rhs) {
-		(None, Some(_)) => rhs,
-		(Some(_), None) => lhs,
-		(None, None) => None,
-		(Some(_), Some(_)) => rhs,
-	}
+pub trait AsOption<T> {
+	fn combine(self, rhs: Self) -> Self
+	where
+		Self: Sized;
 }
 
-pub fn combine_option_vec<T: Clone>(lhs: &Option<Vec<T>>, rhs: &Option<Vec<T>>) -> Option<Vec<T>> {
-	match (&lhs, &rhs) {
-		(None, Some(rhs)) => Some(rhs.clone()),
-		(Some(lhs), None) => Some(lhs.clone()),
-		(None, None) => None,
-		(Some(lhs), Some(rhs)) => {
-			let mut rhs = rhs.clone();
-			let lhs = &mut lhs.clone();
-			rhs.append(lhs);
-			Some(rhs)
+impl AsOption<bool> for Option<bool> {
+	fn combine(self, rhs: Self) -> Self
+	where
+		Self: Sized,
+	{
+		match (&self, &rhs) {
+			(None, Some(_)) => rhs,
+			(Some(_), None) => self,
+			(None, None) => None,
+			(Some(_), Some(_)) => rhs,
 		}
 	}
 }
 
-fn combine_apply(lhs: Option<ApplyWrapper>, rhs: Option<ApplyWrapper>) -> Option<ApplyWrapper> {
-	match (&lhs, &rhs) {
-		(None, Some(_)) => rhs,
-		(Some(_), None) => lhs,
-		(None, None) => None,
-		(Some(lhs), Some(rhs)) => {
-			Some(ApplyWrapper {
-				// FIXME: avoid cloning
+impl AsOption<ApplyWrapper> for Option<ApplyWrapper> {
+	fn combine(self, rhs: Self) -> Self
+	where
+		Self: Sized,
+	{
+		match (self, rhs) {
+			(None, Some(rhs)) => Some(rhs),
+			(Some(lhs), None) => Some(lhs),
+			(None, None) => None,
+			(Some(lhs), Some(rhs)) => Some(ApplyWrapper {
 				actions: match (&lhs.actions, &rhs.actions) {
-					(None, Some(_)) => rhs.actions.clone(),
-					(Some(_), None) => lhs.actions.clone(),
+					(None, Some(_)) => rhs.actions,
+					(Some(_), None) => lhs.actions,
 					(None, None) => None,
-					(Some(_), Some(_)) => rhs.actions.clone(),
+					(Some(_), Some(_)) => rhs.actions,
 				},
 				filters: match (&lhs.filters, &rhs.filters) {
-					(None, Some(_)) => rhs.filters.clone(),
-					(Some(_), None) => lhs.filters.clone(),
+					(None, Some(_)) => rhs.filters,
+					(Some(_), None) => lhs.filters,
 					(None, None) => None,
-					(Some(_), Some(_)) => rhs.filters.clone(),
+					(Some(_), Some(_)) => rhs.filters,
 				},
-			})
+			}),
+		}
+	}
+}
+
+impl<T: Clone> AsOption<Vec<T>> for Option<Vec<T>> {
+	fn combine(self, rhs: Self) -> Self
+	where
+		Self: Sized,
+	{
+		match (self, rhs) {
+			(None, Some(rhs)) => Some(rhs),
+			(Some(lhs), None) => Some(lhs),
+			(None, None) => None,
+			(Some(mut lhs), Some(rhs)) => {
+				let mut rhs = rhs;
+				let lhs = &mut lhs;
+				rhs.append(lhs);
+				Some(rhs)
+			}
 		}
 	}
 }
@@ -67,11 +85,11 @@ impl Add<Self> for &Options {
 
 	fn add(self, rhs: &Options) -> Self::Output {
 		Options {
-			watch: combine_options(self.watch, rhs.watch),
-			recursive: combine_options(self.recursive, rhs.recursive),
-			hidden_files: combine_options(self.hidden_files, rhs.hidden_files),
-			apply: combine_apply(self.apply.clone(), rhs.apply.clone()),
-			ignore: combine_option_vec(&self.ignore, &rhs.ignore),
+			watch: self.watch.combine(rhs.watch),
+			recursive: self.recursive.combine(rhs.recursive),
+			hidden_files: self.hidden_files.combine(rhs.hidden_files),
+			apply: self.apply.clone().combine(rhs.apply.clone()),
+			ignore: self.ignore.clone().combine(rhs.ignore.clone()),
 		}
 	}
 }
@@ -81,8 +99,7 @@ mod tests {
 	use std::io::Result;
 
 	use super::*;
-	use crate::utils::tests::IntoResult;
-	use crate::settings::Settings;
+	use crate::{settings::Settings, utils::tests::IntoResult};
 
 	#[test]
 	fn add_two() -> Result<()> {
