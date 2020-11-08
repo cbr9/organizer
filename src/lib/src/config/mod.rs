@@ -78,14 +78,15 @@ impl UserConfig {
 		let content = fs::read_to_string(&path).unwrap(); // if there is some problem with the config file, we should not try to fix it
 		match serde_yaml::from_str::<UserConfig>(&content) {
 			Ok(mut config) => {
-				let rules = config.rules.clone();
-				let settings = Settings::new().unwrap();
-				for (i, rule) in rules.iter().enumerate() {
-					for (j, folder) in rule.folders.iter().enumerate() {
-						let options = folder.fill_options(&settings, &config, &rule);
-						config.rules[i].folders[j].options = options;
+				let mut settings = Settings::new().unwrap();
+				settings.defaults = &Options::default() + &settings.defaults;
+				config.defaults = Some(settings.defaults).combine(config.defaults);
+				for rule in config.rules.iter_mut() {
+					rule.options = config.defaults.clone().combine(rule.options.clone());
+					for folder in rule.folders.iter_mut() {
+						folder.options = rule.options.clone().combine(folder.options.clone());
 					}
-					config.rules[i].options = None;
+					rule.options = None;
 				}
 				config.defaults = None;
 				config
