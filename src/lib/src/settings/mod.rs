@@ -47,8 +47,7 @@ impl Settings {
 				let settings = toml::from_str::<Settings>(&content);
 				match settings {
 					Ok(mut settings) => {
-						let defaults = Settings::default();
-						settings.defaults = &defaults.defaults + &settings.defaults;
+						settings.defaults = Options::default() + settings.defaults;
 						Ok(settings)
 					}
 					Err(e) => Err(e),

@@ -79,7 +79,6 @@ impl UserConfig {
 		match serde_yaml::from_str::<UserConfig>(&content) {
 			Ok(mut config) => {
 				let mut settings = Settings::new().unwrap();
-				settings.defaults = &Options::default() + &settings.defaults;
 				config.defaults = Some(settings.defaults).combine(config.defaults);
 				for rule in config.rules.iter_mut() {
 					rule.options = config.defaults.clone().combine(rule.options.clone());

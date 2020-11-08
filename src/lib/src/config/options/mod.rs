@@ -37,10 +37,10 @@ impl AsOption<Options> for Option<Options> {
 	where
 		Self: Sized,
 	{
-		match (&self, &rhs) {
+		match (self, rhs) {
 			(None, None) => Some(Options::default()),
-			(Some(_), None) => self,
-			(None, Some(_)) => rhs,
+			(Some(lhs), None) => Some(lhs),
+			(None, Some(rhs)) => Some(rhs),
 			(Some(lhs), Some(rhs)) => Some(lhs + rhs),
 		}
 	}
@@ -69,26 +69,24 @@ impl<T> AsOption<Vec<T>> for Option<Vec<T>> {
 			(None, Some(rhs)) => Some(rhs),
 			(Some(lhs), None) => Some(lhs),
 			(None, None) => None,
-			(Some(mut lhs), Some(rhs)) => {
-				let mut rhs = rhs;
-				let lhs = &mut lhs;
-				rhs.append(lhs);
+			(Some(mut lhs), Some(mut rhs)) => {
+				rhs.append(&mut lhs);
 				Some(rhs)
 			}
 		}
 	}
 }
 
-impl Add<Self> for &Options {
-	type Output = Options;
+impl Add<Self> for Options {
+	type Output = Self;
 
-	fn add(self, rhs: &Options) -> Self::Output {
+	fn add(self, rhs: Self) -> Self::Output {
 		Options {
 			watch: self.watch.combine(rhs.watch),
 			recursive: self.recursive.combine(rhs.recursive),
 			hidden_files: self.hidden_files.combine(rhs.hidden_files),
-			apply: self.apply.clone().combine(rhs.apply.clone()),
-			ignore: self.ignore.clone().combine(rhs.ignore.clone()),
+			apply: self.apply.combine(rhs.apply),
+			ignore: self.ignore.combine(rhs.ignore),
 		}
 	}
 }
@@ -129,7 +127,7 @@ mod tests {
 			hidden_files: defaults.defaults.hidden_files,
 			apply: opt2.apply.clone(),
 		};
-		(&opt1 + &opt2 == expected).into_result()
+		(opt1 + opt2 == expected).into_result()
 	}
 	#[test]
 	fn add_three() -> Result<()> {
@@ -168,7 +166,6 @@ mod tests {
 			hidden_files: Some(true),
 			apply: opt3.apply.clone(),
 		};
-		let one_two = &opt1 + &opt2;
-		(&one_two + &opt3 == expected).into_result()
+		(opt1 + opt2 + opt3 == expected).into_result()
 	}
 }
