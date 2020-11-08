@@ -1,5 +1,10 @@
 use std::{fmt, path::PathBuf, result, str::FromStr};
 
+use crate::{
+	config::{Options, Rule, UserConfig},
+	path::Expand,
+	settings::Settings,
+};
 use serde::{
 	de,
 	de::{MapAccess, Visitor},
@@ -7,36 +12,11 @@ use serde::{
 	Deserialize,
 	Deserializer,
 };
-use crate::path::Expand;
-use crate::config::{Rule, UserConfig, Options};
-use crate::settings::Settings;
-
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Folder {
 	pub path: PathBuf,
 	pub options: Option<Options>,
-}
-
-impl Folder {
-	pub fn fill_options<S, C, R>(&self, settings: &S, config: &C, rule: &R) -> Option<Options>
-	where
-		S: AsRef<Settings>,
-		C: AsRef<UserConfig>,
-		R: AsRef<Rule>,
-	{
-		let mut options = settings.as_ref().defaults.clone();
-		if let Some(config_defaults) = &config.as_ref().defaults {
-			options = &options + config_defaults;
-		}
-		if let Some(rule_options) = &rule.as_ref().options {
-			options = &options + rule_options;
-		}
-		if let Some(folder_options) = &self.options {
-			options = &options + folder_options;
-		}
-		Some(options)
-	}
 }
 
 impl<'de> Deserialize<'de> for Folder {

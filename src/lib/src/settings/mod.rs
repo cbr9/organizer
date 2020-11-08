@@ -1,6 +1,6 @@
 use crate::config::{Apply, ApplyWrapper, Options, UserConfig};
 use serde::{Deserialize, Serialize};
-use std::{fs, path::PathBuf};
+use std::{fs, ops::Add, path::PathBuf};
 use toml::de::Error as TomlError;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -8,6 +8,20 @@ pub struct Settings {
 	#[serde(skip)]
 	path: PathBuf,
 	pub defaults: Options,
+	// pub r#match: Match,
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone)]
+#[serde(rename_all(deserialize = "lowercase"))]
+pub enum Match {
+	All,
+	First,
+}
+
+impl Default for Match {
+	fn default() -> Self {
+		Self::First
+	}
 }
 
 impl AsRef<Self> for Settings {
@@ -20,13 +34,7 @@ impl Default for Settings {
 	fn default() -> Self {
 		Self {
 			path: PathBuf::new(),
-			defaults: Options {
-				ignore: Some(Vec::new()),
-				hidden_files: Some(false),
-				recursive: Some(false),
-				watch: Some(true),
-				apply: Some(ApplyWrapper::from(Apply::All)),
-			},
+			defaults: Default::default(), // r#match: Default::default()
 		}
 	}
 }

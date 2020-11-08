@@ -14,10 +14,36 @@ pub struct Options {
 	pub apply: Option<ApplyWrapper>,
 }
 
+impl Default for Options {
+	fn default() -> Self {
+		Self {
+			recursive: Some(false),
+			watch: Some(true),
+			ignore: Some(Vec::new()),
+			hidden_files: Some(false),
+			apply: Some(ApplyWrapper::from(Apply::All)),
+		}
+	}
+}
+
 pub trait AsOption<T> {
 	fn combine(self, rhs: Self) -> Self
 	where
 		Self: Sized;
+}
+
+impl AsOption<Options> for Option<Options> {
+	fn combine(self, rhs: Self) -> Self
+	where
+		Self: Sized,
+	{
+		match (&self, &rhs) {
+			(None, None) => Some(Options::default()),
+			(Some(_), None) => self,
+			(None, Some(_)) => rhs,
+			(Some(lhs), Some(rhs)) => Some(lhs + rhs),
+		}
+	}
 }
 
 impl AsOption<bool> for Option<bool> {
@@ -34,34 +60,7 @@ impl AsOption<bool> for Option<bool> {
 	}
 }
 
-impl AsOption<ApplyWrapper> for Option<ApplyWrapper> {
-	fn combine(self, rhs: Self) -> Self
-	where
-		Self: Sized,
-	{
-		match (self, rhs) {
-			(None, Some(rhs)) => Some(rhs),
-			(Some(lhs), None) => Some(lhs),
-			(None, None) => None,
-			(Some(lhs), Some(rhs)) => Some(ApplyWrapper {
-				actions: match (&lhs.actions, &rhs.actions) {
-					(None, Some(_)) => rhs.actions,
-					(Some(_), None) => lhs.actions,
-					(None, None) => None,
-					(Some(_), Some(_)) => rhs.actions,
-				},
-				filters: match (&lhs.filters, &rhs.filters) {
-					(None, Some(_)) => rhs.filters,
-					(Some(_), None) => lhs.filters,
-					(None, None) => None,
-					(Some(_), Some(_)) => rhs.filters,
-				},
-			}),
-		}
-	}
-}
-
-impl<T: Clone> AsOption<Vec<T>> for Option<Vec<T>> {
+impl<T> AsOption<Vec<T>> for Option<Vec<T>> {
 	fn combine(self, rhs: Self) -> Self
 	where
 		Self: Sized,

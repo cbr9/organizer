@@ -1,5 +1,6 @@
 use std::fmt;
 
+use crate::config::AsOption;
 use serde::{
 	de::{Error, MapAccess, SeqAccess, Visitor},
 	export::{Formatter, PhantomData},
@@ -7,6 +8,7 @@ use serde::{
 	Deserializer,
 	Serialize,
 };
+use std::borrow::Cow;
 
 #[derive(Serialize, Debug, Clone, Eq, PartialEq)]
 #[serde(rename_all(serialize = "lowercase", deserialize = "lowercase"))]
@@ -20,6 +22,15 @@ pub enum Apply {
 pub struct ApplyWrapper {
 	pub actions: Option<Apply>,
 	pub filters: Option<Apply>,
+}
+
+impl Default for ApplyWrapper {
+	fn default() -> Self {
+		Self {
+			actions: Some(Apply::All),
+			filters: Some(Apply::All),
+		}
+	}
 }
 
 impl From<Apply> for ApplyWrapper {
@@ -164,6 +175,36 @@ impl ToString for Apply {
 			Apply::All => "all".into(),
 			Apply::Any => "any".into(),
 			Apply::Select(vec) => format!("{:?}", vec),
+		}
+	}
+}
+
+impl AsOption<ApplyWrapper> for Option<ApplyWrapper> {
+	fn combine(self, rhs: Self) -> Self
+	where
+		Self: Sized,
+	{
+		match (self, rhs) {
+			(None, Some(rhs)) => Some(rhs),
+			(Some(lhs), None) => Some(lhs),
+			(None, None) => Some(ApplyWrapper::default()),
+			(Some(lhs), Some(rhs)) => {
+				let apply = ApplyWrapper {
+					actions: match (&lhs.actions, &rhs.actions) {
+						(None, Some(_)) => rhs.actions,
+						(Some(_), None) => lhs.actions,
+						(None, None) => Some(Apply::All),
+						(Some(_), Some(_)) => rhs.actions,
+					},
+					filters: match (&lhs.filters, &rhs.filters) {
+						(None, Some(_)) => rhs.filters,
+						(Some(_), None) => lhs.filters,
+						(None, None) => Some(Apply::All),
+						(Some(_), Some(_)) => rhs.filters,
+					},
+				};
+				Some(apply)
+			}
 		}
 	}
 }
