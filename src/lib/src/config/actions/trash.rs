@@ -9,7 +9,7 @@ use colored::Colorize;
 use log::info;
 use serde::Deserialize;
 
-use crate::config::{AsAction, ActionType};
+use crate::config::{ActionType, AsAction};
 
 #[derive(Debug, Clone, Deserialize, Default)]
 pub struct Trash(bool);

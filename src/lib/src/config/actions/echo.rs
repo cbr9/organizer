@@ -1,14 +1,12 @@
 use std::{borrow::Cow, io::Result, ops::Deref, path::Path};
 
+use crate::{
+	config::{ActionType, AsAction},
+	string::{deserialize_placeholder_string, Placeholder},
+};
 use colored::Colorize;
 use log::info;
 use serde::Deserialize;
-use crate::{
-	string::deserialize_placeholder_string,
-	config::{ActionType, AsAction}
-};
-use crate::string::Placeholder;
-
 
 #[derive(Debug, Clone, Deserialize, Default)]
 pub struct Echo(#[serde(deserialize_with = "deserialize_placeholder_string")] String);

@@ -1,6 +1,6 @@
-use crate::config::{Apply, ApplyWrapper, Options, UserConfig};
+use crate::config::{Options, UserConfig};
 use serde::{Deserialize, Serialize};
-use std::{fs, ops::Add, path::PathBuf};
+use std::{fs, path::PathBuf};
 use toml::de::Error as TomlError;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -41,7 +41,7 @@ impl Default for Settings {
 
 impl Settings {
 	pub fn new() -> Result<Self, TomlError> {
-		let path = UserConfig::dir().join("settings.toml");
+		let path = UserConfig::default_dir().join("settings.toml");
 		match fs::read_to_string(&path) {
 			Ok(content) => {
 				let settings = toml::from_str::<Settings>(&content);

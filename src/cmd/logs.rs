@@ -1,7 +1,7 @@
 use crate::Cmd;
-use colored::Colorize;
 use anyhow::Result;
 use clap::Clap;
+use colored::Colorize;
 use fern::colors::{Color, ColoredLevelConfig};
 use lib::config::UserConfig;
 use std::{fs, path::PathBuf};
@@ -28,7 +28,7 @@ impl Cmd for Logs {
 
 impl Logs {
 	pub fn path() -> PathBuf {
-		UserConfig::dir().join("output.log")
+		UserConfig::default_dir().join("output.log")
 	}
 
 	pub(crate) fn setup() -> Result<(), fern::InitError> {

@@ -8,7 +8,6 @@ use serde::{
 	Deserializer,
 	Serialize,
 };
-use std::borrow::Cow;
 
 #[derive(Serialize, Debug, Clone, Eq, PartialEq)]
 #[serde(rename_all(serialize = "lowercase", deserialize = "lowercase"))]

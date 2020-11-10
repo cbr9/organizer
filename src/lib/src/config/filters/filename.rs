@@ -1,8 +1,7 @@
 use std::{borrow::Cow, path::Path};
 
-use serde::Deserialize;
 use crate::config::AsFilter;
-
+use serde::Deserialize;
 
 #[derive(Eq, PartialEq, Deserialize, Debug, Clone, Default)]
 pub struct Filename {

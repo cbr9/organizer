@@ -1,10 +1,6 @@
 use std::{fmt, path::PathBuf, result, str::FromStr};
 
-use crate::{
-	config::{Options, Rule, UserConfig},
-	path::Expand,
-	settings::Settings,
-};
+use crate::{config::Options, path::Expand};
 use serde::{
 	de,
 	de::{MapAccess, Visitor},

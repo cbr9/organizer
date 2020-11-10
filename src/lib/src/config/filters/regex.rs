@@ -1,7 +1,7 @@
 use std::{ops::Deref, path::Path, str::FromStr};
 
+use crate::config::{filters::Extension, AsFilter};
 use serde::{de::Error, Deserialize, Deserializer};
-use crate::config::{AsFilter, filters::Extension};
 
 #[derive(Debug, Clone)]
 pub struct Regex(pub Vec<regex::Regex>);

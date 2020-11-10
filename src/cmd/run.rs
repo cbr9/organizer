@@ -1,7 +1,7 @@
 use crate::{cmd::watch::process_file, Cmd, DEFAULT_CONFIG_STR};
 use anyhow::Result;
 use clap::Clap;
-use lib::config::{UserConfig, AsMap};
+use lib::config::{AsMap, UserConfig};
 use rayon::prelude::*;
 use std::{fs, path::PathBuf};
 

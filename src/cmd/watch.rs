@@ -12,8 +12,8 @@ use crate::{cmd::run::Run, Cmd, DEFAULT_CONFIG_STR};
 use clap::Clap;
 use lib::{
 	config::{AsMap, Options, PathToRecursive, PathToRules, UserConfig},
-	lock_file::{GetProcessBy, LockFile},
 	path::{GetRules, IsHidden},
+	register::Register,
 };
 use std::{
 	borrow::Borrow,
@@ -34,10 +34,8 @@ impl Cmd for Watch {
 		if self.replace {
 			self.replace()
 		} else {
-			let lock_file = LockFile::new();
-			let watchers = lock_file.get_running_watchers();
-			let mut running_configs = watchers.iter().map(|(_, path)| path);
-			if running_configs.any(|config| config == &self.config) {
+			let register = Register::new().unwrap();
+			if register.iter().map(|section| &section.path).any(|config| config == &self.config) {
 				return if self.config == UserConfig::default_path() {
 					println!("An existing instance is already running. Use --replace to restart it");
 					Ok(())
@@ -59,15 +57,12 @@ impl Cmd for Watch {
 
 impl Watch {
 	fn replace(&self) -> Result<()> {
-		let lock_file = LockFile::new();
-		match lock_file.get_process_by(self.config.as_path()) {
-			Some((pid, _)) => {
+		let register = Register::new()?;
+		match register.iter().find(|section| section.path == self.config) {
+			Some(section) => {
 				let sys = System::new_with_specifics(RefreshKind::with_processes(RefreshKind::new()));
-				match sys.get_process(pid) {
-					None => {}
-					Some(process) => {
-						process.kill(Signal::Kill);
-					}
+				if let Some(process) = sys.get_process(section.pid) {
+					process.kill(Signal::Kill);
 				}
 				self.start(UserConfig::new(&self.config))
 			}
@@ -103,25 +98,14 @@ impl Watch {
 		Ok((watcher, rx))
 	}
 
-	fn register<T>(&self, lock_file: T) -> Result<()>
-	where
-		T: Borrow<LockFile>,
-	{
-		lock_file
-			.borrow()
-			.append(process::id() as i32, self.config.as_path())
-			.map_err(anyhow::Error::new)
-	}
-
 	fn start<T>(&self, config: T) -> Result<()>
 	where
 		T: AsRef<UserConfig>,
 	{
-		let lock_file = LockFile::new();
+		Register::new()?.append(process::id(), &self.config)?;
 		let (mut watcher, rx) = self.setup(config.borrow())?;
 		let path2rules = config.as_ref().rules.map();
 		let config_parent = self.config.parent().unwrap();
-		self.register(lock_file)?;
 
 		loop {
 			match rx.recv() {

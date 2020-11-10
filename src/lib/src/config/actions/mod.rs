@@ -11,9 +11,9 @@ pub use script::*;
 
 use std::{borrow::Cow, io::Result, ops::Deref, path::Path};
 
+use crate::config::Apply;
 use log::error;
 use serde::Deserialize;
-use crate::config::Apply;
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all(deserialize = "lowercase"))]
@@ -122,10 +122,10 @@ mod tests {
 	use std::io::Result;
 
 	use crate::{
+		config::ConflictOption,
+		path::Update,
 		utils::tests::{project, IntoResult},
 	};
-	use crate::config::ConflictOption;
-	use crate::path::Update;
 
 	#[test]
 	fn rename_with_rename_conflict() -> Result<()> {

@@ -1,9 +1,9 @@
 use std::{borrow::Cow, fs, io::Result, ops::Deref, path::Path};
 
+use crate::config::{ActionType, AsAction};
 use colored::Colorize;
 use log::info;
 use serde::Deserialize;
-use crate::config::{ActionType, AsAction};
 
 #[derive(Debug, Clone, Deserialize, Default)]
 pub struct Delete(bool);

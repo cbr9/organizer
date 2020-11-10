@@ -8,10 +8,10 @@ use filename::Filename;
 mod extension;
 mod filename;
 mod regex;
+pub use self::regex::*;
+use crate::config::{Apply, Script};
 pub use extension::*;
 pub use filename::*;
-pub use self::regex::*;
-use crate::config::{Script, Apply};
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all(deserialize = "lowercase"))]

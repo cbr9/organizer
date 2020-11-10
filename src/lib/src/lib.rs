@@ -1,5 +1,4 @@
 pub mod config;
-pub mod lock_file;
 pub mod path {
 	mod expand;
 	mod get_rules;
@@ -16,6 +15,7 @@ pub mod string {
 	pub use capitalize::*;
 	pub use placeholder::*;
 }
+pub mod register;
 pub mod settings;
 pub mod utils;
 

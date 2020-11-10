@@ -1,6 +1,4 @@
-use crate::{
-	cmd::Cmd,
-};
+use crate::cmd::Cmd;
 use anyhow::Result;
 use clap::{crate_name, Clap};
 use colored::Colorize;

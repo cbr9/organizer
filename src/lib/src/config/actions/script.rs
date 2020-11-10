@@ -14,10 +14,9 @@ use log::info;
 use serde::{de::Error, Deserialize, Deserializer};
 
 use crate::{
-	string::deserialize_placeholder_string,
-	config::{UserConfig, AsFilter, AsAction}
+	config::{AsAction, AsFilter, UserConfig},
+	string::{deserialize_placeholder_string, Placeholder},
 };
-use crate::string::Placeholder;
 
 #[derive(Deserialize, Debug, Clone, Default)]
 pub struct Script {
@@ -77,7 +76,7 @@ impl Script {
 	fn write(&self, path: &Path) -> Result<PathBuf> {
 		let content = self.content.as_str();
 		let content = content.expand_placeholders(path)?;
-		let dir = UserConfig::dir().join("scripts");
+		let dir = UserConfig::default_dir().join("scripts");
 		if !dir.exists() {
 			fs::create_dir_all(&dir)?;
 		}

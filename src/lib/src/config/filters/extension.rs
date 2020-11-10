@@ -1,5 +1,6 @@
 use std::{fmt, ops::Deref, path::Path};
 
+use crate::config::AsFilter;
 use serde::{
 	de,
 	de::{SeqAccess, Visitor},
@@ -8,7 +9,6 @@ use serde::{
 	Deserialize,
 	Deserializer,
 };
-use crate::config::AsFilter;
 
 #[derive(Debug, Clone)]
 pub struct Extension(Vec<String>);
@@ -74,7 +74,7 @@ pub mod tests {
 		path::PathBuf,
 	};
 
-	use crate::{utils::tests::IntoResult};
+	use crate::utils::tests::IntoResult;
 
 	use super::Extension;
 	use crate::config::AsFilter;
