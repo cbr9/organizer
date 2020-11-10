@@ -110,7 +110,7 @@ impl UserConfig {
 				if !parent.exists() {
 					std::fs::create_dir_all(parent).unwrap_or_else(|_| panic!("error: could not create config directory ({})", parent.display()));
 				}
-				let output = include_str!("../../../../examples/config.yml");
+				let output = include_str!("../../../examples/config.yml");
 				std::fs::write(&path, output).unwrap_or_else(|_| panic!("error: could not create config file ({})", path.display()));
 				println!("New config file created at {}", path.display());
 			}
