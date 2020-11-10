@@ -7,6 +7,7 @@ use toml::de::Error as TomlError;
 pub struct Settings {
 	#[serde(skip)]
 	path: PathBuf,
+	#[serde(flatten)]
 	pub defaults: Options,
 	// pub r#match: Match,
 }
