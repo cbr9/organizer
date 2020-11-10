@@ -5,7 +5,7 @@ use std::{
 };
 
 use colored::Colorize;
-use log::{error, info};
+use log::{debug, error, info};
 use notify::{op, raw_watcher, RawEvent, RecommendedWatcher, RecursiveMode, Watcher};
 
 use crate::{cmd::run::Run, Cmd, DEFAULT_CONFIG_STR};
@@ -48,9 +48,13 @@ impl Cmd for Watch {
 				};
 			}
 
-			let config = UserConfig::new(&self.config);
-			Run { config: self.config.clone() }.start(&config)?;
-			self.start(config)
+			match UserConfig::new(&self.config) {
+				Ok(config) => {
+					Run { config: self.config.clone() }.start(&config)?;
+					self.start(config)
+				}
+				Err(_) => std::process::exit(0),
+			}
 		}
 	}
 }
@@ -64,7 +68,10 @@ impl Watch {
 				if let Some(process) = sys.get_process(section.pid) {
 					process.kill(Signal::Kill);
 				}
-				self.start(UserConfig::new(&self.config))
+				match UserConfig::new(&self.config) {
+					Ok(config) => self.start(config),
+					Err(_) => std::process::exit(0),
+				}
 			}
 			None => {
 				// there is no running process
@@ -121,16 +128,21 @@ impl Watch {
 						}
 						op::CLOSE_WRITE => {
 							if cfg!(feature = "hot-reload") && path == self.config {
-								for folder in config.as_ref().rules.get_paths() {
-									watcher.unwatch(folder)?;
+								match UserConfig::new(&self.config) {
+									Ok(config) => {
+										for folder in config.as_ref().rules.get_paths() {
+											watcher.unwatch(folder)?;
+										};
+										watcher.unwatch(config_parent)?;
+										std::mem::drop(path);
+										std::mem::drop(path2rules);
+										info!("reloaded configuration: {}", self.config.display());
+										break self.start(config);
+									}
+									Err(_) => {
+										debug!("could not reload configuration");
+									}
 								};
-								watcher.unwatch(config_parent)?;
-								std::mem::drop(path2rules);
-								std::mem::drop(path);
-                                std::mem::drop(config);
-								let config = UserConfig::new(&self.config);
-								info!("reloaded configuration: {}", self.config.display());
-								break self.start(config);
 							}
 						}
 						_ => {}

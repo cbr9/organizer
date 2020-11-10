@@ -13,8 +13,10 @@ pub struct Run {
 
 impl Cmd for Run {
 	fn run(self) -> Result<()> {
-		let config = UserConfig::new(&self.config.canonicalize()?);
-		self.start(config)
+		match UserConfig::new(&self.config) {
+			Ok(config) => self.start(config),
+			Err(_) => std::process::exit(0),
+		}
 	}
 }
 

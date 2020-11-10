@@ -17,6 +17,7 @@ use std::{
 	path::{Path, PathBuf},
 };
 
+use anyhow::Result;
 use dirs::{config_dir, home_dir};
 use log::error;
 use notify::RecursiveMode;
@@ -51,7 +52,7 @@ impl UserConfig {
 	/// ### Errors
 	/// This constructor fails in the following cases:
 	/// - The configuration file does not exist
-	pub fn new<T>(path: T) -> Self
+	pub fn new<T>(path: T) -> Result<Self>
 	where
 		T: AsRef<Path>,
 	{
@@ -88,11 +89,11 @@ impl UserConfig {
 					rule.options = None;
 				}
 				config.defaults = None;
-				config
+				Ok(config)
 			}
 			Err(e) => {
 				error!("{}", e);
-				std::process::exit(1);
+				Err(e.into())
 			}
 		}
 	}
