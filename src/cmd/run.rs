@@ -13,7 +13,7 @@ pub struct Run {
 
 impl Cmd for Run {
 	fn run(self) -> Result<()> {
-		let config = UserConfig::new(&self.config);
+		let config = UserConfig::new(&self.config.canonicalize()?);
 		self.start(config)
 	}
 }

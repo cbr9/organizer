@@ -101,7 +101,6 @@ impl Register {
 				.filter(|section| sys.get_process(section.pid).is_some())
 				.collect::<Vec<_>>();
 			fs::write(&self.path, serde_json::to_string(&self.sections)?)?;
-			std::mem::drop(sys);
 		}
 		Ok(self)
 	}

@@ -24,10 +24,19 @@ pub trait Cmd {
 impl Cmd for App {
 	fn run(self) -> anyhow::Result<()> {
 		match self {
-			App::Watch(watch) => watch.run(),
-			App::Run(run) => run.run(),
+			App::Watch(mut watch) => {
+				watch.config = watch.config.canonicalize()?;
+				watch.run()
+			}
+			App::Run(mut run) => {
+				run.config = run.config.canonicalize()?;
+				run.run()
+			}
+			App::Stop(mut stop) => {
+				stop.config = stop.config.canonicalize()?;
+				stop.run()
+			}
 			App::Logs(logs) => logs.run(),
-			App::Stop(stop) => stop.run(),
 			App::Config(config) => config.run(),
 		}
 	}

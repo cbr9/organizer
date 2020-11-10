@@ -34,7 +34,7 @@ impl Cmd for Watch {
 		if self.replace {
 			self.replace()
 		} else {
-			let register = Register::new().unwrap();
+			let register = Register::new()?;
 			if register.iter().map(|section| &section.path).any(|config| config == &self.config) {
 				return if self.config == UserConfig::default_path() {
 					println!("An existing instance is already running. Use --replace to restart it");

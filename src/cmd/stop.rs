@@ -10,7 +10,7 @@ pub struct Stop {
 	#[clap(long)]
 	all: bool,
 	#[clap(long, default_value = &DEFAULT_CONFIG_STR)]
-	config: PathBuf,
+	pub(crate) config: PathBuf,
 }
 
 impl Cmd for Stop {
