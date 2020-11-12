@@ -61,7 +61,10 @@ impl<'de> Deserialize<'de> for Extension {
 impl AsFilter for Extension {
 	fn matches(&self, path: &Path) -> bool {
 		match path.extension() {
-			Some(extension) => self.contains(&extension.to_str().unwrap().to_string()),
+			Some(extension) => {
+				let extension = extension.to_str().unwrap().to_string();
+				self.contains(&extension)
+			}
 			None => false,
 		}
 	}
@@ -97,6 +100,7 @@ pub mod tests {
 		let path = PathBuf::from("$HOME/Downloads/test.pdf");
 		assert!(extension.matches(&path))
 	}
+
 	#[test]
 	fn no_match() {
 		let extension = Extension(vec!["pdf".into(), "doc".into(), "docx".into()]);

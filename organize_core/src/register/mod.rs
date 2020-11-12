@@ -7,12 +7,10 @@ use std::{
 	result,
 };
 
-use crate::config::UserConfig;
 use num_traits::AsPrimitive;
 use serde_json::error::Category;
 use std::{
 	env::temp_dir,
-	io::Write,
 	ops::{Deref, DerefMut},
 };
 use sysinfo::{Pid, RefreshKind, System, SystemExt};

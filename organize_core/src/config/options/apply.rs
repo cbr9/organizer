@@ -47,13 +47,13 @@ impl AsOption<Apply> for Option<Apply> {
 			(_, Some(Apply::Any)) => Some(Apply::Any),
 			(Some(Apply::AllOf(mut lhs)), Some(Apply::AllOf(mut rhs))) => {
 				rhs.append(&mut lhs);
-				rhs.sort();
+				rhs.sort_unstable();
 				rhs.dedup();
 				Some(Apply::AllOf(rhs))
 			}
 			(Some(Apply::AnyOf(mut lhs)), Some(Apply::AnyOf(mut rhs))) => {
 				rhs.append(&mut lhs);
-				rhs.sort();
+				rhs.sort_unstable();
 				rhs.dedup();
 				Some(Apply::AnyOf(rhs))
 			}

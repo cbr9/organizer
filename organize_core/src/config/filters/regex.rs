@@ -32,12 +32,8 @@ impl AsFilter for Regex {
 		match path.file_name() {
 			None => false,
 			Some(filename) => {
-				for regex in self.iter() {
-					if regex.is_match(&filename.to_string_lossy()) {
-						return true;
-					}
-				}
-				false
+				let filename = filename.to_string_lossy();
+				self.iter().any(|re| re.is_match(&filename))
 			}
 		}
 	}
