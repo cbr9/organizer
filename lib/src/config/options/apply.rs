@@ -15,7 +15,8 @@ use std::str::FromStr;
 pub enum Apply {
 	All,
 	Any,
-	Select(Vec<usize>),
+	AllOf(Vec<usize>),
+	AnyOf(Vec<usize>),
 }
 
 impl Default for Apply {
@@ -73,9 +74,13 @@ impl From<Apply> for ApplyWrapper {
 				actions: Some(Apply::All),
 				filters: Some(val),
 			},
-			Apply::Select(vec) => Self {
-				actions: Some(Apply::Select(vec.clone())),
-				filters: Some(Apply::Select(vec)),
+			Apply::AllOf(vec) => Self {
+				actions: Some(Apply::AllOf(vec.clone())),
+				filters: Some(Apply::AllOf(vec)),
+			},
+			Apply::AnyOf(vec) => Self {
+				actions: Some(Apply::AllOf(vec.clone())),
+				filters: Some(Apply::AnyOf(vec)),
 			},
 		}
 	}
@@ -105,15 +110,18 @@ impl<'de> Deserialize<'de> for Apply {
 				}
 			}
 
-			fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+			fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
 			where
-				A: SeqAccess<'de>,
+				A: MapAccess<'de>,
 			{
-				let mut vec = Vec::new();
-				while let Some(val) = seq.next_element()? {
-					vec.push(val)
+				match map.next_entry::<String, Vec<usize>>()? {
+					Some((key, value)) => match key.as_str() {
+						"any_of" => Ok(Apply::AnyOf(value)),
+						"all_of" => Ok(Apply::AllOf(value)),
+						_ => Err(A::Error::custom("invalid key")),
+					},
+					None => Err(A::Error::custom("empty map")),
 				}
-				Ok(Apply::Select(vec))
 			}
 		}
 		deserializer.deserialize_any(ApplyVisitor)
@@ -144,17 +152,6 @@ impl<'de> Deserialize<'de> for ApplyWrapper {
 				}
 			}
 
-			fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
-			where
-				A: SeqAccess<'de>,
-			{
-				let mut vec = Vec::new();
-				while let Some(val) = seq.next_element()? {
-					vec.push(val)
-				}
-				Ok(ApplyWrapper::from(Apply::Select(vec)))
-			}
-
 			fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
 			where
 				A: MapAccess<'de>,
@@ -169,9 +166,9 @@ impl<'de> Deserialize<'de> for ApplyWrapper {
 						"actions" => {
 							wrapper.actions = match value {
 								Apply::All => Some(value),
-								Apply::Select(_) => Some(value),
-								Apply::Any => {
-									let msg = "variant 'any' not valid for field 'actions' in option 'apply'";
+								Apply::AllOf(_) => Some(value),
+								Apply::Any | Apply::AnyOf(_) => {
+									let msg = "variant 'any' and 'any_of' not valid for field 'actions' in option 'apply'";
 									return Err(A::Error::custom(msg));
 								}
 							}
@@ -198,7 +195,8 @@ impl ToString for Apply {
 		match self {
 			Apply::All => "all".into(),
 			Apply::Any => "any".into(),
-			Apply::Select(vec) => format!("{:?}", vec),
+			Apply::AllOf(vec) => format!("{:?}", vec),
+			Apply::AnyOf(vec) => format!("{:?}", vec),
 		}
 	}
 }
@@ -217,7 +215,7 @@ impl AsOption<ApplyWrapper> for Option<ApplyWrapper> {
 					filters: lhs.filters.combine(rhs.filters),
 				};
 				Some(wrapper)
-			},
+			}
 		}
 	}
 }
@@ -238,14 +236,31 @@ mod tests {
 		assert_de_tokens(&value, &[Token::Str("any")])
 	}
 	#[test]
-	fn test_apply_select() {
-		let value = Apply::Select(vec![0, 1, 2]);
+	fn test_apply_all_of() {
+		let value = Apply::AllOf(vec![0, 1, 2]);
 		assert_de_tokens(&value, &[
+			Token::Map { len: Some(1) },
+			Token::Str("all_of"),
 			Token::Seq { len: Some(3) },
 			Token::U8(0),
 			Token::U8(1),
 			Token::U8(2),
 			Token::SeqEnd,
+			Token::MapEnd,
+		])
+	}
+	#[test]
+	fn test_apply_any_of() {
+		let value = Apply::AnyOf(vec![0, 1, 2]);
+		assert_de_tokens(&value, &[
+			Token::Map { len: Some(1) },
+			Token::Str("any_of"),
+			Token::Seq { len: Some(3) },
+			Token::U8(0),
+			Token::U8(1),
+			Token::U8(2),
+			Token::SeqEnd,
+			Token::MapEnd,
 		])
 	}
 	#[test]
@@ -259,23 +274,21 @@ mod tests {
 		assert_de_tokens(&value, &[Token::Str("any")])
 	}
 	#[test]
-	fn test_apply_wrapper_single_value_select() {
-		let value = ApplyWrapper::from(Apply::Select(vec![0, 2]));
-		assert_de_tokens(&value, &[Token::Seq { len: Some(2) }, Token::U8(0), Token::U8(2), Token::SeqEnd])
-	}
-	#[test]
-	fn test_apply_wrapper_actions_select_filters_all() {
+	fn test_apply_wrapper_actions_all_of_filters_all() {
 		let value = ApplyWrapper {
-			actions: Some(Apply::Select(vec![0, 1])),
+			actions: Some(Apply::AllOf(vec![0, 1])),
 			filters: Some(Apply::All),
 		};
 		assert_de_tokens(&value, &[
 			Token::Map { len: Some(2) },
 			Token::Str("actions"),
+			Token::Map { len: Some(1) },
+			Token::Str("all_of"),
 			Token::Seq { len: Some(2) },
 			Token::U8(0),
 			Token::U8(1),
 			Token::SeqEnd,
+			Token::MapEnd,
 			Token::Str("filters"),
 			Token::Str("all"),
 			Token::MapEnd,
@@ -341,7 +354,21 @@ mod tests {
 				Token::Str("any"),
 				Token::MapEnd,
 			],
-			"variant 'any' not valid for field 'actions' in option 'apply' (select 'all' or provide an array of indices)",
+			"variant 'any' and 'any_of' not valid for field 'actions' in option 'apply'",
+		)
+	}
+	#[test]
+	fn test_apply_wrapper_actions_any_of_filters_any() {
+		assert_de_tokens_error::<ApplyWrapper>(
+			&[
+				Token::Map { len: Some(2) },
+				Token::Str("filters"),
+				Token::Str("all"),
+				Token::Str("actions"),
+				Token::Str("any"),
+				Token::MapEnd,
+			],
+			"variant 'any' and 'any_of' not valid for field 'actions' in option 'apply'",
 		)
 	}
 }

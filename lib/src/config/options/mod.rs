@@ -149,7 +149,7 @@ mod tests {
 			watch: Some(true),
 			ignore: Some(vec!["$HOME/Pictures".into()]),
 			hidden_files: Some(true),
-			apply: Some(ApplyWrapper::from(Apply::Select(vec![0, 2]))),
+			apply: Some(ApplyWrapper::from(Apply::AllOf(vec![0, 2]))),
 			r#match: None,
 		};
 		let expected = Options {

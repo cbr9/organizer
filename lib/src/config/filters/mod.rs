@@ -57,11 +57,16 @@ impl Filters {
 		match apply.as_ref() {
 			Apply::All => self.iter().all(|filter| filter.matches(path.as_ref())),
 			Apply::Any => self.iter().any(|filter| filter.matches(path.as_ref())),
-			Apply::Select(filters) => self
+			Apply::AllOf(filters) => self
 				.iter()
 				.enumerate()
 				.filter(|(i, _)| filters.contains(i))
 				.all(|(_, filter)| filter.matches(path.as_ref())),
+			Apply::AnyOf(filters) => self
+				.iter()
+				.enumerate()
+				.filter(|(i, _)| filters.contains(i))
+				.any(|(_, filter)| filter.matches(path.as_ref())),
 		}
 	}
 }

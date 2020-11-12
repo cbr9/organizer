@@ -89,7 +89,9 @@ impl Actions {
 		A: AsRef<Apply>,
 	{
 		match apply.as_ref() {
-			Apply::Any => panic!("deserializer should not have allowed variant 'any' for field 'actions' in option 'apply'"),
+			Apply::Any | Apply::AnyOf(_) => {
+				panic!("deserializer should not have allowed variants 'any' or 'any_of' for field 'actions' in option 'apply'")
+			}
 			Apply::All => {
 				let mut path = Cow::from(path);
 				self.iter()
@@ -105,7 +107,7 @@ impl Actions {
 					})
 					.and_then(|_| Ok(path.to_path_buf()))
 			}
-			Apply::Select(indices) => {
+			Apply::AllOf(indices) => {
 				let mut path = Cow::from(path);
 				indices
 					.iter()
