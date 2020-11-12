@@ -50,20 +50,25 @@ impl AsOption<bool> for Option<bool> {
 		match (&self, &rhs) {
 			(None, Some(_)) => rhs,
 			(Some(_), None) => self,
-			(None, None) => None,
+			(None, None) => Some(bool::default()),
 			(Some(_), Some(_)) => rhs,
 		}
 	}
 }
 
-impl<T> AsOption<Vec<T>> for Option<Vec<T>> {
+impl<T> AsOption<Vec<T>> for Option<Vec<T>>
+where
+	T: PartialEq + Ord,
+{
 	fn combine(self, rhs: Self) -> Self {
 		match (self, rhs) {
 			(None, Some(rhs)) => Some(rhs),
 			(Some(lhs), None) => Some(lhs),
-			(None, None) => None,
+			(None, None) => Some(Vec::new()),
 			(Some(mut lhs), Some(mut rhs)) => {
 				rhs.append(&mut lhs);
+				rhs.sort();
+				rhs.dedup();
 				Some(rhs)
 			}
 		}
@@ -87,86 +92,70 @@ impl Add<Self> for Options {
 
 #[cfg(test)]
 mod tests {
-	use std::io::Result;
 
 	use super::*;
 	use crate::{settings::Settings, utils::tests::IntoResult};
 
 	#[test]
-	fn add_two() -> Result<()> {
-		let defaults = Settings::default();
-		let opt1 = Options {
-			recursive: Some(true),
-			watch: None,
-			ignore: Some(vec!["$HOME".into(), "$HOME/Downloads".into()]),
-			hidden_files: None,
-			apply: Some(ApplyWrapper::from(Apply::All)),
-			r#match: Some(Match::First),
-		};
-		let opt2 = Options {
-			recursive: Some(false),
-			watch: Some(false),
-			ignore: Some(vec!["$HOME/Documents".into()]),
-			hidden_files: None,
-			apply: Some(ApplyWrapper::from(Apply::Any)),
-			r#match: None,
-		};
-		let expected = Options {
-			recursive: opt2.recursive,
-			watch: opt2.watch,
-			ignore: Some({
-				let mut ignore1 = opt1.clone().ignore.unwrap();
-				let ignore2 = &mut opt2.clone().ignore.unwrap();
-				ignore2.append(&mut ignore1);
-				ignore2.clone()
-			}),
-			hidden_files: defaults.defaults.hidden_files,
-			apply: opt2.apply.clone(),
-			r#match: Some(Match::First),
-		};
-		(opt1 + opt2 == expected).into_result()
+	fn combine_opt_bool_some_some() {
+		let left = Some(true);
+		let right = Some(false);
+		assert_eq!(left.combine(right), right)
 	}
 	#[test]
-	fn add_three() -> Result<()> {
-		let opt1 = Options {
-			recursive: Some(true),
-			watch: None,
-			ignore: Some(vec!["$HOME".into(), "$HOME/Downloads".into()]),
-			hidden_files: None,
-			apply: None,
-			r#match: Some(Match::All),
-		};
-		let opt2 = Options {
-			recursive: Some(false),
-			watch: Some(false),
-			ignore: Some(vec!["$HOME/Documents".into()]),
-			hidden_files: None,
-			apply: None,
-			r#match: Some(Match::First),
-		};
-		let opt3 = Options {
-			recursive: Some(true),
-			watch: Some(true),
-			ignore: Some(vec!["$HOME/Pictures".into()]),
-			hidden_files: Some(true),
-			apply: Some(ApplyWrapper::from(Apply::AllOf(vec![0, 2]))),
-			r#match: None,
-		};
-		let expected = Options {
-			recursive: Some(true),
-			watch: Some(true),
-			ignore: Some({
-				let mut ignore1 = opt1.clone().ignore.unwrap();
-				let ignore2 = &mut opt2.clone().ignore.unwrap();
-				let mut ignore3 = opt3.clone().ignore.unwrap();
-				ignore2.append(&mut ignore1);
-				ignore3.append(ignore2);
-				ignore3
-			}),
-			hidden_files: Some(true),
-			apply: opt3.apply.clone(),
-			r#match: Some(Match::First),
-		};
-		(opt1 + opt2 + opt3 == expected).into_result()
+	fn combine_opt_bool_some_none() {
+		let left = Some(true);
+		let right = None;
+		assert_eq!(left.combine(right), left)
+	}
+	#[test]
+	fn combine_opt_bool_none_some() {
+		let left = None;
+		let right = Some(true);
+		assert_eq!(left.combine(right), right)
+	}
+	#[test]
+	fn combine_opt_bool_none_none() {
+		let left: Option<bool> = None;
+		let right = None;
+		assert_eq!(left.combine(right), Some(bool::default()))
+	}
+	#[test]
+	fn combine_opt_vec_none_none() {
+		let left: Option<Vec<&str>> = None;
+		let right = None;
+		assert_eq!(left.combine(right), Some(Vec::new()))
+	}
+	#[test]
+	fn combine_opt_vec_none_some() {
+		let left: Option<Vec<&str>> = None;
+		let right = Some(vec!["$HOME"]);
+		assert_eq!(left.combine(right.clone()), right)
+	}
+	#[test]
+	fn combine_opt_vec_some_none() {
+		let left: Option<Vec<&str>> = Some(vec!["$HOME"]);
+		let right = None;
+		assert_eq!(left.clone().combine(right), left)
+	}
+	#[test]
+	fn combine_opt_vec_some_some_equal() {
+		let left = Some(vec!["$HOME", "$HOME/Downloads"]);
+		let right = Some(vec!["$HOME", "$HOME/Downloads"]);
+		assert_eq!(left.combine(right.clone()), right)
+	}
+	#[test]
+	fn combine_opt_vec_some_some_overlap() {
+		let left = Some(vec!["$HOME", "$HOME/Downloads"]);
+		let right = Some(vec!["$HOME", "$HOME/Documents"]);
+		let expected = Some(vec!["$HOME", "$HOME/Documents", "$HOME/Downloads"]);
+		assert_eq!(left.combine(right), expected)
+	}
+	#[test]
+	fn combine_opt_vec_some_some_no_overlap() {
+		let left = Some(vec!["$HOME", "$HOME/Downloads"]);
+		let right = Some(vec!["$HOME/Documents"]);
+		let expected = Some(vec!["$HOME", "$HOME/Documents", "$HOME/Downloads"]);
+		assert_eq!(left.combine(right), expected)
 	}
 }

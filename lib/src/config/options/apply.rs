@@ -43,7 +43,22 @@ impl AsOption<Apply> for Option<Apply> {
 			(None, None) => Some(Apply::default()),
 			(Some(lhs), None) => Some(lhs),
 			(None, Some(rhs)) => Some(rhs),
-			(Some(_), Some(rhs)) => Some(rhs),
+			(_, Some(Apply::All)) => Some(Apply::All),
+			(_, Some(Apply::Any)) => Some(Apply::Any),
+			(Some(Apply::AllOf(mut lhs)), Some(Apply::AllOf(mut rhs))) => {
+				rhs.append(&mut lhs);
+				rhs.sort();
+				rhs.dedup();
+				Some(Apply::AllOf(rhs))
+			}
+			(Some(Apply::AnyOf(mut lhs)), Some(Apply::AnyOf(mut rhs))) => {
+				rhs.append(&mut lhs);
+				rhs.sort();
+				rhs.dedup();
+				Some(Apply::AnyOf(rhs))
+			}
+			(_, Some(Apply::AnyOf(vec))) => Some(Apply::AnyOf(vec)),
+			(_, Some(Apply::AllOf(vec))) => Some(Apply::AllOf(vec)),
 		}
 	}
 }
@@ -57,8 +72,8 @@ pub struct ApplyWrapper {
 impl Default for ApplyWrapper {
 	fn default() -> Self {
 		Self {
-			actions: Some(Apply::All),
-			filters: Some(Apply::All),
+			actions: Some(Apply::default()),
+			filters: Some(Apply::default()),
 		}
 	}
 }
@@ -156,14 +171,6 @@ impl<'de> Deserialize<'de> for ApplyWrapper {
 			where
 				A: SeqAccess<'de>,
 			{
-				// this method works as a shorthand for
-				// apply:
-				//  actions:
-				//    all_of: [seq]
-				//  filters:
-				//    all_of: [seq]
-				// since any_of is only possible with filters and not actions, it makes sense to only allow that field
-				// with the long notation
 				let mut vec = Vec::new();
 				while let Some(val) = seq.next_element()? {
 					vec.push(val)
@@ -249,11 +256,13 @@ mod tests {
 		let value = Apply::All;
 		assert_de_tokens(&value, &[Token::Str("all")])
 	}
+
 	#[test]
 	fn test_apply_str_any() {
 		let value = Apply::Any;
 		assert_de_tokens(&value, &[Token::Str("any")])
 	}
+
 	#[test]
 	fn test_apply_all_of() {
 		let value = Apply::AllOf(vec![0, 1, 2]);
@@ -268,6 +277,7 @@ mod tests {
 			Token::MapEnd,
 		])
 	}
+
 	#[test]
 	fn test_apply_any_of() {
 		let value = Apply::AnyOf(vec![0, 1, 2]);
@@ -282,21 +292,25 @@ mod tests {
 			Token::MapEnd,
 		])
 	}
+
 	#[test]
 	fn test_apply_wrapper_single_value_all() {
 		let value = ApplyWrapper::from(Apply::All);
 		assert_de_tokens(&value, &[Token::Str("all")])
 	}
+
 	#[test]
 	fn test_apply_wrapper_single_value_any() {
 		let value = ApplyWrapper::from(Apply::Any);
 		assert_de_tokens(&value, &[Token::Str("any")])
 	}
+
 	#[test]
 	fn test_apply_wrapper_single_value_select() {
 		let value = ApplyWrapper::from(Apply::AllOf(vec![0, 2]));
 		assert_de_tokens(&value, &[Token::Seq { len: Some(2) }, Token::U8(0), Token::U8(2), Token::SeqEnd])
 	}
+
 	#[test]
 	fn test_apply_wrapper_actions_all_of_filters_all() {
 		let value = ApplyWrapper {
@@ -318,6 +332,7 @@ mod tests {
 			Token::MapEnd,
 		])
 	}
+
 	#[test]
 	fn test_apply_wrapper_actions_all_filters_any() {
 		let value = ApplyWrapper {
@@ -333,6 +348,7 @@ mod tests {
 			Token::MapEnd,
 		])
 	}
+
 	#[test]
 	fn test_apply_wrapper_actions_all_filters_none() {
 		let value = ApplyWrapper {
@@ -346,6 +362,7 @@ mod tests {
 			Token::MapEnd,
 		])
 	}
+
 	#[test]
 	fn test_apply_wrapper_actions_none_filters_none() {
 		let value = ApplyWrapper {
@@ -354,6 +371,7 @@ mod tests {
 		};
 		assert_de_tokens(&value, &[Token::Map { len: None }, Token::MapEnd])
 	}
+
 	#[test]
 	fn test_apply_wrapper_actions_none_filters_all() {
 		let value = ApplyWrapper {
@@ -367,6 +385,7 @@ mod tests {
 			Token::MapEnd,
 		])
 	}
+
 	#[test]
 	fn test_apply_wrapper_actions_any_filters_any() {
 		assert_de_tokens_error::<ApplyWrapper>(
@@ -381,6 +400,7 @@ mod tests {
 			"variant 'any' and 'any_of' not valid for field 'actions' in option 'apply'",
 		)
 	}
+
 	#[test]
 	fn test_apply_wrapper_actions_any_of_filters_any() {
 		assert_de_tokens_error::<ApplyWrapper>(
@@ -389,10 +409,118 @@ mod tests {
 				Token::Str("filters"),
 				Token::Str("all"),
 				Token::Str("actions"),
-				Token::Str("any"),
+				Token::Map { len: Some(1) },
+				Token::Str("any_of"),
+				Token::Seq { len: Some(1) },
+				Token::U8(1),
+				Token::SeqEnd,
+				Token::MapEnd,
 				Token::MapEnd,
 			],
 			"variant 'any' and 'any_of' not valid for field 'actions' in option 'apply'",
 		)
+	}
+
+	#[test]
+	fn combine_apply_some_some() {
+		let left = Some(Apply::All);
+		let right = Some(Apply::Any);
+		assert_eq!(left.combine(right.clone()), right)
+	}
+
+	#[test]
+	fn combine_apply_some_none() {
+		let left = Some(Apply::All);
+		let right = None;
+		assert_eq!(left.clone().combine(right), left)
+	}
+
+	#[test]
+	fn combine_apply_none_some() {
+		let left = None;
+		let right = Some(Apply::All);
+		assert_eq!(left.combine(right.clone()), right)
+	}
+
+	#[test]
+	fn combine_apply_vec_some_some_all_of_all_of() {
+		let left = Some(Apply::AllOf(vec![0, 1]));
+		let right = Some(Apply::AllOf(vec![2]));
+		let expected = Some(Apply::AllOf(vec![0, 1, 2]));
+		assert_eq!(left.combine(right), expected)
+	}
+
+	#[test]
+	fn combine_apply_vec_some_some_any_of_any_of() {
+		let left = Some(Apply::AnyOf(vec![0, 1]));
+		let right = Some(Apply::AnyOf(vec![2]));
+		let expected = Some(Apply::AnyOf(vec![0, 1, 2]));
+		assert_eq!(left.combine(right), expected)
+	}
+
+	#[test]
+	fn combine_apply_vec_some_some_all_of_any_of() {
+		let left = Some(Apply::AllOf(vec![0, 1]));
+		let right = Some(Apply::AnyOf(vec![2]));
+		assert_eq!(left.combine(right.clone()), right)
+	}
+
+	#[test]
+	fn combine_apply_vec_some_some_any_of_all_of() {
+		let left = Some(Apply::AnyOf(vec![2]));
+		let right = Some(Apply::AllOf(vec![0, 1]));
+		assert_eq!(left.combine(right.clone()), right)
+	}
+
+	#[test]
+	fn combine_apply_vec_some_none() {
+		let left = Some(Apply::All);
+		let right = None;
+		assert_eq!(left.clone().combine(right), left)
+	}
+
+	#[test]
+	fn combine_apply_vec_none_some() {
+		let left = None;
+		let right = Some(Apply::All);
+		assert_eq!(left.combine(right.clone()), right)
+	}
+
+	#[test]
+	fn combine_apply_none_none() {
+		let left: Option<Apply> = None;
+		let right = None;
+		assert_eq!(left.combine(right), Some(Apply::default()))
+	}
+
+	#[test]
+	fn combine_wrapper_none_none() {
+		let left: Option<ApplyWrapper> = None;
+		let right = None;
+		assert_eq!(left.combine(right), Some(ApplyWrapper::default()))
+	}
+
+	#[test]
+	fn combine_wrapper_none_some() {
+		let left: Option<ApplyWrapper> = None;
+		let right = Some(ApplyWrapper::default());
+		assert_eq!(left.combine(right.clone()), right)
+	}
+
+	#[test]
+	fn combine_wrapper_some_some() {
+		let left: Option<ApplyWrapper> = Some(ApplyWrapper {
+			actions: Some(Apply::Any),
+			filters: None,
+		});
+		let right = Some(ApplyWrapper {
+			actions: None,
+			filters: None,
+		});
+		let expected = Some(ApplyWrapper {
+			actions: Some(Apply::Any),
+			filters: Some(Apply::All),
+		});
+		assert_eq!(left.combine(right), expected)
 	}
 }
