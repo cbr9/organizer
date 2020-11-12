@@ -1,8 +1,8 @@
 use crate::cmd::{logs::Logs, App, Cmd};
 use clap::Clap;
 use lazy_static::lazy_static;
-use lib::config::UserConfig;
 use log::error;
+use organize_core::config::UserConfig;
 use std::{borrow::Cow, path::PathBuf};
 
 lazy_static! {

@@ -1,7 +1,7 @@
 use crate::{Cmd, DEFAULT_CONFIG_STR};
 use anyhow::Result;
 use clap::Clap;
-use lib::{config::UserConfig, file::File, utils::UnwrapRef};
+use organize_core::{config::UserConfig, file::File, utils::UnwrapRef};
 use rayon::prelude::*;
 use std::{fs, path::PathBuf};
 

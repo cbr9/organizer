@@ -2,7 +2,7 @@ use crate::cmd::Cmd;
 use anyhow::Result;
 use clap::{crate_name, Clap};
 use colored::Colorize;
-use lib::{
+use organize_core::{
 	config::{ApplyWrapper, Options, UserConfig},
 	settings::Settings,
 };

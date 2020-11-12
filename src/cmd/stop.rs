@@ -1,7 +1,7 @@
 use crate::{cmd::Cmd, DEFAULT_CONFIG_STR};
 use anyhow::Result;
 use clap::Clap;
-use lib::register::Register;
+use organize_core::register::Register;
 use std::path::PathBuf;
 use sysinfo::{ProcessExt, RefreshKind, Signal, System, SystemExt};
 

@@ -10,7 +10,7 @@ use notify::{op, raw_watcher, RawEvent, RecommendedWatcher, RecursiveMode, Watch
 
 use crate::{Cmd, DEFAULT_CONFIG_STR};
 use clap::Clap;
-use lib::{config::UserConfig, file::File, register::Register, utils::UnwrapRef};
+use organize_core::{config::UserConfig, file::File, register::Register, utils::UnwrapRef};
 use std::path::PathBuf;
 use sysinfo::{ProcessExt, RefreshKind, Signal, System, SystemExt};
 
