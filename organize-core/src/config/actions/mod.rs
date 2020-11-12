@@ -152,12 +152,4 @@ mod tests {
 		let original = project().join("tests").join("files").join("test2.txt");
 		assert!(original.update(&ConflictOption::Skip, &Default::default()).is_err())
 	}
-
-	#[test]
-	#[should_panic]
-	fn new_path_for_non_existing_file() {
-		let original = project().join("tests").join("files").join("test_dir2").join("test1.txt");
-		debug_assert!(!original.exists());
-		original.update(&ConflictOption::Rename, &Default::default()).unwrap();
-	}
 }

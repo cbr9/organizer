@@ -4,7 +4,7 @@ pub mod tests {
 
 	pub fn project() -> PathBuf {
 		// when 'cargo test' is run, the current directory should be the project directory
-		env::current_dir().unwrap().parent().unwrap().to_path_buf()
+		env::current_dir().unwrap()
 	}
 }
 
