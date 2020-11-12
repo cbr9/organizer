@@ -152,6 +152,17 @@ impl<'de> Deserialize<'de> for ApplyWrapper {
 				}
 			}
 
+			fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+			where
+				A: SeqAccess<'de>,
+			{
+				let mut vec = Vec::new();
+				while let Some(val) = seq.next_element()? {
+					vec.push(val)
+				}
+				Ok(ApplyWrapper::from(Apply::AllOf(vec)))
+			}
+
 			fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
 			where
 				A: MapAccess<'de>,
@@ -272,6 +283,11 @@ mod tests {
 	fn test_apply_wrapper_single_value_any() {
 		let value = ApplyWrapper::from(Apply::Any);
 		assert_de_tokens(&value, &[Token::Str("any")])
+	}
+	#[test]
+	fn test_apply_wrapper_single_value_select() {
+		let value = ApplyWrapper::from(Apply::AllOf(vec![0, 2]));
+		assert_de_tokens(&value, &[Token::Seq { len: Some(2) }, Token::U8(0), Token::U8(2), Token::SeqEnd])
 	}
 	#[test]
 	fn test_apply_wrapper_actions_all_of_filters_all() {
