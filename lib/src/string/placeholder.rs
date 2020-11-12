@@ -106,12 +106,7 @@ fn placeholder_error(placeholder: &str, current_value: &Path, span: &str) -> std
 
 #[cfg(test)]
 pub mod tests {
-	use std::{
-		io::{Error, Result},
-		path::PathBuf,
-	};
-
-	use crate::utils::tests::IntoResult;
+	use std::path::PathBuf;
 
 	use super::*;
 
@@ -259,12 +254,12 @@ pub mod tests {
 		assert_eq!(new_str, expected)
 	}
 	#[test]
-	fn multiple_placeholders() -> Result<()> {
+	fn multiple_placeholders() {
 		let with_ph = "$HOME/{extension}/{parent.filename}";
 		let expected = String::from("$HOME/pdf/Documents");
 		let path = Path::new("$HOME/Documents/test.pdf");
 		let new_str = with_ph.expand_placeholders(path).unwrap();
-		(new_str == expected).into_result()
+		assert_eq!(new_str, expected)
 	}
 	#[test]
 	fn multiple_placeholders_sentence() {

@@ -108,11 +108,10 @@ impl Register {
 
 #[cfg(test)]
 mod tests {
-	use std::{fs, io::Result};
 
 	use sysinfo::{ProcessExt, RefreshKind, Signal, System, SystemExt};
 
-	use crate::{config::UserConfig, register::Register, utils::tests::IntoResult};
+	use crate::{config::UserConfig, register::Register};
 
 	fn stop() {
 		let sys = System::new_with_specifics(RefreshKind::with_processes(RefreshKind::new()));
@@ -132,10 +131,10 @@ mod tests {
 	}
 
 	#[test]
-	fn clear_dead_processes() -> Result<()> {
+	fn clear_dead_processes() {
 		stop();
 		simulate_watch();
 		let register = Register::new().unwrap();
-		register.is_empty().into_result()
+		assert!(register.is_empty())
 	}
 }

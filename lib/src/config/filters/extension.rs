@@ -70,10 +70,7 @@ impl AsFilter for Extension {
 #[cfg(test)]
 pub mod tests {
 	use serde_test::{assert_de_tokens, Token};
-	use std::{
-		io::{Error, ErrorKind, Result},
-		path::PathBuf,
-	};
+	use std::path::PathBuf;
 
 	use super::Extension;
 	use crate::config::AsFilter;

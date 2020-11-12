@@ -35,6 +35,7 @@ impl Expand for PathBuf {
 					let component = component.to_string_lossy();
 					if component.starts_with('$') {
 						env::var(component.replace('$', ""))
+							// todo: return error, don't panic
 							.unwrap_or_else(|_| panic!("error: environment variable '{}' could not be found", component))
 					} else {
 						component.to_string()
@@ -49,25 +50,26 @@ impl Expand for PathBuf {
 
 #[cfg(test)]
 mod tests {
-	use std::{env, io::Result};
+	use std::env;
 
 	use dirs::home_dir;
 
-	use crate::utils::tests::{project, IntoResult};
+	use crate::utils::tests::project;
 
 	use super::*;
 
 	#[test]
-	fn home() -> Result<()> {
+	fn home() {
 		let original = PathBuf::from("$HOME/Documents");
 		let expected = home_dir().unwrap().join("Documents");
-		(original.expand_vars() == expected).into_result()
+		assert_eq!(original.expand_vars(), expected)
 	}
 	#[test]
-	fn new_var() -> Result<()> {
+	fn new_var() {
 		env::set_var("PROJECT_DIR", project());
 		let original = PathBuf::from("$PROJECT_DIR/tests");
-		(original.expand_vars() == project().join("tests")).into_result()
+		let expected = project().join("tests");
+		assert_eq!(original.expand_vars(), expected)
 	}
 	#[test]
 	#[should_panic]

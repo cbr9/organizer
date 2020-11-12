@@ -8,18 +8,10 @@ use colored::Colorize;
 use log::{debug, error, info};
 use notify::{op, raw_watcher, RawEvent, RecommendedWatcher, RecursiveMode, Watcher};
 
-use crate::{cmd::run::Run, Cmd, DEFAULT_CONFIG_STR};
+use crate::{Cmd, DEFAULT_CONFIG_STR};
 use clap::Clap;
-use lib::{
-	config::{ApplyWrapper, AsMap, Match, Options, UserConfig},
-	file::File,
-	register::Register,
-	utils::UnwrapRef,
-};
-use std::{
-	borrow::Borrow,
-	path::{Path, PathBuf},
-};
+use lib::{config::UserConfig, file::File, register::Register, utils::UnwrapRef};
+use std::path::PathBuf;
 use sysinfo::{ProcessExt, RefreshKind, Signal, System, SystemExt};
 
 #[derive(Clap, Debug)]
@@ -114,7 +106,7 @@ impl<'a> Watch {
 						op::CREATE => {
 							if let Some(parent) = path.parent() {
 								if (cfg!(not(feature = "hot-reload")) || (cfg!(feature = "hot-reload") && parent != config_parent)) && path.is_file() {
-									let mut file = File::new(path);
+									let file = File::new(path);
 									file.process(&config);
 								}
 							}

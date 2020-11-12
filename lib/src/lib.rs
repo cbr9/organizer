@@ -1,11 +1,9 @@
 pub mod config;
 pub(crate) mod path {
 	mod expand;
-	mod get_rules;
 	mod is_hidden;
 	mod update;
 	pub(crate) use expand::*;
-	pub(crate) use get_rules::*;
 	pub(crate) use is_hidden::*;
 	pub(crate) use update::*;
 }

@@ -1,13 +1,9 @@
 use crate::{Cmd, DEFAULT_CONFIG_STR};
 use anyhow::Result;
 use clap::Clap;
-use lib::{
-	config::{AsMap, Match, UserConfig},
-	file::File,
-	utils::UnwrapRef,
-};
+use lib::{config::UserConfig, file::File, utils::UnwrapRef};
 use rayon::prelude::*;
-use std::{collections::HashMap, fs, path::PathBuf};
+use std::{fs, path::PathBuf};
 
 #[derive(Clap, Debug)]
 pub struct Run {
@@ -39,7 +35,7 @@ impl<'a> Run {
 					let path = file.unwrap().path();
 					if path.is_file() {
 						let file = File::new(path);
-						file.process(&config);	
+						file.process(&config);
 					}
 				});
 			});

@@ -11,7 +11,7 @@ pub use script::*;
 
 use std::{borrow::Cow, io::Result, ops::Deref, path::Path};
 
-use crate::{config::Apply, file::File};
+use crate::config::Apply;
 use log::error;
 use serde::Deserialize;
 use std::path::PathBuf;
@@ -129,38 +129,32 @@ impl Actions {
 
 #[cfg(test)]
 mod tests {
-	use std::io::Result;
 
-	use crate::{
-		config::ConflictOption,
-		path::Update,
-		utils::tests::{project, IntoResult},
-	};
+	use crate::{config::ConflictOption, path::Update, utils::tests::project};
 
 	#[test]
-	fn rename_with_rename_conflict() -> Result<()> {
+	fn rename_with_rename_conflict() {
 		let original = project().join("tests").join("files").join("test2.txt");
 		let expected = original.with_file_name("test2 (1).txt");
 		let new_path = original.update(&ConflictOption::Rename, &Default::default()).unwrap();
-		(new_path == expected).into_result()
+		assert_eq!(new_path, expected)
 	}
 
 	#[test]
-	fn rename_with_overwrite_conflict() -> Result<()> {
+	fn rename_with_overwrite_conflict() {
 		let original = project().join("tests").join("files").join("test2.txt");
 		let new_path = original.update(&ConflictOption::Overwrite, &Default::default()).unwrap();
-		(new_path == original).into_result()
+		assert_eq!(new_path, original)
 	}
 
 	#[test]
-	#[should_panic] // unwrapping a None value
 	fn rename_with_skip_conflict() {
 		let original = project().join("tests").join("files").join("test2.txt");
-		original.update(&ConflictOption::Skip, &Default::default()).unwrap();
+		assert!(original.update(&ConflictOption::Skip, &Default::default()).is_err())
 	}
 
 	#[test]
-	#[should_panic] // trying to modify a path that does not exist
+	#[should_panic]
 	fn new_path_for_non_existing_file() {
 		let original = project().join("tests").join("files").join("test_dir2").join("test1.txt");
 		debug_assert!(!original.exists());

@@ -94,7 +94,6 @@ impl Add<Self> for Options {
 mod tests {
 
 	use super::*;
-	use crate::{settings::Settings, utils::tests::IntoResult};
 
 	#[test]
 	fn combine_opt_bool_some_some() {

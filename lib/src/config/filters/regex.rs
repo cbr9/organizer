@@ -1,6 +1,6 @@
 use std::{fmt, ops::Deref, path::Path, str::FromStr};
 
-use crate::config::{filters::Extension, AsFilter};
+use crate::config::AsFilter;
 use serde::{
 	de,
 	de::{Error, SeqAccess, Visitor},
@@ -104,7 +104,6 @@ impl<'de> Deserialize<'de> for Regex {
 #[cfg(test)]
 mod tests {
 	use serde_test::{assert_de_tokens, Token};
-	use std::io::{Error, ErrorKind};
 
 	use super::*;
 

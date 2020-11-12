@@ -1,6 +1,6 @@
-use crate::config::{Match, Options, UserConfig};
+use crate::config::{Options, UserConfig};
 use serde::{Deserialize, Serialize};
-use std::{fs, ops::Deref, path::PathBuf};
+use std::{fs, path::PathBuf};
 use toml::de::Error as TomlError;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]

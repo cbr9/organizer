@@ -1,13 +1,9 @@
 use crate::{
-	config::{ApplyWrapper, AsMap, Match, Options, Rule, UserConfig},
-	path::{GetRules, IsHidden},
+	config::{ApplyWrapper, AsMap, Match, Options, UserConfig},
+	path::IsHidden,
 	utils::UnwrapRef,
 };
-use std::{
-	collections::HashMap,
-	io::Error,
-	path::{Path, PathBuf},
-};
+use std::path::PathBuf;
 
 pub struct File {
 	pub path: PathBuf,

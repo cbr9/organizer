@@ -239,10 +239,9 @@ mod tests {
 	use super::*;
 	use crate::{
 		config::{ActionType, IOAction},
-		utils::tests::{project, IntoResult},
+		utils::tests::project,
 	};
 	use serde_test::{assert_de_tokens, Token};
-	use std::io::Result;
 
 	#[test]
 	fn deserialize_str() {
@@ -267,38 +266,38 @@ mod tests {
 	}
 
 	#[test]
-	fn prepare_path_copy() -> Result<()> {
+	fn prepare_path_copy() {
 		let original = project().join("tests").join("files").join("test1.txt");
 		let target = project().join("tests").join("files").join("test_dir");
 		let expected = target.join("test1 (1).txt");
 		assert!(target.join(original.file_name().unwrap()).exists());
 		assert!(!expected.exists());
 		let action = IOAction::from(target);
-		let new_path = IOAction::helper(&original, &action, ActionType::Copy)?;
-		(new_path == expected).into_result()
+		let new_path = IOAction::helper(&original, &action, ActionType::Copy).unwrap();
+		assert_eq!(new_path, expected)
 	}
 
 	#[test]
-	fn prepare_path_move() -> Result<()> {
+	fn prepare_path_move() {
 		let original = project().join("tests").join("files").join("test1.txt");
 		let target = project().join("tests").join("files").join("test_dir");
 		let expected = target.join("test1 (1).txt");
 		assert!(target.join(original.file_name().unwrap()).exists());
 		assert!(!expected.exists());
 		let action = IOAction::from(target);
-		let new_path = IOAction::helper(&original, &action, ActionType::Move)?;
-		(new_path == expected).into_result()
+		let new_path = IOAction::helper(&original, &action, ActionType::Move).unwrap();
+		assert_eq!(new_path, expected)
 	}
 
 	#[test]
-	fn prepare_path_rename() -> Result<()> {
+	fn prepare_path_rename() {
 		let original = project().join("tests").join("files").join("test1.txt");
 		let target = original.with_file_name("test_dir").join(original.file_name().unwrap());
 		let expected = target.with_file_name("test1 (1).txt");
 		assert!(target.exists());
 		assert!(!expected.exists());
 		let action = IOAction::from(target);
-		let new_path = IOAction::helper(&original, &action, ActionType::Rename)?;
-		(new_path == expected).into_result()
+		let new_path = IOAction::helper(&original, &action, ActionType::Rename).unwrap();
+		assert_eq!(new_path, expected)
 	}
 }
