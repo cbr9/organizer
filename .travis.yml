@@ -3,7 +3,11 @@ language: rust
 rust:
   - stable
 
-script: cargo build --verbose && cargo test --verbose && cargo fmt && cargo clippy --verbose
+script:
+  cargo build --verbose &&
+  cargo test --all --verbose &&
+  cargo fmt &&
+  cargo clippy --verbose
 
 branches:
   only:
@@ -21,7 +25,8 @@ matrix:
       - before_script:
         - rustup component add rustfmt-preview
         - rustup component add clippy-preview
-        - rm -r target/debug/deps/organize-*
+        - rm target/debug/deps/organize-*
+        - rm target/debug/deps/organize_core-*
 
 addons: # required for kcov
   apt:
@@ -47,5 +52,6 @@ after_success: |
     cd ../.. &&
     rm -rf kcov-master &&
     for file in target/debug/deps/organize-*; do [ -x "${file}" ] || continue; mkdir -p "target/cov/$(basename $file)"; ./kcov-build/usr/local/bin/kcov --exclude-pattern=/.cargo,/usr/lib --verify "target/cov/$(basename $file)" "$file"; done &&
+    for file in target/debug/deps/organize_core-*; do [ -x "${file}" ] || continue; mkdir -p "target/cov/$(basename $file)"; ./kcov-build/usr/local/bin/kcov --exclude-pattern=/.cargo,/usr/lib --verify "target/cov/$(basename $file)" "$file"; done &&
     bash <(curl -s https://codecov.io/bash) &&
     echo "Uploaded code coverage"

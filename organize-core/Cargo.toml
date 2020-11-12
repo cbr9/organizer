@@ -1,5 +1,5 @@
 [package]
-name = "lib"
+name = "organize-core"
 version = "0.1.0"
 authors = ["KBR9 <cabero96@protonmail.com>"]
 edition = "2018"

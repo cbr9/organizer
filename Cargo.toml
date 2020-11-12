@@ -26,10 +26,10 @@ log = "0.4"
 fern = {version = "0.5", features = ["colored"] }
 toml = "0.5.7"
 anyhow = "1.0.34"
-lib = { path = "lib" }
+organize-core = { path = "organize-core" }
 
 [features]
 hot-reload = []
 
 [workspace]
-members = ["lib/"]
+members = ["organize-core/"]
