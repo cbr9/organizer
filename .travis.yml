@@ -25,8 +25,8 @@ matrix:
       - before_script:
         - rustup component add rustfmt-preview
         - rustup component add clippy-preview
-        - rm target/debug/deps/organize-*
-        - rm target/debug/deps/organize_core-*
+        - rm target/debug/deps/organize-* || true
+        - rm target/debug/deps/organize_core-* || true
 
 addons: # required for kcov
   apt:
