@@ -3,7 +3,7 @@ use std::{fmt, path::PathBuf, result, str::FromStr};
 use crate::{config::Options, path::Expand};
 use serde::{
 	de,
-	de::{MapAccess, Visitor},
+	de::{Error, MapAccess, Visitor},
 	export,
 	Deserialize,
 	Deserializer,
@@ -33,34 +33,36 @@ impl<'de> Deserialize<'de> for Folder {
 			where
 				E: de::Error,
 			{
-				Ok(Folder::from_str(v).unwrap())
+				Folder::from_str(v).map_err(E::custom)
 			}
 
 			fn visit_map<M>(self, mut map: M) -> Result<Self::Value, M::Error>
 			where
 				M: MapAccess<'de>,
 			{
-				let mut path: Option<String> = None;
-				let mut options: Option<Options> = None;
+				let mut folder = Folder {
+					path: Default::default(),
+					options: None,
+				};
 				while let Some(key) = map.next_key::<String>()? {
-					if key == "path" {
-						path = Some(map.next_value()?);
-					} else if key == "options" {
-						options = Some(map.next_value()?);
-					} else {
-						return Err(serde::de::Error::custom(&format!("Invalid key: {}", key)));
+					match key.as_str() {
+						"path" => {
+							folder = match Folder::from_str(&map.next_value::<String>()?) {
+								Ok(mut new_folder) => {
+									new_folder.options = folder.options;
+									new_folder
+								}
+								Err(e) => return Err(M::Error::custom(e)),
+							}
+						}
+						"options" => {
+							folder.options = Some(map.next_value()?);
+						}
+						_ => return Err(M::Error::custom("unknown field")),
 					}
 				}
-				if path.is_none() {
-					return Err(serde::de::Error::custom("Missing path"));
-				}
-
-				let mut folder = match Folder::from_str(path.unwrap().as_str()) {
-					Ok(folder) => folder,
-					Err(e) => return Err(serde::de::Error::custom(&format!("Path does not exist: {}", e))),
-				};
-				if let Some(options) = options {
-					folder.options = Some(options);
+				if folder.path == PathBuf::default() {
+					return Err(serde::de::Error::custom("missing path"));
 				}
 				Ok(folder)
 			}
@@ -82,3 +84,68 @@ impl FromStr for Folder {
 }
 
 pub type Folders = Vec<Folder>;
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+	use crate::config::{Apply, ApplyWrapper};
+	use serde_test::{assert_de_tokens, assert_de_tokens_error, Token};
+
+	#[test]
+	fn deserialize_str() {
+		let value = Folder::from_str("$HOME").unwrap();
+		assert_de_tokens(&value, &[Token::Str("$HOME")])
+	}
+	#[test]
+	fn deserialize_map_invalid() {
+		assert_de_tokens_error::<Folder>(
+			&[
+				Token::Map { len: Some(1) },
+				Token::Str("options"),
+				Token::Map { len: Some(3) },
+				Token::Str("recursive"),
+				Token::Some,
+				Token::Bool(true),
+				Token::Str("apply"),
+				Token::Some,
+				Token::Str("all"),
+				Token::Str("watch"),
+				Token::Some,
+				Token::Bool(true),
+				Token::MapEnd,
+				Token::MapEnd,
+			],
+			"missing path",
+		)
+	}
+	#[test]
+	fn deserialize_map_valid() {
+		let mut value = Folder::from_str("$HOME").unwrap();
+		value.options = Some(Options {
+			recursive: Some(true),
+			watch: Some(true),
+			ignore: None,
+			hidden_files: None,
+			r#match: None, // TODO: create issue in serde_test about raw identifiers not working properly
+			apply: Some(ApplyWrapper::from(Apply::All)),
+		});
+		assert_de_tokens(&value, &[
+			Token::Map { len: Some(2) },
+			Token::Str("path"),
+			Token::Str("$HOME"),
+			Token::Str("options"),
+			Token::Map { len: Some(3) },
+			Token::Str("recursive"),
+			Token::Some,
+			Token::Bool(true),
+			Token::Str("apply"),
+			Token::Some,
+			Token::Str("all"),
+			Token::Str("watch"),
+			Token::Some,
+			Token::Bool(true),
+			Token::MapEnd,
+			Token::MapEnd,
+		])
+	}
+}

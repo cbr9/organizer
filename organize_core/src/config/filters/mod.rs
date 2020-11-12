@@ -58,7 +58,7 @@ impl Filters {
 		T: AsRef<Path>,
 		A: AsRef<Apply>,
 	{
-		let temp_files = ["crdownload", "part"];
+		let temp_files = ["crdownload" /* chrome download */, "part"];
 		if temp_files.contains(&&*path.as_ref().extension().unwrap_or_default().to_string_lossy()) {
 			return false;
 		}
@@ -85,7 +85,7 @@ mod tests {
 	use std::{path::PathBuf, str::FromStr};
 
 	#[test]
-	fn match_partial_file() {
+	fn do_not_match_partial_file() {
 		let regex = Regex::from_str(".*").unwrap();
 		let filters = Filters {
 			inner: vec![Filter::Regex(regex)],
