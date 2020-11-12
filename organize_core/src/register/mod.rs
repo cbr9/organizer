@@ -10,7 +10,11 @@ use std::{
 use crate::config::UserConfig;
 use num_traits::AsPrimitive;
 use serde_json::error::Category;
-use std::ops::{Deref, DerefMut};
+use std::{
+	env::temp_dir,
+	io::Write,
+	ops::{Deref, DerefMut},
+};
 use sysinfo::{Pid, RefreshKind, System, SystemExt};
 
 /// File where watchers are registered with their PID and configuration
@@ -55,7 +59,7 @@ pub struct Section {
 
 impl Register {
 	pub fn new() -> Result<Self> {
-		let path = UserConfig::default_dir().join("register.json");
+		let path = temp_dir().join("register.json");
 		let f = OpenOptions::new().create(true).write(true).read(true).open(&path)?;
 		let mut register = match serde_json::from_reader::<_, Self>(f) {
 			Ok(mut register) => {
