@@ -1,10 +1,11 @@
 use crate::{
-	config::{ApplyWrapper, AsMap, Options, Rule, UserConfig},
+	config::{ApplyWrapper, AsMap, Match, Options, Rule, UserConfig},
 	path::{GetRules, IsHidden},
 	utils::UnwrapRef,
 };
 use std::{
 	collections::HashMap,
+	io::Error,
 	path::{Path, PathBuf},
 };
 
@@ -17,8 +18,37 @@ impl File {
 		Self { path }
 	}
 
+	pub fn process(self, config: &UserConfig) {
+		let mut path = self.path.clone();
+		let mut process_rule = |i: &usize, j: &usize| {
+			let rule = &config.rules[*i];
+			let apply = rule.folders[*j].options.unwrap_ref().apply.unwrap_ref();
+			match rule.actions.run(&path, apply.actions.unwrap_ref()) {
+				Ok(new_path) => {
+					path = new_path;
+					Ok(())
+				}
+				Err(e) => Err(e),
+			}
+		};
+		match config.defaults.unwrap_ref().r#match.unwrap_ref() {
+			Match::All => {
+				self.get_matching_rules(config.as_ref())
+					.into_iter()
+					.try_for_each(|(i, j)| process_rule(i, j))
+					.ok();
+			}
+			Match::First => {
+				let rules = self.get_matching_rules(config.as_ref());
+				if !rules.is_empty() {
+					let (i, j) = rules.first().unwrap();
+					process_rule(i, j).ok();
+				}
+			}
+		}
+	}
+
 	pub fn get_matching_rules<'a>(&self, config: &'a UserConfig) -> Vec<&'a (usize, usize)> {
-		// let path2rules = config.as_ref().rules.map();
 		let parent = self.path.parent().unwrap();
 		let possible_rules: &Vec<(usize, usize)> = &config.rules.get(&self.path);
 		possible_rules

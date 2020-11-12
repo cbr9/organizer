@@ -156,6 +156,14 @@ impl<'de> Deserialize<'de> for ApplyWrapper {
 			where
 				A: SeqAccess<'de>,
 			{
+				// this method works as a shorthand for
+				// apply:
+				//  actions:
+				//    all_of: [seq]
+				//  filters:
+				//    all_of: [seq]
+				// since any_of is only possible with filters and not actions, it makes sense to only allow that field
+				// with the long notation
 				let mut vec = Vec::new();
 				while let Some(val) = seq.next_element()? {
 					vec.push(val)

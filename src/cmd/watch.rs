@@ -115,27 +115,7 @@ impl<'a> Watch {
 							if let Some(parent) = path.parent() {
 								if (cfg!(not(feature = "hot-reload")) || (cfg!(feature = "hot-reload") && parent != config_parent)) && path.is_file() {
 									let mut file = File::new(path);
-									match config.defaults.unwrap_ref().r#match.unwrap_ref() {
-										Match::All => file.get_matching_rules(config.as_ref()).into_iter().for_each(|(i, j)| {
-											let rule = &config.rules[*i];
-											rule.actions
-												.run(&file.path, rule.folders[*j].options.unwrap_ref().apply.unwrap_ref().actions.unwrap_ref())
-												.and_then(|f| {
-													file.path = f;
-													Ok(())
-												});
-										}),
-										Match::First => {
-											let (i, j) = file.get_matching_rules(config.as_ref()).into_iter().next().unwrap();
-											let rule = &config.rules[*i];
-											rule.actions
-												.run(&file.path, rule.folders[*j].options.unwrap_ref().apply.unwrap_ref().actions.unwrap_ref())
-												.and_then(|f| {
-													file.path = f;
-													Ok(())
-												})?
-										}
-									}
+									file.process(&config);
 								}
 							}
 						}

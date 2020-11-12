@@ -38,31 +38,8 @@ impl<'a> Run {
 				dir.collect::<Vec<_>>().into_par_iter().for_each(|file| {
 					let path = file.unwrap().path();
 					if path.is_file() {
-						let mut file = File::new(path);
-						match config.defaults.unwrap_ref().r#match.unwrap_ref() {
-							Match::All => file.get_matching_rules(config.as_ref()).into_iter().for_each(|(i, j)| {
-								let rule = &config.rules[*i];
-								rule.actions
-									.run(&file.path, rule.folders[*j].options.unwrap_ref().apply.unwrap_ref().actions.unwrap_ref())
-									.and_then(|f| {
-										file.path = f;
-										Ok(())
-									});
-							}),
-							Match::First => {
-								let rules = file.get_matching_rules(config.as_ref());
-								if !rules.is_empty() {
-									let (i, j) = rules.first().unwrap();
-									let rule = &config.rules[*i];
-									rule.actions
-										.run(&file.path, rule.folders[*j].options.unwrap_ref().apply.unwrap_ref().actions.unwrap_ref())
-										.and_then(|f| {
-											file.path = f;
-											Ok(())
-										});
-								}
-							}
-						}
+						let file = File::new(path);
+						file.process(&config);	
 					}
 				});
 			});
