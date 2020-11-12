@@ -38,7 +38,9 @@ impl AsFilter for Filter {
 }
 
 #[derive(Debug, Clone, Deserialize)]
+#[serde(transparent)]
 pub struct Filters {
+	#[serde(flatten)]
 	inner: Vec<Filter>,
 }
 
