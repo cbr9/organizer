@@ -8,6 +8,7 @@ use serde::{
 	Deserializer,
 	Serialize,
 };
+use std::str::FromStr;
 
 #[derive(Serialize, Debug, Clone, Eq, PartialEq)]
 #[serde(rename_all(serialize = "lowercase", deserialize = "lowercase"))]
@@ -15,6 +16,35 @@ pub enum Apply {
 	All,
 	Any,
 	Select(Vec<usize>),
+}
+
+impl Default for Apply {
+	fn default() -> Self {
+		Self::All
+	}
+}
+
+impl FromStr for Apply {
+	type Err = String;
+
+	fn from_str(s: &str) -> Result<Self, Self::Err> {
+		match s {
+			"all" => Ok(Self::All),
+			"any" => Ok(Self::Any),
+			_ => Err("invalid value".into()),
+		}
+	}
+}
+
+impl AsOption<Apply> for Option<Apply> {
+	fn combine(self, rhs: Self) -> Self {
+		match (self, rhs) {
+			(None, None) => Some(Apply::default()),
+			(Some(lhs), None) => Some(lhs),
+			(None, Some(rhs)) => Some(rhs),
+			(Some(_), Some(rhs)) => Some(rhs),
+		}
+	}
 }
 
 #[derive(Debug, Serialize, Clone, Eq, PartialEq)]
@@ -108,14 +138,8 @@ impl<'de> Deserialize<'de> for ApplyWrapper {
 				E: Error,
 			{
 				match v {
-					"all" => Ok(ApplyWrapper {
-						filters: Some(Apply::All),
-						actions: Some(Apply::All),
-					}),
-					"any" => Ok(ApplyWrapper {
-						filters: Some(Apply::Any),
-						actions: Some(Apply::All),
-					}),
+					"all" => Ok(ApplyWrapper::from(Apply::All)),
+					"any" => Ok(ApplyWrapper::from(Apply::Any)),
 					_ => Err(E::custom("unknown option")),
 				}
 			}
@@ -128,34 +152,35 @@ impl<'de> Deserialize<'de> for ApplyWrapper {
 				while let Some(val) = seq.next_element()? {
 					vec.push(val)
 				}
-				Ok(ApplyWrapper {
-					actions: Some(Apply::Select(vec.clone())),
-					filters: Some(Apply::Select(vec)),
-				})
+				Ok(ApplyWrapper::from(Apply::Select(vec)))
 			}
 
 			fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
 			where
 				A: MapAccess<'de>,
 			{
-				let mut actions: Option<Apply> = None;
-				let mut filters: Option<Apply> = None;
+				let mut wrapper = ApplyWrapper {
+					actions: None,
+					filters: None,
+				};
 
-				while let Some(key) = map.next_key::<String>()? {
+				while let Some((key, value)) = map.next_entry::<String, Apply>()? {
 					match key.as_str() {
-						"actions" => actions = Some(map.next_value()?),
-						"filters" => filters = Some(map.next_value()?),
+						"actions" => {
+							wrapper.actions = match value {
+								Apply::All => Some(value),
+								Apply::Select(_) => Some(value),
+								Apply::Any => {
+									let msg = "variant 'any' not valid for field 'actions' in option 'apply'";
+									return Err(A::Error::custom(msg));
+								}
+							}
+						}
+						"filters" => wrapper.filters = Some(value),
 						_ => return Err(A::Error::custom("unknown field")),
 					}
 				}
-				if let Some(actions) = &actions {
-					if actions.eq(&Apply::Any) {
-						return Err(A::Error::custom(
-							"variant 'any' not valid for field 'actions' in option 'apply' (select 'all' or provide an array of indices)",
-						));
-					}
-				}
-				Ok(ApplyWrapper { actions, filters })
+				Ok(wrapper)
 			}
 		}
 		deserializer.deserialize_any(ApplyVisitor(PhantomData))
@@ -177,7 +202,6 @@ impl ToString for Apply {
 		}
 	}
 }
-
 impl AsOption<ApplyWrapper> for Option<ApplyWrapper> {
 	fn combine(self, rhs: Self) -> Self
 	where
@@ -188,22 +212,136 @@ impl AsOption<ApplyWrapper> for Option<ApplyWrapper> {
 			(Some(lhs), None) => Some(lhs),
 			(None, None) => Some(ApplyWrapper::default()),
 			(Some(lhs), Some(rhs)) => {
-				let apply = ApplyWrapper {
-					actions: match (&lhs.actions, &rhs.actions) {
-						(None, Some(_)) => rhs.actions,
-						(Some(_), None) => lhs.actions,
-						(None, None) => Some(Apply::All),
-						(Some(_), Some(_)) => rhs.actions,
-					},
-					filters: match (&lhs.filters, &rhs.filters) {
-						(None, Some(_)) => rhs.filters,
-						(Some(_), None) => lhs.filters,
-						(None, None) => Some(Apply::All),
-						(Some(_), Some(_)) => rhs.filters,
-					},
+				let wrapper = ApplyWrapper {
+					actions: lhs.actions.combine(rhs.actions),
+					filters: lhs.filters.combine(rhs.filters),
 				};
-				Some(apply)
-			}
+				Some(wrapper)
+			},
 		}
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+	use serde_test::{assert_de_tokens, assert_de_tokens_error, Token};
+
+	#[test]
+	fn test_apply_str_all() {
+		let value = Apply::All;
+		assert_de_tokens(&value, &[Token::Str("all")])
+	}
+	#[test]
+	fn test_apply_str_any() {
+		let value = Apply::Any;
+		assert_de_tokens(&value, &[Token::Str("any")])
+	}
+	#[test]
+	fn test_apply_select() {
+		let value = Apply::Select(vec![0, 1, 2]);
+		assert_de_tokens(&value, &[
+			Token::Seq { len: Some(3) },
+			Token::U8(0),
+			Token::U8(1),
+			Token::U8(2),
+			Token::SeqEnd,
+		])
+	}
+	#[test]
+	fn test_apply_wrapper_single_value_all() {
+		let value = ApplyWrapper::from(Apply::All);
+		assert_de_tokens(&value, &[Token::Str("all")])
+	}
+	#[test]
+	fn test_apply_wrapper_single_value_any() {
+		let value = ApplyWrapper::from(Apply::Any);
+		assert_de_tokens(&value, &[Token::Str("any")])
+	}
+	#[test]
+	fn test_apply_wrapper_single_value_select() {
+		let value = ApplyWrapper::from(Apply::Select(vec![0, 2]));
+		assert_de_tokens(&value, &[Token::Seq { len: Some(2) }, Token::U8(0), Token::U8(2), Token::SeqEnd])
+	}
+	#[test]
+	fn test_apply_wrapper_actions_select_filters_all() {
+		let value = ApplyWrapper {
+			actions: Some(Apply::Select(vec![0, 1])),
+			filters: Some(Apply::All),
+		};
+		assert_de_tokens(&value, &[
+			Token::Map { len: Some(2) },
+			Token::Str("actions"),
+			Token::Seq { len: Some(2) },
+			Token::U8(0),
+			Token::U8(1),
+			Token::SeqEnd,
+			Token::Str("filters"),
+			Token::Str("all"),
+			Token::MapEnd,
+		])
+	}
+	#[test]
+	fn test_apply_wrapper_actions_all_filters_any() {
+		let value = ApplyWrapper {
+			actions: Some(Apply::All),
+			filters: Some(Apply::Any),
+		};
+		assert_de_tokens(&value, &[
+			Token::Map { len: Some(2) },
+			Token::Str("actions"),
+			Token::Str("all"),
+			Token::Str("filters"),
+			Token::Str("any"),
+			Token::MapEnd,
+		])
+	}
+	#[test]
+	fn test_apply_wrapper_actions_all_filters_none() {
+		let value = ApplyWrapper {
+			actions: Some(Apply::All),
+			filters: None,
+		};
+		assert_de_tokens(&value, &[
+			Token::Map { len: Some(1) },
+			Token::Str("actions"),
+			Token::Str("all"),
+			Token::MapEnd,
+		])
+	}
+	#[test]
+	fn test_apply_wrapper_actions_none_filters_none() {
+		let value = ApplyWrapper {
+			actions: None,
+			filters: None,
+		};
+		assert_de_tokens(&value, &[Token::Map { len: None }, Token::MapEnd])
+	}
+	#[test]
+	fn test_apply_wrapper_actions_none_filters_all() {
+		let value = ApplyWrapper {
+			actions: None,
+			filters: Some(Apply::All),
+		};
+		assert_de_tokens(&value, &[
+			Token::Map { len: Some(1) },
+			Token::Str("filters"),
+			Token::Str("all"),
+			Token::MapEnd,
+		])
+	}
+	#[test]
+	fn test_apply_wrapper_actions_any_filters_any() {
+		assert_de_tokens_error::<ApplyWrapper>(
+			&[
+				Token::Map { len: Some(2) },
+				Token::Str("filters"),
+				Token::Str("all"),
+				Token::Str("actions"),
+				Token::Str("any"),
+				Token::MapEnd,
+			],
+			"variant 'any' not valid for field 'actions' in option 'apply' (select 'all' or provide an array of indices)",
+		)
 	}
 }

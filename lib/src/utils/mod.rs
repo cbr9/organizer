@@ -28,3 +28,13 @@ pub mod tests {
 		cwd
 	}
 }
+
+pub trait UnwrapRef<T> {
+	fn unwrap_ref(&self) -> &T;
+}
+
+impl<T> UnwrapRef<T> for Option<T> {
+	fn unwrap_ref(&self) -> &T {
+		self.as_ref().unwrap()
+	}
+}

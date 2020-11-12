@@ -2,7 +2,9 @@ use std::{ops::Add, path::PathBuf};
 
 use serde::{Deserialize, Serialize};
 mod apply;
+mod r#match;
 pub use apply::*;
+pub use r#match::*;
 
 #[derive(Deserialize, Serialize, Debug, Clone, Eq, PartialEq)]
 pub struct Options {
@@ -11,6 +13,7 @@ pub struct Options {
 	pub watch: Option<bool>,
 	pub ignore: Option<Vec<PathBuf>>,
 	pub hidden_files: Option<bool>,
+	pub r#match: Option<Match>,
 	pub apply: Option<ApplyWrapper>,
 }
 
@@ -21,22 +24,18 @@ impl Default for Options {
 			watch: Some(true),
 			ignore: Some(Vec::new()),
 			hidden_files: Some(false),
-			apply: Some(ApplyWrapper::from(Apply::All)),
+			apply: Some(ApplyWrapper::default()),
+			r#match: Some(Match::default()),
 		}
 	}
 }
 
-pub trait AsOption<T> {
-	fn combine(self, rhs: Self) -> Self
-	where
-		Self: Sized;
+pub trait AsOption<T: Default> {
+	fn combine(self, rhs: Self) -> Self;
 }
 
 impl AsOption<Options> for Option<Options> {
-	fn combine(self, rhs: Self) -> Self
-	where
-		Self: Sized,
-	{
+	fn combine(self, rhs: Self) -> Self {
 		match (self, rhs) {
 			(None, None) => Some(Options::default()),
 			(Some(lhs), None) => Some(lhs),
@@ -47,10 +46,7 @@ impl AsOption<Options> for Option<Options> {
 }
 
 impl AsOption<bool> for Option<bool> {
-	fn combine(self, rhs: Self) -> Self
-	where
-		Self: Sized,
-	{
+	fn combine(self, rhs: Self) -> Self {
 		match (&self, &rhs) {
 			(None, Some(_)) => rhs,
 			(Some(_), None) => self,
@@ -61,10 +57,7 @@ impl AsOption<bool> for Option<bool> {
 }
 
 impl<T> AsOption<Vec<T>> for Option<Vec<T>> {
-	fn combine(self, rhs: Self) -> Self
-	where
-		Self: Sized,
-	{
+	fn combine(self, rhs: Self) -> Self {
 		match (self, rhs) {
 			(None, Some(rhs)) => Some(rhs),
 			(Some(lhs), None) => Some(lhs),
@@ -87,6 +80,7 @@ impl Add<Self> for Options {
 			hidden_files: self.hidden_files.combine(rhs.hidden_files),
 			apply: self.apply.combine(rhs.apply),
 			ignore: self.ignore.combine(rhs.ignore),
+			r#match: self.r#match.combine(rhs.r#match),
 		}
 	}
 }
@@ -107,6 +101,7 @@ mod tests {
 			ignore: Some(vec!["$HOME".into(), "$HOME/Downloads".into()]),
 			hidden_files: None,
 			apply: Some(ApplyWrapper::from(Apply::All)),
+			r#match: Some(Match::First),
 		};
 		let opt2 = Options {
 			recursive: Some(false),
@@ -114,6 +109,7 @@ mod tests {
 			ignore: Some(vec!["$HOME/Documents".into()]),
 			hidden_files: None,
 			apply: Some(ApplyWrapper::from(Apply::Any)),
+			r#match: None,
 		};
 		let expected = Options {
 			recursive: opt2.recursive,
@@ -126,6 +122,7 @@ mod tests {
 			}),
 			hidden_files: defaults.defaults.hidden_files,
 			apply: opt2.apply.clone(),
+			r#match: Some(Match::First),
 		};
 		(opt1 + opt2 == expected).into_result()
 	}
@@ -137,6 +134,7 @@ mod tests {
 			ignore: Some(vec!["$HOME".into(), "$HOME/Downloads".into()]),
 			hidden_files: None,
 			apply: None,
+			r#match: Some(Match::All),
 		};
 		let opt2 = Options {
 			recursive: Some(false),
@@ -144,6 +142,7 @@ mod tests {
 			ignore: Some(vec!["$HOME/Documents".into()]),
 			hidden_files: None,
 			apply: None,
+			r#match: Some(Match::First),
 		};
 		let opt3 = Options {
 			recursive: Some(true),
@@ -151,6 +150,7 @@ mod tests {
 			ignore: Some(vec!["$HOME/Pictures".into()]),
 			hidden_files: Some(true),
 			apply: Some(ApplyWrapper::from(Apply::Select(vec![0, 2]))),
+			r#match: None,
 		};
 		let expected = Options {
 			recursive: Some(true),
@@ -165,6 +165,7 @@ mod tests {
 			}),
 			hidden_files: Some(true),
 			apply: opt3.apply.clone(),
+			r#match: Some(Match::First),
 		};
 		(opt1 + opt2 + opt3 == expected).into_result()
 	}

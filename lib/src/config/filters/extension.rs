@@ -10,7 +10,7 @@ use serde::{
 	Deserializer,
 };
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Extension(Vec<String>);
 
 impl Deref for Extension {
@@ -69,48 +69,41 @@ impl AsFilter for Extension {
 
 #[cfg(test)]
 pub mod tests {
+	use serde_test::{assert_de_tokens, Token};
 	use std::{
 		io::{Error, ErrorKind, Result},
 		path::PathBuf,
 	};
 
-	use crate::utils::tests::IntoResult;
-
 	use super::Extension;
 	use crate::config::AsFilter;
 
 	#[test]
-	fn deserialize_string() -> Result<()> {
-		serde_yaml::from_str::<Extension>("pdf").map_or_else(|e| Err(Error::new(ErrorKind::Other, e.to_string())), |_| Ok(()))
+	fn deserialize_string() {
+		let value = Extension(vec!["pdf".into()]);
+		assert_de_tokens(&value, &[Token::Str("pdf")])
 	}
 	#[test]
-	fn deserialize_seq() -> Result<()> {
-		serde_yaml::from_str::<Extension>("[pdf, doc, docx]").map_or_else(|e| Err(Error::new(ErrorKind::Other, e.to_string())), |_| Ok(()))
+	fn deserialize_seq() {
+		let value = Extension(vec!["pdf".into()]);
+		assert_de_tokens(&value, &[Token::Seq { len: Some(1) }, Token::Str("pdf"), Token::SeqEnd])
 	}
 	#[test]
-	#[should_panic]
-	fn deserialize_map() {
-		serde_yaml::from_str::<Extension>("extension: pdf")
-			.map_or_else(|_| Err(Error::from(ErrorKind::Other)), |_| Ok(()))
-			.unwrap()
-	}
-	#[test]
-	fn single_match_pdf() -> Result<()> {
+	fn single_match_pdf() {
 		let extension = Extension(vec!["pdf".into()]);
 		let path = PathBuf::from("$HOME/Downloads/test.pdf");
-		extension.matches(&path).into_result()
+		assert!(extension.matches(&path))
 	}
 	#[test]
-	fn multiple_match_pdf() -> Result<()> {
+	fn multiple_match_pdf() {
 		let extension = Extension(vec!["pdf".into(), "doc".into(), "docx".into()]);
 		let path = PathBuf::from("$HOME/Downloads/test.pdf");
-		extension.matches(&path).into_result()
+		assert!(extension.matches(&path))
 	}
 	#[test]
-	#[should_panic]
 	fn no_match() {
 		let extension = Extension(vec!["pdf".into(), "doc".into(), "docx".into()]);
 		let path = PathBuf::from("$HOME/Downloads/test.jpg");
-		extension.matches(&path).into_result().unwrap()
+		assert!(!extension.matches(&path))
 	}
 }

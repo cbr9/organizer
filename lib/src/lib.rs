@@ -1,20 +1,21 @@
 pub mod config;
-pub mod path {
+pub(crate) mod path {
 	mod expand;
 	mod get_rules;
 	mod is_hidden;
 	mod update;
-	pub use expand::*;
-	pub use get_rules::*;
-	pub use is_hidden::*;
-	pub use update::*;
+	pub(crate) use expand::*;
+	pub(crate) use get_rules::*;
+	pub(crate) use is_hidden::*;
+	pub(crate) use update::*;
 }
-pub mod string {
+pub(crate) mod string {
 	mod capitalize;
 	mod placeholder;
-	pub use capitalize::*;
-	pub use placeholder::*;
+	pub(crate) use capitalize::*;
+	pub(crate) use placeholder::*;
 }
+pub mod file;
 pub mod register;
 pub mod settings;
 pub mod utils;

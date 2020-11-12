@@ -29,7 +29,8 @@ impl Cmd for Config {
 				ignore: Some(ignore),
 				hidden_files: Some(hidden_files),
 				apply: Some(apply),
-			} = Settings::new()?.defaults
+				r#match: Some(r#match),
+			} = Settings::default().defaults
 			{
 				if let ApplyWrapper {
 					actions: Some(actions),
@@ -40,6 +41,7 @@ impl Cmd for Config {
 					println!("watch: {}", watch.to_string().bright_purple());
 					println!("hidden_files: {}", hidden_files.to_string().bright_purple());
 					println!("ignored_directories: {:?}", ignore);
+					println!("match: {:?}", r#match);
 					println!("apply (actions): {}", actions.to_string().bright_purple());
 					println!("apply (filters): {}", filters.to_string().bright_purple());
 				}

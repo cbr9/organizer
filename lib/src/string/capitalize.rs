@@ -14,28 +14,18 @@ impl Capitalize for String {
 
 #[cfg(test)]
 mod tests {
-	use std::io::{Error, ErrorKind, Result};
-
 	use super::*;
 
 	#[test]
-	fn capitalize_word() -> Result<()> {
+	fn capitalize_word() {
 		let tested = String::from("house");
 		let expected = String::from("House");
-		if tested.capitalize() == expected {
-			Ok(())
-		} else {
-			Err(Error::from(ErrorKind::Other))
-		}
+		assert_eq!(tested.capitalize(), expected)
 	}
 	#[test]
-	fn capitalize_single_char() -> Result<()> {
+	fn capitalize_single_char() {
 		let tested = String::from("h");
 		let expected = String::from("H");
-		if tested.capitalize() == expected {
-			Ok(())
-		} else {
-			Err(Error::from(ErrorKind::Other))
-		}
+		assert_eq!(tested.capitalize(), expected)
 	}
 }

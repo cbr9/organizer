@@ -1,28 +1,12 @@
-use crate::config::{Options, UserConfig};
+use crate::config::{Match, Options, UserConfig};
 use serde::{Deserialize, Serialize};
-use std::{fs, path::PathBuf};
+use std::{fs, ops::Deref, path::PathBuf};
 use toml::de::Error as TomlError;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct Settings {
-	#[serde(skip)]
-	path: PathBuf,
 	#[serde(flatten)]
 	pub defaults: Options,
-	// pub r#match: Match,
-}
-
-#[derive(Deserialize, Serialize, Debug, Clone)]
-#[serde(rename_all(deserialize = "lowercase"))]
-pub enum Match {
-	All,
-	First,
-}
-
-impl Default for Match {
-	fn default() -> Self {
-		Self::First
-	}
 }
 
 impl AsRef<Self> for Settings {
@@ -33,32 +17,33 @@ impl AsRef<Self> for Settings {
 
 impl Default for Settings {
 	fn default() -> Self {
-		Self {
-			path: PathBuf::new(),
-			defaults: Default::default(), // r#match: Default::default()
-		}
+		let path = UserConfig::default_dir().join("settings.toml");
+		Self::new(path).unwrap()
 	}
 }
 
 impl Settings {
-	pub fn new() -> Result<Self, TomlError> {
-		let path = UserConfig::default_dir().join("settings.toml");
+	pub fn new(path: PathBuf) -> Result<Self, TomlError> {
 		match fs::read_to_string(&path) {
 			Ok(content) => {
 				let settings = toml::from_str::<Settings>(&content);
 				match settings {
 					Ok(mut settings) => {
 						settings.defaults = Options::default() + settings.defaults;
+						let serialized = toml::to_string(&settings).unwrap();
+						fs::write(&path, serialized).ok();
 						Ok(settings)
 					}
 					Err(e) => Err(e),
 				}
 			}
 			Err(_) => {
-				let default = Settings::default();
-				let serialized = toml::to_string(&default).unwrap();
+				let settings = Settings {
+					defaults: Options::default(),
+				};
+				let serialized = toml::to_string(&settings).unwrap();
 				fs::write(&path, serialized).ok();
-				Ok(default)
+				Ok(settings)
 			}
 		}
 	}

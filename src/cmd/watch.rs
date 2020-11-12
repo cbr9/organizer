@@ -11,9 +11,10 @@ use notify::{op, raw_watcher, RawEvent, RecommendedWatcher, RecursiveMode, Watch
 use crate::{cmd::run::Run, Cmd, DEFAULT_CONFIG_STR};
 use clap::Clap;
 use lib::{
-	config::{AsMap, Options, PathToRecursive, PathToRules, UserConfig},
-	path::{GetRules, IsHidden},
+	config::{ApplyWrapper, AsMap, Match, Options, UserConfig},
+	file::File,
 	register::Register,
+	utils::UnwrapRef,
 };
 use std::{
 	borrow::Borrow,
@@ -49,17 +50,14 @@ impl Cmd for Watch {
 			}
 
 			match UserConfig::new(&self.config) {
-				Ok(config) => {
-					Run { config: self.config.clone() }.start(&config)?;
-					self.start(config)
-				}
+				Ok(config) => self.start(config),
 				Err(_) => std::process::exit(0),
 			}
 		}
 	}
 }
 
-impl Watch {
+impl<'a> Watch {
 	fn replace(&self) -> Result<()> {
 		let register = Register::new()?;
 		match register.iter().find(|section| section.path == self.config) {
@@ -69,6 +67,7 @@ impl Watch {
 					process.kill(Signal::Kill);
 				}
 				match UserConfig::new(&self.config) {
+					// TODO: should check that it's valid before killing the previous process
 					Ok(config) => self.start(config),
 					Err(_) => std::process::exit(0),
 				}
@@ -89,15 +88,12 @@ impl Watch {
 		}
 	}
 
-	fn setup<T>(&self, config: T) -> Result<(RecommendedWatcher, Receiver<RawEvent>)>
-	where
-		T: AsRef<UserConfig>,
-	{
-		let mut folders: PathToRecursive = config.as_ref().rules.map();
+	fn setup(&self, config: &mut UserConfig) -> Result<(RecommendedWatcher, Receiver<RawEvent>)> {
+		let folders = config.rules.path_to_recursive.as_mut().unwrap();
 		let (tx, rx) = channel();
 		let mut watcher = raw_watcher(tx).unwrap();
 		if cfg!(feature = "hot-reload") && self.config.parent().is_some() {
-			folders.insert(self.config.parent().unwrap(), RecursiveMode::NonRecursive);
+			folders.insert(self.config.parent().unwrap().to_path_buf(), RecursiveMode::NonRecursive);
 		}
 		for (folder, recursive) in folders.iter() {
 			watcher.watch(folder, *recursive)?
@@ -105,13 +101,9 @@ impl Watch {
 		Ok((watcher, rx))
 	}
 
-	fn start<T>(&self, config: T) -> Result<()>
-	where
-		T: AsRef<UserConfig>,
-	{
+	fn start(&self, mut config: UserConfig) -> Result<()> {
 		Register::new()?.append(process::id(), &self.config)?;
-		let (mut watcher, rx) = self.setup(config.borrow())?;
-		let path2rules = config.as_ref().rules.map();
+		let (mut watcher, rx) = self.setup(&mut config)?;
 		let config_parent = self.config.parent().unwrap();
 
 		loop {
@@ -121,23 +113,44 @@ impl Watch {
 					match op {
 						op::CREATE => {
 							if let Some(parent) = path.parent() {
-								if cfg!(not(feature = "hot-reload")) || (cfg!(feature = "hot-reload") && parent != config_parent) {
-									process_file(&path, &path2rules, true)
+								if (cfg!(not(feature = "hot-reload")) || (cfg!(feature = "hot-reload") && parent != config_parent)) && path.is_file() {
+									let mut file = File::new(path);
+									match config.defaults.unwrap_ref().r#match.unwrap_ref() {
+										Match::All => file.get_matching_rules(config.as_ref()).into_iter().for_each(|(i, j)| {
+											let rule = &config.rules[*i];
+											rule.actions
+												.run(&file.path, rule.folders[*j].options.unwrap_ref().apply.unwrap_ref().actions.unwrap_ref())
+												.and_then(|f| {
+													file.path = f;
+													Ok(())
+												});
+										}),
+										Match::First => {
+											let (i, j) = file.get_matching_rules(config.as_ref()).into_iter().next().unwrap();
+											let rule = &config.rules[*i];
+											rule.actions
+												.run(&file.path, rule.folders[*j].options.unwrap_ref().apply.unwrap_ref().actions.unwrap_ref())
+												.and_then(|f| {
+													file.path = f;
+													Ok(())
+												})?
+										}
+									}
 								}
 							}
 						}
 						op::CLOSE_WRITE => {
 							if cfg!(feature = "hot-reload") && path == self.config {
 								match UserConfig::new(&self.config) {
-									Ok(config) => {
-										for folder in config.as_ref().rules.get_paths() {
+									Ok(new_config) => {
+										for folder in config.rules.path_to_recursive.unwrap_ref().keys() {
 											watcher.unwatch(folder)?;
 										};
 										watcher.unwatch(config_parent)?;
 										std::mem::drop(path);
-										std::mem::drop(path2rules);
+										std::mem::drop(config);
 										info!("reloaded configuration: {}", self.config.display());
-										break self.start(config);
+										break self.start(new_config);
 									}
 									Err(_) => {
 										debug!("could not reload configuration");
@@ -150,33 +163,6 @@ impl Watch {
 				},
 				Err(e) => error!("{}", e.to_string()),
 				_ => {}
-			}
-		}
-	}
-}
-
-pub fn process_file(path: &Path, path2rules: &PathToRules, from_watch: bool) {
-	if path.is_file() {
-		let parent = path.parent().unwrap();
-		'rules: for (rule, i) in path.get_rules(path2rules) {
-			let folder = rule.folders.get(*i).unwrap();
-			let Options {
-				ignore,
-				hidden_files,
-				watch,
-				apply,
-				..
-			} = folder.options.as_ref().unwrap();
-			if ignore.as_ref().unwrap().contains(&parent.to_path_buf()) {
-				continue 'rules;
-			}
-			if path.is_hidden() && !hidden_files.unwrap() {
-				continue 'rules;
-			}
-			if (!from_watch || watch.unwrap()) && rule.filters.r#match(path, &apply.as_ref().unwrap().filters.as_ref().unwrap()) {
-				// simplified from `if (from_watch && *watch) || !from_watch`
-				rule.actions.run(&path, &apply.as_ref().unwrap().actions.as_ref().unwrap());
-				break 'rules;
 			}
 		}
 	}

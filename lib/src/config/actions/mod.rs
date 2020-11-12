@@ -11,9 +11,10 @@ pub use script::*;
 
 use std::{borrow::Cow, io::Result, ops::Deref, path::Path};
 
-use crate::config::Apply;
+use crate::{config::Apply, file::File};
 use log::error;
 use serde::Deserialize;
+use std::path::PathBuf;
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all(deserialize = "lowercase"))]
@@ -83,7 +84,7 @@ impl Deref for Actions {
 }
 
 impl Actions {
-	pub fn run<A>(&self, path: &Path, apply: A)
+	pub fn run<A>(&self, path: &Path, apply: A) -> Result<PathBuf>
 	where
 		A: AsRef<Apply>,
 	{
@@ -91,27 +92,34 @@ impl Actions {
 			Apply::Any => panic!("deserializer should not have allowed variant 'any' for field 'actions' in option 'apply'"),
 			Apply::All => {
 				let mut path = Cow::from(path);
-				for action in self.iter() {
-					path = match action.act(path) {
-						Ok(new_path) => new_path,
+				self.iter()
+					.try_for_each(|action| match action.act(path.clone()) {
+						Ok(new_path) => {
+							path = new_path;
+							Ok(())
+						}
 						Err(e) => {
 							error!("{}", e);
-							break;
+							Err(e)
 						}
-					}
-				}
+					})
+					.and_then(|_| Ok(path.to_path_buf()))
 			}
 			Apply::Select(indices) => {
 				let mut path = Cow::from(path);
-				for i in indices {
-					path = match self.get(*i).unwrap().act(path) {
-						Ok(path) => path,
+				indices
+					.iter()
+					.try_for_each(|i| match self.get(*i).unwrap().act(path.clone()) {
+						Ok(new_path) => {
+							path = new_path;
+							Ok(())
+						}
 						Err(e) => {
 							error!("{}", e);
-							break;
+							Err(e)
 						}
-					}
-				}
+					})
+					.and_then(|_| Ok(path.to_path_buf()))
 			}
 		}
 	}

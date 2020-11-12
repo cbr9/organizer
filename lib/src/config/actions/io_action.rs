@@ -109,27 +109,33 @@ impl<'de> Deserialize<'de> for IOAction {
 			where
 				M: MapAccess<'de>,
 			{
-				let mut to: Option<String> = None;
-				let mut if_exists: Option<ConflictOption> = None;
-				let mut sep: Option<Sep> = None;
-				while let Some(key) = map.next_key::<String>()? {
+				let mut action: IOAction = IOAction::default();
+				while let Some((key, value)) = map.next_entry::<String, String>()? {
 					match key.as_str() {
-						"to" => to = Some(map.next_value()?),
-						"if_exists" => if_exists = Some(map.next_value()?),
-						"sep" => sep = Some(map.next_value()?),
-						_ => return Err(serde::de::Error::custom(&format!("Invalid key: {}", key))),
+						"to" => {
+							action.to = match visit_placeholder_string(&value) {
+								Ok(str) => {
+									let path = PathBuf::from(str).expand_vars().expand_user();
+									if !path.exists() {
+										return Err(M::Error::custom("path does not exist"));
+									}
+									path
+								}
+								Err(e) => return Err(M::Error::custom(e.to_string())),
+							}
+						}
+						"if_exists" => {
+							action.if_exists = match ConflictOption::from_str(&value) {
+								Ok(value) => value,
+								Err(e) => return Err(M::Error::custom(e)),
+							}
+						}
+						"sep" => action.sep = Sep(value),
+						_ => return Err(serde::de::Error::custom("unexpected key")),
 					}
 				}
-				if to.is_none() {
-					return Err(serde::de::Error::custom("Missing path"));
-				}
-				let to = visit_placeholder_string(to.unwrap().as_str()).map_err(|e| M::Error::custom(e.to_string()))?;
-				let mut action = IOAction::from_str(to.as_str()).unwrap();
-				if let Some(if_exists) = if_exists {
-					action.if_exists = if_exists;
-				}
-				if let Some(sep) = sep {
-					action.sep = sep;
+				if action.to.to_string_lossy().is_empty() {
+					return Err(serde::de::Error::custom("missing path"));
 				}
 				Ok(action)
 			}
@@ -209,6 +215,19 @@ pub enum ConflictOption {
 	Rename,
 }
 
+impl FromStr for ConflictOption {
+	type Err = String;
+
+	fn from_str(s: &str) -> result::Result<Self, Self::Err> {
+		match s {
+			"overwrite" => Ok(Self::Overwrite),
+			"skip" => Ok(Self::Skip),
+			"rename" => Ok(Self::Rename),
+			_ => Err("invalid value".into()),
+		}
+	}
+}
+
 impl Default for ConflictOption {
 	fn default() -> Self {
 		ConflictOption::Rename
@@ -217,12 +236,35 @@ impl Default for ConflictOption {
 
 #[cfg(test)]
 mod tests {
-	use std::io::Result;
-
+	use super::*;
 	use crate::{
 		config::{ActionType, IOAction},
 		utils::tests::{project, IntoResult},
 	};
+	use serde_test::{assert_de_tokens, Token};
+	use std::io::Result;
+
+	#[test]
+	fn deserialize_str() {
+		let value = IOAction::from_str("$HOME").unwrap();
+		assert_de_tokens(&value, &[Token::Str("$HOME")])
+	}
+	#[test]
+	fn deserialize_map() {
+		let mut value = IOAction::from_str("$HOME").unwrap();
+		value.if_exists = ConflictOption::Rename;
+		value.sep = Sep("-".into());
+		assert_de_tokens(&value, &[
+			Token::Map { len: Some(3) },
+			Token::Str("to"),
+			Token::Str("$HOME"),
+			Token::Str("if_exists"),
+			Token::Str("rename"),
+			Token::Str("sep"),
+			Token::Str("-"),
+			Token::MapEnd,
+		])
+	}
 
 	#[test]
 	fn prepare_path_copy() -> Result<()> {
