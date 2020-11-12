@@ -132,8 +132,8 @@ mod tests {
 
 	#[test]
 	fn clear_dead_processes() {
-		stop();
 		simulate_watch();
+		stop();
 		let register = Register::new().unwrap();
 		assert!(register.is_empty())
 	}
