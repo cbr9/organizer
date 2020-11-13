@@ -26,6 +26,8 @@ matrix:
   fast_finish: true
   include:
       - before_script:
+          - rm target/debug/deps/organize-* || true
+          - rm target/debug/deps/organize_core-* || true
           - rustup component add rustfmt-preview
           - rustup component add clippy-preview
         script:
@@ -54,9 +56,6 @@ after_success: |
   make install DESTDIR=../../kcov-build &&
   cd ../.. &&
   rm -rf kcov-master &&
-  rm target/debug/deps/organize-*;
-  rm target/debug/deps/organize_core-*;
-  cargo test --all --no-run &&
   for file in target/debug/deps/organize-*; do [ -x "${file}" ] || continue; mkdir -p "target/cov/$(basename $file)"; ./kcov-build/usr/local/bin/kcov --exclude-pattern=/.cargo,/usr/lib --verify "target/cov/$(basename $file)" "$file"; done &&
   for file in target/debug/deps/organize_core-*; do [ -x "${file}" ] || continue; mkdir -p "target/cov/$(basename $file)"; ./kcov-build/usr/local/bin/kcov --exclude-pattern=/.cargo,/usr/lib --verify "target/cov/$(basename $file)" "$file"; done &&
   bash <(curl -s https://codecov.io/bash) &&
