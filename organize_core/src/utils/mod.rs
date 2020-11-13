@@ -1,8 +1,7 @@
 #[cfg(test)]
 pub mod tests {
-	use crate::{utils::UnwrapRef, PROJECT_NAME};
+	use crate::PROJECT_NAME;
 	use std::{
-		borrow::Cow,
 		env,
 		path::{Path, PathBuf},
 	};

@@ -9,6 +9,8 @@ os:
   - windows
 
 script:
+  rustup component add rustfmt --toolchain stable-x86_64-apple-darwin &&
+  rustup component add clippy --toolchain stable-x86_64-apple-darwin &&
   cargo build --verbose &&
   cargo test --all --verbose &&
   cargo fmt &&
@@ -28,6 +30,7 @@ matrix:
   fast_finish: true
   include:
       - before_script:
+        - rustup component add rustfmt-preview --toolchain stable-x86_64-apple-darwin
         - rustup component add rustfmt --toolchain stable-x86_64-apple-darwin
         - rustup component add rustfmt-preview
         - rustup component add clippy-preview
