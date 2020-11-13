@@ -182,7 +182,7 @@ impl IOAction {
 			if !to.exists() {
 				fs::create_dir_all(&to)?;
 			}
-			to = to.canonicalize().unwrap();
+			// to = to.canonicalize().unwrap();
 			to.push(
 				path.as_ref()
 					.file_name()

@@ -44,7 +44,6 @@ addons: # required for kcov
       - libiberty-dev
 
 after_success: |
-  cargo test --all --no-run &&
   wget https://github.com/SimonKagstrom/kcov/archive/master.tar.gz &&
   tar xzf master.tar.gz &&
   cd kcov-master &&
@@ -57,6 +56,7 @@ after_success: |
   rm -rf kcov-master &&
   rm target/debug/deps/organize-*;
   rm target/debug/deps/organize_core-*;
+  cargo test --all --no-run &&
   for file in target/debug/deps/organize-*; do [ -x "${file}" ] || continue; mkdir -p "target/cov/$(basename $file)"; ./kcov-build/usr/local/bin/kcov --exclude-pattern=/.cargo,/usr/lib --verify "target/cov/$(basename $file)" "$file"; done &&
   for file in target/debug/deps/organize_core-*; do [ -x "${file}" ] || continue; mkdir -p "target/cov/$(basename $file)"; ./kcov-build/usr/local/bin/kcov --exclude-pattern=/.cargo,/usr/lib --verify "target/cov/$(basename $file)" "$file"; done &&
   bash <(curl -s https://codecov.io/bash) &&

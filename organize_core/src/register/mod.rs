@@ -111,7 +111,7 @@ impl Register {
 #[cfg(test)]
 mod tests {
 
-	use sysinfo::{ProcessExt, RefreshKind, Signal, System, SystemExt};
+	use sysinfo::{Pid, ProcessExt, RefreshKind, Signal, System, SystemExt};
 
 	use crate::{config::UserConfig, register::Register};
 	use num_traits::AsPrimitive;
@@ -125,9 +125,9 @@ mod tests {
 	}
 
 	fn simulate_watch() {
-		let pid = 1000000000i32;
+		let pid: Pid = 1000000000;
 		let sys = System::new_with_specifics(RefreshKind::with_processes(RefreshKind::new()));
-		assert!(sys.get_process(pid.as_()).is_none());
+		assert!(sys.get_process(pid).is_none());
 		let path = UserConfig::default_path();
 		let register = Register::new().unwrap();
 		register.append(pid, &path).unwrap();

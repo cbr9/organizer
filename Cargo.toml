@@ -27,6 +27,7 @@ fern = {version = "0.5", features = ["colored"] }
 toml = "0.5.7"
 anyhow = "1.0.34"
 organize_core = { path = "organize_core/" }
+path-clean = "0.1.0"
 
 [features]
 hot-reload = []
