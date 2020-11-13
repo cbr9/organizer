@@ -46,10 +46,10 @@ mod tests {
 	fn check_hidden() {
 		let path = Path::new(".testfile");
 		fs::OpenOptions::new()
+			.custom_flags(FILE_ATTRIBUTE_HIDDEN)
 			.create(true)
 			.write(true)
-			.open(path)
-			.custom_flags(FILE_ATTRIBUTE_HIDDEN);
+			.open(path);
 		assert!(path.is_hidden())
 	}
 }
