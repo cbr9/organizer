@@ -28,7 +28,7 @@ pub struct Script {
 
 impl AsAction<Self> for Script {
 	fn act<'a>(&self, path: Cow<'a, Path>) -> Result<Cow<'a, Path>> {
-		match self.helper(&path) {
+		match self.run(&path) {
 			Ok(_output) => {
 				// improve output
 				info!("({}) run script on {}", self.exec.bold(), path.display());
@@ -56,19 +56,15 @@ where
 
 impl AsFilter for Script {
 	fn matches(&self, path: &Path) -> bool {
-		let output = self.helper(path);
-		match output {
-			Ok(output) => {
-				let output = String::from_utf8_lossy(&output.stdout);
-				let parsed = bool::from_str(&output.trim().to_lowercase());
-				println!("{:?}", parsed);
-				match parsed {
-					Ok(boolean) => boolean,
-					Err(_) => false,
-				}
-			}
-			Err(_) => false,
-		}
+		let out = self.run(path);
+		out.map(|out| {
+			let out = String::from_utf8_lossy(&out.stdout);
+			out.lines()
+				.last()
+				.map(|last| bool::from_str(&last.to_lowercase().trim()).unwrap_or_default())
+		})
+		.map(|x| x.unwrap_or_default())
+		.unwrap_or_default()
 	}
 }
 
@@ -85,17 +81,30 @@ impl Script {
 		Ok(script)
 	}
 
-	fn helper(&self, path: &Path) -> Result<Output> {
+	fn run(&self, path: &Path) -> Result<Output> {
 		let script = self.write(path)?;
 		let output = Command::new(&self.exec)
 			.arg(&script)
 			.stdout(Stdio::piped())
-			.stderr(Stdio::piped())
 			.spawn()
 			.expect("could not run script")
 			.wait_with_output()
 			.expect("script terminated with an error");
-		fs::remove_file(script)?;
 		Ok(output)
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	#[test]
+	fn test_script_filter() {
+		let script = Script {
+			exec: "python".into(),
+			content: "print('huh')\nprint('{path}'.islower())".into(),
+		};
+		let path = Path::new("/home");
+		assert!(script.matches(path))
 	}
 }
