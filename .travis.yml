@@ -29,8 +29,8 @@ matrix:
           - rustup component add rustfmt-preview
           - rustup component add clippy-preview
         script:
-          - cargo fmt -- --write-mode=diff
-          - cargo clippy -- -D clippy
+          - cargo fmt
+          - cargo clippy
 
 addons: # required for kcov
   apt:
