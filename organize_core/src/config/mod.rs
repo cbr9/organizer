@@ -79,7 +79,7 @@ impl UserConfig {
 		let content = fs::read_to_string(&path).unwrap(); // if there is some problem with the config file, we should not try to fix it
 		match serde_yaml::from_str::<UserConfig>(&content) {
 			Ok(mut config) => {
-				let settings = Settings::default();
+				let settings = Settings::from_default_path();
 				config.defaults = Some(settings.defaults).combine(config.defaults);
 				for rule in config.rules.iter_mut() {
 					rule.options = config.defaults.clone().combine(rule.options.clone());

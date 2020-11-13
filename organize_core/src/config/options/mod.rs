@@ -7,6 +7,7 @@ pub use apply::*;
 pub use r#match::*;
 
 #[derive(Deserialize, Serialize, Debug, Clone, Eq, PartialEq)]
+#[serde(deny_unknown_fields)]
 pub struct Options {
 	/// defines whether or not subdirectories must be scanned
 	pub recursive: Option<bool>,
