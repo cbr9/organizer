@@ -83,7 +83,7 @@ impl Register {
 	pub fn append<T, P>(mut self, pid: P, path: T) -> Result<Self>
 	where
 		T: AsRef<Path>,
-		P: AsPrimitive<i32>,
+		P: AsPrimitive<i32> + AsPrimitive<usize>,
 	{
 		let section = Section {
 			path: path.as_ref().to_path_buf(),

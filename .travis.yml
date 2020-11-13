@@ -30,6 +30,7 @@ matrix:
       - before_script:
         - rustup component add rustfmt-preview
         - rustup component add clippy-preview
+        - rustup component add rustfmt --toolchain stable-x86_64-apple-darwin
         - rm target/debug/deps/organize-* || true
         - rm target/debug/deps/organize_core-* || true
 

@@ -10,7 +10,6 @@ pub trait Expand {
 }
 
 impl Expand for PathBuf {
-	#[cfg(any(target_os = "linux", target_os = "macos"))]
 	fn expand_user(self) -> PathBuf {
 		let str = self.to_str().unwrap();
 		if str.contains('~') {

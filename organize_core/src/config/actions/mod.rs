@@ -105,7 +105,7 @@ impl Actions {
 							Err(e)
 						}
 					})
-					.and_then(|_| Ok(path.to_path_buf()))
+					.map(|_| path.to_path_buf())
 			}
 			Apply::AllOf(indices) => {
 				let mut path = Cow::from(path);
@@ -121,7 +121,7 @@ impl Actions {
 							Err(e)
 						}
 					})
-					.and_then(|_| Ok(path.to_path_buf()))
+					.map(|_| path.to_path_buf())
 			}
 		}
 	}
