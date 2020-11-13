@@ -16,7 +16,7 @@ pub struct Folder {
 }
 
 impl<'de> Deserialize<'de> for Folder {
-	fn deserialize<D>(deserializer: D) -> result::Result<Self, <D as Deserializer<'de>>::Error>
+	fn deserialize<D>(deserializer: D) -> result::Result<Self, D::Error>
 	where
 		D: Deserializer<'de>,
 	{
@@ -41,28 +41,34 @@ impl<'de> Deserialize<'de> for Folder {
 				M: MapAccess<'de>,
 			{
 				let mut folder = Folder {
-					path: Default::default(),
+					path: PathBuf::default(),
 					options: None,
 				};
 				while let Some(key) = map.next_key::<String>()? {
 					match key.as_str() {
 						"path" => {
-							folder = match Folder::from_str(&map.next_value::<String>()?) {
-								Ok(mut new_folder) => {
-									new_folder.options = folder.options;
-									new_folder
-								}
-								Err(e) => return Err(M::Error::custom(e)),
+							folder = match folder.path == PathBuf::default() {
+								true => return Err(M::Error::duplicate_field("path")),
+								false => match Folder::from_str(&map.next_value::<String>()?) {
+									Ok(mut new_folder) => {
+										new_folder.options = folder.options;
+										new_folder
+									}
+									Err(e) => return Err(M::Error::custom(e)),
+								},
 							}
 						}
 						"options" => {
-							folder.options = Some(map.next_value()?);
+							folder.options = match folder.options.is_some() {
+								true => return Err(M::Error::duplicate_field("options")),
+								false => Some(map.next_value()?),
+							};
 						}
-						_ => return Err(M::Error::custom("unknown field")),
+						_ => return Err(M::Error::unknown_field(key.as_str(), &["path", "options"])),
 					}
 				}
 				if folder.path == PathBuf::default() {
-					return Err(serde::de::Error::custom("missing path"));
+					return Err(M::Error::missing_field("path"));
 				}
 				Ok(folder)
 			}
@@ -89,6 +95,7 @@ pub type Folders = Vec<Folder>;
 mod tests {
 	use super::*;
 	use crate::config::{Apply, ApplyWrapper};
+	use serde::de::{value::Error, Error as ErrorTrait};
 	use serde_test::{assert_de_tokens, assert_de_tokens_error, Token};
 
 	#[test]
@@ -97,7 +104,7 @@ mod tests {
 		assert_de_tokens(&value, &[Token::Str("$HOME")])
 	}
 	#[test]
-	fn deserialize_map_invalid() {
+	fn deserialize_map_missing_path() {
 		assert_de_tokens_error::<Folder>(
 			&[
 				Token::Map { len: Some(1) },
@@ -115,7 +122,82 @@ mod tests {
 				Token::MapEnd,
 				Token::MapEnd,
 			],
-			"missing path",
+			&Error::missing_field("path").to_string(),
+		)
+	}
+	#[test]
+	fn deserialize_map_duplicate_options() {
+		assert_de_tokens_error::<Folder>(
+			&[
+				Token::Map { len: Some(3) },
+				Token::Str("path"),
+				Token::Str("$HOME"),
+				Token::Str("options"),
+				Token::Map { len: Some(3) },
+				Token::Str("recursive"),
+				Token::Some,
+				Token::Bool(true),
+				Token::Str("apply"),
+				Token::Some,
+				Token::Str("all"),
+				Token::Str("watch"),
+				Token::Some,
+				Token::Bool(true),
+				Token::MapEnd,
+				Token::Str("options"),
+				Token::MapEnd,
+			],
+			&Error::duplicate_field("options").to_string(),
+		)
+	}
+	#[test]
+	fn deserialize_map_duplicate_path() {
+		assert_de_tokens_error::<Folder>(
+			&[
+				Token::Map { len: Some(3) },
+				Token::Str("path"),
+				Token::Str("$HOME"),
+				Token::Str("options"),
+				Token::Map { len: Some(3) },
+				Token::Str("recursive"),
+				Token::Some,
+				Token::Bool(true),
+				Token::Str("apply"),
+				Token::Some,
+				Token::Str("all"),
+				Token::Str("watch"),
+				Token::Some,
+				Token::Bool(true),
+				Token::MapEnd,
+				Token::Str("path"),
+				Token::MapEnd,
+			],
+			&Error::duplicate_field("path").to_string(),
+		)
+	}
+	#[test]
+	fn deserialize_map_unknown_field() {
+		assert_de_tokens_error::<Folder>(
+			&[
+				Token::Map { len: Some(3) },
+				Token::Str("path"),
+				Token::Str("$HOME"),
+				Token::Str("options"),
+				Token::Map { len: Some(3) },
+				Token::Str("recursive"),
+				Token::Some,
+				Token::Bool(true),
+				Token::Str("apply"),
+				Token::Some,
+				Token::Str("all"),
+				Token::Str("watch"),
+				Token::Some,
+				Token::Bool(true),
+				Token::MapEnd,
+				Token::Str("unknown"),
+				Token::MapEnd,
+			],
+			&Error::unknown_field("unknown", &["path", "options"]).to_string(),
 		)
 	}
 	#[test]
@@ -126,7 +208,7 @@ mod tests {
 			watch: Some(true),
 			ignore: None,
 			hidden_files: None,
-			r#match: None, // TODO: create issue in serde_test about raw identifiers not working properly
+			r#match: None,
 			apply: Some(ApplyWrapper::from(Apply::All)),
 		});
 		assert_de_tokens(&value, &[
