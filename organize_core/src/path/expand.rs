@@ -58,6 +58,12 @@ mod tests {
 	use super::*;
 
 	#[test]
+	fn user() {
+		let original = PathBuf::from("~/Documents");
+		let expected = home_dir().unwrap().join("Documents");
+		assert_eq!(original.expand_user(), expected)
+	}
+	#[test]
 	fn home() {
 		let original = PathBuf::from("$HOME/Documents");
 		let expected = home_dir().unwrap().join("Documents");
