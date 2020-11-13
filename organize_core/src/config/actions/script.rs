@@ -69,6 +69,13 @@ impl AsFilter for Script {
 }
 
 impl Script {
+	pub fn new<T: Into<String>>(exec: T, content: T) -> Self {
+		Self {
+			exec: exec.into(),
+			content: content.into(),
+		}
+	}
+
 	fn write(&self, path: &Path) -> Result<PathBuf> {
 		let content = self.content.as_str();
 		let content = content.expand_placeholders(path)?;
@@ -99,11 +106,9 @@ mod tests {
 	use super::*;
 
 	#[test]
+	#[cfg(not(target_os = "windows"))] // python doesn't come installed by default on windows
 	fn test_script_filter() {
-		let script = Script {
-			exec: "python".into(),
-			content: "print('huh')\nprint('{path}'.islower())".into(),
-		};
+		let script = Script::new("python", "print('huh')\nprint('{path}'.islower())");
 		let path = Path::new("/home");
 		assert!(script.matches(path))
 	}
