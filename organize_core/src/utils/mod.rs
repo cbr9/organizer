@@ -1,9 +1,18 @@
 #[cfg(test)]
 pub mod tests {
-	use std::{env, path::PathBuf};
+	use crate::{utils::UnwrapRef, PROJECT_NAME};
+	use std::{
+		borrow::Cow,
+		env,
+		path::{Path, PathBuf},
+	};
 
 	pub fn project() -> PathBuf {
-		env::current_dir().unwrap().parent().unwrap().to_path_buf()
+		let mut path = env::current_dir().unwrap();
+		while path.file_name().unwrap() != PROJECT_NAME {
+			path = path.parent().unwrap().to_path_buf();
+		}
+		path
 	}
 }
 
