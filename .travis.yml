@@ -19,10 +19,10 @@ branches:
     - master
     - alpha-2.0
 
+dist: xenial
 cache: cargo
-sudo: required # travis-ci/travis-ci#9061
 
-matrix:
+jobs:
   fast_finish: true
   include:
       - before_script:
