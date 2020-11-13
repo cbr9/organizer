@@ -3,6 +3,11 @@ language: rust
 rust:
   - stable
 
+os:
+  - linux
+  - osx
+  - windows
+
 script:
   cargo build --verbose &&
   cargo test --all --verbose &&
