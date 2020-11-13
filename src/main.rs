@@ -15,11 +15,6 @@ mod cmd;
 fn main() -> anyhow::Result<()> {
 	Logs::setup()?;
 
-	if cfg!(target_os = "windows") {
-		eprintln!("Windows is not supported yet");
-		return Ok(());
-	}
-
 	let app: App = App::parse();
 	match app.run() {
 		Ok(_) => {}
