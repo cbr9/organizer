@@ -40,26 +40,18 @@ impl<'de> Deserialize<'de> for Folder {
 			where
 				M: MapAccess<'de>,
 			{
-				let mut folder = Folder {
-					path: PathBuf::default(),
-					options: None,
-				};
+				let mut path = None;
+				let mut options = None;
 				while let Some(key) = map.next_key::<String>()? {
 					match key.as_str() {
 						"path" => {
-							folder = match folder.path == PathBuf::default() {
+							path = match path.is_none() {
+								true => Some(Folder::from_str(&map.next_value::<String>()?).map(|f| f.path).map_err(M::Error::custom)?),
 								false => return Err(M::Error::duplicate_field("path")),
-								true => match Folder::from_str(&map.next_value::<String>()?) {
-									Ok(mut new_folder) => {
-										new_folder.options = folder.options;
-										new_folder
-									}
-									Err(e) => return Err(M::Error::custom(e)),
-								},
 							}
 						}
 						"options" => {
-							folder.options = match folder.options.is_some() {
+							options = match options.is_some() {
 								true => return Err(M::Error::duplicate_field("options")),
 								false => Some(map.next_value()?),
 							};
@@ -67,9 +59,10 @@ impl<'de> Deserialize<'de> for Folder {
 						_ => return Err(M::Error::unknown_field(key.as_str(), &["path", "options"])),
 					}
 				}
-				if folder.path == PathBuf::default() {
-					return Err(M::Error::missing_field("path"));
-				}
+				let folder = Folder {
+					path: path.ok_or_else(|| M::Error::missing_field("path"))?,
+					options,
+				};
 				Ok(folder)
 			}
 		}
@@ -111,13 +104,13 @@ mod tests {
 				Token::Str("options"),
 				Token::Map { len: Some(3) },
 				Token::Str("recursive"),
-				Token::Some,
 				Token::Bool(true),
 				Token::Str("apply"),
-				Token::Some,
-				Token::Str("all"),
+				Token::UnitVariant {
+					name: "Apply",
+					variant: "all",
+				},
 				Token::Str("watch"),
-				Token::Some,
 				Token::Bool(true),
 				Token::MapEnd,
 				Token::MapEnd,
@@ -135,13 +128,10 @@ mod tests {
 				Token::Str("options"),
 				Token::Map { len: Some(3) },
 				Token::Str("recursive"),
-				Token::Some,
 				Token::Bool(true),
 				Token::Str("apply"),
-				Token::Some,
 				Token::Str("all"),
 				Token::Str("watch"),
-				Token::Some,
 				Token::Bool(true),
 				Token::MapEnd,
 				Token::Str("options"),
@@ -160,13 +150,10 @@ mod tests {
 				Token::Str("options"),
 				Token::Map { len: Some(3) },
 				Token::Str("recursive"),
-				Token::Some,
 				Token::Bool(true),
 				Token::Str("apply"),
-				Token::Some,
 				Token::Str("all"),
 				Token::Str("watch"),
-				Token::Some,
 				Token::Bool(true),
 				Token::MapEnd,
 				Token::Str("path"),
@@ -185,13 +172,10 @@ mod tests {
 				Token::Str("options"),
 				Token::Map { len: Some(3) },
 				Token::Str("recursive"),
-				Token::Some,
 				Token::Bool(true),
 				Token::Str("apply"),
-				Token::Some,
 				Token::Str("all"),
 				Token::Str("watch"),
-				Token::Some,
 				Token::Bool(true),
 				Token::MapEnd,
 				Token::Str("unknown"),
@@ -218,13 +202,10 @@ mod tests {
 			Token::Str("options"),
 			Token::Map { len: Some(3) },
 			Token::Str("recursive"),
-			Token::Some,
 			Token::Bool(true),
 			Token::Str("apply"),
-			Token::Some,
 			Token::Str("all"),
 			Token::Str("watch"),
-			Token::Some,
 			Token::Bool(true),
 			Token::MapEnd,
 			Token::MapEnd,

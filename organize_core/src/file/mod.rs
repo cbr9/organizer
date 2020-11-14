@@ -54,10 +54,12 @@ impl File {
 				let folder = &rule.folders[*j];
 				match folder.options.unwrap_ref() {
 					Options {
+						recursive: _,
+						watch: _,
 						ignore: Some(ignore),
 						hidden_files: Some(hidden_files),
+						r#match: _,
 						apply: Some(ApplyWrapper { filters: Some(filters), .. }),
-						..
 					} => {
 						if ignore.contains(&parent.to_path_buf()) {
 							return false;

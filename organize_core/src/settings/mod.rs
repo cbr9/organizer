@@ -1,5 +1,5 @@
 use crate::config::{Options, UserConfig};
-use anyhow::Result;
+use anyhow::{Context, Result};
 use log::{debug, error};
 use serde::{Deserialize, Deserializer, Serialize};
 use std::{
@@ -40,10 +40,10 @@ impl Settings {
 		T: AsRef<Path>,
 	{
 		let path = path.as_ref();
-		fs::read_to_string(path).map_or_else(
+		fs::read_to_string(path).with_context(|| "problem reading settings.toml").map_or_else(
 			|e| {
 				// if there is some problem with the settings file
-				debug!("{}", e.to_string());
+				debug!("{:?}", e);
 				let settings = Settings::default();
 				// Serialize is automatically derived and these are default options so it's safe to unwrap
 				let serialized = toml::to_string(&settings).unwrap();
@@ -85,13 +85,10 @@ mod tests {
 		assert_de_tokens(&value, &[
 			Token::Map { len: Some(3) },
 			Token::Str("hidden_files"),
-			Token::Some,
 			Token::Bool(true),
 			Token::Str("watch"),
-			Token::Some,
 			Token::Bool(false),
 			Token::Str("recursive"),
-			Token::Some,
 			Token::Bool(true),
 			Token::MapEnd,
 		])

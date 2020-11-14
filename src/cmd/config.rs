@@ -28,8 +28,8 @@ impl Cmd for Config {
 				watch: Some(watch),
 				ignore: Some(ignore),
 				hidden_files: Some(hidden_files),
-				apply: Some(apply),
 				r#match: Some(r#match),
+				apply: Some(apply),
 			} = Settings::default().defaults
 			{
 				if let ApplyWrapper {

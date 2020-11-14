@@ -2,7 +2,7 @@ use std::fmt;
 
 use crate::config::AsOption;
 use serde::{
-	de::{Error, MapAccess, SeqAccess, Visitor},
+	de::{EnumAccess, Error, MapAccess, SeqAccess, Unexpected, VariantAccess, Visitor},
 	export::{Formatter, PhantomData},
 	Deserialize,
 	Deserializer,
@@ -26,13 +26,13 @@ impl Default for Apply {
 }
 
 impl FromStr for Apply {
-	type Err = String;
+	type Err = serde::de::value::Error;
 
 	fn from_str(s: &str) -> Result<Self, Self::Err> {
 		match s {
 			"all" => Ok(Self::All),
 			"any" => Ok(Self::Any),
-			_ => Err("invalid value".into()),
+			_ => Err(serde::de::value::Error::unknown_variant(s, &["all", "any"])),
 		}
 	}
 }
@@ -43,8 +43,6 @@ impl AsOption<Apply> for Option<Apply> {
 			(None, None) => Some(Apply::default()),
 			(Some(lhs), None) => Some(lhs),
 			(None, Some(rhs)) => Some(rhs),
-			(_, Some(Apply::All)) => Some(Apply::All),
-			(_, Some(Apply::Any)) => Some(Apply::Any),
 			(Some(Apply::AllOf(mut lhs)), Some(Apply::AllOf(mut rhs))) => {
 				rhs.append(&mut lhs);
 				rhs.sort_unstable();
@@ -57,13 +55,13 @@ impl AsOption<Apply> for Option<Apply> {
 				rhs.dedup();
 				Some(Apply::AnyOf(rhs))
 			}
-			(_, Some(Apply::AnyOf(vec))) => Some(Apply::AnyOf(vec)),
-			(_, Some(Apply::AllOf(vec))) => Some(Apply::AllOf(vec)),
+			(_, rhs) => rhs,
 		}
 	}
 }
 
 #[derive(Debug, Serialize, Clone, Eq, PartialEq)]
+#[serde(deny_unknown_fields)]
 pub struct ApplyWrapper {
 	pub actions: Option<Apply>,
 	pub filters: Option<Apply>,
@@ -100,46 +98,52 @@ impl From<Apply> for ApplyWrapper {
 		}
 	}
 }
-
 impl<'de> Deserialize<'de> for Apply {
 	fn deserialize<D>(deserializer: D) -> Result<Self, <D as Deserializer<'de>>::Error>
 	where
 		D: Deserializer<'de>,
 	{
-		struct ApplyVisitor;
+		struct ApplyVisitor(PhantomData<fn() -> Apply>);
 		impl<'de> Visitor<'de> for ApplyVisitor {
 			type Value = Apply;
 
 			fn expecting(&self, formatter: &mut Formatter) -> fmt::Result {
-				formatter.write_str("string or seq")
+				formatter.write_str("string, seq or map")
 			}
 
 			fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
 			where
 				E: Error,
 			{
-				match v {
-					"all" => Ok(Apply::All),
-					"any" => Ok(Apply::Any),
-					_ => Err(E::custom("unknown variant")),
+				Apply::from_str(v).map_err(E::custom)
+			}
+
+			fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+			where
+				A: SeqAccess<'de>,
+			{
+				let mut vec = Vec::new();
+				while let Some(val) = seq.next_element()? {
+					vec.push(val)
 				}
+				Ok(Apply::AllOf(vec))
 			}
 
 			fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
 			where
 				A: MapAccess<'de>,
 			{
-				match map.next_entry::<String, Vec<usize>>()? {
-					Some((key, value)) => match key.as_str() {
-						"any_of" => Ok(Apply::AnyOf(value)),
-						"all_of" => Ok(Apply::AllOf(value)),
-						_ => Err(A::Error::custom("invalid key")),
+				match map.next_key::<String>()? {
+					Some(key) => match key.as_str() {
+						"any_of" => Ok(Apply::AnyOf(map.next_value()?)),
+						"all_of" => Ok(Apply::AllOf(map.next_value()?)),
+						key => Err(A::Error::unknown_field(key, &["any_of", "all_of"])),
 					},
-					None => Err(A::Error::custom("empty map")),
+					None => Err(A::Error::missing_field("any_of or all_of")),
 				}
 			}
 		}
-		deserializer.deserialize_any(ApplyVisitor)
+		deserializer.deserialize_any(ApplyVisitor(PhantomData))
 	}
 }
 
@@ -148,7 +152,7 @@ impl<'de> Deserialize<'de> for ApplyWrapper {
 	where
 		D: Deserializer<'de>,
 	{
-		struct ApplyVisitor(PhantomData<fn() -> ApplyWrapper>);
+		struct ApplyVisitor;
 		impl<'de> Visitor<'de> for ApplyVisitor {
 			type Value = ApplyWrapper;
 
@@ -160,11 +164,7 @@ impl<'de> Deserialize<'de> for ApplyWrapper {
 			where
 				E: Error,
 			{
-				match v {
-					"all" => Ok(ApplyWrapper::from(Apply::All)),
-					"any" => Ok(ApplyWrapper::from(Apply::Any)),
-					_ => Err(E::custom("unknown option")),
-				}
+				ApplyWrapper::from_str(v).map_err(E::custom)
 			}
 
 			fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
@@ -178,35 +178,51 @@ impl<'de> Deserialize<'de> for ApplyWrapper {
 				Ok(ApplyWrapper::from(Apply::AllOf(vec)))
 			}
 
-			fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
+			fn visit_map<M>(self, mut map: M) -> Result<Self::Value, M::Error>
 			where
-				A: MapAccess<'de>,
+				M: MapAccess<'de>,
 			{
 				let mut wrapper = ApplyWrapper {
 					actions: None,
 					filters: None,
 				};
-
-				while let Some((key, value)) = map.next_entry::<String, Apply>()? {
+				while let Some(key) = map.next_key::<String>()? {
 					match key.as_str() {
 						"actions" => {
-							wrapper.actions = match value {
-								Apply::All => Some(value),
-								Apply::AllOf(_) => Some(value),
-								Apply::Any | Apply::AnyOf(_) => {
-									let msg = "variant 'any' and 'any_of' not valid for field 'actions' in option 'apply'";
-									return Err(A::Error::custom(msg));
+							wrapper.actions = match wrapper.actions.is_some() {
+								true => return Err(M::Error::duplicate_field("actions")),
+								false => {
+									let value = map.next_value()?;
+									match value {
+										Apply::All | Apply::AllOf(_) => Some(value),
+										Apply::Any | Apply::AnyOf(_) => {
+											return Err(M::Error::unknown_variant(&value.to_string(), &["all", "all_of"]))
+										}
+									}
 								}
 							}
 						}
-						"filters" => wrapper.filters = Some(value),
-						_ => return Err(A::Error::custom("unknown field")),
+						"filters" => {
+							wrapper.filters = match wrapper.filters.is_some() {
+								true => return Err(M::Error::duplicate_field("filters")),
+								false => Some(map.next_value()?),
+							}
+						}
+						key => return Err(M::Error::unknown_field(key, &["actions", "filters"])),
 					}
 				}
 				Ok(wrapper)
 			}
 		}
-		deserializer.deserialize_any(ApplyVisitor(PhantomData))
+		deserializer.deserialize_any(ApplyVisitor)
+	}
+}
+
+impl FromStr for ApplyWrapper {
+	type Err = serde::de::value::Error;
+
+	fn from_str(s: &str) -> Result<Self, Self::Err> {
+		Ok(Self::from(Apply::from_str(s)?))
 	}
 }
 
@@ -221,8 +237,8 @@ impl ToString for Apply {
 		match self {
 			Apply::All => "all".into(),
 			Apply::Any => "any".into(),
-			Apply::AllOf(vec) => format!("{:?}", vec),
-			Apply::AnyOf(vec) => format!("{:?}", vec),
+			Apply::AllOf(_) => "all_of".into(),
+			Apply::AnyOf(_) => "any_of".into(),
 		}
 	}
 }
@@ -261,6 +277,18 @@ mod tests {
 	fn test_apply_str_any() {
 		let value = Apply::Any;
 		assert_de_tokens(&value, &[Token::Str("any")])
+	}
+
+	#[test]
+	fn test_apply_str_vec() {
+		let value = Apply::AllOf(vec![0, 1, 2]);
+		assert_de_tokens(&value, &[
+			Token::Seq { len: Some(3) },
+			Token::U8(0),
+			Token::U8(1),
+			Token::U8(2),
+			Token::SeqEnd,
+		])
 	}
 
 	#[test]
@@ -306,9 +334,23 @@ mod tests {
 	}
 
 	#[test]
-	fn test_apply_wrapper_single_value_select() {
+	fn test_apply_wrapper_single_value_vec() {
 		let value = ApplyWrapper::from(Apply::AllOf(vec![0, 2]));
 		assert_de_tokens(&value, &[Token::Seq { len: Some(2) }, Token::U8(0), Token::U8(2), Token::SeqEnd])
+	}
+
+	#[test]
+	fn test_wrapper_unknown_field() {
+		assert_de_tokens_error::<ApplyWrapper>(
+			&[
+				Token::Map { len: Some(2) },
+				Token::Str("actions"),
+				Token::Str("all"),
+				Token::Str("unknown"),
+				Token::MapEnd,
+			],
+			&serde::de::value::Error::unknown_field("unknown", &["actions", "filters"]).to_string(),
+		)
 	}
 
 	#[test]
@@ -364,15 +406,6 @@ mod tests {
 	}
 
 	#[test]
-	fn test_apply_wrapper_actions_none_filters_none() {
-		let value = ApplyWrapper {
-			actions: None,
-			filters: None,
-		};
-		assert_de_tokens(&value, &[Token::Map { len: None }, Token::MapEnd])
-	}
-
-	#[test]
 	fn test_apply_wrapper_actions_none_filters_all() {
 		let value = ApplyWrapper {
 			actions: None,
@@ -385,9 +418,8 @@ mod tests {
 			Token::MapEnd,
 		])
 	}
-
 	#[test]
-	fn test_apply_wrapper_actions_any_filters_any() {
+	fn test_apply_wrapper_invalid_actions_any() {
 		assert_de_tokens_error::<ApplyWrapper>(
 			&[
 				Token::Map { len: Some(2) },
@@ -397,7 +429,7 @@ mod tests {
 				Token::Str("any"),
 				Token::MapEnd,
 			],
-			"variant 'any' and 'any_of' not valid for field 'actions' in option 'apply'",
+			&serde::de::value::Error::unknown_variant("any", &["all", "all_of"]).to_string(),
 		)
 	}
 
@@ -417,7 +449,7 @@ mod tests {
 				Token::MapEnd,
 				Token::MapEnd,
 			],
-			"variant 'any' and 'any_of' not valid for field 'actions' in option 'apply'",
+			&serde::de::value::Error::unknown_variant("any_of", &["all", "all_of"]).to_string(),
 		)
 	}
 
