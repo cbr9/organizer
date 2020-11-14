@@ -48,8 +48,8 @@ impl<'de> Deserialize<'de> for Folder {
 					match key.as_str() {
 						"path" => {
 							folder = match folder.path == PathBuf::default() {
-								true => return Err(M::Error::duplicate_field("path")),
-								false => match Folder::from_str(&map.next_value::<String>()?) {
+								false => return Err(M::Error::duplicate_field("path")),
+								true => match Folder::from_str(&map.next_value::<String>()?) {
 									Ok(mut new_folder) => {
 										new_folder.options = folder.options;
 										new_folder
@@ -172,7 +172,7 @@ mod tests {
 				Token::Str("path"),
 				Token::MapEnd,
 			],
-			&Error::duplicate_field("path").to_string(),
+			&format!("{}", &Error::duplicate_field("path")),
 		)
 	}
 	#[test]
