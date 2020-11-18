@@ -1,10 +1,7 @@
 #[cfg(test)]
 pub mod tests {
 	use crate::PROJECT_NAME;
-	use std::{
-		env,
-		path::{Path, PathBuf},
-	};
+	use std::{env, path::PathBuf};
 
 	pub fn project() -> PathBuf {
 		let mut path = env::current_dir().unwrap();

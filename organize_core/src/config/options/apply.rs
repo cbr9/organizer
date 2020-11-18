@@ -2,7 +2,7 @@ use std::fmt;
 
 use crate::config::AsOption;
 use serde::{
-	de::{EnumAccess, Error, MapAccess, SeqAccess, Unexpected, VariantAccess, Visitor},
+	de::{Error, MapAccess, SeqAccess, Unexpected, VariantAccess, Visitor},
 	export::{Formatter, PhantomData},
 	Deserialize,
 	Deserializer,
@@ -60,44 +60,6 @@ impl AsOption<Apply> for Option<Apply> {
 	}
 }
 
-#[derive(Debug, Serialize, Clone, Eq, PartialEq)]
-#[serde(deny_unknown_fields)]
-pub struct ApplyWrapper {
-	pub actions: Option<Apply>,
-	pub filters: Option<Apply>,
-}
-
-impl Default for ApplyWrapper {
-	fn default() -> Self {
-		Self {
-			actions: Some(Apply::default()),
-			filters: Some(Apply::default()),
-		}
-	}
-}
-
-impl From<Apply> for ApplyWrapper {
-	fn from(val: Apply) -> Self {
-		match val {
-			Apply::All => Self {
-				actions: Some(val.clone()),
-				filters: Some(val),
-			},
-			Apply::Any => Self {
-				actions: Some(Apply::All),
-				filters: Some(val),
-			},
-			Apply::AllOf(vec) => Self {
-				actions: Some(Apply::AllOf(vec.clone())),
-				filters: Some(Apply::AllOf(vec)),
-			},
-			Apply::AnyOf(vec) => Self {
-				actions: Some(Apply::AllOf(vec.clone())),
-				filters: Some(Apply::AnyOf(vec)),
-			},
-		}
-	}
-}
 impl<'de> Deserialize<'de> for Apply {
 	fn deserialize<D>(deserializer: D) -> Result<Self, <D as Deserializer<'de>>::Error>
 	where
@@ -144,6 +106,62 @@ impl<'de> Deserialize<'de> for Apply {
 			}
 		}
 		deserializer.deserialize_any(ApplyVisitor(PhantomData))
+	}
+}
+
+impl AsRef<Self> for Apply {
+	fn as_ref(&self) -> &Self {
+		self
+	}
+}
+
+impl ToString for Apply {
+	fn to_string(&self) -> String {
+		match self {
+			Apply::All => "all".into(),
+			Apply::Any => "any".into(),
+			Apply::AllOf(_) => "all_of".into(),
+			Apply::AnyOf(_) => "any_of".into(),
+		}
+	}
+}
+
+#[derive(Debug, Serialize, Clone, Eq, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct ApplyWrapper {
+	pub actions: Option<Apply>,
+	pub filters: Option<Apply>,
+}
+
+impl Default for ApplyWrapper {
+	fn default() -> Self {
+		Self {
+			actions: Some(Apply::default()),
+			filters: Some(Apply::default()),
+		}
+	}
+}
+
+impl From<Apply> for ApplyWrapper {
+	fn from(val: Apply) -> Self {
+		match val {
+			Apply::All => Self {
+				actions: Some(val.clone()),
+				filters: Some(val),
+			},
+			Apply::Any => Self {
+				actions: Some(Apply::All),
+				filters: Some(val),
+			},
+			Apply::AllOf(vec) => Self {
+				actions: Some(Apply::AllOf(vec.clone())),
+				filters: Some(Apply::AllOf(vec)),
+			},
+			Apply::AnyOf(vec) => Self {
+				actions: Some(Apply::AllOf(vec.clone())),
+				filters: Some(Apply::AnyOf(vec)),
+			},
+		}
 	}
 }
 
@@ -226,22 +244,6 @@ impl FromStr for ApplyWrapper {
 	}
 }
 
-impl AsRef<Self> for Apply {
-	fn as_ref(&self) -> &Self {
-		self
-	}
-}
-
-impl ToString for Apply {
-	fn to_string(&self) -> String {
-		match self {
-			Apply::All => "all".into(),
-			Apply::Any => "any".into(),
-			Apply::AllOf(_) => "all_of".into(),
-			Apply::AnyOf(_) => "any_of".into(),
-		}
-	}
-}
 impl AsOption<ApplyWrapper> for Option<ApplyWrapper> {
 	fn combine(self, rhs: Self) -> Self
 	where

@@ -30,7 +30,7 @@ mod tests {
 	use crate::path::IsHidden;
 	#[cfg(target_os = "windows")]
 	use std::os::windows::prelude::*;
-	use std::{fs, path::Path};
+	use std::path::Path;
 	#[cfg(target_os = "windows")]
 	use winapi::um::winnt::FILE_ATTRIBUTE_HIDDEN;
 

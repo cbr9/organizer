@@ -5,8 +5,8 @@ mod apply;
 mod r#match;
 pub use apply::*;
 pub use r#match::*;
-use serde::de::{value::MapAccessDeserializer, Error, MapAccess, Visitor};
-use std::{collections::HashMap, fmt, fmt::Formatter};
+use serde::de::{Error, MapAccess, Visitor};
+use std::{fmt, fmt::Formatter};
 
 #[derive(Serialize, Debug, Clone, Eq, PartialEq)]
 // #[serde(deny_unknown_fields)]
@@ -182,7 +182,7 @@ impl Add<Self> for Options {
 mod tests {
 	use super::*;
 	use serde::de::{value::Error, Error as SerdeError};
-	use serde_test::{assert_de_tokens, assert_de_tokens_error, Token};
+	use serde_test::{assert_de_tokens_error, Token};
 
 	fn check_duplicate(field: &'static str, mut token: Vec<Token>) {
 		let mut tokens = vec![Token::Map { len: Some(2) }, Token::Str(field)];
