@@ -85,11 +85,11 @@ impl UserConfig {
 		match serde_yaml::from_str::<UserConfig>(&content) {
 			Ok(mut config) => {
 				let settings = Settings::from_default_path();
-				config.defaults = Some(settings.defaults).combine(config.defaults);
+				config.defaults = Some(settings.defaults).combine(&config.defaults);
 				for rule in config.rules.iter_mut() {
-					rule.options = config.defaults.clone().combine(rule.options.clone());
+					rule.options = config.defaults.combine(&rule.options);
 					for folder in rule.folders.iter_mut() {
-						folder.options = rule.options.clone().combine(folder.options.clone());
+						folder.options = rule.options.combine(&folder.options);
 					}
 					rule.options = None;
 				}

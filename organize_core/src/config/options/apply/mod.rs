@@ -33,24 +33,26 @@ impl FromStr for Apply {
 }
 
 impl AsOption<Apply> for Option<Apply> {
-	fn combine(self, rhs: Self) -> Self {
+	fn combine(&self, rhs: &Self) -> Self {
 		match (self, rhs) {
 			(None, None) => Some(Apply::default()),
-			(Some(lhs), None) => Some(lhs),
-			(None, Some(rhs)) => Some(rhs),
-			(Some(Apply::AllOf(mut lhs)), Some(Apply::AllOf(mut rhs))) => {
+			(Some(lhs), None) => Some(lhs.clone()),
+			(None, Some(rhs)) => Some(rhs.clone()),
+			(Some(Apply::AllOf(lhs)), Some(Apply::AllOf(mut rhs))) => {
+				let mut lhs = lhs.clone();
 				rhs.append(&mut lhs);
 				rhs.sort_unstable();
 				rhs.dedup();
 				Some(Apply::AllOf(rhs))
 			}
-			(Some(Apply::AnyOf(mut lhs)), Some(Apply::AnyOf(mut rhs))) => {
+			(Some(Apply::AnyOf(lhs)), Some(Apply::AnyOf(mut rhs))) => {
+				let mut lhs = lhs.clone();
 				rhs.append(&mut lhs);
 				rhs.sort_unstable();
 				rhs.dedup();
 				Some(Apply::AnyOf(rhs))
 			}
-			(_, rhs) => rhs,
+			(_, rhs) => rhs.clone(),
 		}
 	}
 }

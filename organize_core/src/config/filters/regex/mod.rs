@@ -3,7 +3,6 @@ mod de;
 use std::{ops::Deref, path::Path, str::FromStr};
 
 use crate::config::filters::AsFilter;
-use regex::Error;
 use std::convert::TryFrom;
 
 #[derive(Debug, Clone)]
