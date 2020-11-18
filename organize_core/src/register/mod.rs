@@ -1,3 +1,5 @@
+mod de;
+
 use serde::{Deserialize, Serialize};
 use std::{
 	fs,
@@ -15,7 +17,7 @@ use std::{
 use sysinfo::{Pid, RefreshKind, System, SystemExt};
 
 /// File where watchers are registered with their PID and configuration
-#[derive(Default, Deserialize, Serialize)]
+#[derive(Default, Serialize)]
 pub struct Register {
 	#[serde(skip)]
 	path: PathBuf,

@@ -14,7 +14,7 @@ impl<'de> Deserialize<'de> for Regex {
 	where
 		D: Deserializer<'de>,
 	{
-		struct StringOrSeq(PhantomData<fn() -> Regex>);
+		struct StringOrSeq;
 
 		impl<'de> Visitor<'de> for StringOrSeq {
 			type Value = Regex;
@@ -44,7 +44,7 @@ impl<'de> Deserialize<'de> for Regex {
 			}
 		}
 
-		deserializer.deserialize_any(StringOrSeq(PhantomData))
+		deserializer.deserialize_any(StringOrSeq)
 	}
 }
 
