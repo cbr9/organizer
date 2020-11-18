@@ -68,7 +68,9 @@ where
 			(None, Some(rhs)) => Some(rhs.clone()),
 			(Some(lhs), None) => Some(lhs.clone()),
 			(None, None) => Some(Vec::default()),
-			(Some(mut lhs), Some(mut rhs)) => {
+			(Some(lhs), Some(rhs)) => {
+				let mut lhs = lhs.clone();
+				let mut rhs = rhs.clone();
 				rhs.append(&mut lhs);
 				rhs.sort();
 				rhs.dedup();

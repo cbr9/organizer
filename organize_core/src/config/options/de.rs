@@ -1,9 +1,9 @@
+use crate::config::options::Options;
 use serde::{
 	de::{Error, MapAccess, Visitor},
 	Deserialize,
 	Deserializer,
 };
-use crate::config::options::Options;
 use std::fmt;
 
 impl<'de> Deserialize<'de> for Options {
@@ -11,8 +11,8 @@ impl<'de> Deserialize<'de> for Options {
 	// when it encounters a key without a value. Instead, it returns None and continues execution.
 	// the (hopefully temporary) solution is to implement the deserializer manually
 	fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-		where
-			D: Deserializer<'de>,
+	where
+		D: Deserializer<'de>,
 	{
 		struct OptVisitor;
 		impl<'de> Visitor<'de> for OptVisitor {
@@ -23,8 +23,8 @@ impl<'de> Deserialize<'de> for Options {
 			}
 
 			fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
-				where
-					A: MapAccess<'de>,
+			where
+				A: MapAccess<'de>,
 			{
 				let mut opts = Options {
 					apply: None,

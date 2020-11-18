@@ -1,4 +1,5 @@
 use crate::{
+	config::actions::io_action::{ConflictOption, IOAction, Sep},
 	path::Expand,
 	string::visit_placeholder_string,
 };
@@ -10,7 +11,6 @@ use serde::{
 	Deserializer,
 };
 use std::{fmt, path::PathBuf, str::FromStr};
-use crate::config::actions::io_action::{ConflictOption, Sep, IOAction};
 
 impl<'de> Deserialize<'de> for IOAction {
 	fn deserialize<D>(deserializer: D) -> Result<Self, <D as Deserializer<'de>>::Error>

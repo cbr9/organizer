@@ -1,9 +1,15 @@
 use crate::{Cmd, DEFAULT_CONFIG_STR};
 use anyhow::Result;
 use clap::Clap;
-use organize_core::{config::UserConfig, file::File, utils::UnwrapRef};
+use notify::RecursiveMode;
+use organize_core::{
+	config::{AsMap, UserConfig},
+	file::File,
+	utils::UnwrapRef,
+};
 use rayon::prelude::*;
 use std::{fs, path::PathBuf};
+use walkdir::{DirEntry, WalkDir};
 
 #[derive(Clap, Debug)]
 pub struct Run {
@@ -22,23 +28,35 @@ impl Cmd for Run {
 
 impl<'a> Run {
 	pub(crate) fn start(self, config: UserConfig) -> Result<()> {
-		config
+		let paths = config
 			.as_ref()
 			.rules
 			.path_to_rules
 			.unwrap_ref()
-			.par_iter()
-			.map(|(path, _)| fs::read_dir(path).unwrap())
-			.into_par_iter()
-			.for_each(|dir| {
-				dir.collect::<Vec<_>>().into_par_iter().for_each(|file| {
-					let path = file.unwrap().path();
-					if path.is_file() {
-						let file = File::new(path);
-						file.process(&config);
-					}
-				});
-			});
+			.iter()
+			.map(|(path, _)| path)
+			.collect::<Vec<_>>();
+
+		let process = |entry: DirEntry| {
+			if entry.path().is_file() {
+				let file = File::new(entry.path());
+				file.process(&config)
+			}
+		};
+
+		paths.par_iter().for_each(|path| {
+			let recursive: &RecursiveMode = config.rules.get(path);
+			if recursive == &RecursiveMode::Recursive {
+				WalkDir::new(path).follow_links(true).into_iter().filter_map(|e| e.ok()).for_each(process);
+			} else {
+				WalkDir::new(path)
+					.max_depth(1) // only direct descendants
+					.follow_links(true)
+					.into_iter()
+					.filter_map(|e| e.ok())
+					.for_each(process);
+			};
+		});
 		Ok(())
 	}
 }

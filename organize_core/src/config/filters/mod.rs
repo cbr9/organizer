@@ -8,8 +8,7 @@ use filename::Filename;
 mod extension;
 mod filename;
 mod regex;
-use crate::config::{filters::regex::Regex, options::apply::Apply};
-use crate::config::actions::script::Script;
+use crate::config::{actions::script::Script, filters::regex::Regex, options::apply::Apply};
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all(deserialize = "lowercase"))]

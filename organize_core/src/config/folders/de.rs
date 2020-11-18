@@ -1,6 +1,6 @@
 use std::{fmt, result, str::FromStr};
 
-use crate::config::folders::{Folder};
+use crate::config::folders::Folder;
 use serde::{
 	de,
 	de::{Error, MapAccess, Visitor},

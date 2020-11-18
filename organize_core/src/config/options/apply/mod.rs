@@ -38,15 +38,17 @@ impl AsOption<Apply> for Option<Apply> {
 			(None, None) => Some(Apply::default()),
 			(Some(lhs), None) => Some(lhs.clone()),
 			(None, Some(rhs)) => Some(rhs.clone()),
-			(Some(Apply::AllOf(lhs)), Some(Apply::AllOf(mut rhs))) => {
+			(Some(Apply::AllOf(lhs)), Some(Apply::AllOf(rhs))) => {
 				let mut lhs = lhs.clone();
+				let mut rhs = rhs.clone();
 				rhs.append(&mut lhs);
 				rhs.sort_unstable();
 				rhs.dedup();
 				Some(Apply::AllOf(rhs))
 			}
-			(Some(Apply::AnyOf(lhs)), Some(Apply::AnyOf(mut rhs))) => {
+			(Some(Apply::AnyOf(lhs)), Some(Apply::AnyOf(rhs))) => {
 				let mut lhs = lhs.clone();
+				let mut rhs = rhs.clone();
 				rhs.append(&mut lhs);
 				rhs.sort_unstable();
 				rhs.dedup();

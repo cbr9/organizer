@@ -8,7 +8,6 @@ pub enum Match {
 	All,
 	First,
 }
-static TEST: Arc<bool> = Arc::new(true);
 
 impl Default for Match {
 	fn default() -> Self {

@@ -1,7 +1,7 @@
 use crate::{
 	config::{
-		AsMap,
 		options::{apply::wrapper::ApplyWrapper, r#match::Match, Options},
+		AsMap,
 		UserConfig,
 	},
 	path::IsHidden,
@@ -14,8 +14,8 @@ pub struct File {
 }
 
 impl File {
-	pub fn new(path: PathBuf) -> Self {
-		Self { path }
+	pub fn new<T: Into<PathBuf>>(path: T) -> Self {
+		Self { path: path.into() }
 	}
 
 	pub fn process(self, config: &UserConfig) {
