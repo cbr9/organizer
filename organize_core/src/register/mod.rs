@@ -1,10 +1,9 @@
-use serde::{Deserialize, Deserializer, Serialize};
+use serde::{Deserialize, Serialize};
 use std::{
 	fs,
 	fs::OpenOptions,
 	io::Result,
 	path::{Path, PathBuf},
-	result,
 };
 
 use num_traits::AsPrimitive;
@@ -16,24 +15,12 @@ use std::{
 use sysinfo::{Pid, RefreshKind, System, SystemExt};
 
 /// File where watchers are registered with their PID and configuration
-#[derive(Default, Serialize)]
+#[derive(Default, Deserialize, Serialize)]
 pub struct Register {
 	#[serde(skip)]
 	path: PathBuf,
 	#[serde(flatten)]
 	sections: Vec<Section>,
-}
-
-impl<'de> Deserialize<'de> for Register {
-	fn deserialize<D>(deserializer: D) -> result::Result<Self, D::Error>
-	where
-		D: Deserializer<'de>,
-	{
-		Ok(Self {
-			path: PathBuf::new(),
-			sections: Vec::deserialize(deserializer)?,
-		})
-	}
 }
 
 impl Deref for Register {

@@ -1,6 +1,6 @@
 use std::{borrow::Cow, fs, io::Result, ops::Deref, path::Path};
 
-use crate::config::{ActionType, AsAction};
+use crate::config::actions::{ActionType, AsAction};
 use colored::Colorize;
 use log::info;
 use serde::Deserialize;

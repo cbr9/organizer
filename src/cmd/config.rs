@@ -3,7 +3,10 @@ use anyhow::Result;
 use clap::{crate_name, Clap};
 use colored::Colorize;
 use organize_core::{
-	config::{ApplyWrapper, Options, UserConfig},
+	config::{
+		options::{apply::wrapper::ApplyWrapper, Options},
+		UserConfig,
+	},
 	settings::Settings,
 };
 use std::{env, process};

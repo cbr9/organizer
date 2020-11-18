@@ -1,12 +1,7 @@
-pub use actions::*;
-pub use filters::*;
-pub use folders::*;
-pub use options::*;
-
-mod actions;
-mod filters;
-mod folders;
-mod options;
+pub mod actions;
+pub mod filters;
+pub mod folders;
+pub mod options;
 
 use std::{
 	borrow::Cow,
@@ -23,7 +18,18 @@ use log::error;
 use notify::RecursiveMode;
 use serde::Deserialize;
 
-use crate::{path::Update, settings::Settings, utils::UnwrapRef, PROJECT_NAME};
+use crate::{
+	config::{
+		actions::{io_action::ConflictOption, Actions},
+		filters::Filters,
+		folders::Folders,
+		options::{AsOption, Options},
+	},
+	path::Update,
+	settings::Settings,
+	utils::UnwrapRef,
+	PROJECT_NAME,
+};
 
 // TODO: add tests for the custom deserializers
 
@@ -75,7 +81,6 @@ impl UserConfig {
 		if !path.exists() {
 			Self::create(&path);
 		}
-
 		let content = fs::read_to_string(&path).unwrap(); // if there is some problem with the config file, we should not try to fix it
 		match serde_yaml::from_str::<UserConfig>(&content) {
 			Ok(mut config) => {

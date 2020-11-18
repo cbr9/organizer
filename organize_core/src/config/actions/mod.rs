@@ -1,17 +1,21 @@
-mod delete;
-mod echo;
-mod io_action;
-mod script;
-mod trash;
-pub use self::trash::*;
-pub use delete::*;
-pub use echo::*;
-pub use io_action::*;
-pub use script::*;
+pub(crate) mod delete;
+pub(crate) mod echo;
+pub(crate) mod io_action;
+pub(crate) mod script;
+pub(crate) mod trash;
 
 use std::{borrow::Cow, io::Result, ops::Deref, path::Path};
 
-use crate::config::Apply;
+use crate::config::{
+	actions::{
+		delete::Delete,
+		echo::Echo,
+		io_action::{Copy, IOAction, Move, Rename},
+		script::Script,
+		trash::Trash,
+	},
+	options::apply::Apply,
+};
 use log::error;
 use serde::Deserialize;
 use std::path::PathBuf;
@@ -46,7 +50,8 @@ pub(super) trait AsAction<T> {
 	fn act<'a>(&self, path: Cow<'a, Path>) -> Result<Cow<'a, Path>>;
 }
 
-#[derive(Eq, PartialEq)]
+#[derive(Eq, PartialEq, ToString)]
+#[strum(serialize_all = "lowercase")]
 pub enum ActionType {
 	Copy,
 	Delete,
@@ -55,21 +60,6 @@ pub enum ActionType {
 	Rename,
 	Script,
 	Trash,
-}
-
-impl ToString for ActionType {
-	fn to_string(&self) -> String {
-		match self {
-			Self::Move => "move",
-			Self::Copy => "copy",
-			Self::Rename => "rename",
-			Self::Delete => "delete",
-			Self::Trash => "trash",
-			Self::Echo => "echo",
-			Self::Script => "script",
-		}
-		.into()
-	}
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -129,8 +119,7 @@ impl Actions {
 
 #[cfg(test)]
 mod tests {
-
-	use crate::{config::ConflictOption, path::Update, utils::tests::project};
+	use crate::{config::actions::io_action::ConflictOption, path::Update, utils::tests::project};
 
 	#[test]
 	fn rename_with_rename_conflict() {

@@ -17,5 +17,7 @@ pub mod file;
 pub mod register;
 pub mod settings;
 pub mod utils;
+#[macro_use]
+extern crate strum_macros;
 
 pub const PROJECT_NAME: &str = "organize";

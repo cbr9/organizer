@@ -3,8 +3,7 @@ use std::{
 	io::{Error, ErrorKind, Result},
 	path::Path,
 };
-
-use crate::config::{ConflictOption, Sep};
+use crate::config::actions::io_action::{ConflictOption, Sep};
 
 pub trait Update {
 	fn update(&self, if_exists: &ConflictOption, sep: &Sep) -> Result<Cow<Path>>;

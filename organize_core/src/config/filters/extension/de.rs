@@ -1,25 +1,12 @@
-use std::{fmt, ops::Deref, path::Path};
-
-use crate::config::AsFilter;
+use crate::config::filters::extension::Extension;
 use serde::{
 	de,
 	de::{SeqAccess, Visitor},
-	export,
 	export::PhantomData,
 	Deserialize,
 	Deserializer,
 };
-
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub struct Extension(Vec<String>);
-
-impl Deref for Extension {
-	type Target = Vec<String>;
-
-	fn deref(&self) -> &Self::Target {
-		&self.0
-	}
-}
+use std::fmt;
 
 impl<'de> Deserialize<'de> for Extension {
 	fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
@@ -31,7 +18,7 @@ impl<'de> Deserialize<'de> for Extension {
 		impl<'de> Visitor<'de> for StringOrSeq {
 			type Value = Extension;
 
-			fn expecting(&self, formatter: &mut export::Formatter) -> fmt::Result {
+			fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
 				formatter.write_str("string or seq")
 			}
 
@@ -58,25 +45,11 @@ impl<'de> Deserialize<'de> for Extension {
 	}
 }
 
-impl AsFilter for Extension {
-	fn matches(&self, path: &Path) -> bool {
-		match path.extension() {
-			Some(extension) => {
-				let extension = extension.to_str().unwrap().to_string();
-				self.contains(&extension)
-			}
-			None => false,
-		}
-	}
-}
-
 #[cfg(test)]
-pub mod tests {
+mod tests {
 	use serde_test::{assert_de_tokens, Token};
-	use std::path::PathBuf;
 
 	use super::Extension;
-	use crate::config::AsFilter;
 
 	#[test]
 	fn deserialize_string() {
@@ -87,24 +60,5 @@ pub mod tests {
 	fn deserialize_seq() {
 		let value = Extension(vec!["pdf".into()]);
 		assert_de_tokens(&value, &[Token::Seq { len: Some(1) }, Token::Str("pdf"), Token::SeqEnd])
-	}
-	#[test]
-	fn single_match_pdf() {
-		let extension = Extension(vec!["pdf".into()]);
-		let path = PathBuf::from("$HOME/Downloads/test.pdf");
-		assert!(extension.matches(&path))
-	}
-	#[test]
-	fn multiple_match_pdf() {
-		let extension = Extension(vec!["pdf".into(), "doc".into(), "docx".into()]);
-		let path = PathBuf::from("$HOME/Downloads/test.pdf");
-		assert!(extension.matches(&path))
-	}
-
-	#[test]
-	fn no_match() {
-		let extension = Extension(vec!["pdf".into(), "doc".into(), "docx".into()]);
-		let path = PathBuf::from("$HOME/Downloads/test.jpg");
-		assert!(!extension.matches(&path))
 	}
 }

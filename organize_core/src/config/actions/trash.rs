@@ -5,11 +5,10 @@ use std::{
 	path::Path,
 };
 
+use crate::config::actions::{ActionType, AsAction};
 use colored::Colorize;
 use log::info;
 use serde::Deserialize;
-
-use crate::config::{ActionType, AsAction};
 
 #[derive(Debug, Clone, Deserialize, Default)]
 pub struct Trash(bool);

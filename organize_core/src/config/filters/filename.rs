@@ -1,6 +1,6 @@
 use std::{borrow::Cow, path::Path};
 
-use crate::config::AsFilter;
+use crate::config::filters::AsFilter;
 use serde::Deserialize;
 
 #[derive(Eq, PartialEq, Deserialize, Debug, Clone, Default)]

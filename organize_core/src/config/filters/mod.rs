@@ -8,10 +8,8 @@ use filename::Filename;
 mod extension;
 mod filename;
 mod regex;
-pub use self::regex::*;
-use crate::config::{Apply, Script};
-pub use extension::*;
-pub use filename::*;
+use crate::config::{filters::regex::Regex, options::apply::Apply};
+use crate::config::actions::script::Script;
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all(deserialize = "lowercase"))]
@@ -81,7 +79,11 @@ impl Filters {
 
 #[cfg(test)]
 mod tests {
-	use crate::config::{Apply, Filter, Filters, Regex};
+	use crate::config::{
+		filters::{Filter, Regex},
+		options::apply::Apply,
+		Filters,
+	};
 	use std::{path::PathBuf, str::FromStr};
 
 	#[test]

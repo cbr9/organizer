@@ -1,4 +1,4 @@
-use crate::config::AsOption;
+use crate::config::options::AsOption;
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize, Debug, Clone, Eq, PartialEq)]

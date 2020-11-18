@@ -1,7 +1,7 @@
 use std::{borrow::Cow, io::Result, ops::Deref, path::Path};
 
 use crate::{
-	config::{ActionType, AsAction},
+	config::actions::{ActionType, AsAction},
 	string::{deserialize_placeholder_string, Placeholder},
 };
 use colored::Colorize;

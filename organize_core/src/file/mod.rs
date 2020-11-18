@@ -1,5 +1,9 @@
 use crate::{
-	config::{ApplyWrapper, AsMap, Match, Options, UserConfig},
+	config::{
+		AsMap,
+		options::{apply::wrapper::ApplyWrapper, r#match::Match, Options},
+		UserConfig,
+	},
 	path::IsHidden,
 	utils::UnwrapRef,
 };
@@ -46,7 +50,7 @@ impl File {
 
 	pub fn get_matching_rules<'a>(&self, config: &'a UserConfig) -> Vec<&'a (usize, usize)> {
 		let parent = self.path.parent().unwrap();
-		let possible_rules: &Vec<(usize, usize)> = &config.rules.get(&self.path);
+		let possible_rules: &Vec<(usize, usize)> = &config.rules.get(self.path.as_path());
 		possible_rules
 			.iter()
 			.filter(|(i, j)| {
