@@ -164,7 +164,7 @@ impl DerefMut for Rules {
 
 impl<'a> AsMap<'a, Vec<(usize, usize)>> for Rules {
 	fn map(&self) -> HashMap<PathBuf, Vec<(usize, usize)>, RandomState> {
-		let mut map = HashMap::new();
+		let mut map = HashMap::with_capacity(self.len());
 		for (j, rule) in self.iter().enumerate() {
 			for (i, folder) in rule.folders.iter().enumerate() {
 				if !map.contains_key(&folder.path) {
@@ -202,7 +202,7 @@ impl<'a> AsMap<'a, Vec<(usize, usize)>> for Rules {
 
 impl<'a> AsMap<'a, RecursiveMode> for Rules {
 	fn map(&self) -> HashMap<PathBuf, RecursiveMode> {
-		let mut folders = HashMap::new();
+		let mut folders = HashMap::with_capacity(self.len());
 		for rule in self.iter() {
 			for folder in rule.folders.iter() {
 				let recursive = if folder.options.unwrap_ref().recursive.unwrap() {
@@ -222,6 +222,7 @@ impl<'a> AsMap<'a, RecursiveMode> for Rules {
 				}
 			}
 		}
+		folders.shrink_to_fit();
 		folders
 	}
 
