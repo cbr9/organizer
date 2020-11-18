@@ -3,6 +3,8 @@ mod de;
 use std::{ops::Deref, path::Path, str::FromStr};
 
 use crate::config::filters::AsFilter;
+use regex::Error;
+use std::convert::TryFrom;
 
 #[derive(Debug, Clone)]
 pub struct Regex(pub Vec<regex::Regex>);
@@ -33,10 +35,16 @@ impl AsFilter for Regex {
 	}
 }
 
-impl From<Vec<&str>> for Regex {
-	fn from(vec: Vec<&str>) -> Self {
-		let vec = vec.iter().map(|str| regex::Regex::new(str).unwrap()).collect::<Vec<_>>();
-		Self(vec)
+impl TryFrom<Vec<&str>> for Regex {
+	type Error = regex::Error;
+
+	fn try_from(value: Vec<&str>) -> Result<Self, Self::Error> {
+		let mut vec = Vec::with_capacity(value.len());
+		for str in value {
+			let re = regex::Regex::new(str)?;
+			vec.push(re)
+		}
+		Ok(Self(vec))
 	}
 }
 
@@ -65,14 +73,14 @@ mod tests {
 
 	#[test]
 	fn match_multiple() {
-		let regex = Regex::from(vec![r".*unsplash.*", r"\w"]);
+		let regex = Regex::try_from(vec![r".*unsplash.*", r"\w"]).unwrap();
 		let path = Path::new("$HOME/Pictures/test_unsplash_img.jpg");
 		assert!(regex.matches(path))
 	}
 
 	#[test]
 	fn no_match_multiple() {
-		let regex = Regex::from(vec![r".*unsplash.*", r"\d"]);
+		let regex = Regex::try_from(vec![r".*unsplash.*", r"\d"]).unwrap();
 		let path = Path::new("$HOME/Documents/deep_learning.pdf");
 		assert!(!regex.matches(path))
 	}

@@ -48,7 +48,7 @@ impl Register {
 	pub fn new() -> Result<Self> {
 		let path = temp_dir().join("register.json");
 		let f = OpenOptions::new().create(true).write(true).read(true).open(&path)?;
-		let mut register = match serde_json::from_reader::<_, Self>(f) {
+		let register = match serde_json::from_reader::<_, Self>(f) {
 			Ok(mut register) => {
 				register.path = path;
 				Ok(register)
@@ -57,7 +57,7 @@ impl Register {
 				match e.classify() {
 					Category::Io | Category::Syntax | Category::Data => Err(e),
 					Category::Eof => {
-						// the file is empty
+						// the file may be empty
 						let mut register = Register::default();
 						register.path = path;
 						Ok(register)
@@ -65,14 +65,14 @@ impl Register {
 				}
 			}
 		}?;
-		register = register.update()?;
-		Ok(register)
+		Ok(register.update()?)
 	}
 
 	pub fn append<T, P>(mut self, pid: P, path: T) -> Result<Self>
 	where
 		T: AsRef<Path>,
 		P: AsPrimitive<i32> + AsPrimitive<usize>,
+		// the Pid type represents a usize in Windows, and an i32 in other platforms
 	{
 		let section = Section {
 			path: path.as_ref().to_path_buf(),
