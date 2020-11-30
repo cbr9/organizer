@@ -12,7 +12,7 @@ use std::{
 	path::{Path, PathBuf},
 };
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use dirs::{config_dir, home_dir};
 use log::error;
 use notify::RecursiveMode;
@@ -125,11 +125,15 @@ impl UserConfig {
 	}
 
 	pub fn default_dir() -> PathBuf {
-		Self::default_path().parent().unwrap().to_path_buf()
+		let dir = config_dir().unwrap().join(PROJECT_NAME);
+		if !dir.exists() {
+			std::fs::create_dir(&dir).context("could not create config directory").unwrap();
+		}
+		dir
 	}
 
 	pub fn default_path() -> PathBuf {
-		config_dir().unwrap().join(PROJECT_NAME).join("config.yml")
+		Self::default_dir().join("config.yml")
 	}
 }
 
