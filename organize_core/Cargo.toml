@@ -25,6 +25,8 @@ serde_json = "1.0.59"
 strum = "0.19"
 strum_macros = "0.19"
 num-traits = "0.2.14"
+mime_guess = "2.0.3"
+mime = "0.3.16"
 
 [target.'cfg(windows)'.dependencies]
 winapi = { version = "0.3.9", features = [ "winnt" ]}

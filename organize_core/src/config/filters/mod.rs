@@ -7,8 +7,15 @@ use filename::Filename;
 
 mod extension;
 mod filename;
+mod mime;
 mod regex;
-use crate::config::{actions::script::Script, filters::regex::Regex, options::apply::Apply};
+
+use crate::config::{
+	actions::script::Script,
+	filters::{mime::Mime, regex::Regex},
+	options::apply::Apply,
+};
+use crate::config::filters::mime::MimeWrapper;
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all(deserialize = "lowercase"))]
@@ -17,6 +24,7 @@ pub enum Filter {
 	Filename(Filename),
 	Extension(Extension),
 	Script(Script),
+	Mime(MimeWrapper),
 }
 
 pub trait AsFilter {
@@ -30,6 +38,7 @@ impl AsFilter for Filter {
 			Filter::Filename(filename) => filename.matches(path),
 			Filter::Extension(extension) => extension.matches(path),
 			Filter::Script(script) => script.matches(path),
+			Filter::Mime(mime) => mime.matches(path),
 		}
 	}
 }
@@ -79,7 +88,7 @@ impl Filters {
 #[cfg(test)]
 mod tests {
 	use crate::config::{
-		filters::{Filter, Regex},
+		filters::{regex::Regex, Filter},
 		options::apply::Apply,
 		Filters,
 	};
