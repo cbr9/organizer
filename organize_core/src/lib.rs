@@ -15,10 +15,12 @@ pub(crate) mod string {
 	pub(crate) use capitalize::*;
 	pub(crate) use placeholder::*;
 }
+pub mod data;
 pub mod file;
 pub mod register;
 pub mod settings;
 pub mod utils;
+
 #[macro_use]
 extern crate strum_macros;
 

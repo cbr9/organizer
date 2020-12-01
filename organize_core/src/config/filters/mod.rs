@@ -12,10 +12,7 @@ mod regex;
 
 use crate::config::{
 	actions::script::Script,
-	filters::{
-		mime::{Mime, MimeWrapper},
-		regex::Regex,
-	},
+	filters::{mime::MimeWrapper, regex::Regex},
 	options::apply::Apply,
 };
 

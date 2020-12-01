@@ -1,10 +1,13 @@
-use crate::config::options::Options;
+use crate::{
+	config::options::{apply::wrapper::ApplyWrapper, Match, Options},
+	utils::UnwrapOrDefaultOpt,
+};
 use serde::{
 	de::{Error, MapAccess, Visitor},
 	Deserialize,
 	Deserializer,
 };
-use std::fmt;
+use std::{fmt, path::PathBuf};
 
 impl<'de> Deserialize<'de> for Options {
 	// for some reason, the derived implementation of Deserialize for Options doesn't return an error
@@ -26,48 +29,47 @@ impl<'de> Deserialize<'de> for Options {
 			where
 				A: MapAccess<'de>,
 			{
-				let mut opts = Options {
-					apply: None,
-					hidden_files: None,
-					ignore: None,
-					r#match: None,
-					recursive: None,
-					watch: None,
-				};
+				let mut apply: Option<ApplyWrapper> = None;
+				let mut hidden_files: Option<bool> = None;
+				let mut ignore: Option<Vec<PathBuf>> = None;
+				let mut r#match: Option<Match> = None;
+				let mut recursive: Option<bool> = None;
+				let mut watch: Option<bool> = None;
+
 				while let Some(key) = map.next_key::<String>()? {
 					match key.as_str() {
 						"recursive" => {
-							opts.recursive = match opts.recursive.is_none() {
+							recursive = match recursive.is_none() {
 								true => Some(map.next_value()?),
 								false => return Err(A::Error::duplicate_field("recursive")),
 							}
 						}
 						"watch" => {
-							opts.watch = match opts.watch.is_none() {
+							watch = match watch.is_none() {
 								true => Some(map.next_value()?),
 								false => return Err(A::Error::duplicate_field("watch")),
 							}
 						}
 						"ignore" => {
-							opts.ignore = match opts.ignore.is_none() {
+							ignore = match ignore.is_none() {
 								true => Some(map.next_value()?),
 								false => return Err(A::Error::duplicate_field("ignore")),
 							}
 						}
 						"hidden_files" => {
-							opts.hidden_files = match opts.hidden_files.is_none() {
+							hidden_files = match hidden_files.is_none() {
 								true => Some(map.next_value()?),
 								false => return Err(A::Error::duplicate_field("hidden_files")),
 							}
 						}
 						"match" => {
-							opts.r#match = match opts.r#match.is_none() {
+							r#match = match r#match.is_none() {
 								true => Some(map.next_value()?),
 								false => return Err(A::Error::duplicate_field("match")),
 							}
 						}
 						"apply" => {
-							opts.apply = match opts.apply.is_none() {
+							apply = match apply.is_none() {
 								true => Some(map.next_value()?),
 								false => return Err(A::Error::duplicate_field("apply")),
 							}
@@ -84,7 +86,15 @@ impl<'de> Deserialize<'de> for Options {
 						}
 					}
 				}
-				Ok(opts)
+
+				Ok(Options {
+					recursive,
+					watch,
+					ignore,
+					hidden_files,
+					r#match,
+					apply: apply.unwrap_or_default_none(),
+				})
 			}
 		}
 		deserializer.deserialize_map(OptVisitor)

@@ -7,7 +7,7 @@ use organize_core::{
 		options::{apply::wrapper::ApplyWrapper, Options},
 		UserConfig,
 	},
-	settings::Settings,
+	utils::DefaultOpt,
 };
 use std::{env, process};
 
@@ -32,8 +32,8 @@ impl Cmd for Config {
 				ignore: Some(ignore),
 				hidden_files: Some(hidden_files),
 				r#match: Some(r#match),
-				apply: Some(apply),
-			} = Settings::default().defaults
+				apply,
+			} = Options::default_some()
 			{
 				if let ApplyWrapper {
 					actions: Some(actions),

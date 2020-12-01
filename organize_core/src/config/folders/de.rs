@@ -1,6 +1,6 @@
 use std::{fmt, result, str::FromStr};
 
-use crate::config::folders::Folder;
+use crate::{config::folders::Folder, utils::UnwrapOrDefaultOpt};
 use serde::{
 	de,
 	de::{Error, MapAccess, Visitor},
@@ -55,7 +55,7 @@ impl<'de> Deserialize<'de> for Folder {
 				}
 				let folder = Folder {
 					path: path.ok_or_else(|| M::Error::missing_field("path"))?,
-					options,
+					options: options.unwrap_or_default_none(),
 				};
 				Ok(folder)
 			}
@@ -170,14 +170,14 @@ mod tests {
 	#[test]
 	fn deserialize_map_valid() {
 		let mut value = Folder::from_str("$HOME").unwrap();
-		value.options = Some(Options {
+		value.options = Options {
 			recursive: Some(true),
 			watch: Some(true),
 			ignore: None,
 			hidden_files: None,
 			r#match: None,
-			apply: Some(ApplyWrapper::from(Apply::All)),
-		});
+			apply: ApplyWrapper::from(Apply::All),
+		};
 		assert_de_tokens(&value, &[
 			Token::Map { len: Some(2) },
 			Token::Str("path"),

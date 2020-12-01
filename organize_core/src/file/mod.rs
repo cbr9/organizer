@@ -1,9 +1,6 @@
 use crate::{
-	config::{
-		options::{apply::wrapper::ApplyWrapper, r#match::Match, Options},
-		AsMap,
-		UserConfig,
-	},
+	config::{options::r#match::Match, UserConfig},
+	data::{Data, PathToRules},
 	path::IsHidden,
 	utils::UnwrapRef,
 };
@@ -18,12 +15,24 @@ impl File {
 		Self { path: path.into() }
 	}
 
-	pub fn process(self, config: &UserConfig) {
+	pub fn process<'a>(self, data: &'a Data, map: &'a PathToRules) {
 		let mut path = self.path.clone();
 		let mut process_rule = |i: &usize, j: &usize| {
-			let rule = &config.rules[*i];
-			let apply = rule.folders[*j].options.unwrap_ref().apply.unwrap_ref();
-			match rule.actions.run(&path, apply.actions.unwrap_ref()) {
+			let rule = &data.config.rules[*i];
+			let folder = &rule.folders[*j];
+			let actions = folder.options.apply.actions.as_ref().unwrap_or_else(|| {
+				rule.options.apply.actions.as_ref().unwrap_or_else(|| {
+					data.config.defaults.apply.actions.as_ref().unwrap_or_else(|| {
+						data.settings
+							.defaults
+							.apply
+							.actions
+							.as_ref()
+							.unwrap_or_else(|| data.defaults.apply.actions.unwrap_ref())
+					})
+				})
+			});
+			match rule.actions.run(&path, actions) {
 				Ok(new_path) => {
 					path = new_path;
 					Ok(())
@@ -31,15 +40,22 @@ impl File {
 				Err(e) => Err(e),
 			}
 		};
-		match config.defaults.unwrap_ref().r#match.unwrap_ref() {
+		let r#match = data.config.defaults.r#match.as_ref().unwrap_or_else(|| {
+			data.settings
+				.defaults
+				.r#match
+				.as_ref()
+				.unwrap_or_else(|| data.defaults.r#match.unwrap_ref())
+		});
+		match r#match {
 			Match::All => {
-				self.get_matching_rules(config.as_ref())
+				self.get_matching_rules(data, map)
 					.into_iter()
 					.try_for_each(|(i, j)| process_rule(i, j))
 					.ok();
 			}
 			Match::First => {
-				let rules = self.get_matching_rules(config.as_ref());
+				let rules = self.get_matching_rules(data, map);
 				if !rules.is_empty() {
 					let (i, j) = rules.first().unwrap();
 					process_rule(i, j).ok();
@@ -48,33 +64,59 @@ impl File {
 		}
 	}
 
-	pub fn get_matching_rules<'a>(&self, config: &'a UserConfig) -> Vec<&'a (usize, usize)> {
+	pub fn get_matching_rules<'a>(&self, data: &'a Data, map: &'a PathToRules) -> Vec<&'a (usize, usize)> {
 		let parent = self.path.parent().unwrap();
-		let possible_rules: &Vec<(usize, usize)> = &config.rules.get(self.path.as_path());
+		let mut top_ignored = data.defaults.ignore.unwrap_ref().iter().collect::<Vec<_>>();
+		if let Some(vec) = &data.settings.defaults.ignore {
+			top_ignored.extend(vec);
+		}
+		if let Some(vec) = &data.config.defaults.ignore {
+			top_ignored.extend(vec);
+		}
+		let possible_rules = map.get(&self.path);
 		possible_rules
 			.iter()
 			.filter(|(i, j)| {
-				let rule = &config.rules[*i];
+				let rule = &data.config.rules[*i];
 				let folder = &rule.folders[*j];
-				match folder.options.unwrap_ref() {
-					Options {
-						recursive: _,
-						watch: _,
-						ignore: Some(ignore),
-						hidden_files: Some(hidden_files),
-						r#match: _,
-						apply: Some(ApplyWrapper { filters: Some(filters), .. }),
-					} => {
-						if ignore.contains(&parent.to_path_buf()) {
-							return false;
-						}
-						if self.path.is_hidden() && !*hidden_files {
-							return false;
-						}
-						rule.filters.r#match(&self.path, filters)
-					}
-					_ => unreachable!(),
+				let hidden_files = folder.options.hidden_files.as_ref().unwrap_or_else(|| {
+					rule.options.hidden_files.as_ref().unwrap_or_else(|| {
+						data.config.defaults.hidden_files.as_ref().unwrap_or_else(|| {
+							data.settings
+								.defaults
+								.hidden_files
+								.as_ref()
+								.unwrap_or_else(|| data.defaults.hidden_files.unwrap_ref())
+						})
+					})
+				});
+				let filters = folder.options.apply.filters.as_ref().unwrap_or_else(|| {
+					rule.options.apply.filters.as_ref().unwrap_or_else(|| {
+						data.config.defaults.apply.filters.as_ref().unwrap_or_else(|| {
+							data.settings
+								.defaults
+								.apply
+								.filters
+								.as_ref()
+								.unwrap_or_else(|| data.defaults.apply.filters.unwrap_ref())
+						})
+					})
+				});
+				let mut lower_ignored = Vec::new();
+				if let Some(ignore) = &folder.options.ignore {
+					lower_ignored.extend(ignore);
 				}
+				if let Some(ignore) = &rule.options.ignore {
+					lower_ignored.extend(ignore);
+				}
+
+				if top_ignored.iter().any(|path| path == &parent) || lower_ignored.iter().any(|path| path == &parent) {
+					return false;
+				}
+				if self.path.is_hidden() && !*hidden_files {
+					return false;
+				}
+				rule.filters.r#match(&self.path, filters)
 			})
 			.collect::<Vec<_>>()
 	}

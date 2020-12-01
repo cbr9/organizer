@@ -1,4 +1,4 @@
-use std::{borrow::Cow, path::Path};
+use std::path::Path;
 
 use crate::config::filters::AsFilter;
 use serde::Deserialize;
@@ -93,9 +93,11 @@ mod tests {
 	#[test]
 	fn match_beginning_case_sensitive() -> Result<()> {
 		let path = PathBuf::from("$HOME/Downloads/test.pdf");
-		let mut filename = Filename::default();
-		filename.case_sensitive = true;
-		filename.startswith = Some("TE".into());
+		let filename = Filename {
+			case_sensitive: true,
+			startswith: Some("TE".into()),
+			..Default::default()
+		};
 		match filename.matches(&path) {
 			false => Ok(()),
 			true => Err(Error::from(ErrorKind::Other)),
@@ -105,9 +107,11 @@ mod tests {
 	#[test]
 	fn match_ending_case_sensitive() -> Result<()> {
 		let path = PathBuf::from("$HOME/Downloads/test.pdf");
-		let mut filename = Filename::default();
-		filename.case_sensitive = true;
-		filename.endswith = Some("DF".into());
+		let filename = Filename {
+			case_sensitive: true,
+			startswith: Some("DF".into()),
+			..Default::default()
+		};
 		match filename.matches(&path) {
 			false => Ok(()),
 			true => Err(Error::from(ErrorKind::Other)),
@@ -117,9 +121,11 @@ mod tests {
 	#[test]
 	fn match_containing_case_sensitive() -> Result<()> {
 		let path = PathBuf::from("$HOME/Downloads/test.pdf");
-		let mut filename = Filename::default();
-		filename.case_sensitive = true;
-		filename.contains = Some("ES".into());
+		let filename = Filename {
+			case_sensitive: true,
+			startswith: Some("ES".into()),
+			..Default::default()
+		};
 		match filename.matches(&path) {
 			false => Ok(()),
 			true => Err(Error::from(ErrorKind::Other)),

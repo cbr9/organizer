@@ -6,18 +6,19 @@ impl<'de> Deserialize<'de> for Settings {
 	where
 		D: Deserializer<'de>,
 	{
-		Ok(Self::from(Options::default() + Options::deserialize(deserializer)?))
+		Ok(Self::from(Options::deserialize(deserializer)?))
 	}
 }
 
 #[cfg(test)]
 mod tests {
 	use super::*;
+	use crate::utils::DefaultOpt;
 	use serde_test::{assert_de_tokens, Token};
 
 	#[test]
 	fn deserialize() {
-		let mut defaults = Options::default();
+		let mut defaults = Options::default_none();
 		defaults.watch = Some(false);
 		defaults.hidden_files = Some(true);
 		defaults.recursive = Some(true);

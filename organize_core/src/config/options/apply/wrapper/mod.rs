@@ -1,6 +1,6 @@
 mod de;
 
-use crate::config::options::{apply::Apply, AsOption};
+use crate::{config::options::apply::Apply, utils::DefaultOpt};
 use serde::Serialize;
 use std::str::FromStr;
 
@@ -11,8 +11,15 @@ pub struct ApplyWrapper {
 	pub filters: Option<Apply>,
 }
 
-impl Default for ApplyWrapper {
-	fn default() -> Self {
+impl DefaultOpt for ApplyWrapper {
+	fn default_none() -> Self {
+		Self {
+			actions: None,
+			filters: None,
+		}
+	}
+
+	fn default_some() -> Self {
 		Self {
 			actions: Some(Apply::default()),
 			filters: Some(Apply::default()),
@@ -48,25 +55,5 @@ impl FromStr for ApplyWrapper {
 
 	fn from_str(s: &str) -> Result<Self, Self::Err> {
 		Ok(Self::from(Apply::from_str(s)?))
-	}
-}
-
-impl AsOption<ApplyWrapper> for Option<ApplyWrapper> {
-	fn combine(&self, rhs: &Self) -> Self
-	where
-		Self: Sized,
-	{
-		match (self, rhs) {
-			(None, Some(rhs)) => Some(rhs.clone()),
-			(Some(lhs), None) => Some(lhs.clone()),
-			(None, None) => Some(ApplyWrapper::default()),
-			(Some(lhs), Some(rhs)) => {
-				let wrapper = ApplyWrapper {
-					actions: lhs.actions.combine(&rhs.actions),
-					filters: lhs.filters.combine(&rhs.filters),
-				};
-				Some(wrapper)
-			}
-		}
 	}
 }

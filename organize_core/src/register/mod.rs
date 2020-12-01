@@ -58,8 +58,7 @@ impl Register {
 					Category::Io | Category::Syntax | Category::Data => Err(e),
 					Category::Eof => {
 						// the file may be empty
-						let mut register = Register::default();
-						register.path = path;
+						let register = Register { path, ..Register::default() };
 						Ok(register)
 					}
 				}

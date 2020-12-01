@@ -10,7 +10,13 @@ use notify::{op, raw_watcher, RawEvent, RecommendedWatcher, RecursiveMode, Watch
 
 use crate::{Cmd, CONFIG_PATH_STR};
 use clap::Clap;
-use organize_core::{config::UserConfig, file::File, register::Register, utils::UnwrapRef};
+use organize_core::{
+	config::UserConfig,
+	data::{Data, PathToRecursive, PathToRules},
+	file::File,
+	register::Register,
+	utils::UnwrapRef,
+};
 use std::path::PathBuf;
 use sysinfo::{ProcessExt, RefreshKind, Signal, System, SystemExt};
 
@@ -42,7 +48,10 @@ impl Cmd for Watch {
 			}
 
 			match UserConfig::new(&self.config) {
-				Ok(config) => self.start(config),
+				Ok(config) => {
+					let data = Data::from(config);
+					self.start(data, PathToRules::new(&data), PathToRecursive::new(&data))
+				}
 				Err(_) => std::process::exit(0),
 			}
 		}
@@ -60,7 +69,10 @@ impl<'a> Watch {
 				}
 				match UserConfig::new(&self.config) {
 					// TODO: should check that it's valid before killing the previous process
-					Ok(config) => self.start(config),
+					Ok(config) => {
+						let data = Data::from(config);
+						self.start(data, PathToRules::new(&data), PathToRecursive::new(&data))
+					}
 					Err(_) => std::process::exit(0),
 				}
 			}
@@ -80,24 +92,21 @@ impl<'a> Watch {
 		}
 	}
 
-	fn setup(&self, config: &mut UserConfig) -> Result<(RecommendedWatcher, Receiver<RawEvent>)> {
-		let folders = config.rules.path_to_recursive.as_mut().unwrap();
-		println!("{:?}", folders.keys().collect::<Vec<_>>());
-		println!("{:?}", std::env::current_dir().unwrap());
+	fn setup(&'a self, mut path_to_recursive: &'a mut PathToRecursive<'a>) -> Result<(RecommendedWatcher, Receiver<RawEvent>)> {
 		let (tx, rx) = channel();
 		let mut watcher = raw_watcher(tx).unwrap();
 		if cfg!(feature = "hot-reload") && self.config.parent().is_some() {
-			folders.insert(self.config.parent().unwrap().to_path_buf(), RecursiveMode::NonRecursive);
+			path_to_recursive.insert(self.config.parent().unwrap(), RecursiveMode::NonRecursive);
 		}
-		for (folder, recursive) in folders.iter() {
+		for (folder, recursive) in path_to_recursive.iter() {
 			watcher.watch(folder, *recursive)?
 		}
 		Ok((watcher, rx))
 	}
 
-	fn start(&self, mut config: UserConfig) -> Result<()> {
+	fn start(&'a self, mut data: Data, path_to_rules: PathToRules<'a>, mut path_to_recursive: PathToRecursive<'a>) -> Result<()> {
 		Register::new()?.append(process::id(), &self.config)?;
-		let (mut watcher, rx) = self.setup(&mut config)?;
+		let (mut watcher, rx) = self.setup(&mut path_to_recursive)?;
 		let config_parent = self.config.parent().unwrap();
 
 		loop {
@@ -109,7 +118,7 @@ impl<'a> Watch {
 							if let Some(parent) = path.parent() {
 								if (cfg!(not(feature = "hot-reload")) || (cfg!(feature = "hot-reload") && parent != config_parent)) && path.is_file() {
 									let file = File::new(path);
-									file.process(&config);
+									file.process(&data, &path_to_rules);
 								}
 							}
 						}
@@ -117,14 +126,19 @@ impl<'a> Watch {
 							if cfg!(feature = "hot-reload") && path == self.config {
 								match UserConfig::new(&self.config) {
 									Ok(new_config) => {
-										for folder in config.rules.path_to_recursive.unwrap_ref().keys() {
+										for folder in path_to_recursive.keys() {
 											watcher.unwatch(folder)?;
 										};
 										watcher.unwatch(config_parent)?;
 										std::mem::drop(path);
-										std::mem::drop(config);
+										std::mem::drop(data);
+										std::mem::drop(path_to_recursive);
+										std::mem::drop(path_to_rules);
+										let data = Data::from(new_config);
+										let path_to_rules = PathToRules::new(&data);
+										let path_to_recursive = PathToRecursive::new(&data);
 										info!("reloaded configuration: {}", self.config.display());
-										break self.start(new_config);
+										break self.start(data, path_to_rules, path_to_recursive);
 									}
 									Err(_) => {
 										debug!("could not reload configuration");

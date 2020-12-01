@@ -5,16 +5,16 @@ pub mod options;
 
 use std::{
 	borrow::Cow,
-	collections::{hash_map::RandomState, HashMap, HashSet},
+	collections::HashMap,
 	env,
 	fs,
 	ops::{Deref, DerefMut},
 	path::{Path, PathBuf},
 };
 
-use anyhow::{Context, Result};
+use anyhow::Context;
 use dirs::{config_dir, home_dir};
-use log::error;
+
 use notify::RecursiveMode;
 use serde::Deserialize;
 
@@ -23,11 +23,9 @@ use crate::{
 		actions::{io_action::ConflictOption, Actions},
 		filters::Filters,
 		folders::Folders,
-		options::{AsOption, Options},
+		options::Options,
 	},
 	path::Update,
-	settings::Settings,
-	utils::UnwrapRef,
 	PROJECT_NAME,
 };
 
@@ -40,7 +38,7 @@ use crate::{
 #[derive(Deserialize, Clone, Debug)]
 pub struct UserConfig {
 	pub rules: Rules,
-	pub defaults: Option<Options>,
+	pub defaults: Options,
 }
 
 impl AsRef<Self> for UserConfig {
@@ -58,37 +56,43 @@ impl UserConfig {
 	/// ### Errors
 	/// This constructor fails in the following cases:
 	/// - The configuration file does not exist
-	pub fn new<T>(path: T) -> Result<Self>
+	pub fn new<T>(path: T) -> serde_yaml::Result<UserConfig>
 	where
 		T: AsRef<Path>,
 	{
 		let path = path.as_ref();
+		if path == Self::default_path() {
+			std::env::set_current_dir(home_dir().unwrap()).unwrap();
+		} else {
+			std::env::set_current_dir(path.parent().unwrap()).unwrap();
+		}
 		println!("{}", path.display());
 
 		if !path.exists() {
 			Self::create(&path);
 		}
 		let content = fs::read_to_string(&path).unwrap(); // if there is some problem with the config file, we should not try to fix it
-		match serde_yaml::from_str::<UserConfig>(&content) {
-			Ok(mut config) => {
-				let settings = Settings::from_default_path();
-				config.defaults = Some(settings.defaults).combine(&config.defaults);
-				for rule in config.rules.iter_mut() {
-					rule.options = config.defaults.combine(&rule.options);
-					for folder in rule.folders.iter_mut() {
-						folder.options = rule.options.combine(&folder.options);
-					}
-					rule.options = None;
-				}
-				config.rules.path_to_rules = Some(config.rules.map());
-				config.rules.path_to_recursive = Some(config.rules.map());
-				Ok(config)
-			}
-			Err(e) => {
-				error!("{}", e);
-				Err(e.into())
-			}
-		}
+		serde_yaml::from_str::<UserConfig>(&content)
+		// match serde_yaml::from_str::<UserConfig>(&content) {
+		// 	Ok(mut config) => {
+		// 		let settings = Settings::from_default_path();
+		// 		config.defaults = Some(settings.defaults).combine(&config.defaults);
+		// 		for rule in config.rules.iter_mut() {
+		// 			rule.options = config.defaults.combine(&rule.options);
+		// 			for folder in rule.folders.iter_mut() {
+		// 				folder.options = rule.options.combine(&folder.options);
+		// 			}
+		// 			rule.options = None;
+		// 		}
+		// 		config.rules.path_to_rules = Some(config.rules.map());
+		// 		config.rules.path_to_recursive = Some(config.rules.map());
+		// 		Ok(config)
+		// 	}
+		// 	Err(e) => {
+		// 		error!("{}", e);
+		// 		Err(e.into())
+		// 	}
+		// }
 	}
 
 	pub fn create(path: &Path) {
@@ -127,14 +131,12 @@ impl UserConfig {
 		std::env::current_dir().map_or_else(
 			|_| {
 				// if the current dir could not be identified
-				std::env::set_current_dir(home_dir().unwrap()).unwrap();
 				Self::default_path()
 			},
 			|dir| {
 				dir.read_dir().map_or_else(
 					|_| {
 						// if it could be identified but there was a problem reading its content
-						std::env::set_current_dir(home_dir().unwrap()).unwrap();
 						Self::default_path()
 					},
 					|mut files| {
@@ -144,30 +146,17 @@ impl UserConfig {
 								if let Ok(entry) = file {
 									let path = entry.path();
 									let mime_type = mime_guess::from_path(&entry.path()).first_or_octet_stream();
-									if path.file_stem().unwrap() == "organize" && mime_type == "text/x-yaml" {
-										std::env::set_current_dir(path.parent().unwrap()).unwrap();
-										Some(path)
-									} else {
-										None
-									}
+									(path.file_stem().unwrap() == "organize" && mime_type == "text/x-yaml").then_some(path)
 								} else {
 									None
 								}
 							})
-							.unwrap_or_else(|| {
-								std::env::set_current_dir(home_dir().unwrap()).unwrap();
-								Self::default_path()
-							})
+							.unwrap_or_else(Self::default_path)
 					},
 				)
 			},
 		)
 	}
-}
-
-pub trait AsMap<'a, V> {
-	fn map(&self) -> HashMap<PathBuf, V>;
-	fn get(&'a self, path: &Path) -> &'a V;
 }
 
 #[derive(Deserialize, Clone, Debug)]
@@ -194,95 +183,12 @@ impl DerefMut for Rules {
 	}
 }
 
-impl<'a> AsMap<'a, Vec<(usize, usize)>> for Rules {
-	fn map(&self) -> HashMap<PathBuf, Vec<(usize, usize)>, RandomState> {
-		let mut map = HashMap::with_capacity(self.len());
-		for (j, rule) in self.iter().enumerate() {
-			for (i, folder) in rule.folders.iter().enumerate() {
-				let path = folder.path.canonicalize().unwrap();
-				if !map.contains_key(&path) {
-					map.insert(path.clone(), Vec::new());
-				}
-				map.get_mut(&path).unwrap().push((j, i));
-			}
-		}
-		map.shrink_to_fit();
-		map
-	}
-
-	fn get(&'a self, path: &Path) -> &'a Vec<(usize, usize)> {
-		debug_assert!(self.path_to_rules.is_some());
-		let map = self.path_to_rules.unwrap_ref();
-
-		map.get(path).unwrap_or_else(|| {
-			// if the path is some subdirectory not represented in the hashmap
-			let components = path.components().collect::<Vec<_>>();
-			let mut paths = Vec::new();
-			for i in 0..components.len() {
-				let slice = components[0..i].iter().map(|comp| comp.as_os_str().to_string_lossy()).collect::<Vec<_>>();
-				let str: String = slice.join(&std::path::MAIN_SEPARATOR.to_string());
-				paths.push(PathBuf::from(str.replace("//", "/")))
-			}
-			let path = paths
-				.iter()
-				.rev()
-				.find_map(|path| if map.contains_key(path.as_path()) { Some(path) } else { None })
-				.unwrap();
-			map.get(path.as_path()).unwrap()
-		})
-	}
-}
-
-impl<'a> AsMap<'a, RecursiveMode> for Rules {
-	fn map(&self) -> HashMap<PathBuf, RecursiveMode> {
-		let mut folders = HashMap::with_capacity(self.len());
-		for rule in self.iter() {
-			for folder in rule.folders.iter() {
-				let recursive = if folder.options.unwrap_ref().recursive.unwrap() {
-					RecursiveMode::Recursive
-				} else {
-					RecursiveMode::NonRecursive
-				};
-				match folders.get(folder.path.as_path()) {
-					None => {
-						folders.insert(folder.path.clone(), recursive);
-					}
-					Some(value) => {
-						if recursive == RecursiveMode::Recursive && value == &RecursiveMode::NonRecursive {
-							folders.insert(folder.path.clone(), recursive);
-						}
-					}
-				}
-			}
-		}
-		folders.shrink_to_fit();
-		folders
-	}
-
-	fn get(&'a self, path: &Path) -> &'a RecursiveMode {
-		debug_assert!(self.path_to_recursive.is_some());
-		self.path_to_recursive.unwrap_ref().get(path).unwrap()
-	}
-}
-
-impl Rules {
-	pub fn get_paths(&self) -> HashSet<&Path> {
-		let mut set = HashSet::new();
-		for rule in self.iter() {
-			for folder in rule.folders.iter() {
-				set.insert(folder.path.as_path());
-			}
-		}
-		set
-	}
-}
-
 #[derive(Debug, Clone, Deserialize)]
 pub struct Rule {
 	pub actions: Actions,
 	pub filters: Filters,
 	pub folders: Folders,
-	pub options: Option<Options>,
+	pub options: Options,
 }
 
 impl<'a> AsRef<Self> for Rule {

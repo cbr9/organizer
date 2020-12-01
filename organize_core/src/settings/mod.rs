@@ -1,6 +1,9 @@
 mod de;
 
-use crate::config::{options::Options, UserConfig};
+use crate::{
+	config::{options::Options, UserConfig},
+	utils::DefaultOpt,
+};
 use anyhow::Context;
 use log::{debug, error};
 use serde::Serialize;
@@ -9,7 +12,7 @@ use std::{
 	path::{Path, PathBuf},
 };
 
-#[derive(Serialize, Eq, PartialEq, Debug, Clone, Default)]
+#[derive(Serialize, Eq, PartialEq, Debug, Clone)]
 pub struct Settings {
 	#[serde(flatten)]
 	pub defaults: Options,
@@ -18,6 +21,20 @@ pub struct Settings {
 impl AsRef<Self> for Settings {
 	fn as_ref(&self) -> &Settings {
 		self
+	}
+}
+
+impl DefaultOpt for Settings {
+	fn default_none() -> Self {
+		Self {
+			defaults: DefaultOpt::default_none(),
+		}
+	}
+
+	fn default_some() -> Self {
+		Self {
+			defaults: DefaultOpt::default_some(),
+		}
 	}
 }
 
@@ -37,7 +54,7 @@ impl Settings {
 			|e| {
 				// if there is some problem with the settings file
 				debug!("{:?}", e);
-				let settings = Settings::default();
+				let settings = Settings::default_some();
 				// Serialize is automatically derived and these are default options so it's safe to unwrap
 				let serialized = toml::to_string(&settings).unwrap();
 				fs::write(path, serialized).unwrap_or_else(|e| debug!("{}", e));
@@ -73,6 +90,6 @@ mod tests {
 		let settings = Settings::new(path);
 		let exists = path.exists(); // Settings::new should create a new settings file if the given path does not exist
 		std::fs::remove_file(path).unwrap();
-		assert!(exists && settings == Settings::default())
+		assert!(exists && settings == Settings::default_some())
 	}
 }
