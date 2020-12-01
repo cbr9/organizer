@@ -13,8 +13,8 @@ pub struct Filename {
 }
 
 impl AsFilter for Filename {
-	fn matches(&self, path: &Path) -> bool {
-		let mut filename = path.file_name().unwrap().to_str().unwrap().to_string();
+	fn matches<T: AsRef<Path>>(&self, path: &T) -> bool {
+		let mut filename = path.as_ref().file_name().unwrap().to_str().unwrap().to_string();
 		let mut filter = Cow::Borrowed(self);
 		if !self.case_sensitive {
 			filename = filename.to_lowercase();

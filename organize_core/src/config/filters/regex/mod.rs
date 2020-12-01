@@ -23,8 +23,8 @@ impl Deref for Regex {
 }
 
 impl AsFilter for Regex {
-	fn matches(&self, path: &Path) -> bool {
-		match path.file_name() {
+	fn matches<T: AsRef<Path>>(&self, path: &T) -> bool {
+		match path.as_ref().file_name() {
 			None => false,
 			Some(filename) => {
 				let filename = filename.to_string_lossy();
@@ -66,21 +66,21 @@ mod tests {
 	#[test]
 	fn match_single() {
 		let regex = Regex::from_str(r".*unsplash.*").unwrap();
-		let path = Path::new("$HOME/Pictures/test_unsplash_img.jpg");
-		assert!(regex.matches(path))
+		let path = "$HOME/Pictures/test_unsplash_img.jpg";
+		assert!(regex.matches(&path))
 	}
 
 	#[test]
 	fn match_multiple() {
 		let regex = Regex::try_from(vec![r".*unsplash.*", r"\w"]).unwrap();
-		let path = Path::new("$HOME/Pictures/test_unsplash_img.jpg");
-		assert!(regex.matches(path))
+		let path = "$HOME/Pictures/test_unsplash_img.jpg";
+		assert!(regex.matches(&path))
 	}
 
 	#[test]
 	fn no_match_multiple() {
 		let regex = Regex::try_from(vec![r".*unsplash.*", r"\d"]).unwrap();
-		let path = Path::new("$HOME/Documents/deep_learning.pdf");
-		assert!(!regex.matches(path))
+		let path = "$HOME/Documents/deep_learning.pdf";
+		assert!(!regex.matches(&path))
 	}
 }

@@ -55,8 +55,8 @@ where
 }
 
 impl AsFilter for Script {
-	fn matches(&self, path: &Path) -> bool {
-		let out = self.run(path);
+	fn matches<T: AsRef<Path>>(&self, path: &T) -> bool {
+		let out = self.run(path.as_ref());
 		out.map(|out| {
 			// get the last line in stdout and parse it as a boolean
 			// if it can't be parsed, return false
@@ -113,7 +113,7 @@ mod tests {
 	#[cfg(not(target_os = "windows"))] // python doesn't come installed by default on windows
 	fn test_script_filter() {
 		let script = Script::new("python", "print('huh')\nprint('{path}'.islower())");
-		let path = Path::new("/home");
-		assert!(script.matches(path))
+		let path = "/home";
+		assert!(script.matches(&path))
 	}
 }

@@ -85,21 +85,21 @@ mod tests {
 	fn combine_apply_some_some() {
 		let left = Some(Apply::All);
 		let right = Some(Apply::Any);
-		assert_eq!(left.combine(right.clone()), right)
+		assert_eq!(left.combine(&right), right)
 	}
 
 	#[test]
 	fn combine_apply_some_none() {
 		let left = Some(Apply::All);
 		let right = None;
-		assert_eq!(left.clone().combine(right), left)
+		assert_eq!(left.combine(&right), left)
 	}
 
 	#[test]
 	fn combine_apply_none_some() {
 		let left = None;
 		let right = Some(Apply::All);
-		assert_eq!(left.combine(right.clone()), right)
+		assert_eq!(left.combine(&right), right)
 	}
 
 	#[test]
@@ -107,7 +107,7 @@ mod tests {
 		let left = Some(Apply::AllOf(vec![0, 1]));
 		let right = Some(Apply::AllOf(vec![2]));
 		let expected = Some(Apply::AllOf(vec![0, 1, 2]));
-		assert_eq!(left.combine(right), expected)
+		assert_eq!(left.combine(&right), expected)
 	}
 
 	#[test]
@@ -115,56 +115,56 @@ mod tests {
 		let left = Some(Apply::AnyOf(vec![0, 1]));
 		let right = Some(Apply::AnyOf(vec![2]));
 		let expected = Some(Apply::AnyOf(vec![0, 1, 2]));
-		assert_eq!(left.combine(right), expected)
+		assert_eq!(left.combine(&right), expected)
 	}
 
 	#[test]
 	fn combine_apply_vec_some_some_all_of_any_of() {
 		let left = Some(Apply::AllOf(vec![0, 1]));
 		let right = Some(Apply::AnyOf(vec![2]));
-		assert_eq!(left.combine(right.clone()), right)
+		assert_eq!(left.combine(&right), right)
 	}
 
 	#[test]
 	fn combine_apply_vec_some_some_any_of_all_of() {
 		let left = Some(Apply::AnyOf(vec![2]));
 		let right = Some(Apply::AllOf(vec![0, 1]));
-		assert_eq!(left.combine(right.clone()), right)
+		assert_eq!(left.combine(&right), right)
 	}
 
 	#[test]
 	fn combine_apply_vec_some_none() {
 		let left = Some(Apply::All);
 		let right = None;
-		assert_eq!(left.clone().combine(right), left)
+		assert_eq!(left.combine(&right), left)
 	}
 
 	#[test]
 	fn combine_apply_vec_none_some() {
 		let left = None;
 		let right = Some(Apply::All);
-		assert_eq!(left.combine(right.clone()), right)
+		assert_eq!(left.combine(&right), right)
 	}
 
 	#[test]
 	fn combine_apply_none_none() {
 		let left: Option<Apply> = None;
 		let right = None;
-		assert_eq!(left.combine(right), Some(Apply::default()))
+		assert_eq!(left.combine(&right), Some(Apply::default()))
 	}
 
 	#[test]
 	fn combine_wrapper_none_none() {
 		let left: Option<ApplyWrapper> = None;
 		let right = None;
-		assert_eq!(left.combine(right), Some(ApplyWrapper::default()))
+		assert_eq!(left.combine(&right), Some(ApplyWrapper::default()))
 	}
 
 	#[test]
 	fn combine_wrapper_none_some() {
 		let left: Option<ApplyWrapper> = None;
 		let right = Some(ApplyWrapper::default());
-		assert_eq!(left.combine(right.clone()), right)
+		assert_eq!(left.combine(&right), right)
 	}
 
 	#[test]
@@ -181,6 +181,6 @@ mod tests {
 			actions: Some(Apply::Any),
 			filters: Some(Apply::All),
 		});
-		assert_eq!(left.combine(right), expected)
+		assert_eq!(left.combine(&right), expected)
 	}
 }

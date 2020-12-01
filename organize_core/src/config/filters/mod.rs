@@ -12,10 +12,12 @@ mod regex;
 
 use crate::config::{
 	actions::script::Script,
-	filters::{mime::Mime, regex::Regex},
+	filters::{
+		mime::{Mime, MimeWrapper},
+		regex::Regex,
+	},
 	options::apply::Apply,
 };
-use crate::config::filters::mime::MimeWrapper;
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all(deserialize = "lowercase"))]
@@ -28,11 +30,11 @@ pub enum Filter {
 }
 
 pub trait AsFilter {
-	fn matches(&self, path: &Path) -> bool;
+	fn matches<T: AsRef<Path>>(&self, path: &T) -> bool;
 }
 
 impl AsFilter for Filter {
-	fn matches(&self, path: &Path) -> bool {
+	fn matches<T: AsRef<Path>>(&self, path: &T) -> bool {
 		match self {
 			Filter::Regex(regex) => regex.matches(path),
 			Filter::Filename(filename) => filename.matches(path),
@@ -69,18 +71,18 @@ impl Filters {
 			return false;
 		}
 		match apply.as_ref() {
-			Apply::All => self.iter().all(|filter| filter.matches(path.as_ref())),
-			Apply::Any => self.iter().any(|filter| filter.matches(path.as_ref())),
+			Apply::All => self.iter().all(|filter| filter.matches(&path)),
+			Apply::Any => self.iter().any(|filter| filter.matches(&path)),
 			Apply::AllOf(filters) => self
 				.iter()
 				.enumerate()
 				.filter(|(i, _)| filters.contains(i))
-				.all(|(_, filter)| filter.matches(path.as_ref())),
+				.all(|(_, filter)| filter.matches(&path)),
 			Apply::AnyOf(filters) => self
 				.iter()
 				.enumerate()
 				.filter(|(i, _)| filters.contains(i))
-				.any(|(_, filter)| filter.matches(path.as_ref())),
+				.any(|(_, filter)| filter.matches(&path)),
 		}
 	}
 }

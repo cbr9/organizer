@@ -16,8 +16,8 @@ impl Deref for Extension {
 }
 
 impl AsFilter for Extension {
-	fn matches(&self, path: &Path) -> bool {
-		match path.extension() {
+	fn matches<T: AsRef<Path>>(&self, path: &T) -> bool {
+		match path.as_ref().extension() {
 			Some(extension) => {
 				let extension = extension.to_str().unwrap().to_string();
 				self.contains(&extension)
