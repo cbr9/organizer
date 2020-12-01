@@ -1,3 +1,5 @@
+#![feature(bool_to_option)]
+
 pub mod config;
 pub(crate) mod path {
 	mod expand;

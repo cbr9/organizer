@@ -54,10 +54,10 @@ impl Cmd for Config {
 			UserConfig::create(&config_file);
 		} else {
 			let editor = match env::var_os("EDITOR") {
-				Some(prog) => prog,
+				Some(exec) => exec,
 				None => panic!("Could not find any EDITOR environment variable or it's not properly set"),
 			};
-			process::Command::new(&editor).arg(UserConfig::default_path()).spawn()?.wait()?;
+			process::Command::new(&editor).arg(UserConfig::path()).spawn()?.wait()?;
 		}
 		Ok(())
 	}

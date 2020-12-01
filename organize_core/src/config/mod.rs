@@ -63,20 +63,7 @@ impl UserConfig {
 		T: AsRef<Path>,
 	{
 		let path = path.as_ref();
-		if path == UserConfig::default_path() {
-			match home_dir() {
-				None => panic!("error: cannot determine home directory"),
-				Some(home) => env::set_current_dir(&home).unwrap(),
-			};
-		} else if let Some(parent) = path.parent() {
-			match env::set_current_dir(parent) {
-				Ok(_) => {}
-				Err(e) => {
-					error!("{}", e);
-					std::process::exit(1);
-				}
-			}
-		};
+		println!("{}", path.display());
 
 		if !path.exists() {
 			Self::create(&path);
@@ -135,6 +122,47 @@ impl UserConfig {
 	pub fn default_path() -> PathBuf {
 		Self::default_dir().join("config.yml")
 	}
+
+	pub fn path() -> PathBuf {
+		std::env::current_dir().map_or_else(
+			|_| {
+				// if the current dir could not be identified
+				std::env::set_current_dir(home_dir().unwrap()).unwrap();
+				Self::default_path()
+			},
+			|dir| {
+				dir.read_dir().map_or_else(
+					|_| {
+						// if it could be identified but there was a problem reading its content
+						std::env::set_current_dir(home_dir().unwrap()).unwrap();
+						Self::default_path()
+					},
+					|mut files| {
+						// if its content was successfully read, look for a `organize.yml` file, otherwise return the default
+						files
+							.find_map(|file| {
+								if let Ok(entry) = file {
+									let path = entry.path();
+									let mime_type = mime_guess::from_path(&entry.path()).first_or_octet_stream();
+									if path.file_stem().unwrap() == "organize" && mime_type == "text/x-yaml" {
+										std::env::set_current_dir(path.parent().unwrap()).unwrap();
+										Some(path)
+									} else {
+										None
+									}
+								} else {
+									None
+								}
+							})
+							.unwrap_or_else(|| {
+								std::env::set_current_dir(home_dir().unwrap()).unwrap();
+								Self::default_path()
+							})
+					},
+				)
+			},
+		)
+	}
 }
 
 pub trait AsMap<'a, V> {
@@ -171,10 +199,11 @@ impl<'a> AsMap<'a, Vec<(usize, usize)>> for Rules {
 		let mut map = HashMap::with_capacity(self.len());
 		for (j, rule) in self.iter().enumerate() {
 			for (i, folder) in rule.folders.iter().enumerate() {
-				if !map.contains_key(&folder.path) {
-					map.insert(folder.path.clone(), Vec::new());
+				let path = folder.path.canonicalize().unwrap();
+				if !map.contains_key(&path) {
+					map.insert(path.clone(), Vec::new());
 				}
-				map.get_mut(&folder.path).unwrap().push((j, i));
+				map.get_mut(&path).unwrap().push((j, i));
 			}
 		}
 		map.shrink_to_fit();

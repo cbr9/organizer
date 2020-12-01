@@ -6,8 +6,8 @@ use organize_core::config::UserConfig;
 use std::{borrow::Cow, path::PathBuf};
 
 lazy_static! {
-	pub static ref DEFAULT_CONFIG: PathBuf = UserConfig::default_path();
-	pub static ref DEFAULT_CONFIG_STR: Cow<'static, str> = DEFAULT_CONFIG.to_string_lossy();
+	pub static ref CONFIG_PATH: PathBuf = UserConfig::path();
+	pub static ref CONFIG_PATH_STR: Cow<'static, str> = CONFIG_PATH.to_string_lossy();
 }
 
 mod cmd;

@@ -1,4 +1,4 @@
-use crate::{Cmd, DEFAULT_CONFIG_STR};
+use crate::{Cmd, CONFIG_PATH_STR};
 use anyhow::Result;
 use clap::Clap;
 use notify::RecursiveMode;
@@ -13,7 +13,7 @@ use walkdir::{DirEntry, WalkDir};
 
 #[derive(Clap, Debug)]
 pub struct Run {
-	#[clap(long, default_value = &DEFAULT_CONFIG_STR)]
+	#[clap(long, default_value = &CONFIG_PATH_STR)]
 	pub(crate) config: PathBuf,
 }
 

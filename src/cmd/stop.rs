@@ -1,4 +1,4 @@
-use crate::{cmd::Cmd, DEFAULT_CONFIG_STR};
+use crate::{cmd::Cmd, CONFIG_PATH_STR};
 use anyhow::Result;
 use clap::Clap;
 use organize_core::register::Register;
@@ -9,7 +9,7 @@ use sysinfo::{ProcessExt, RefreshKind, Signal, System, SystemExt};
 pub struct Stop {
 	#[clap(long)]
 	all: bool,
-	#[clap(long, default_value = &DEFAULT_CONFIG_STR)]
+	#[clap(long, default_value = &CONFIG_PATH_STR)]
 	pub(crate) config: PathBuf,
 }
 

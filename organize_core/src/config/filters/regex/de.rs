@@ -3,7 +3,6 @@ use serde::{
 	de,
 	de::{Error, SeqAccess, Visitor},
 	export,
-	export::PhantomData,
 	Deserialize,
 	Deserializer,
 };

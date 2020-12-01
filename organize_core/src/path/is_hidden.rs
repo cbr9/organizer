@@ -1,4 +1,6 @@
 #[cfg(target_os = "windows")]
+use std::fs::OpenOptions;
+#[cfg(target_os = "windows")]
 use std::os::windows::prelude::*;
 #[cfg(target_os = "windows")]
 use winapi::um::winnt::FILE_ATTRIBUTE_HIDDEN;
@@ -27,13 +29,7 @@ impl IsHidden for Path {
 
 #[cfg(test)]
 mod tests {
-	use crate::path::IsHidden;
-	#[cfg(target_os = "windows")]
-	use std::os::windows::prelude::*;
-	use std::path::Path;
-	#[cfg(target_os = "windows")]
-	use winapi::um::winnt::FILE_ATTRIBUTE_HIDDEN;
-
+	use super::*;
 	#[test]
 	#[cfg(any(target_os = "linux", target_os = "macos"))]
 	fn check_hidden() {
@@ -45,11 +41,7 @@ mod tests {
 	#[cfg(target_os = "windows")]
 	fn check_hidden() {
 		let path = Path::new(".testfile");
-		fs::OpenOptions::new()
-			.custom_flags(FILE_ATTRIBUTE_HIDDEN)
-			.create(true)
-			.write(true)
-			.open(path);
+		OpenOptions::new().custom_flags(FILE_ATTRIBUTE_HIDDEN).create(true).write(true).open(path);
 		assert!(path.is_hidden())
 	}
 }

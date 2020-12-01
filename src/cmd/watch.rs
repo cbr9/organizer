@@ -8,7 +8,7 @@ use colored::Colorize;
 use log::{debug, error, info};
 use notify::{op, raw_watcher, RawEvent, RecommendedWatcher, RecursiveMode, Watcher};
 
-use crate::{Cmd, DEFAULT_CONFIG_STR};
+use crate::{Cmd, CONFIG_PATH_STR};
 use clap::Clap;
 use organize_core::{config::UserConfig, file::File, register::Register, utils::UnwrapRef};
 use std::path::PathBuf;
@@ -16,7 +16,7 @@ use sysinfo::{ProcessExt, RefreshKind, Signal, System, SystemExt};
 
 #[derive(Clap, Debug)]
 pub struct Watch {
-	#[clap(long, default_value = &DEFAULT_CONFIG_STR)]
+	#[clap(long, default_value = &CONFIG_PATH_STR)]
 	pub config: PathBuf,
 	#[clap(long)]
 	replace: bool,
@@ -29,7 +29,7 @@ impl Cmd for Watch {
 		} else {
 			let register = Register::new()?;
 			if register.iter().map(|section| &section.path).any(|config| config == &self.config) {
-				return if self.config == UserConfig::default_path() {
+				return if self.config == UserConfig::path() {
 					println!("An existing instance is already running. Use --replace to restart it");
 					Ok(())
 				} else {
@@ -66,7 +66,7 @@ impl<'a> Watch {
 			}
 			None => {
 				// there is no running process
-				if self.config == UserConfig::default_path() {
+				if self.config == UserConfig::path() {
 					println!("{}", "No instance was found running with the default configuration.".bold());
 				} else {
 					println!(
@@ -82,6 +82,8 @@ impl<'a> Watch {
 
 	fn setup(&self, config: &mut UserConfig) -> Result<(RecommendedWatcher, Receiver<RawEvent>)> {
 		let folders = config.rules.path_to_recursive.as_mut().unwrap();
+		println!("{:?}", folders.keys().collect::<Vec<_>>());
+		println!("{:?}", std::env::current_dir().unwrap());
 		let (tx, rx) = channel();
 		let mut watcher = raw_watcher(tx).unwrap();
 		if cfg!(feature = "hot-reload") && self.config.parent().is_some() {

@@ -116,7 +116,7 @@ mod tests {
 		let pid: Pid = 1000000000;
 		let sys = System::new_with_specifics(RefreshKind::with_processes(RefreshKind::new()));
 		assert!(sys.get_process(pid).is_none());
-		let path = UserConfig::default_path();
+		let path = UserConfig::path();
 		let register = Register::new().unwrap();
 		register.append(pid, &path).unwrap();
 	}

@@ -15,17 +15,17 @@ pub struct Filename {
 impl AsFilter for Filename {
 	fn matches<T: AsRef<Path>>(&self, path: &T) -> bool {
 		let mut filename = path.as_ref().file_name().unwrap().to_str().unwrap().to_string();
-		let mut filter = Cow::Borrowed(self);
+		let mut filter = self.clone();
 		if !self.case_sensitive {
 			filename = filename.to_lowercase();
 			if let Some(startswith) = &filter.startswith {
-				filter.to_mut().startswith = Some(startswith.to_lowercase())
+				filter.startswith = Some(startswith.to_lowercase())
 			}
 			if let Some(endswith) = &filter.endswith {
-				filter.to_mut().endswith = Some(endswith.to_lowercase())
+				filter.endswith = Some(endswith.to_lowercase())
 			}
 			if let Some(contains) = &filter.contains {
-				filter.to_mut().contains = Some(contains.to_lowercase())
+				filter.contains = Some(contains.to_lowercase())
 			}
 		}
 		let mut matches = true;
@@ -54,8 +54,10 @@ mod tests {
 	#[test]
 	fn match_beginning_case_insensitive() -> Result<()> {
 		let path = PathBuf::from("$HOME/Downloads/test.pdf");
-		let mut filename = Filename::default();
-		filename.startswith = Some("TE".into());
+		let filename = Filename {
+			startswith: Some("TE".into()),
+			..Default::default()
+		};
 		match filename.matches(&path) {
 			true => Ok(()),
 			false => Err(Error::from(ErrorKind::Other)),
@@ -65,8 +67,10 @@ mod tests {
 	#[test]
 	fn match_ending_case_insensitive() -> Result<()> {
 		let path = PathBuf::from("$HOME/Downloads/test.pdf");
-		let mut filename = Filename::default();
-		filename.endswith = Some("DF".into());
+		let filename = Filename {
+			endswith: Some("DF".into()),
+			..Default::default()
+		};
 		match filename.matches(&path) {
 			true => Ok(()),
 			false => Err(Error::from(ErrorKind::Other)),
@@ -76,8 +80,10 @@ mod tests {
 	#[test]
 	fn match_containing_case_insensitive() -> Result<()> {
 		let path = PathBuf::from("$HOME/Downloads/test.pdf");
-		let mut filename = Filename::default();
-		filename.contains = Some("ES".into());
+		let filename = Filename {
+			contains: Some("ES".into()),
+			..Default::default()
+		};
 		match filename.matches(&path) {
 			true => Ok(()),
 			false => Err(Error::from(ErrorKind::Other)),
