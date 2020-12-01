@@ -47,7 +47,7 @@ where
 	let mut command = std::process::Command::new(&str);
 	match command.spawn() {
 		Ok(mut child) => {
-			child.kill().unwrap_or_else(|_| ());
+			child.kill().unwrap_or(());
 			Ok(str)
 		}
 		Err(_) => Err(D::Error::custom(format!("interpreter '{}' could not be run", str))),
@@ -58,12 +58,16 @@ impl AsFilter for Script {
 	fn matches(&self, path: &Path) -> bool {
 		let out = self.run(path);
 		out.map(|out| {
+			// get the last line in stdout and parse it as a boolean
+			// if it can't be parsed, return false
 			let out = String::from_utf8_lossy(&out.stdout);
 			out.lines()
 				.last()
 				.map(|last| bool::from_str(&last.to_lowercase().trim()).unwrap_or_default())
 		})
+		// unwrap the underlying boolean: if there was no line in stdout, return false
 		.map(|x| x.unwrap_or_default())
+		// unwrap the underlying boolean: if running the script produced an error, return false
 		.unwrap_or_default()
 	}
 }
