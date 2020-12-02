@@ -92,15 +92,9 @@ impl Script {
 		Ok(script)
 	}
 
-	fn run(&self, path: &Path) -> Result<Output> {
-		let script = self.write(path)?;
-		let output = Command::new(&self.exec)
-			.arg(&script)
-			.stdout(Stdio::piped())
-			.spawn()
-			.expect("could not run script")
-			.wait_with_output()
-			.expect("script terminated with an error");
+	fn run<T: AsRef<Path>>(&self, path: T) -> Result<Output> {
+		let script = self.write(path.as_ref())?;
+		let output = Command::new(&self.exec).arg(&script).stdout(Stdio::piped()).spawn()?.wait_with_output()?;
 		Ok(output)
 	}
 }
@@ -112,8 +106,13 @@ mod tests {
 	#[test]
 	#[cfg(not(target_os = "windows"))] // python doesn't come installed by default on windows
 	fn test_script_filter() {
-		let script = Script::new("python", "print('huh')\nprint('{path}'.islower())");
+		let mut script = Script::new("python", "print('huh')\nprint('{path}'.islower())");
 		let path = "/home";
+		script.run(path).unwrap_or_else(|_| {
+			// some linux distributions don't have a `python` executable, but a `python3`
+			script = Script::new("python3", "print('huh')\nprint('{path}'.islower())");
+			script.run(path).unwrap()
+		});
 		assert!(script.matches(&path))
 	}
 }
