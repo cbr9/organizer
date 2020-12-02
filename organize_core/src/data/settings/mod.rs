@@ -1,7 +1,7 @@
 mod de;
 
 use crate::{
-	data::config::{options::Options, UserConfig},
+	data::{config::UserConfig, options::Options},
 	utils::DefaultOpt,
 };
 use anyhow::Context;

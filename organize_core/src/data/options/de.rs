@@ -1,5 +1,5 @@
 use crate::{
-	data::config::options::{apply::wrapper::ApplyWrapper, r#match::Match, Options},
+	data::options::{apply::wrapper::ApplyWrapper, r#match::Match, Options},
 	utils::UnwrapOrDefaultOpt,
 };
 use serde::{

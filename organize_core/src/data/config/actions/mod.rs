@@ -6,8 +6,8 @@ pub(crate) mod trash;
 
 use std::{borrow::Cow, io::Result, ops::Deref, path::Path};
 
-use crate::data::config::{
-	actions::{
+use crate::data::{
+	config::actions::{
 		delete::Delete,
 		echo::Echo,
 		io_action::{Copy, IOAction, Move, Rename},

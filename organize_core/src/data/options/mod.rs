@@ -2,9 +2,9 @@ pub mod apply;
 mod de;
 pub(crate) mod r#match;
 
-use crate::data::config::options::r#match::Match;
+use crate::data::options::r#match::Match;
 
-use crate::{data::config::options::apply::wrapper::ApplyWrapper, utils::DefaultOpt};
+use crate::{data::options::apply::wrapper::ApplyWrapper, utils::DefaultOpt};
 use serde::Serialize;
 use std::path::PathBuf;
 

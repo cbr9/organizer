@@ -2,7 +2,7 @@ mod de;
 
 use std::{path::PathBuf, str::FromStr};
 
-use crate::{data::config::options::Options, path::Expand, utils::DefaultOpt};
+use crate::{data::options::Options, path::Expand, utils::DefaultOpt};
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Folder {

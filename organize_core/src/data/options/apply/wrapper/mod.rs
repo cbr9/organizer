@@ -1,6 +1,6 @@
 mod de;
 
-use crate::{data::config::options::apply::Apply, utils::DefaultOpt};
+use crate::{data::options::apply::Apply, utils::DefaultOpt};
 use serde::Serialize;
 use std::str::FromStr;
 

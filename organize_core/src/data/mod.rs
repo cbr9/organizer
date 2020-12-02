@@ -1,13 +1,11 @@
 pub mod config;
+pub mod options;
 pub mod path_to_recursive;
 pub mod path_to_rules;
 pub mod settings;
 
 use crate::{
-	data::{
-		config::{options::Options, UserConfig},
-		settings::Settings,
-	},
+	data::{config::UserConfig, options::Options, settings::Settings},
 	utils::DefaultOpt,
 	PROJECT_NAME,
 };

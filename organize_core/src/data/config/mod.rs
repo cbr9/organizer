@@ -1,7 +1,6 @@
 pub mod actions;
 pub mod filters;
 pub mod folders;
-pub mod options;
 
 use std::{
 	borrow::Cow,
@@ -18,10 +17,12 @@ use notify::RecursiveMode;
 use serde::Deserialize;
 
 use crate::{
-	data::config::{
-		actions::{io_action::ConflictOption, Actions},
-		filters::Filters,
-		folders::Folders,
+	data::{
+		config::{
+			actions::{io_action::ConflictOption, Actions},
+			filters::Filters,
+			folders::Folders,
+		},
 		options::Options,
 	},
 	path::Update,

@@ -1,4 +1,4 @@
-use crate::data::config::options::apply::Apply;
+use crate::data::options::apply::Apply;
 use serde::{
 	de::{Error, MapAccess, SeqAccess, Visitor},
 	export::{Formatter, PhantomData},

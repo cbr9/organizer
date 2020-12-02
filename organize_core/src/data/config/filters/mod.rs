@@ -10,9 +10,11 @@ mod filename;
 mod mime;
 mod regex;
 
-use crate::data::config::{
-	actions::script::Script,
-	filters::{mime::MimeWrapper, regex::Regex},
+use crate::data::{
+	config::{
+		actions::script::Script,
+		filters::{mime::MimeWrapper, regex::Regex},
+	},
 	options::apply::Apply,
 };
 
@@ -86,10 +88,10 @@ impl Filters {
 
 #[cfg(test)]
 mod tests {
-	use crate::data::config::{
-		filters::{regex::Regex, Filter},
+	use super::*;
+	use crate::data::{
+		config::filters::{regex::Regex, Filter},
 		options::apply::Apply,
-		Filters,
 	};
 	use std::{path::PathBuf, str::FromStr};
 

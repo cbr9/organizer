@@ -1,5 +1,5 @@
 use crate::{
-	data::{config::options::r#match::Match, path_to_rules::PathToRules, Data},
+	data::{options::r#match::Match, path_to_rules::PathToRules, Data},
 	path::IsHidden,
 	utils::UnwrapRef,
 };

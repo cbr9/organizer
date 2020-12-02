@@ -1,7 +1,7 @@
 use std::{fmt, result, str::FromStr};
 
 use crate::{
-	data::config::{folders::Folder, options::Options},
+	data::{config::folders::Folder, options::Options},
 	utils::UnwrapOrDefaultOpt,
 };
 use serde::{
@@ -71,7 +71,7 @@ impl<'de> Deserialize<'de> for Folder {
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use crate::data::config::options::{
+	use crate::data::options::{
 		apply::{wrapper::ApplyWrapper, Apply},
 		Options,
 	};

@@ -1,4 +1,4 @@
-use crate::data::{config::options::Options, settings::Settings};
+use crate::data::{options::Options, settings::Settings};
 use serde::{Deserialize, Deserializer};
 
 impl<'de> Deserialize<'de> for Settings {
