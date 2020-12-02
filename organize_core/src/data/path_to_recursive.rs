@@ -44,6 +44,7 @@ impl<'a> PathToRecursive<'a> {
 			})
 		});
 		map.shrink_to_fit();
+		println!("{:?}", map);
 		Self(map)
 	}
 

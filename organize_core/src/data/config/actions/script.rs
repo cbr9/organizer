@@ -106,11 +106,12 @@ mod tests {
 	#[test]
 	#[cfg(not(target_os = "windows"))] // python doesn't come installed by default on windows
 	fn test_script_filter() {
-		let mut script = Script::new("python", "print('huh')\nprint('{path}'.islower())");
+		let content = "print('huh')\nprint('{path}'.islower())";
+		let mut script = Script::new("python", content);
 		let path = "/home";
 		script.run(path).unwrap_or_else(|_| {
 			// some linux distributions don't have a `python` executable, but a `python3`
-			script = Script::new("python3", "print('huh')\nprint('{path}'.islower())");
+			script = Script::new("python3", content);
 			script.run(path).unwrap()
 		});
 		assert!(script.matches(&path))

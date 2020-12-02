@@ -55,8 +55,7 @@ impl File {
 			}
 			Match::First => {
 				let rules = self.get_matching_rules(data, map);
-				if !rules.is_empty() {
-					let (i, j) = rules.first().unwrap();
+				if let Some((i, j)) = rules.first() {
 					process_rule(i, j).ok();
 				}
 			}
@@ -65,7 +64,7 @@ impl File {
 
 	pub fn get_matching_rules<'a>(&self, data: &'a Data, map: &'a PathToRules) -> Vec<&'a (usize, usize)> {
 		let parent = self.path.parent().unwrap();
-		let mut top_ignored = data.defaults.ignore.unwrap_ref().iter().collect::<Vec<_>>();
+		let mut top_ignored: Vec<&PathBuf> = Vec::new(); // the default is an empty Vec
 		if let Some(vec) = &data.settings.defaults.ignore {
 			top_ignored.extend(vec);
 		}
