@@ -3,8 +3,7 @@ use anyhow::Result;
 use clap::Clap;
 use notify::RecursiveMode;
 use organize_core::{
-	config::UserConfig,
-	data::{Data, PathToRecursive, PathToRules},
+	data::{path_to_recursive::PathToRecursive, path_to_rules::PathToRules, Data},
 	file::File,
 };
 use rayon::prelude::*;
@@ -20,15 +19,14 @@ pub struct Run {
 impl Cmd for Run {
 	fn run(self) -> Result<()> {
 		let data = Data::new();
-		let path_to_rules = PathToRules::new(&data);
-		let path_to_recursive = PathToRecursive::new(&data);
-		self.start(data, path_to_rules, path_to_recursive)
+		self.start(data)
 	}
 }
 
 impl<'a> Run {
-	pub(crate) fn start(self, data: Data, path_to_rules: PathToRules<'_>, path_to_recursive: PathToRecursive<'_>) -> Result<()> {
-		let paths = path_to_rules.keys().collect::<Vec<_>>();
+	pub(crate) fn start(self, data: Data) -> Result<()> {
+		let path_to_recursive = PathToRecursive::new(&data);
+		let path_to_rules = PathToRules::new(&data);
 
 		let process = |entry: DirEntry| {
 			if entry.path().is_file() {
@@ -37,7 +35,7 @@ impl<'a> Run {
 			}
 		};
 
-		paths.par_iter().for_each(|path| {
+		path_to_rules.keys().collect::<Vec<_>>().par_iter().for_each(|path| {
 			let recursive = path_to_recursive.get(path).unwrap();
 			if recursive == &RecursiveMode::Recursive {
 				WalkDir::new(path).follow_links(true).into_iter().filter_map(|e| e.ok()).for_each(process);

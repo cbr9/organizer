@@ -1,6 +1,5 @@
 #![feature(bool_to_option)]
 
-pub mod config;
 pub(crate) mod path {
 	mod expand;
 	mod is_hidden;
@@ -18,7 +17,6 @@ pub(crate) mod string {
 pub mod data;
 pub mod file;
 pub mod register;
-pub mod settings;
 pub mod utils;
 
 #[macro_use]

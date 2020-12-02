@@ -101,7 +101,7 @@ mod tests {
 
 	use sysinfo::{Pid, ProcessExt, RefreshKind, Signal, System, SystemExt};
 
-	use crate::{config::UserConfig, register::Register};
+	use crate::{data::config::UserConfig, register::Register};
 
 	fn stop() {
 		let sys = System::new_with_specifics(RefreshKind::with_processes(RefreshKind::new()));

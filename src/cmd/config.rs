@@ -3,7 +3,7 @@ use anyhow::Result;
 use clap::{crate_name, Clap};
 use colored::Colorize;
 use organize_core::{
-	config::{
+	data::config::{
 		options::{apply::wrapper::ApplyWrapper, Options},
 		UserConfig,
 	},

@@ -3,7 +3,7 @@ use anyhow::Result;
 use clap::Clap;
 use colored::Colorize;
 use fern::colors::{Color, ColoredLevelConfig};
-use organize_core::config::UserConfig;
+use organize_core::data::config::UserConfig;
 use std::{fs, path::PathBuf};
 
 #[derive(Debug, Clap)]

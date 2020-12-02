@@ -1,4 +1,4 @@
-use crate::config::actions::io_action::{ConflictOption, Sep};
+use crate::data::config::actions::io_action::{ConflictOption, Sep};
 use std::{
 	borrow::Cow,
 	io::{Error, ErrorKind, Result},

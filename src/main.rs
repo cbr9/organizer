@@ -2,7 +2,7 @@ use crate::cmd::{logs::Logs, App, Cmd};
 use clap::Clap;
 use lazy_static::lazy_static;
 use log::error;
-use organize_core::config::UserConfig;
+use organize_core::data::config::UserConfig;
 use std::{borrow::Cow, path::PathBuf};
 
 lazy_static! {
