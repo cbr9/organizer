@@ -132,7 +132,6 @@ impl<'a> Watch {
                                         if cfg!(feature = "hot-reload") {
 											watcher.unwatch(self.config.parent().unwrap())?;
 										}
-										watcher.unwatch(config_parent)?;
 										std::mem::drop(path);
 										std::mem::drop(path_to_rules);
 										std::mem::drop(data);

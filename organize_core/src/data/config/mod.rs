@@ -68,33 +68,12 @@ impl UserConfig {
 		} else {
 			std::env::set_current_dir(path.parent().unwrap()).unwrap();
 		}
-		println!("{}", path.display());
 
 		if !path.exists() {
 			Self::create(&path);
 		}
 		let content = fs::read_to_string(&path).unwrap(); // if there is some problem with the config file, we should not try to fix it
 		serde_yaml::from_str::<UserConfig>(&content)
-		// match serde_yaml::from_str::<UserConfig>(&content) {
-		// 	Ok(mut config) => {
-		// 		let settings = Settings::from_default_path();
-		// 		config.defaults = Some(settings.defaults).combine(&config.defaults);
-		// 		for rule in config.rules.iter_mut() {
-		// 			rule.options = config.defaults.combine(&rule.options);
-		// 			for folder in rule.folders.iter_mut() {
-		// 				folder.options = rule.options.combine(&folder.options);
-		// 			}
-		// 			rule.options = None;
-		// 		}
-		// 		config.rules.path_to_rules = Some(config.rules.map());
-		// 		config.rules.path_to_recursive = Some(config.rules.map());
-		// 		Ok(config)
-		// 	}
-		// 	Err(e) => {
-		// 		error!("{}", e);
-		// 		Err(e.into())
-		// 	}
-		// }
 	}
 
 	pub fn create(path: &Path) {
