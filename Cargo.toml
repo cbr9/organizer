@@ -3,7 +3,7 @@ name = "organize"
 version = "0.2.0"
 authors = ["KBR9 <cabero96@protonmail.com>"]
 edition = "2018"
-description = "file automation for the power user"
+description = "file automation for the poweruser"
 repository = "https://github.com/cbr9/organize"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
