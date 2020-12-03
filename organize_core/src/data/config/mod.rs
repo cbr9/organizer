@@ -40,7 +40,7 @@ use crate::{
 /// * `rules`: a list of parsed rules defined by the user
 #[derive(Deserialize, Clone, Debug)]
 pub struct UserConfig {
-	pub rules: Rules,
+	pub rules: Vec<Rule>,
 	#[serde(default = "Options::default_none")]
 	pub defaults: Options,
 }
@@ -69,8 +69,9 @@ impl UserConfig {
 			if !path.exists() {
 				Self::create(&path);
 			}
-			let content = fs::read_to_string(&path).unwrap(); // if there is some problem with the config file, we should not try to fix it
-			serde_yaml::from_str::<UserConfig>(&content).map_err(anyhow::Error::new)
+			fs::read_to_string(&path).map(|content| {
+				serde_yaml::from_str::<UserConfig>(&content).map_err(anyhow::Error::new)
+			})?
 		};
 
 		if config_path == Self::default_path() {
@@ -155,31 +156,8 @@ impl UserConfig {
 	}
 }
 
-#[derive(Deserialize, Clone, Debug)]
-#[serde(transparent)]
-pub struct Rules {
-	pub(crate) inner: Vec<Rule>,
-	#[serde(skip)]
-	pub path_to_rules: Option<HashMap<PathBuf, Vec<(usize, usize)>>>,
-	#[serde(skip)]
-	pub path_to_recursive: Option<HashMap<PathBuf, RecursiveMode>>,
-}
-
-impl Deref for Rules {
-	type Target = Vec<Rule>;
-
-	fn deref(&self) -> &Self::Target {
-		&self.inner
-	}
-}
-
-impl DerefMut for Rules {
-	fn deref_mut(&mut self) -> &mut Self::Target {
-		&mut self.inner
-	}
-}
-
 #[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Rule {
 	pub actions: Actions,
 	pub filters: Filters,
