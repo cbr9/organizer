@@ -49,10 +49,7 @@ impl File {
 		match r#match {
 			Match::All => {
 				let rules = self.get_matching_rules(data, map);
-				rules
-					.into_iter()
-					.try_for_each(|(i, j)| process_rule(i, j))
-					.ok();
+				rules.into_iter().try_for_each(|(i, j)| process_rule(i, j)).ok();
 			}
 			Match::First => {
 				let rules = self.get_matching_rules(data, map);

@@ -2,8 +2,7 @@ mod de;
 
 use std::{
 	borrow::Cow,
-	fs,
-	io,
+	fs, io,
 	io::{ErrorKind, Result},
 	ops::Deref,
 	path::{Path, PathBuf},
@@ -163,16 +162,19 @@ mod tests {
 		let mut value = IOAction::from_str("$HOME").unwrap();
 		value.if_exists = ConflictOption::Rename;
 		value.sep = Sep("-".into());
-		assert_de_tokens(&value, &[
-			Token::Map { len: Some(3) },
-			Token::Str("to"),
-			Token::Str("$HOME"),
-			Token::Str("if_exists"),
-			Token::Str("rename"),
-			Token::Str("sep"),
-			Token::Str("-"),
-			Token::MapEnd,
-		])
+		assert_de_tokens(
+			&value,
+			&[
+				Token::Map { len: Some(3) },
+				Token::Str("to"),
+				Token::Str("$HOME"),
+				Token::Str("if_exists"),
+				Token::Str("rename"),
+				Token::Str("sep"),
+				Token::Str("-"),
+				Token::MapEnd,
+			],
+		)
 	}
 
 	#[test]

@@ -15,12 +15,14 @@ impl FromStr for Folder {
 
 	fn from_str(s: &str) -> Result<Self, Self::Err> {
 		let path = PathBuf::from(s);
-		path.expand_user()?.expand_vars()?.canonicalize().map(|path| {
-			Self {
+		path.expand_user()?
+			.expand_vars()?
+			.canonicalize()
+			.map(|path| Self {
 				path,
-				options: DefaultOpt::default_none()
-			}
-		}).map_err(anyhow::Error::new)
+				options: DefaultOpt::default_none(),
+			})
+			.map_err(anyhow::Error::new)
 	}
 }
 

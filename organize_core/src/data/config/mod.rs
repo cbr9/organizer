@@ -11,6 +11,7 @@ use std::{
 };
 
 use anyhow::Context;
+use anyhow::Result;
 use dirs::{config_dir, home_dir};
 use log::error;
 
@@ -59,22 +60,29 @@ impl UserConfig {
 	/// ### Errors
 	/// This constructor fails in the following cases:
 	/// - The configuration file does not exist
-	pub fn new<T>(path: T) -> serde_yaml::Result<UserConfig>
+	pub fn new<T>(path: T) -> Result<UserConfig>
 	where
 		T: AsRef<Path>,
 	{
-		let path = path.as_ref();
-		if path == Self::default_path() {
-			std::env::set_current_dir(home_dir().unwrap()).unwrap();
-		} else {
-			std::env::set_current_dir(path.parent().unwrap()).unwrap();
-		}
+		let config_path = path.as_ref();
+		let parse = |path: &Path| {
+			if !path.exists() {
+				Self::create(&path);
+			}
+			let content = fs::read_to_string(&path).unwrap(); // if there is some problem with the config file, we should not try to fix it
+			serde_yaml::from_str::<UserConfig>(&content).map_err(anyhow::Error::new)
+		};
 
-		if !path.exists() {
-			Self::create(&path);
+		if config_path == Self::default_path() {
+			home_dir()
+				.map(|path| std::env::set_current_dir(&path).map(|_| parse(&config_path))?)
+				.ok_or_else(|| anyhow::Error::msg("could not determine home directory"))?
+		} else {
+			config_path
+				.parent()
+				.map(|path| std::env::set_current_dir(path).map(|_| parse(config_path))?)
+				.ok_or_else(|| anyhow::Error::msg("cannot determine config file directory"))?
 		}
-		let content = fs::read_to_string(&path).unwrap(); // if there is some problem with the config file, we should not try to fix it
-		serde_yaml::from_str::<UserConfig>(&content)
 	}
 
 	pub fn create(path: &Path) {

@@ -7,8 +7,7 @@ use serde::{
 	de,
 	de::{Error, MapAccess, Visitor},
 	export::PhantomData,
-	Deserialize,
-	Deserializer,
+	Deserialize, Deserializer,
 };
 use std::{fmt, path::PathBuf, str::FromStr};
 
@@ -44,7 +43,11 @@ impl<'de> Deserialize<'de> for IOAction {
 						"to" => {
 							action.to = match visit_placeholder_string(&value) {
 								Ok(str) => {
-									let path = PathBuf::from(str).expand_vars().map_err(M::Error::custom)?.expand_user().map_err(M::Error::custom)?;
+									let path = PathBuf::from(str)
+										.expand_vars()
+										.map_err(M::Error::custom)?
+										.expand_user()
+										.map_err(M::Error::custom)?;
 									if !path.exists() {
 										return Err(M::Error::custom("path does not exist"));
 									}

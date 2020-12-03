@@ -4,8 +4,7 @@ use crate::{
 };
 use serde::{
 	de::{Error, MapAccess, Visitor},
-	Deserialize,
-	Deserializer,
+	Deserialize, Deserializer,
 };
 use std::{fmt, path::PathBuf};
 
@@ -75,14 +74,10 @@ impl<'de> Deserialize<'de> for Options {
 							}
 						}
 						key => {
-							return Err(A::Error::unknown_field(key, &[
-								"recursive",
-								"watch",
-								"ignore",
-								"hidden_files",
-								"match",
-								"apply",
-							]))
+							return Err(A::Error::unknown_field(
+								key,
+								&["recursive", "watch", "ignore", "hidden_files", "match", "apply"],
+							))
 						}
 					}
 				}
@@ -122,14 +117,20 @@ mod tests {
 		check_duplicate("watch", vec![Token::Bool(true)]);
 		check_duplicate("ignore", vec![Token::Seq { len: Some(1) }, Token::Str("/home"), Token::SeqEnd]);
 		check_duplicate("hidden_files", vec![Token::Bool(true)]);
-		check_duplicate("match", vec![Token::UnitVariant {
-			name: "Match",
-			variant: "first",
-		}]);
-		check_duplicate("apply", vec![Token::UnitVariant {
-			name: "Apply",
-			variant: "all",
-		}]);
+		check_duplicate(
+			"match",
+			vec![Token::UnitVariant {
+				name: "Match",
+				variant: "first",
+			}],
+		);
+		check_duplicate(
+			"apply",
+			vec![Token::UnitVariant {
+				name: "Apply",
+				variant: "all",
+			}],
+		);
 	}
 
 	#[test]

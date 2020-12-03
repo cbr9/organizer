@@ -1,5 +1,8 @@
-use std::{env, path::{Path, PathBuf}};
 use std::env::VarError;
+use std::{
+	env,
+	path::{Path, PathBuf},
+};
 
 pub trait Expand {
 	// TODO: implement for str
@@ -24,7 +27,7 @@ impl Expand for PathBuf {
 	fn expand_vars(self) -> Result<PathBuf, VarError> {
 		if self.to_string_lossy().contains('$') {
 			let mut components = Vec::new();
-            for comp in self.components() {
+			for comp in self.components() {
 				let component: &Path = comp.as_ref();
 				let component = component.to_string_lossy();
 				if component.starts_with('$') {

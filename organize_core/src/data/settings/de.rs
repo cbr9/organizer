@@ -23,15 +23,18 @@ mod tests {
 		defaults.hidden_files = Some(true);
 		defaults.recursive = Some(true);
 		let value = Settings { defaults };
-		assert_de_tokens(&value, &[
-			Token::Map { len: Some(3) },
-			Token::Str("hidden_files"),
-			Token::Bool(true),
-			Token::Str("watch"),
-			Token::Bool(false),
-			Token::Str("recursive"),
-			Token::Bool(true),
-			Token::MapEnd,
-		])
+		assert_de_tokens(
+			&value,
+			&[
+				Token::Map { len: Some(3) },
+				Token::Str("hidden_files"),
+				Token::Bool(true),
+				Token::Str("watch"),
+				Token::Bool(false),
+				Token::Str("recursive"),
+				Token::Bool(true),
+				Token::MapEnd,
+			],
+		)
 	}
 }

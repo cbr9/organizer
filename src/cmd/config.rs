@@ -1,8 +1,8 @@
 use crate::cmd::Cmd;
-use log::error;
-use anyhow::{Result, Context};
+use anyhow::{Context, Result};
 use clap::{crate_name, Clap};
 use colored::Colorize;
+use log::error;
 use organize_core::{
 	data::{
 		config::UserConfig,
@@ -10,9 +10,9 @@ use organize_core::{
 	},
 	utils::DefaultOpt,
 };
-use std::{env, process};
-use std::thread::spawn;
 use std::process::{Command, ExitStatus};
+use std::thread::spawn;
+use std::{env, process};
 
 #[derive(Clap, Debug)]
 pub struct Config {
@@ -56,11 +56,18 @@ impl Cmd for Config {
 			let config_file = env::current_dir()?.join(format!("{}.yml", crate_name!()));
 			UserConfig::create(&config_file);
 		} else {
-			env::var("EDITOR").map(|editor| {
-				let path = UserConfig::path();
-				let mut command = Command::new(&editor);
-				command.arg(path).spawn().context(format!("{}", &editor))?.wait().context("command wasn't running")
-			}).context("invalid EDITOR variable")??;
+			env::var("EDITOR")
+				.map(|editor| {
+					let path = UserConfig::path();
+					let mut command = Command::new(&editor);
+					command
+						.arg(path)
+						.spawn()
+						.context(format!("{}", &editor))?
+						.wait()
+						.context("command wasn't running")
+				})
+				.context("invalid EDITOR variable")??;
 		}
 		Ok(())
 	}

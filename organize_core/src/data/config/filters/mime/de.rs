@@ -1,8 +1,7 @@
 use crate::data::config::filters::mime::{Mime, MimeWrapper};
 use serde::{
 	de::{Error, SeqAccess, Visitor},
-	Deserialize,
-	Deserializer,
+	Deserialize, Deserializer,
 };
 use std::{fmt, str::FromStr};
 

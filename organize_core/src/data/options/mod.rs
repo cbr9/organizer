@@ -5,8 +5,8 @@ pub(crate) mod r#match;
 use crate::data::options::r#match::Match;
 
 use crate::{data::options::apply::wrapper::ApplyWrapper, utils::DefaultOpt};
-use serde::Serialize;
 use serde::Deserialize;
+use serde::Serialize;
 use std::path::PathBuf;
 
 #[derive(Serialize, Debug, Clone, Eq, PartialEq)]

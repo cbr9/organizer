@@ -36,13 +36,11 @@ impl<'a> PathToRules<'a> {
 				let str: String = slice.join(&std::path::MAIN_SEPARATOR.to_string());
 				paths.push(PathBuf::from(str.replace("//", "/")))
 			}
-			let path = paths.iter().rev().find_map(|path| {
-				if self.0.contains_key(path) {
-					Some(path)
-				} else {
-					None
-				}
-			}).unwrap();
+			let path = paths
+				.iter()
+				.rev()
+				.find_map(|path| if self.0.contains_key(path) { Some(path) } else { None })
+				.unwrap();
 			self.0.get(path).unwrap()
 		})
 	}

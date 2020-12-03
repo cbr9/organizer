@@ -2,9 +2,7 @@ use crate::data::config::filters::regex::Regex;
 use serde::{
 	de,
 	de::{Error, SeqAccess, Visitor},
-	export,
-	Deserialize,
-	Deserializer,
+	export, Deserialize, Deserializer,
 };
 use std::{fmt, str::FromStr};
 

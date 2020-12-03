@@ -7,9 +7,7 @@ use crate::{
 use serde::{
 	de,
 	de::{Error, MapAccess, Visitor},
-	export,
-	Deserialize,
-	Deserializer,
+	export, Deserialize, Deserializer,
 };
 use std::path::PathBuf;
 
@@ -182,20 +180,23 @@ mod tests {
 			r#match: None,
 			apply: ApplyWrapper::from(Apply::All),
 		};
-		assert_de_tokens(&value, &[
-			Token::Map { len: Some(2) },
-			Token::Str("path"),
-			Token::Str("$HOME"),
-			Token::Str("options"),
-			Token::Map { len: Some(3) },
-			Token::Str("recursive"),
-			Token::Bool(true),
-			Token::Str("apply"),
-			Token::Str("all"),
-			Token::Str("watch"),
-			Token::Bool(true),
-			Token::MapEnd,
-			Token::MapEnd,
-		])
+		assert_de_tokens(
+			&value,
+			&[
+				Token::Map { len: Some(2) },
+				Token::Str("path"),
+				Token::Str("$HOME"),
+				Token::Str("options"),
+				Token::Map { len: Some(3) },
+				Token::Str("recursive"),
+				Token::Bool(true),
+				Token::Str("apply"),
+				Token::Str("all"),
+				Token::Str("watch"),
+				Token::Bool(true),
+				Token::MapEnd,
+				Token::MapEnd,
+			],
+		)
 	}
 }

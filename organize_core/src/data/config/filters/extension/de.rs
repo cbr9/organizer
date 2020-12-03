@@ -3,8 +3,7 @@ use serde::{
 	de,
 	de::{SeqAccess, Visitor},
 	export::PhantomData,
-	Deserialize,
-	Deserializer,
+	Deserialize, Deserializer,
 };
 use std::fmt;
 
