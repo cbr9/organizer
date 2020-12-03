@@ -1,4 +1,5 @@
 use crate::cmd::Cmd;
+use log::error;
 use anyhow::Result;
 use clap::{crate_name, Clap};
 use colored::Colorize;
@@ -10,6 +11,8 @@ use organize_core::{
 	utils::DefaultOpt,
 };
 use std::{env, process};
+use std::thread::spawn;
+use std::process::{Command, ExitStatus};
 
 #[derive(Clap, Debug)]
 pub struct Config {
@@ -53,11 +56,11 @@ impl Cmd for Config {
 			let config_file = env::current_dir()?.join(format!("{}.yml", crate_name!()));
 			UserConfig::create(&config_file);
 		} else {
-			let editor = match env::var_os("EDITOR") {
-				Some(exec) => exec,
-				None => panic!("Could not find any EDITOR environment variable or it's not properly set"),
-			};
-			process::Command::new(&editor).arg(UserConfig::path()).spawn()?.wait()?;
+			env::var("EDITOR").map(|editor| {
+				let path = UserConfig::path();
+				let mut command = Command::new(&editor);
+				command.arg(path).spawn()?.wait()
+			})??;
 		}
 		Ok(())
 	}

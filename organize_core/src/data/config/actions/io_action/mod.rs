@@ -2,7 +2,6 @@ mod de;
 
 use std::{
 	borrow::Cow,
-	convert::Infallible,
 	fs,
 	io,
 	io::{ErrorKind, Result},

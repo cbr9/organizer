@@ -6,10 +6,11 @@ use crate::data::options::r#match::Match;
 
 use crate::{data::options::apply::wrapper::ApplyWrapper, utils::DefaultOpt};
 use serde::Serialize;
+use serde::Deserialize;
 use std::path::PathBuf;
 
-#[derive(Serialize, Debug, Clone, Eq, PartialEq)]
-// #[serde(deny_unknown_fields)]
+#[derive(Deserialize, Serialize, Debug, Clone, Eq, PartialEq)]
+#[serde(deny_unknown_fields)]
 pub struct Options {
 	/// defines whether or not subdirectories must be scanned
 	pub recursive: Option<bool>,
