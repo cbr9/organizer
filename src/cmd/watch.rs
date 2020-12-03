@@ -18,6 +18,8 @@ use organize_core::{
 use std::path::PathBuf;
 use sysinfo::{ProcessExt, RefreshKind, Signal, System, SystemExt};
 use std::time::Duration;
+use organize_core::data::settings::Settings;
+
 
 #[derive(Clap, Debug)]
 pub struct Watch {
@@ -45,14 +47,7 @@ impl Cmd for Watch {
                     Ok(())
                 };
             }
-
-            match UserConfig::new(&self.config) {
-                Ok(config) => {
-                    let data = Data::from(config);
-                    self.start(data)
-                }
-                Err(_) => std::process::exit(0),
-            }
+            self.start(Data::new()?)
         }
     }
 }
@@ -66,14 +61,7 @@ impl<'a> Watch {
                 if let Some(process) = sys.get_process(section.pid) {
                     process.kill(Signal::Kill);
                 }
-                match UserConfig::new(&self.config) {
-                    // TODO: should check that it's valid before killing the previous process
-                    Ok(config) => {
-                        let data = Data::from(config);
-                        self.start(data)
-                    }
-                    Err(_) => std::process::exit(0),
-                }
+                self.start(Data::new()?)
             }
             None => {
                 // there is no running process
@@ -125,29 +113,39 @@ impl<'a> Watch {
                             }
                         }
                         DebouncedEvent::Write(path) => {
-                            if cfg!(feature = "hot-reload") && path == self.config {
-                                match UserConfig::new(&self.config) {
-                                    Ok(new_config) =>{
-                                        if new_config != data.config {
-                                            for folder in path_to_rules.keys() {
-                                                watcher.unwatch(folder)?;
-                                            };
-                                            if cfg!(feature = "hot-reload") {
-                                                watcher.unwatch(self.config.parent().unwrap())?;
+                            if cfg!(feature = "hot-reload") {
+                                if path == self.config {
+                                    match UserConfig::new(&self.config) {
+                                        Ok(new_config) => {
+                                            if new_config != data.config {
+                                                for folder in path_to_rules.keys() {
+                                                    watcher.unwatch(folder)?;
+                                                };
+                                                if cfg!(feature = "hot-reload") {
+                                                    watcher.unwatch(self.config.parent().unwrap())?;
+                                                }
+                                                std::mem::drop(path);
+                                                std::mem::drop(path_to_rules);
+                                                data.config = new_config;
+                                                info!("reloaded configuration: {}", self.config.display());
+                                                break self.start(data);
                                             }
-                                            std::mem::drop(path);
-                                            std::mem::drop(path_to_rules);
-                                            // std::mem::drop(data);
-                                            data.config = new_config;
-                                            // let data = Data::from(new_config);
-                                            info!("reloaded configuration: {}", self.config.display());
+                                        }
+                                        Err(e) => {
+                                            debug!("could not reload configuration: {}", e);
+                                        }
+                                    };
+                                } else if path == Settings::path() {
+                                    match Settings::new(Settings::path()) {
+                                        Ok(settings) => {
+                                            data.settings = settings;
                                             break self.start(data);
                                         }
+                                        Err(e) => {
+                                            debug!("could not reload settings: {}", e);
+                                        }
                                     }
-                                    Err(_) => {
-                                        debug!("could not reload configuration");
-                                    }
-                                };
+                                }
                             }
                         }
                         _ => {}

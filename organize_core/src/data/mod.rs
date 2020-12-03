@@ -10,36 +10,30 @@ use crate::{
 	PROJECT_NAME,
 };
 use dirs::config_dir;
-use log::error;
 
+
+use anyhow::Result;
 use std::path::PathBuf;
 
 #[derive(Debug)]
 pub struct Data {
 	pub(crate) defaults: Options,
-	pub(crate) settings: Settings,
+	pub settings: Settings,
 	pub config: UserConfig,
 }
 
-impl Default for Data {
-	fn default() -> Self {
-		Self::new()
-	}
-}
-
 impl Data {
-	pub fn new() -> Self {
-		match UserConfig::new(UserConfig::path()) {
-			Ok(config) => Self {
-				defaults: Options::default_some(),
-				settings: Settings::from_default_path(),
-				config,
-			},
-			Err(e) => {
-				error!("{}", e);
-				std::process::exit(0)
-			}
-		}
+	pub fn new() -> Result<Self> {
+		let data = UserConfig::new(UserConfig::path()).map(|config| {
+			Settings::new(Settings::path()).map(|settings| {
+				Self {
+					defaults: Options::default_some(),
+					settings,
+					config,
+				}
+			})
+		})??;
+		Ok(data)
 	}
 
 	pub fn dir() -> PathBuf {
@@ -47,12 +41,3 @@ impl Data {
 	}
 }
 
-impl From<UserConfig> for Data {
-	fn from(config: UserConfig) -> Self {
-		Self {
-			defaults: Options::default_some(),
-			settings: Settings::from_default_path(),
-			config,
-		}
-	}
-}

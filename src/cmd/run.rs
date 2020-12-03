@@ -18,7 +18,7 @@ pub struct Run {
 
 impl Cmd for Run {
 	fn run(self) -> Result<()> {
-		let data = Data::new();
+		let data = Data::new()?;
 		self.start(data)
 	}
 }
