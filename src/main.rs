@@ -4,6 +4,7 @@ use lazy_static::lazy_static;
 use log::error;
 use organize_core::data::config::UserConfig;
 use std::{borrow::Cow, path::PathBuf};
+use anyhow::private::kind::TraitKind;
 
 lazy_static! {
 	pub static ref CONFIG_PATH: PathBuf = UserConfig::path();
@@ -19,7 +20,7 @@ fn main() -> anyhow::Result<()> {
 	match app.run() {
 		Ok(_) => {}
 		Err(e) => {
-			error!("{}", e);
+			error!("{:?}", e);
 			std::process::exit(0)
 		}
 	}

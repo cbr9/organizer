@@ -1,6 +1,6 @@
 use crate::cmd::Cmd;
 use log::error;
-use anyhow::Result;
+use anyhow::{Result, Context};
 use clap::{crate_name, Clap};
 use colored::Colorize;
 use organize_core::{
@@ -59,8 +59,8 @@ impl Cmd for Config {
 			env::var("EDITOR").map(|editor| {
 				let path = UserConfig::path();
 				let mut command = Command::new(&editor);
-				command.arg(path).spawn()?.wait()
-			})??;
+				command.arg(path).spawn().context(format!("{}", &editor))?.wait().context("command wasn't running")
+			}).context("invalid EDITOR variable")??;
 		}
 		Ok(())
 	}
