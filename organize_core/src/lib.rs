@@ -1,5 +1,3 @@
-#![feature(bool_to_option)]
-
 pub(crate) mod path {
 	mod expand;
 	mod is_hidden;
