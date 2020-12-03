@@ -1,14 +1,15 @@
 pub trait Capitalize {
-	fn capitalize(&self) -> String;
+	fn capitalize(self) -> String;
 }
 
 impl Capitalize for String {
-	fn capitalize(&self) -> Self {
-		if self.is_empty() {
-			return self.clone();
+	fn capitalize(self) -> Self {
+		let mut chars = self.chars();
+		if let Some(char) = chars.next() {
+			char.to_uppercase().to_string() + chars.as_str()
+		} else {
+			self
 		}
-		let mut c = self.chars();
-		c.next().unwrap().to_uppercase().collect::<String>() + c.as_str()
 	}
 }
 
