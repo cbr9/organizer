@@ -28,8 +28,5 @@ num-traits = "0.2.14"
 mime_guess = "2.0.3"
 mime = "0.3.16"
 
-[target.'cfg(windows)'.dependencies]
-winapi = { version = "0.3.9", features = [ "winnt" ]}
-
 [dev-dependencies]
 serde_test = "1.0.117"

@@ -104,7 +104,6 @@ mod tests {
 	use super::*;
 
 	#[test]
-	#[cfg(not(target_os = "windows"))] // python doesn't come installed by default on windows
 	fn test_script_filter() {
 		let content = "print('huh')\nprint('{path}'.islower())";
 		let mut script = Script::new("python", content);
