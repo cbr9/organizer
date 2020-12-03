@@ -9,8 +9,7 @@ use serde::Serialize;
 use serde::Deserialize;
 use std::path::PathBuf;
 
-#[derive(Deserialize, Serialize, Debug, Clone, Eq, PartialEq)]
-#[serde(deny_unknown_fields)]
+#[derive(Serialize, Debug, Clone, Eq, PartialEq)]
 pub struct Options {
 	/// defines whether or not subdirectories must be scanned
 	pub recursive: Option<bool>,
@@ -18,6 +17,7 @@ pub struct Options {
 	pub ignore: Option<Vec<PathBuf>>,
 	pub hidden_files: Option<bool>,
 	pub r#match: Option<Match>,
+	#[serde(default = "DefaultOpt::default_none")]
 	pub apply: ApplyWrapper,
 }
 
