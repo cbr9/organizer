@@ -2,7 +2,7 @@ use crate::cmd::Cmd;
 use anyhow::{Context, Result};
 use clap::{crate_name, Clap};
 use colored::Colorize;
-use log::error;
+
 use organize_core::{
 	data::{
 		config::UserConfig,
@@ -10,9 +10,9 @@ use organize_core::{
 	},
 	utils::DefaultOpt,
 };
-use std::process::{Command, ExitStatus};
-use std::thread::spawn;
-use std::{env, process};
+use std::process::{Command};
+
+use std::{env};
 
 #[derive(Clap, Debug)]
 pub struct Config {

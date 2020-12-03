@@ -6,7 +6,7 @@ use std::{
 
 use colored::Colorize;
 use log::{debug, error, info};
-use notify::{op, raw_watcher, watcher, RawEvent, RecommendedWatcher, RecursiveMode, Watcher, DebouncedEvent};
+use notify::{watcher, RecommendedWatcher, RecursiveMode, Watcher, DebouncedEvent};
 
 use crate::{Cmd, CONFIG_PATH_STR};
 use clap::Clap;
@@ -34,7 +34,7 @@ impl Cmd for Watch {
         } else {
             let register = Register::new()?;
             if register.iter().map(|section| &section.path).any(|config| config == &self.config) {
-                return if self.config == UserConfig::path() {
+                return if self.config == UserConfig::default_path() {
                     println!("An existing instance is already running. Use --replace to restart it");
                     Ok(())
                 } else {
@@ -77,7 +77,7 @@ impl<'a> Watch {
             }
             None => {
                 // there is no running process
-                if self.config == UserConfig::path() {
+                if self.config == UserConfig::default_path() {
                     println!("{}", "No instance was found running with the default configuration.".bold());
                 } else {
                     println!(
@@ -104,7 +104,7 @@ impl<'a> Watch {
         Ok((watcher, rx))
     }
 
-    fn start(&'a self, data: Data) -> Result<()> {
+    fn start(&'a self, mut data: Data) -> Result<()> {
         Register::new()?.append(process::id(), &self.config)?;
         let path_to_rules = PathToRules::new(&data);
         let (mut watcher, rx) = self.setup(&data)?;
@@ -137,8 +137,9 @@ impl<'a> Watch {
                                             }
                                             std::mem::drop(path);
                                             std::mem::drop(path_to_rules);
-                                            std::mem::drop(data);
-                                            let data = Data::from(new_config);
+                                            // std::mem::drop(data);
+                                            data.config = new_config;
+                                            // let data = Data::from(new_config);
                                             info!("reloaded configuration: {}", self.config.display());
                                             break self.start(data);
                                         }
@@ -153,7 +154,6 @@ impl<'a> Watch {
                     }
                 },
                 Err(e) => error!("{}", e.to_string()),
-                _ => {}
             }
         }
     }

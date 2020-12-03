@@ -4,9 +4,7 @@ pub mod folders;
 
 use std::{
 	borrow::Cow,
-	collections::HashMap,
 	fs,
-	ops::{Deref, DerefMut},
 	path::{Path, PathBuf},
 };
 
@@ -15,7 +13,7 @@ use anyhow::Result;
 use dirs::{config_dir, home_dir};
 use log::error;
 
-use notify::RecursiveMode;
+
 use serde::Deserialize;
 
 use crate::{
