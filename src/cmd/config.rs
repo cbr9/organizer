@@ -66,8 +66,7 @@ impl Cmd for Config {
 						.context(format!("{}", &editor))?
 						.wait()
 						.context("command wasn't running")
-				})
-				.context("invalid EDITOR variable")??;
+				})??;
 		}
 		Ok(())
 	}
