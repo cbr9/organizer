@@ -13,6 +13,7 @@ impl PartialEq for Regex {
 		self.iter().zip(other.iter()).all(|(lhs, rhs)| lhs.as_str() == rhs.as_str())
 	}
 }
+impl Eq for Regex {}
 
 impl Deref for Regex {
 	type Target = Vec<regex::Regex>;

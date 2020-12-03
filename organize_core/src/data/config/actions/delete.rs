@@ -5,7 +5,7 @@ use colored::Colorize;
 use log::info;
 use serde::Deserialize;
 
-#[derive(Debug, Clone, Deserialize, Default)]
+#[derive(Debug, Clone, Deserialize, Default, PartialEq, Eq)]
 pub struct Delete(bool);
 
 impl Deref for Delete {

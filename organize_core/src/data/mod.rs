@@ -18,7 +18,7 @@ use std::path::PathBuf;
 pub struct Data {
 	pub(crate) defaults: Options,
 	pub(crate) settings: Settings,
-	pub(crate) config: UserConfig,
+	pub config: UserConfig,
 }
 
 impl Default for Data {

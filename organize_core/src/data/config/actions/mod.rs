@@ -20,7 +20,7 @@ use log::error;
 use serde::Deserialize;
 use std::path::PathBuf;
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
 #[serde(rename_all(deserialize = "lowercase"))]
 pub enum Action {
 	Move(IOAction),
@@ -62,7 +62,7 @@ pub enum ActionType {
 	Trash,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
 pub struct Actions(Vec<Action>);
 
 impl Deref for Actions {

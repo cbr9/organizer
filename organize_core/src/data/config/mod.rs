@@ -38,7 +38,7 @@ use crate::{
 /// ### Fields
 /// * `path`: the path the user's config, either the default one or some other passed with the --with-config argument
 /// * `rules`: a list of parsed rules defined by the user
-#[derive(Deserialize, Clone, Debug)]
+#[derive(Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct UserConfig {
 	pub rules: Vec<Rule>,
 	#[serde(default = "Options::default_none")]
@@ -156,7 +156,7 @@ impl UserConfig {
 	}
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct Rule {
 	pub actions: Actions,

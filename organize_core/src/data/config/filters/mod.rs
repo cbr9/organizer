@@ -18,7 +18,7 @@ use crate::data::{
 	options::apply::Apply,
 };
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Eq, PartialEq)]
 #[serde(rename_all(deserialize = "lowercase"))]
 pub enum Filter {
 	Regex(Regex),
@@ -44,7 +44,7 @@ impl AsFilter for Filter {
 	}
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Eq, PartialEq)]
 #[serde(transparent)]
 pub struct Filters {
 	#[serde(flatten)]

@@ -4,7 +4,7 @@ use crate::data::config::filters::AsFilter;
 use mime::FromStrError;
 use std::{convert::TryFrom, ops::Deref, path::Path, str::FromStr};
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Mime(mime::Mime);
 
 impl Deref for Mime {
@@ -23,7 +23,7 @@ impl FromStr for Mime {
 	}
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct MimeWrapper(Vec<Mime>);
 
 impl Deref for MimeWrapper {

@@ -8,7 +8,7 @@ use colored::Colorize;
 use log::info;
 use serde::Deserialize;
 
-#[derive(Debug, Clone, Deserialize, Default)]
+#[derive(Debug, Clone, Deserialize, Default, Eq, PartialEq)]
 pub struct Echo(#[serde(deserialize_with = "deserialize_placeholder_string")] String);
 
 impl Deref for Echo {

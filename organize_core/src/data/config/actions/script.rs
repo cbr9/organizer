@@ -18,7 +18,7 @@ use crate::{
 	string::{deserialize_placeholder_string, Placeholder},
 };
 
-#[derive(Deserialize, Debug, Clone, Default)]
+#[derive(Deserialize, Debug, Clone, Default, Eq, PartialEq)]
 pub struct Script {
 	#[serde(deserialize_with = "deserialize_exec")]
 	exec: String,
