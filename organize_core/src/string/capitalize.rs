@@ -8,6 +8,7 @@ impl Capitalize for String {
 		if let Some(char) = chars.next() {
 			char.to_uppercase().to_string() + chars.as_str()
 		} else {
+            // it's empty
 			self
 		}
 	}

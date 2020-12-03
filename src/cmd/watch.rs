@@ -118,6 +118,7 @@ impl<'a> Watch {
 							if let Some(parent) = path.parent() {
 								if (cfg!(not(feature = "hot-reload")) || (cfg!(feature = "hot-reload") && parent != config_parent)) && path.is_file() {
 									let file = File::new(path);
+									std::thread::sleep(std::time::Duration::from_secs(1));
 									file.process(&data, &path_to_rules);
 								}
 							}

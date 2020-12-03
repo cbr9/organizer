@@ -12,6 +12,7 @@ use std::{
 
 use anyhow::Context;
 use dirs::{config_dir, home_dir};
+use log::error;
 
 use notify::RecursiveMode;
 use serde::Deserialize;
@@ -110,14 +111,16 @@ impl UserConfig {
 
 	pub fn path() -> PathBuf {
 		std::env::current_dir().map_or_else(
-			|_| {
+			|e| {
 				// if the current dir could not be identified
+				error!("{}", e);
 				Self::default_path()
 			},
 			|dir| {
 				dir.read_dir().map_or_else(
-					|_| {
+					|e| {
 						// if it could be identified but there was a problem reading its content
+						error!("{}", e);
 						Self::default_path()
 					},
 					|mut files| {

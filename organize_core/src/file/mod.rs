@@ -48,7 +48,8 @@ impl File {
 		});
 		match r#match {
 			Match::All => {
-				self.get_matching_rules(data, map)
+				let rules = self.get_matching_rules(data, map);
+				rules
 					.into_iter()
 					.try_for_each(|(i, j)| process_rule(i, j))
 					.ok();
