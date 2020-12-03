@@ -11,17 +11,16 @@ pub struct Folder {
 }
 
 impl FromStr for Folder {
-	type Err = std::io::Error;
+	type Err = anyhow::Error;
 
 	fn from_str(s: &str) -> Result<Self, Self::Err> {
 		let path = PathBuf::from(s);
-		match path.expand_user().expand_vars().canonicalize() {
-			Ok(path) => Ok(Self {
+		path.expand_user()?.expand_vars()?.canonicalize().map(|path| {
+			Self {
 				path,
-				options: DefaultOpt::default_none(),
-			}),
-			Err(e) => Err(e),
-		}
+				options: DefaultOpt::default_none()
+			}
+		}).map_err(anyhow::Error::new)
 	}
 }
 

@@ -1,48 +1,41 @@
-use std::{
-	env,
-	path::{Path, PathBuf},
-};
+use std::{env, path::{Path, PathBuf}};
+use std::env::VarError;
 
 pub trait Expand {
 	// TODO: implement for str
-	fn expand_user(self) -> Self;
-	fn expand_vars(self) -> Self;
+	fn expand_user(self) -> Result<Self, VarError>
+	where
+		Self: Sized;
+	fn expand_vars(self) -> Result<Self, VarError>
+	where
+		Self: Sized;
 }
 
 impl Expand for PathBuf {
-	fn expand_user(self) -> PathBuf {
+	fn expand_user(self) -> Result<PathBuf, VarError> {
 		let str = self.to_str().unwrap();
 		if str.contains('~') {
-			match env::var("HOME") {
-				Ok(home) => {
-					let new = str.replace("~", &home);
-					new.into()
-				}
-				Err(e) => panic!("error: {}", e),
-			}
+			env::var("HOME").map(|home| str.replace("~", &home).into())
 		} else {
-			self
+			Ok(self)
 		}
 	}
 
-	fn expand_vars(self) -> PathBuf {
-		// TODO: avoid panic, return a serde error
+	fn expand_vars(self) -> Result<PathBuf, VarError> {
 		if self.to_string_lossy().contains('$') {
-			self.components()
-				.map(|component| {
-					let component: &Path = component.as_ref();
-					let component = component.to_string_lossy();
-					if component.starts_with('$') {
-						env::var(component.replace('$', ""))
-							// todo: return error, don't panic
-							.unwrap_or_else(|_| panic!("error: environment variable '{}' could not be found", component))
-					} else {
-						component.to_string()
-					}
-				})
-				.collect::<PathBuf>()
+			let mut components = Vec::new();
+            for comp in self.components() {
+				let component: &Path = comp.as_ref();
+				let component = component.to_string_lossy();
+				if component.starts_with('$') {
+					env::var(component.replace('$', "")).map(|comp| components.push(comp))?;
+				} else {
+					components.push(component.to_string());
+				}
+			}
+			Ok(components.into_iter().collect::<PathBuf>())
 		} else {
-			self
+			Ok(self)
 		}
 	}
 }
@@ -61,26 +54,25 @@ mod tests {
 	fn user() {
 		let original = PathBuf::from("~/Documents");
 		let expected = home_dir().unwrap().join("Documents");
-		assert_eq!(original.expand_user(), expected)
+		assert_eq!(original.expand_user().unwrap(), expected)
 	}
 	#[test]
 	fn home() {
 		let original = PathBuf::from("$HOME/Documents");
 		let expected = home_dir().unwrap().join("Documents");
-		assert_eq!(original.expand_vars(), expected)
+		assert_eq!(original.expand_vars().unwrap(), expected)
 	}
 	#[test]
 	fn new_var() {
 		env::set_var("PROJECT_DIR", project());
 		let original = PathBuf::from("$PROJECT_DIR/tests");
 		let expected = project().join("tests");
-		assert_eq!(original.expand_vars(), expected)
+		assert_eq!(original.expand_vars().unwrap(), expected)
 	}
 	#[test]
-	#[should_panic]
 	fn non_existing_var() {
 		let var = "PROJECT_DIR_2";
 		let tested = PathBuf::from(format!("${}/tests", var));
-		tested.expand_vars();
+		assert!(tested.expand_vars().is_err())
 	}
 }

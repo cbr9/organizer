@@ -20,6 +20,9 @@ use crate::{
 use colored::Colorize;
 use log::info;
 use serde::{Deserialize, Serialize};
+use std::convert::TryFrom;
+use std::env::VarError;
+
 #[derive(Debug, Clone, Eq, PartialEq, Default)]
 pub struct IOAction {
 	pub to: PathBuf,
@@ -58,24 +61,24 @@ impl AsAction<Copy> for IOAction {
 	}
 }
 
-impl<T> From<T> for IOAction
-where
-	T: Into<PathBuf>,
-{
-	fn from(val: T) -> Self {
-		Self {
-			to: val.into().expand_user().expand_vars(),
+impl TryFrom<PathBuf> for IOAction {
+	type Error = VarError;
+
+	fn try_from(value: PathBuf) -> result::Result<Self, Self::Error> {
+		let action = Self {
+			to: value.expand_user()?.expand_vars()?,
 			if_exists: Default::default(),
 			sep: Default::default(),
-		}
+		};
+		Ok(action)
 	}
 }
 
 impl FromStr for IOAction {
-	type Err = Infallible;
+	type Err = VarError;
 
 	fn from_str(s: &str) -> result::Result<Self, Self::Err> {
-		Ok(Self::from(s))
+		Self::try_from(PathBuf::from(s))
 	}
 }
 
@@ -180,7 +183,7 @@ mod tests {
 		let expected = target.join("test1 (1).txt");
 		assert!(target.join(original.file_name().unwrap()).exists());
 		assert!(!expected.exists());
-		let action = IOAction::from(target);
+		let action = IOAction::try_from(target).unwrap();
 		let new_path = IOAction::helper(&original, &action, ActionType::Copy).unwrap();
 		assert_eq!(new_path, expected)
 	}
@@ -192,7 +195,7 @@ mod tests {
 		let expected = target.join("test1 (1).txt");
 		assert!(target.join(original.file_name().unwrap()).exists());
 		assert!(!expected.exists());
-		let action = IOAction::from(target);
+		let action = IOAction::try_from(target).unwrap();
 		let new_path = IOAction::helper(&original, &action, ActionType::Move).unwrap();
 		assert_eq!(new_path, expected)
 	}
@@ -204,7 +207,7 @@ mod tests {
 		let expected = target.with_file_name("test1 (1).txt");
 		assert!(target.exists());
 		assert!(!expected.exists());
-		let action = IOAction::from(target);
+		let action = IOAction::try_from(target).unwrap();
 		let new_path = IOAction::helper(&original, &action, ActionType::Rename).unwrap();
 		assert_eq!(new_path, expected)
 	}
