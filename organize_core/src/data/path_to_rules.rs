@@ -38,7 +38,7 @@ impl<'a> PathToRules<'a> {
 			(0..components.len())
 				.map(|i| PathBuf::from_iter(&components[0..i]))
 				.rev()
-				.find_map(|path| if self.0.contains_key(&path) { Some(path) } else { None })
+				.find(|path| self.0.contains_key(&path))
 				.map(|path| self.0.get(&path).unwrap())
 				.unwrap()
 		})

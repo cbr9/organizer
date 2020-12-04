@@ -1,7 +1,7 @@
 mod de;
 
 use crate::{
-	data::{config::UserConfig, options::Options},
+	data::{options::Options},
 	utils::DefaultOpt,
 };
 
