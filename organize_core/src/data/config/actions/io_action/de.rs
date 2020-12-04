@@ -29,8 +29,8 @@ impl<'de> Deserialize<'de> for IOAction {
 			where
 				E: de::Error,
 			{
-				let string = visit_placeholder_string(value).map_err(|e| E::custom(e.to_string()))?;
-				Ok(IOAction::from_str(string.as_str()).unwrap())
+				let string = visit_placeholder_string(value).map_err(E::custom)?;
+				IOAction::from_str(string.as_str()).map_err(E::custom)
 			}
 
 			fn visit_map<M>(self, mut map: M) -> Result<Self::Value, M::Error>
