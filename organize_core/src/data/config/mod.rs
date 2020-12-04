@@ -133,7 +133,7 @@ impl UserConfig {
 								if let Ok(entry) = file {
 									let path = entry.path();
 									let mime_type = mime_guess::from_path(&entry.path()).first_or_octet_stream();
-									if path.file_stem().unwrap() == "organize" && mime_type == "text/x-yaml" {
+									if path.file_stem().unwrap_or_default() == "organize" && mime_type == "text/x-yaml" {
 										Some(path)
 									} else {
 										None
