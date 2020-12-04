@@ -100,7 +100,7 @@ mod tests {
 
 	use sysinfo::{Pid, ProcessExt, RefreshKind, Signal, System, SystemExt};
 
-	use crate::{data::config::UserConfig, register::Register};
+	use crate::{data::config::Config, register::Register};
 
 	fn stop() {
 		let sys = System::new_with_specifics(RefreshKind::with_processes(RefreshKind::new()));
@@ -114,7 +114,7 @@ mod tests {
 		let pid: Pid = 1000000000;
 		let sys = System::new_with_specifics(RefreshKind::with_processes(RefreshKind::new()));
 		assert!(sys.get_process(pid).is_none());
-		let path = UserConfig::path();
+		let path = Config::path();
 		let register = Register::new().unwrap();
 		register.append(pid, &path).unwrap();
 	}

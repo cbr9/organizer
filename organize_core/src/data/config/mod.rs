@@ -36,19 +36,19 @@ use crate::{
 /// * `path`: the path the user's config, either the default one or some other passed with the --with-config argument
 /// * `rules`: a list of parsed rules defined by the user
 #[derive(Deserialize, Clone, Debug, PartialEq, Eq)]
-pub struct UserConfig {
+pub struct Config {
 	pub rules: Vec<Rule>,
 	#[serde(default = "Options::default_none")]
 	pub defaults: Options,
 }
 
-impl AsRef<Self> for UserConfig {
-	fn as_ref(&self) -> &UserConfig {
+impl AsRef<Self> for Config {
+	fn as_ref(&self) -> &Config {
 		self
 	}
 }
 
-impl UserConfig {
+impl Config {
 	/// Creates a new UserConfig instance.
 	/// It parses the configuration file
 	/// and fills missing fields with either the defaults, in the case of global options,
@@ -57,7 +57,7 @@ impl UserConfig {
 	/// ### Errors
 	/// This constructor fails in the following cases:
 	/// - The configuration file does not exist
-	pub fn parse<T>(path: T) -> Result<UserConfig>
+	pub fn parse<T>(path: T) -> Result<Config>
 	where
 		T: AsRef<Path>,
 	{

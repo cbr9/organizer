@@ -4,7 +4,7 @@ use clap::{Clap};
 
 use organize_core::{
 	data::{
-		config::UserConfig,
+		config::Config,
 		options::{Options},
 	},
 };
@@ -23,7 +23,7 @@ pub enum Edit {
 impl Cmd for Edit {
 	fn run(self) -> Result<()> {
         match self {
-			Edit::Config => Self::launch_editor(UserConfig::path()).map(|_| ()),
+			Edit::Config => Self::launch_editor(Config::path()).map(|_| ()),
 			Edit::Settings => Self::launch_editor(Settings::path()).map(|_| ()),
 		}
 	}
@@ -36,7 +36,7 @@ impl Edit {
 			command
 				.arg(path.as_ref())
 				.spawn()
-				.context(format!("{}", &editor))?
+				.context(editor.to_string())?
 				.wait()
 				.context("command wasn't running")
 		})??)

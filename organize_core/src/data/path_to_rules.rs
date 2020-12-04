@@ -1,4 +1,4 @@
-use crate::data::config::UserConfig;
+use crate::data::config::Config;
 use std::iter::FromIterator;
 use std::{
 	collections::{hash_map::Keys, HashMap},
@@ -8,7 +8,7 @@ use std::{
 pub struct PathToRules<'a>(HashMap<&'a PathBuf, Vec<(usize, usize)>>);
 
 impl<'a> PathToRules<'a> {
-	pub fn new(config: &'a UserConfig) -> Self {
+	pub fn new(config: &'a Config) -> Self {
 		let mut map = HashMap::with_capacity(config.rules.len()); // there will be at least one folder per rule
 		config.rules.iter().enumerate().for_each(|(i, rule)| {
 			rule.folders.iter().enumerate().for_each(|(j, folder)| {
@@ -77,7 +77,7 @@ mod tests {
 				..Default::default()
 			},
 		];
-		let config = UserConfig {
+		let config = Config {
 			rules,
 			defaults: Options::default_none(),
 		};

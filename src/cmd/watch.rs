@@ -12,7 +12,7 @@ use crate::{Cmd, CONFIG_PATH_STR};
 use clap::Clap;
 use organize_core::data::settings::Settings;
 use organize_core::{
-	data::{config::UserConfig, path_to_recursive::PathToRecursive, path_to_rules::PathToRules, Data},
+	data::{config::Config, path_to_recursive::PathToRecursive, path_to_rules::PathToRules, Data},
 	file::File,
 	register::Register,
 };
@@ -35,7 +35,7 @@ impl Cmd for Watch {
 		} else {
 			let register = Register::new()?;
 			if register.iter().map(|section| &section.path).any(|config| config == &self.config) {
-				return if self.config == UserConfig::default_path() {
+				return if self.config == Config::default_path() {
 					println!("An existing instance is already running. Use --replace to restart it");
 					Ok(())
 				} else {
@@ -64,7 +64,7 @@ impl<'a> Watch {
 			}
 			None => {
 				// there is no running process
-				if self.config == UserConfig::default_path() {
+				if self.config == Config::default_path() {
 					println!("{}", "No instance was found running with the default configuration.".bold());
 				} else {
 					println!(
@@ -114,7 +114,7 @@ impl<'a> Watch {
                         DebouncedEvent::Write(path) => {
                             if cfg!(feature = "hot-reload") {
                                 if path == self.config {
-                                    match UserConfig::parse(&self.config) {
+                                    match Config::parse(&self.config) {
                                         Ok(new_config) => {
                                             if new_config != data.config {
                                                 for folder in path_to_rules.keys() {

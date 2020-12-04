@@ -5,7 +5,7 @@ pub mod path_to_rules;
 pub mod settings;
 
 use crate::{
-	data::{config::UserConfig, options::Options, settings::Settings},
+	data::{config::Config, options::Options, settings::Settings},
 	utils::DefaultOpt,
 	PROJECT_NAME,
 };
@@ -18,12 +18,12 @@ use std::path::PathBuf;
 pub struct Data {
 	pub(crate) defaults: Options,
 	pub settings: Settings,
-	pub config: UserConfig,
+	pub config: Config,
 }
 
 impl Data {
 	pub fn new() -> Result<Self> {
-		let data = UserConfig::parse(UserConfig::path()).map(|config| {
+		let data = Config::parse(Config::path()).map(|config| {
 			Settings::new(Settings::path()).map(|settings| Self {
 				defaults: Options::default_some(),
 				settings,

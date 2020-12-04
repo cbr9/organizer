@@ -14,8 +14,8 @@ use log::info;
 use serde::{de::Error, Deserialize, Deserializer};
 
 use crate::{
-    data::config::{actions::AsAction, filters::AsFilter, UserConfig},
-    string::{deserialize_placeholder_string, Placeholder},
+	data::config::{actions::AsAction, filters::AsFilter, Config},
+	string::{deserialize_placeholder_string, Placeholder},
 };
 
 #[derive(Deserialize, Debug, Clone, Default, Eq, PartialEq)]
@@ -83,7 +83,7 @@ impl Script {
 	fn write(&self, path: &Path) -> Result<PathBuf> {
 		let content = self.content.as_str();
 		let content = content.expand_placeholders(path)?;
-		let dir = UserConfig::default_dir().join("scripts");
+		let dir = Config::default_dir().join("scripts");
 		if !dir.exists() {
 			fs::create_dir_all(&dir)?;
 		}

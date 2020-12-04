@@ -1,6 +1,6 @@
 use clap::Clap;
 use crate::cmd::Cmd;
-use organize_core::data::config::UserConfig;
+use organize_core::data::config::Config;
 use std::env;
 use clap::crate_name;
 use crate::cmd::edit::Edit;
@@ -14,7 +14,7 @@ pub struct New {
 impl Cmd for New {
     fn run(self) -> anyhow::Result<()> {
         let config_file = env::current_dir()?.join(format!("{}.yml", crate_name!()));
-        UserConfig::create(&config_file)?;
+        Config::create(&config_file)?;
         Edit::launch_editor(config_file).map(|_| ())
     }
 }
