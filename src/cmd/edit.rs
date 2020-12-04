@@ -5,7 +5,6 @@ use clap::{Clap};
 use organize_core::{
 	data::{
 		config::Config,
-		options::{Options},
 	},
 };
 use std::process::{Command, ExitStatus};
@@ -36,7 +35,7 @@ impl Edit {
 			command
 				.arg(path.as_ref())
 				.spawn()
-				.context(editor.to_string())?
+				.context(editor)?
 				.wait()
 				.context("command wasn't running")
 		})??)
