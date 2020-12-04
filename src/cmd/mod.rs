@@ -1,11 +1,15 @@
 use crate::cmd::{edit::Edit, logs::Logs, run::Run, stop::Stop, watch::Watch};
 use clap::Clap;
+use crate::cmd::new::New;
+use crate::cmd::info::Info;
 
 mod edit;
 pub(super) mod logs;
 mod run;
 mod stop;
 mod watch;
+mod new;
+mod info;
 
 #[derive(Clap)]
 #[clap(about, author, version)]
@@ -15,6 +19,8 @@ pub enum App {
 	Logs(Logs),
 	Stop(Stop),
 	Edit(Edit),
+	New(New),
+	Info(Info),
 }
 
 pub trait Cmd {
@@ -38,6 +44,8 @@ impl Cmd for App {
 			}
 			App::Logs(logs) => logs.run(),
 			App::Edit(config) => config.run(),
+			App::New(new) => new.run(),
+			App::Info(info) => info.run(),
 		}
 	}
 }
