@@ -7,7 +7,7 @@ use serde::{de::Error, Deserialize, Deserializer};
 
 lazy_static! {
 	// forgive me god for this monstrosity
-	static ref POTENTIAL_PH_REGEX: Regex = Regex::new(r"\{\w+(?:\.\w+)*}").unwrap();
+	static ref POTENTIAL_PH_REGEX: Regex = Regex::new(r"\{\w+(?:\.\w+)*}").unwrap(); // a panic here indicates a compile-time bug
 	static ref VALID_PH_REGEX: Regex = {
 		let vec = vec![
 			r"\{(?:(?:path|parent)(?:\.path|\.parent)*)(?:\.filename)?(?:\.to_lowercase|\.to_uppercase|\.capitalize)?\}", // match placeholders that involve directories
@@ -22,7 +22,7 @@ lazy_static! {
 				format!("(?:{})|", str)
 			}
 		}).collect::<String>();
-		Regex::new(whole.as_str()).unwrap()
+		Regex::new(whole.as_str()).unwrap() // a panic here indicates a compile-time bug
 	};
 }
 
