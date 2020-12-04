@@ -70,8 +70,7 @@ impl Register {
 	pub fn append<T, P>(mut self, pid: P, path: T) -> Result<Self>
 	where
 		T: AsRef<Path>,
-		P: AsPrimitive<i32> + AsPrimitive<usize>,
-		// the Pid type represents a usize in Windows, and an i32 in other platforms
+		P: AsPrimitive<Pid>
 	{
 		let section = Section {
 			path: path.as_ref().to_path_buf(),
