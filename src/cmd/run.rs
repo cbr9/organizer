@@ -26,7 +26,7 @@ impl Cmd for Run {
 impl<'a> Run {
 	pub(crate) fn start(self, data: Data) -> Result<()> {
 		let path_to_recursive = PathToRecursive::new(&data);
-		let path_to_rules = PathToRules::new(&data);
+		let path_to_rules = PathToRules::new(&data.config);
 
 		let process = |entry: DirEntry| {
 			if entry.path().is_file() {

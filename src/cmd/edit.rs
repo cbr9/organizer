@@ -10,12 +10,13 @@ use organize_core::{
 	},
 	utils::DefaultOpt,
 };
-use std::process::{Command};
+use std::process::{Command, ExitStatus};
 
 use std::{env};
+use std::path::Path;
 
 #[derive(Clap, Debug)]
-pub struct Config {
+pub struct Edit {
 	#[clap(long, exclusive = true)]
 	show_path: bool,
 	#[clap(long, exclusive = true)]
@@ -24,7 +25,7 @@ pub struct Config {
 	new: bool,
 }
 
-impl Cmd for Config {
+impl Cmd for Edit {
 	fn run(self) -> Result<()> {
 		if self.show_path {
 			println!("{}", UserConfig::default_path().display());
@@ -56,18 +57,22 @@ impl Cmd for Config {
 			let config_file = env::current_dir()?.join(format!("{}.yml", crate_name!()));
 			UserConfig::create(&config_file);
 		} else {
-			env::var("EDITOR")
-				.map(|editor| {
-					let path = UserConfig::path();
-					let mut command = Command::new(&editor);
-					command
-						.arg(path)
-						.spawn()
-						.context(format!("{}", &editor))?
-						.wait()
-						.context("command wasn't running")
-				})??;
+			Self::launch_editor(UserConfig::path())?;
 		}
 		Ok(())
+	}
+}
+
+impl Edit {
+	fn launch_editor<T: AsRef<Path>>(path: T) -> anyhow::Result<ExitStatus> {
+		Ok(env::var("EDITOR").map(|editor| {
+			let mut command = Command::new(&editor);
+			command
+				.arg(path.as_ref())
+				.spawn()
+				.context(format!("{}", &editor))?
+				.wait()
+				.context("command wasn't running")
+		})??)
 	}
 }

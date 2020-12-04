@@ -1,7 +1,7 @@
-use crate::cmd::{config::Config, logs::Logs, run::Run, stop::Stop, watch::Watch};
+use crate::cmd::{edit::Edit, logs::Logs, run::Run, stop::Stop, watch::Watch};
 use clap::Clap;
 
-mod config;
+mod edit;
 pub(super) mod logs;
 mod run;
 mod stop;
@@ -14,7 +14,7 @@ pub enum App {
 	Run(Run),
 	Logs(Logs),
 	Stop(Stop),
-	Config(Config),
+	Edit(Edit),
 }
 
 pub trait Cmd {
@@ -37,7 +37,7 @@ impl Cmd for App {
 				stop.run()
 			}
 			App::Logs(logs) => logs.run(),
-			App::Config(config) => config.run(),
+			App::Edit(config) => config.run(),
 		}
 	}
 }
