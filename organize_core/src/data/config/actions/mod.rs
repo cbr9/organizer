@@ -63,7 +63,7 @@ pub enum ActionType {
 }
 
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
-pub struct Actions(Vec<Action>);
+pub struct Actions(pub(crate) Vec<Action>);
 
 impl Deref for Actions {
 	type Target = Vec<Action>;
@@ -114,31 +114,5 @@ impl Actions {
 					.map(|_| path.to_path_buf())
 			}
 		}
-	}
-}
-
-#[cfg(test)]
-mod tests {
-	use crate::{data::config::actions::io_action::ConflictOption, path::Update, utils::tests::project};
-
-	#[test]
-	fn rename_with_rename_conflict() {
-		let original = project().join("tests").join("files").join("test2.txt");
-		let expected = original.with_file_name("test2 (1).txt");
-		let new_path = original.update(&ConflictOption::Rename, &Default::default()).unwrap();
-		assert_eq!(new_path, expected)
-	}
-
-	#[test]
-	fn rename_with_overwrite_conflict() {
-		let original = project().join("tests").join("files").join("test2.txt");
-		let new_path = original.update(&ConflictOption::Overwrite, &Default::default()).unwrap();
-		assert_eq!(new_path, original)
-	}
-
-	#[test]
-	fn rename_with_skip_conflict() {
-		let original = project().join("tests").join("files").join("test2.txt");
-		assert!(original.update(&ConflictOption::Skip, &Default::default()).is_err())
 	}
 }

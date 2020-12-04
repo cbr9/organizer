@@ -45,3 +45,30 @@ impl Update for Path {
 		}
 	}
 }
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+	use crate::utils::tests::project;
+
+	#[test]
+	fn rename_with_rename_conflict() {
+		let original = project().join("tests").join("files").join("test2.txt");
+		let expected = original.with_file_name("test2 (1).txt");
+		let new_path = original.update(&ConflictOption::Rename, &Default::default()).unwrap();
+		assert_eq!(new_path, expected)
+	}
+
+	#[test]
+	fn rename_with_overwrite_conflict() {
+		let original = project().join("tests").join("files").join("test2.txt");
+		let new_path = original.update(&ConflictOption::Overwrite, &Default::default()).unwrap();
+		assert_eq!(new_path, original)
+	}
+
+	#[test]
+	fn rename_with_skip_conflict() {
+		let original = project().join("tests").join("files").join("test2.txt");
+		assert!(original.update(&ConflictOption::Skip, &Default::default()).is_err())
+	}
+}

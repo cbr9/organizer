@@ -14,8 +14,8 @@ use log::info;
 use serde::{de::Error, Deserialize, Deserializer};
 
 use crate::{
-	data::config::{actions::AsAction, filters::AsFilter, UserConfig},
-	string::{deserialize_placeholder_string, Placeholder},
+    data::config::{actions::AsAction, filters::AsFilter, UserConfig},
+    string::{deserialize_placeholder_string, Placeholder},
 };
 
 #[derive(Deserialize, Debug, Clone, Default, Eq, PartialEq)]

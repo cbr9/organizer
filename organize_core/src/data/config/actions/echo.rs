@@ -1,8 +1,8 @@
 use std::{borrow::Cow, io::Result, ops::Deref, path::Path};
 
 use crate::{
-	data::config::actions::{ActionType, AsAction},
-	string::{deserialize_placeholder_string, Placeholder},
+    data::config::actions::{ActionType, AsAction},
+    string::{deserialize_placeholder_string, Placeholder},
 };
 use colored::Colorize;
 use log::info;

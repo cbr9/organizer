@@ -48,7 +48,7 @@ impl AsFilter for Filter {
 #[serde(transparent)]
 pub struct Filters {
 	#[serde(flatten)]
-	inner: Vec<Filter>,
+	pub(crate) inner: Vec<Filter>,
 }
 
 impl Deref for Filters {

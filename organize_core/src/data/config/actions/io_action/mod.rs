@@ -11,9 +11,9 @@ use std::{
 };
 
 use crate::{
-	data::config::actions::{ActionType, AsAction},
-	path::{Expand, Update},
-	string::Placeholder,
+    data::config::actions::{ActionType, AsAction},
+    path::{Expand, Update},
+    string::Placeholder,
 };
 use colored::Colorize;
 use log::info;
