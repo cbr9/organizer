@@ -13,7 +13,6 @@ use anyhow::Result;
 use dirs::{config_dir, home_dir};
 use log::error;
 
-
 use serde::Deserialize;
 
 use crate::{
@@ -58,18 +57,16 @@ impl UserConfig {
 	/// ### Errors
 	/// This constructor fails in the following cases:
 	/// - The configuration file does not exist
-	pub fn new<T>(path: T) -> Result<UserConfig>
+	pub fn parse<T>(path: T) -> Result<UserConfig>
 	where
 		T: AsRef<Path>,
 	{
 		let config_path = path.as_ref();
 		let parse = |path: &Path| {
 			if !path.exists() {
-				Self::create(&path);
+				Self::create(&path)?;
 			}
-			fs::read_to_string(&path).map(|content| {
-				serde_yaml::from_str::<UserConfig>(&content).map_err(anyhow::Error::new)
-			})?
+			fs::read_to_string(&path).map(|content| serde_yaml::from_str(&content).map_err(anyhow::Error::new))?
 		};
 
 		if config_path == Self::default_path() {
@@ -84,24 +81,23 @@ impl UserConfig {
 		}
 	}
 
-	pub fn create(path: &Path) {
+	pub fn create(path: &Path) -> anyhow::Result<()> {
 		let path = if path.exists() {
 			path.update(&ConflictOption::Rename, &Default::default()).unwrap() // safe unwrap (can only return an error if if_exists == Skip)
 		} else {
 			Cow::Borrowed(path)
 		};
 
-		match path.parent() {
-			Some(parent) => {
+		path.parent()
+			.map(|parent| {
 				if !parent.exists() {
 					std::fs::create_dir_all(parent).unwrap_or_else(|_| panic!("error: could not create config directory ({})", parent.display()));
 				}
 				let output = include_str!("../../../../examples/config.yml");
 				std::fs::write(&path, output).unwrap_or_else(|_| panic!("error: could not create config file ({})", path.display()));
 				println!("New config file created at {}", path.display());
-			}
-			None => panic!("config file's parent folder should be defined"),
-		}
+			})
+			.ok_or_else(|| anyhow::Error::msg("config file's parent folder should be defined"))
 	}
 
 	pub fn default_dir() -> PathBuf {
@@ -162,6 +158,17 @@ pub struct Rule {
 	pub folders: Folders,
 	#[serde(default = "Options::default_none")]
 	pub options: Options,
+}
+
+impl Default for Rule {
+	fn default() -> Self {
+		Self {
+			actions: Actions(vec![]),
+			filters: Filters { inner: vec![] },
+			folders: vec![],
+			options: Options::default_none(),
+		}
+	}
 }
 
 impl<'a> AsRef<Self> for Rule {
