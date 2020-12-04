@@ -54,13 +54,24 @@ mod tests {
 	use crate::utils::DefaultOpt;
 	use dirs::home_dir;
 	use std::convert::TryFrom;
+	use std::str::FromStr;
 
 	#[test]
 	fn test_new() {
 		let home = home_dir().unwrap();
 		let download_dir = home.join("Downloads");
+        if !download_dir.exists() {
+			std::fs::create_dir_all(&download_dir).unwrap();
+		}
 		let document_dir = home.join("Documents");
+		if !document_dir.exists() {
+			std::fs::create_dir_all(&document_dir).unwrap();
+		}
 		let picture_dir = home.join("Pictures");
+		if !picture_dir.exists() {
+			std::fs::create_dir_all(&picture_dir).unwrap();
+		}
+		
 		let rules = vec![
 			Rule {
 				folders: vec![
