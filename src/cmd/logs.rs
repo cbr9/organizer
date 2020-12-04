@@ -3,8 +3,8 @@ use anyhow::Result;
 use clap::Clap;
 use colored::Colorize;
 use fern::colors::{Color, ColoredLevelConfig};
-use organize_core::data::config::Config;
 use std::{fs, path::PathBuf};
+use organize_core::data::Data;
 
 #[derive(Debug, Clap)]
 pub struct Logs {
@@ -28,7 +28,7 @@ impl Cmd for Logs {
 
 impl Logs {
 	pub fn path() -> PathBuf {
-		Config::default_dir().join("output.log")
+		Data::dir().join("output.log")
 	}
 
 	pub(crate) fn setup() -> Result<(), fern::InitError> {
