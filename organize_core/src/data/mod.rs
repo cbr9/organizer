@@ -11,7 +11,6 @@ use crate::{
 };
 use dirs::config_dir;
 
-
 use anyhow::Result;
 use std::path::PathBuf;
 
@@ -24,15 +23,13 @@ pub struct Data {
 
 impl Data {
 	pub fn new() -> Result<Self> {
-		let data = UserConfig::new(UserConfig::path()).map(|config| {
-			Settings::new(Settings::path()).map(|settings| {
-				Self {
-					defaults: Options::default_some(),
-					settings,
-					config,
-				}
+		let data = UserConfig::parse(UserConfig::path()).map(|config| {
+			Settings::new(Settings::path()).map(|settings| Self {
+				defaults: Options::default_some(),
+				settings,
+				config,
 			})
-		})??;
+		})??; // return the error from UserConfig::parse and from Settings::new
 		Ok(data)
 	}
 
@@ -40,4 +37,3 @@ impl Data {
 		config_dir().unwrap().join(PROJECT_NAME)
 	}
 }
-
