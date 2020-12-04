@@ -54,7 +54,6 @@ mod tests {
 	use crate::utils::DefaultOpt;
 	use dirs::home_dir;
 	use std::convert::TryFrom;
-	use std::str::FromStr;
 
 	#[test]
 	fn test_new() {

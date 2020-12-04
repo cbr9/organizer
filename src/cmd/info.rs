@@ -32,9 +32,9 @@ impl Cmd for Info {
             println!("  watch = {}", watch.unwrap().to_string().bright_purple());
             println!("  ignore = {:?}", ignore.unwrap());
             println!("  hidden_files = {}", hidden_files.unwrap().to_string().bright_purple());
-            println!("  match = \"{}\"", r#match.unwrap().to_string().bright_green());
-            println!("  apply.actions = \"{}\"", apply.actions.unwrap().to_string().bright_green());
-            println!("  apply.filters = \"{}\"", apply.filters.unwrap().to_string().bright_green());
+            println!("  match = {}", r#match.unwrap().to_string().bright_green());
+            println!("  apply.actions = {}", apply.actions.unwrap().to_string().bright_green());
+            println!("  apply.filters = {}", apply.filters.unwrap().to_string().bright_green());
             println!()
         }
         if self.path {
