@@ -1,27 +1,23 @@
 use crate::cmd::Cmd;
 use anyhow::{Context, Result};
-use clap::{Clap};
+use clap::Clap;
 
-use organize_core::{
-	data::{
-		config::Config,
-	},
-};
+use organize_core::data::config::Config;
 use std::process::{Command, ExitStatus};
 
-use std::{env};
-use std::path::Path;
 use organize_core::data::settings::Settings;
+use std::env;
+use std::path::Path;
 
 #[derive(Clap, Debug)]
 pub enum Edit {
 	Config,
-	Settings
+	Settings,
 }
 
 impl Cmd for Edit {
 	fn run(self) -> Result<()> {
-        match self {
+		match self {
 			Edit::Config => Self::launch_editor(Config::path()).map(|_| ()),
 			Edit::Settings => Self::launch_editor(Settings::path()).map(|_| ()),
 		}

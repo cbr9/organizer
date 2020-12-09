@@ -1,15 +1,15 @@
+use crate::cmd::info::Info;
+use crate::cmd::new::New;
 use crate::cmd::{edit::Edit, logs::Logs, run::Run, stop::Stop, watch::Watch};
 use clap::Clap;
-use crate::cmd::new::New;
-use crate::cmd::info::Info;
 
 mod edit;
+mod info;
 pub(super) mod logs;
+mod new;
 mod run;
 mod stop;
 mod watch;
-mod new;
-mod info;
 
 #[derive(Clap)]
 #[clap(about, author, version)]

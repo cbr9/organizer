@@ -3,8 +3,8 @@ use anyhow::Result;
 use clap::Clap;
 use colored::Colorize;
 use fern::colors::{Color, ColoredLevelConfig};
-use std::{fs, path::PathBuf};
 use organize_core::data::Data;
+use std::{fs, path::PathBuf};
 
 #[derive(Debug, Clap)]
 pub struct Logs {

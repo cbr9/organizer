@@ -1,17 +1,14 @@
 mod de;
 
-use crate::{
-	data::{options::Options},
-	utils::DefaultOpt,
-};
+use crate::{data::options::Options, utils::DefaultOpt};
 
+use crate::data::Data;
 use log::debug;
 use serde::Serialize;
 use std::{
 	fs,
 	path::{Path, PathBuf},
 };
-use crate::data::Data;
 
 #[derive(Serialize, Eq, PartialEq, Debug, Clone)]
 pub struct Settings {
@@ -62,4 +59,3 @@ impl Settings {
 		Data::dir().join("settings.toml")
 	}
 }
-

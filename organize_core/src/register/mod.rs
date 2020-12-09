@@ -15,6 +15,8 @@ use std::{
 	ops::{Deref, DerefMut},
 };
 use sysinfo::{Pid, RefreshKind, System, SystemExt};
+use crate::PROJECT_NAME;
+use crate::data::Data;
 
 /// File where watchers are registered with their PID and configuration
 #[derive(Default, Serialize)]
@@ -46,7 +48,7 @@ pub struct Section {
 
 impl Register {
 	pub fn new() -> Result<Self> {
-		let path = temp_dir().join("register.json");
+		let path = Data::dir().join(format!("{}.json", PROJECT_NAME));
 		let f = OpenOptions::new().create(true).write(true).read(true).open(&path)?;
 		let register = match serde_json::from_reader::<_, Self>(f) {
 			Ok(mut register) => {

@@ -1,20 +1,20 @@
-use clap::Clap;
+use crate::cmd::edit::Edit;
 use crate::cmd::Cmd;
+use clap::crate_name;
+use clap::Clap;
 use organize_core::data::config::Config;
 use std::env;
-use clap::crate_name;
-use crate::cmd::edit::Edit;
 
 #[derive(Clap, Debug)]
 pub struct New {
-    #[clap(skip)]
-    inner: bool,
+	#[clap(skip)]
+	inner: bool,
 }
 
 impl Cmd for New {
-    fn run(self) -> anyhow::Result<()> {
-        let config_file = env::current_dir()?.join(format!("{}.yml", crate_name!()));
-        Config::create(&config_file)?;
-        Edit::launch_editor(config_file).map(|_| ())
-    }
+	fn run(self) -> anyhow::Result<()> {
+		let config_file = env::current_dir()?.join(format!("{}.yml", crate_name!()));
+		Config::create(&config_file)?;
+		Edit::launch_editor(config_file).map(|_| ())
+	}
 }

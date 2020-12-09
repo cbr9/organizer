@@ -59,7 +59,7 @@ mod tests {
 	fn test_new() {
 		let home = home_dir().unwrap();
 		let download_dir = home.join("Downloads");
-        if !download_dir.exists() {
+		if !download_dir.exists() {
 			std::fs::create_dir_all(&download_dir).unwrap();
 		}
 		let document_dir = home.join("Documents");
@@ -70,7 +70,7 @@ mod tests {
 		if !picture_dir.exists() {
 			std::fs::create_dir_all(&picture_dir).unwrap();
 		}
-		
+
 		let rules = vec![
 			Rule {
 				folders: vec![
