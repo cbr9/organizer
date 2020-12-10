@@ -22,9 +22,11 @@ use sysinfo::{ProcessExt, RefreshKind, Signal, System, SystemExt};
 
 #[derive(Clap, Debug)]
 pub struct Watch {
-	#[clap(long, default_value = &CONFIG_PATH_STR)]
+	#[clap(long, short = 'c', default_value = &CONFIG_PATH_STR, about = "Config path")]
 	pub config: PathBuf,
-	#[clap(long)]
+	#[clap(long, short = 'd', default_value = "2", about = "Seconds to wait before processing an event")]
+    delay: u8,
+	#[clap(long, short = 'r', about = "Restart the instance running with the specified configuration")]
 	replace: bool,
 	#[clap(long, short = 's', about = "Do not change any files, but get output on the hypothetical changes")]
 	simulate: bool,
@@ -86,7 +88,7 @@ impl<'a> Watch {
 			path_to_recursive.insert(self.config.parent().unwrap(), RecursiveMode::NonRecursive);
 		}
 		let (tx, rx) = channel();
-		let mut watcher = watcher(tx, Duration::from_secs(1)).unwrap();
+		let mut watcher = watcher(tx, Duration::from_secs(self.delay as u64)).unwrap();
 		for (folder, recursive) in path_to_recursive.iter() {
 			watcher.watch(folder, *recursive)?
 		}

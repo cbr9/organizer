@@ -12,7 +12,7 @@ use walkdir::{DirEntry, WalkDir};
 
 #[derive(Clap, Debug)]
 pub struct Run {
-	#[clap(long, default_value = &CONFIG_PATH_STR)]
+	#[clap(long, short = 'c', default_value = &CONFIG_PATH_STR, about = "Config path")]
 	pub(crate) config: PathBuf,
 	#[clap(long, short = 's', about = "Do not change any files, but get output on the hypothetical changes")]
 	simulate: bool,
