@@ -27,15 +27,12 @@ pub struct Script {
 }
 
 impl AsAction<Self> for Script {
-	fn act<'a>(&self, path: Cow<'a, Path>) -> Result<Cow<'a, Path>> {
-		match self.run(&path) {
-			Ok(_output) => {
-				// improve output
-				info!("({}) run script on {}", self.exec.bold(), path.display());
-				Ok(path)
-			}
-			Err(e) => Err(e),
+	fn act<'a>(&self, path: Cow<'a, Path>, simulate: bool) -> Result<Cow<'a, Path>> {
+        if !simulate {
+			self.run(&path)?;
 		}
+		info!("({}) run script on {}", self.exec.bold(), path.display());
+		Ok(path)
 	}
 }
 

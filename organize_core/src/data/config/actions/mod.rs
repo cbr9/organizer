@@ -33,21 +33,21 @@ pub enum Action {
 }
 
 impl AsAction<Action> for Action {
-	fn act<'a>(&self, path: Cow<'a, Path>) -> Result<Cow<'a, Path>> {
+	fn act<'a>(&self, path: Cow<'a, Path>, simulate: bool) -> Result<Cow<'a, Path>> {
 		match self {
-			Action::Copy(copy) => AsAction::<Copy>::act(copy, path), // IOAction has three different implementations of AsAction
-			Action::Move(r#move) => AsAction::<Move>::act(r#move, path), // so they must be called with turbo-fish syntax
-			Action::Rename(rename) => AsAction::<Rename>::act(rename, path),
-			Action::Delete(delete) => delete.act(path),
-			Action::Echo(echo) => echo.act(path),
-			Action::Trash(trash) => trash.act(path),
-			Action::Script(script) => script.act(path),
+			Action::Copy(copy) => AsAction::<Copy>::act(copy, path, simulate), // IOAction has three different implementations of AsAction
+			Action::Move(r#move) => AsAction::<Move>::act(r#move, path, simulate), // so they must be called with turbo-fish syntax
+			Action::Rename(rename) => AsAction::<Rename>::act(rename, path, simulate),
+			Action::Delete(delete) => delete.act(path, simulate),
+			Action::Echo(echo) => echo.act(path, simulate),
+			Action::Trash(trash) => trash.act(path, simulate),
+			Action::Script(script) => script.act(path, simulate),
 		}
 	}
 }
 
 pub(crate) trait AsAction<T> {
-	fn act<'a>(&self, path: Cow<'a, Path>) -> Result<Cow<'a, Path>>;
+	fn act<'a>(&self, path: Cow<'a, Path>, simulate: bool) -> Result<Cow<'a, Path>>;
 }
 
 #[derive(Eq, PartialEq, ToString)]
@@ -74,7 +74,7 @@ impl Deref for Actions {
 }
 
 impl Actions {
-	pub fn run<A>(&self, path: &Path, apply: A) -> Result<PathBuf>
+	pub fn run<A>(&self, path: &Path, apply: A, simulate: bool) -> Result<PathBuf>
 	where
 		A: AsRef<Apply>,
 	{
@@ -85,7 +85,7 @@ impl Actions {
 			Apply::All => {
 				let mut path = Cow::from(path);
 				self.iter()
-					.try_for_each(|action| match action.act(path.clone()) {
+					.try_for_each(|action| match action.act(path.clone(), simulate) {
 						Ok(new_path) => {
 							path = new_path;
 							Ok(())
@@ -101,7 +101,7 @@ impl Actions {
 				let mut path = Cow::from(path);
 				indices
 					.iter()
-					.try_for_each(|i| match self.get(*i).unwrap().act(path.clone()) {
+					.try_for_each(|i| match self.get(*i).unwrap().act(path.clone(), simulate) {
 						Ok(new_path) => {
 							path = new_path;
 							Ok(())

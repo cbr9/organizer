@@ -22,15 +22,19 @@ impl Deref for Trash {
 }
 
 impl AsAction<Self> for Trash {
-	fn act<'a>(&self, path: Cow<'a, Path>) -> Result<Cow<'a, Path>> {
+	fn act<'a>(&self, path: Cow<'a, Path>, simulate: bool) -> Result<Cow<'a, Path>> {
 		if self.0 {
-			return match trash::delete(&path) {
-				Ok(_) => {
-					info!("({}) {}", ActionType::Trash.to_string().bold(), path.display());
-					Ok(path)
-				}
-				Err(e) => Err(Error::new(ErrorKind::Other, e.to_string())),
-			};
+			if !simulate {
+				return match trash::delete(&path) {
+					Ok(_) => {
+						info!("({}) {}", ActionType::Trash.to_string().bold(), path.display());
+						Ok(path)
+					}
+					Err(e) => Err(Error::new(ErrorKind::Other, e.to_string())),
+				};
+			} else {
+				info!("({}) {}", ActionType::Trash.to_string().bold(), path.display());
+			}
 		}
 		Ok(path)
 	}

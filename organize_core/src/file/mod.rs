@@ -14,7 +14,7 @@ impl File {
 		Self { path: path.into() }
 	}
 
-	pub fn process<'a>(self, data: &'a Data, map: &'a PathToRules) {
+	pub fn process<'a>(self, data: &'a Data, map: &'a PathToRules, simulate: bool) {
 		let mut path = self.path.clone();
 		let mut process_rule = |i: &usize, j: &usize| {
 			let rule = &data.config.rules[*i];
@@ -31,7 +31,7 @@ impl File {
 					})
 				})
 			});
-			match rule.actions.run(&path, actions) {
+			match rule.actions.run(&path, actions, simulate) {
 				Ok(new_path) => {
 					path = new_path;
 					Ok(())

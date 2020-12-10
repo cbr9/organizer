@@ -17,9 +17,11 @@ impl Deref for Delete {
 }
 
 impl AsAction<Self> for Delete {
-	fn act<'a>(&self, path: Cow<'a, Path>) -> Result<Cow<'a, Path>> {
+	fn act<'a>(&self, path: Cow<'a, Path>, simulate: bool) -> Result<Cow<'a, Path>> {
 		if self.0 {
-			fs::remove_file(&path)?;
+            if !simulate {
+				fs::remove_file(&path)?;
+			}
 			info!("({}) {}", ActionType::Delete.to_string().bold(), path.display());
 		}
 		Ok(path)

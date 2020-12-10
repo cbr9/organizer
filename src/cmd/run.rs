@@ -14,6 +14,8 @@ use walkdir::{DirEntry, WalkDir};
 pub struct Run {
 	#[clap(long, default_value = &CONFIG_PATH_STR)]
 	pub(crate) config: PathBuf,
+	#[clap(long, short = 's', about = "Do not change any files, but get output on the hypothetic changes")]
+	simulate: bool,
 }
 
 impl Cmd for Run {
@@ -31,7 +33,7 @@ impl<'a> Run {
 		let process = |entry: DirEntry| {
 			if entry.path().is_file() {
 				let file = File::new(entry.path());
-				file.process(&data, &path_to_rules)
+				file.process(&data, &path_to_rules, self.simulate)
 			}
 		};
 

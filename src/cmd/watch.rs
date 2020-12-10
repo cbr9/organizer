@@ -26,6 +26,8 @@ pub struct Watch {
 	pub config: PathBuf,
 	#[clap(long)]
 	replace: bool,
+	#[clap(long, short = 's', about = "Do not change any files, but get output on the hypothetic changes")]
+	simulate: bool,
 }
 
 impl Cmd for Watch {
@@ -107,7 +109,7 @@ impl<'a> Watch {
                                 if (cfg!(not(feature = "hot-reload")) || (cfg!(feature = "hot-reload") && parent != config_parent)) && path.is_file() {
                                     let file = File::new(path);
                                     // std::thread::sleep(std::time::Duration::from_secs(1));
-                                    file.process(&data, &path_to_rules);
+                                    file.process(&data, &path_to_rules, self.simulate);
                                 }
                             }
                         }

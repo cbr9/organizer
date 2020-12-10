@@ -11,7 +11,6 @@ use std::{
 use num_traits::AsPrimitive;
 use serde_json::error::Category;
 use std::{
-	env::temp_dir,
 	ops::{Deref, DerefMut},
 };
 use sysinfo::{Pid, RefreshKind, System, SystemExt};
