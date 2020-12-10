@@ -26,7 +26,7 @@ pub struct Watch {
 	pub config: PathBuf,
 	#[clap(long)]
 	replace: bool,
-	#[clap(long, short = 's', about = "Do not change any files, but get output on the hypothetic changes")]
+	#[clap(long, short = 's', about = "Do not change any files, but get output on the hypothetical changes")]
 	simulate: bool,
 }
 
