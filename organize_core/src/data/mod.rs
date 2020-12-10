@@ -14,7 +14,7 @@ use dirs::config_dir;
 use anyhow::Result;
 use std::path::PathBuf;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Data {
 	pub(crate) defaults: Options,
 	pub settings: Settings,

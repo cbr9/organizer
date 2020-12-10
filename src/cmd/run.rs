@@ -15,7 +15,7 @@ pub struct Run {
 	#[clap(long, short = 'c', default_value = &CONFIG_PATH_STR, about = "Config path")]
 	pub(crate) config: PathBuf,
 	#[clap(long, short = 's', about = "Do not change any files, but get output on the hypothetical changes")]
-	simulate: bool,
+	pub(crate) simulate: bool,
 }
 
 impl Cmd for Run {
@@ -39,7 +39,7 @@ impl<'a> Run {
 
 		path_to_rules.keys().collect::<Vec<_>>().par_iter().for_each(|path| {
 			let recursive = path_to_recursive.get(path).unwrap();
-			if recursive == &RecursiveMode::Recursive {
+			if recursive == &RecursiveMode::NonRecursive {
 				WalkDir::new(path).follow_links(true).into_iter().filter_map(|e| e.ok()).for_each(process);
 			} else {
 				WalkDir::new(path)

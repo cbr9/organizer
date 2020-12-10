@@ -19,6 +19,7 @@ use organize_core::{
 use std::path::PathBuf;
 use std::time::Duration;
 use sysinfo::{ProcessExt, RefreshKind, Signal, System, SystemExt};
+use crate::cmd::run::Run;
 
 #[derive(Clap, Debug)]
 pub struct Watch {
@@ -30,10 +31,20 @@ pub struct Watch {
 	replace: bool,
 	#[clap(long, short = 's', about = "Do not change any files, but get output on the hypothetical changes")]
 	simulate: bool,
+	#[clap(long, about = "Process existing files before processing events")]
+	clean: bool,
 }
 
 impl Cmd for Watch {
 	fn run(self) -> Result<()> {
+		let data = Data::new()?;
+		if self.clean {
+			let cmd = Run {
+				config: self.config.clone(),
+				simulate: self.simulate
+			};
+			cmd.start(data.clone())?;
+		}
 		if self.replace {
 			self.replace()
 		} else {
@@ -50,7 +61,7 @@ impl Cmd for Watch {
 					Ok(())
 				};
 			}
-			self.start(Data::new()?)
+			self.start(data)
 		}
 	}
 }
