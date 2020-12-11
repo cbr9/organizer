@@ -96,11 +96,11 @@ impl<'a> Watch {
 	fn setup(&'a self, data: &'a Data) -> Result<(RecommendedWatcher, Receiver<DebouncedEvent>)> {
 		let mut path_to_recursive = PathToRecursive::new(&data);
 		if cfg!(feature = "hot-reload") && self.config.parent().is_some() {
-			path_to_recursive.insert(self.config.parent().unwrap(), RecursiveMode::NonRecursive);
+			path_to_recursive.insert(self.config.parent().unwrap(), (RecursiveMode::NonRecursive, None));
 		}
 		let (tx, rx) = channel();
 		let mut watcher = watcher(tx, Duration::from_secs(self.delay as u64)).unwrap();
-		for (folder, recursive) in path_to_recursive.iter() {
+		for (folder, (recursive, _)) in path_to_recursive.iter() {
 			watcher.watch(folder, *recursive)?
 		}
 		Ok((watcher, rx))
@@ -119,7 +119,7 @@ impl<'a> Watch {
                     match event {
                         DebouncedEvent::Create(path) => {
                             if let Some(parent) = path.parent() {
-                                if (cfg!(not(feature = "hot-reload")) || (cfg!(feature = "hot-reload") && parent != config_parent)) && path.is_file() {
+                                if parent != config_parent && path.is_file() {
                                     let file = File::new(path);
                                     // std::thread::sleep(std::time::Duration::from_secs(1));
                                     file.process(&data, &path_to_rules, self.simulate);

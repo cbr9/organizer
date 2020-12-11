@@ -35,7 +35,8 @@ impl Cmd for Info {
 				apply,
 			} = Options::default_some();
 			println!("{}:", "Defaults".bold().underline());
-			println!("  recursive = {}", recursive.unwrap().to_string().bright_purple());
+			println!("  recursive = {}", recursive.enabled.unwrap().to_string().bright_purple());
+			println!("  recursive.depth = {}", recursive.depth.unwrap().to_string().bright_purple());
 			println!("  watch = {}", watch.unwrap().to_string().bright_purple());
 			println!("  ignored_dirs = {:?}", ignored_dirs.unwrap());
 			println!("  hidden_files = {}", hidden_files.unwrap().to_string().bright_purple());

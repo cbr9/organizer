@@ -73,7 +73,8 @@ macro_rules! getter {
 	};
 }
 
-getter!(from folder, pub get_recursive, recursive, bool);
+getter!(from folder, struct, pub get_recursive_depth, recursive, depth, u16);
+getter!(from folder, struct, pub get_recursive_enabled, recursive, enabled, bool);
 getter!(from folder, pub get_watch, watch, bool);
 getter!(from folder, pub get_hidden_files, hidden_files, bool);
 getter!(from folder, struct, pub get_apply_actions, apply, actions, Apply);

@@ -31,17 +31,24 @@ impl<'a> PathToRules<'a> {
 		self.0.keys()
 	}
 
-	pub fn get(&self, key: &PathBuf) -> &Vec<(usize, usize)> {
-		self.0.get(key).unwrap_or_else(|| {
+    pub fn get_key_value(&self, key: &PathBuf) -> (PathBuf, &Vec<(usize, usize)>) {
+		self.0.get_key_value(key).map_or_else(|| {
 			// if the path is some subdirectory not represented in the hashmap
 			let components = key.components().collect::<Vec<_>>();
 			(0..components.len())
 				.map(|i| PathBuf::from_iter(&components[0..i]))
 				.rev()
 				.find(|path| self.0.contains_key(&path))
-				.map(|path| self.0.get(&path).unwrap())
+				.map(|path| {
+					let value = self.0.get(&path).unwrap();
+					(path, value)
+				})
 				.unwrap()
-		})
+		}, |(k, v)| (k.clone().clone(), v))
+	}
+
+	pub fn get(&self, key: &PathBuf) -> &Vec<(usize, usize)> {
+		self.get_key_value(key).1
 	}
 }
 

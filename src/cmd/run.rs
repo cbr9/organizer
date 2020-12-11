@@ -38,12 +38,12 @@ impl<'a> Run {
 		};
 
 		path_to_rules.keys().collect::<Vec<_>>().par_iter().for_each(|path| {
-			let recursive = path_to_recursive.get(path).unwrap();
+			let (recursive, depth) = path_to_recursive.get(path).unwrap();
 			if recursive == &RecursiveMode::NonRecursive {
 				WalkDir::new(path).follow_links(true).into_iter().filter_map(|e| e.ok()).for_each(process);
 			} else {
 				WalkDir::new(path)
-					.max_depth(1) // only direct descendants
+					.max_depth(depth.expect("depth is not defined but enabled is (check PathToRecursive::new)") as usize) // only direct descendants
 					.follow_links(true)
 					.into_iter()
 					.filter_map(|e| e.ok())

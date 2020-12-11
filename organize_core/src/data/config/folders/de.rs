@@ -75,6 +75,7 @@ mod tests {
 	};
 	use serde::de::{value::Error, Error as ErrorTrait};
 	use serde_test::{assert_de_tokens, assert_de_tokens_error, Token};
+	use crate::data::options::recursive::Recursive;
 
 	#[test]
 	fn deserialize_str() {
@@ -173,7 +174,10 @@ mod tests {
 	fn deserialize_map_valid() {
 		let mut value = Folder::from_str("$HOME").unwrap();
 		value.options = Options {
-			recursive: Some(true),
+			recursive: Recursive {
+				enabled: Some(true),
+				depth: None,
+			},
 			watch: Some(true),
 			ignored_dirs: None,
 			hidden_files: None,

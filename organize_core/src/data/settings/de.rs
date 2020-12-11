@@ -15,13 +15,17 @@ mod tests {
 	use super::*;
 	use crate::utils::DefaultOpt;
 	use serde_test::{assert_de_tokens, Token};
+	use crate::data::options::recursive::Recursive;
 
 	#[test]
 	fn deserialize() {
 		let mut defaults = Options::default_none();
 		defaults.watch = Some(false);
 		defaults.hidden_files = Some(true);
-		defaults.recursive = Some(true);
+		defaults.recursive = Recursive {
+			enabled: Some(true),
+			depth: None,
+		};
 		let value = Settings { defaults };
 		assert_de_tokens(
 			&value,

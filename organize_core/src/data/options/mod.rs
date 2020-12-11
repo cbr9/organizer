@@ -1,6 +1,7 @@
 pub mod apply;
 mod de;
 pub(crate) mod r#match;
+pub(crate) mod recursive;
 
 use crate::data::options::r#match::Match;
 
@@ -8,11 +9,12 @@ use crate::{data::options::apply::wrapper::ApplyWrapper, utils::DefaultOpt};
 
 use serde::Serialize;
 use std::path::PathBuf;
+use crate::data::options::recursive::Recursive;
 
 #[derive(Serialize, Debug, Clone, Eq, PartialEq)]
 pub struct Options {
 	/// defines whether or not subdirectories must be scanned
-	pub recursive: Option<bool>,
+	pub recursive: Recursive,
 	pub watch: Option<bool>,
 	pub ignored_dirs: Option<Vec<PathBuf>>,
 	pub hidden_files: Option<bool>,
@@ -24,7 +26,7 @@ pub struct Options {
 impl DefaultOpt for Options {
 	fn default_none() -> Self {
 		Self {
-			recursive: None,
+			recursive: DefaultOpt::default_none(),
 			watch: None,
 			ignored_dirs: None,
 			hidden_files: None,
@@ -35,7 +37,7 @@ impl DefaultOpt for Options {
 
 	fn default_some() -> Self {
 		Self {
-			recursive: Some(false),
+			recursive: DefaultOpt::default_some(),
 			watch: Some(true),
 			ignored_dirs: Some(Vec::new()),
 			hidden_files: Some(false),

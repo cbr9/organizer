@@ -7,6 +7,7 @@ use serde::{
 	Deserialize, Deserializer,
 };
 use std::{fmt, path::PathBuf};
+use crate::data::options::recursive::Recursive;
 
 impl<'de> Deserialize<'de> for Options {
 	// for some reason, the derived implementation of Deserialize for Options doesn't return an error
@@ -32,7 +33,7 @@ impl<'de> Deserialize<'de> for Options {
 				let mut hidden_files: Option<bool> = None;
 				let mut ignore: Option<Vec<PathBuf>> = None;
 				let mut r#match: Option<Match> = None;
-				let mut recursive: Option<bool> = None;
+				let mut recursive: Option<Recursive> = None;
 				let mut watch: Option<bool> = None;
 
 				while let Some(key) = map.next_key::<String>()? {
@@ -83,11 +84,11 @@ impl<'de> Deserialize<'de> for Options {
 				}
 
 				Ok(Options {
-					recursive,
 					watch,
 					ignored_dirs: ignore,
 					hidden_files,
 					r#match,
+					recursive: recursive.unwrap_or_default_none(),
 					apply: apply.unwrap_or_default_none(),
 				})
 			}
