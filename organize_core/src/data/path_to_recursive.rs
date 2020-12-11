@@ -8,6 +8,7 @@ use std::{
 	path::Path,
 };
 
+#[derive(Debug)]
 pub struct PathToRecursive<'a>(HashMap<&'a Path, (RecursiveMode, Option<u16>)>);
 
 impl<'a> PathToRecursive<'a> {

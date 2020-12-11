@@ -26,7 +26,7 @@ impl<'de> Deserialize<'de> for Recursive {
                 })
             }
 
-            fn visit_u16<E>(self, v: u16) -> Result<Self::Value, E>
+            fn visit_u64<E>(self, v: u64) -> Result<Self::Value, E>
             where
                 E: Error
             {
@@ -35,7 +35,7 @@ impl<'de> Deserialize<'de> for Recursive {
                 }
                 Ok(Recursive {
                     enabled: Some(true),
-                    depth: Some(v)
+                    depth: Some(v as u16)
                 })
             }
         }

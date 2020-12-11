@@ -37,7 +37,7 @@ impl DefaultOpt for Options {
 
 	fn default_some() -> Self {
 		Self {
-			recursive: DefaultOpt::default_some(),
+			recursive: DefaultOpt::default_none(),
 			watch: Some(true),
 			ignored_dirs: Some(Vec::new()),
 			hidden_files: Some(false),
