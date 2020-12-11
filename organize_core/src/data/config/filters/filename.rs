@@ -79,7 +79,7 @@ mod tests {
 	}
 
 	#[test]
-	fn match_beginning_case_sensitive() {
+	fn no_match_beginning_case_sensitive() {
 		let path = PathBuf::from("$HOME/Downloads/test.pdf");
 		let filename = Filename {
 			case_sensitive: true,
@@ -90,7 +90,7 @@ mod tests {
 	}
 
 	#[test]
-	fn match_ending_case_sensitive() {
+	fn no_match_ending_case_sensitive() {
 		let path = PathBuf::from("$HOME/Downloads/test.pdf");
 		let filename = Filename {
 			case_sensitive: true,
@@ -101,13 +101,23 @@ mod tests {
 	}
 
 	#[test]
-	fn match_containing_case_sensitive() {
+	fn no_match_containing_case_sensitive() {
 		let path = PathBuf::from("$HOME/Downloads/test.pdf");
 		let filename = Filename {
 			case_sensitive: true,
-			startswith: Some("ES".into()),
+			contains: Some("ES".into()),
 			..Default::default()
 		};
 		assert_eq!(filename.matches(path), false)
+	}
+	#[test]
+	fn match_containing_case_sensitive() {
+		let path = PathBuf::from("$HOME/Downloads/tESt.pdf");
+		let filename = Filename {
+			case_sensitive: true,
+			contains: Some("ES".into()),
+			..Default::default()
+		};
+		assert!(filename.matches(path))
 	}
 }
