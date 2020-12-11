@@ -30,9 +30,6 @@ impl<'de> Deserialize<'de> for Recursive {
             where
                 E: Error
             {
-                if v <= 0 {
-                    return Err(E::custom("depth must be greater than zero"))
-                }
                 Ok(Recursive {
                     enabled: Some(true),
                     depth: Some(v as u16)

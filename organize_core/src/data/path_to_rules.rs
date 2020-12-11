@@ -99,9 +99,9 @@ mod tests {
 			defaults: Options::default_none(),
 		};
 
-		std::fs::remove_file(&test1).unwrap();
-		std::fs::remove_file(&test2).unwrap();
-		std::fs::remove_file(&test3).unwrap();
+		std::fs::remove_dir(&test1).unwrap();
+		std::fs::remove_dir(&test2).unwrap();
+		std::fs::remove_dir(&test3).unwrap();
 
 		let value = PathToRules::new(&config).0;
 		let mut expected = HashMap::new();

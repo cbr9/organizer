@@ -93,15 +93,14 @@ impl<'a> Watch {
 		}
 	}
 
-	fn setup(&'a self, data: &'a Data) -> Result<(RecommendedWatcher, Receiver<DebouncedEvent>)> {
-		let mut path_to_recursive = PathToRecursive::new(&data);
-		if cfg!(feature = "hot-reload") && self.config.parent().is_some() {
-			path_to_recursive.insert(self.config.parent().unwrap(), (RecursiveMode::NonRecursive, None));
-		}
+	fn setup(&'a self, path_to_recursive: &PathToRecursive) -> Result<(RecommendedWatcher, Receiver<DebouncedEvent>)> {
 		let (tx, rx) = channel();
 		let mut watcher = watcher(tx, Duration::from_secs(self.delay as u64)).unwrap();
 		for (folder, (recursive, _)) in path_to_recursive.iter() {
 			watcher.watch(folder, *recursive)?
+		}
+		if cfg!(feature = "hot-reload") && self.config.parent().is_some() {
+			watcher.watch(self.config.parent().unwrap(), RecursiveMode::NonRecursive)?;
 		}
 		Ok((watcher, rx))
 	}
@@ -109,7 +108,8 @@ impl<'a> Watch {
 	fn start(&'a self, mut data: Data) -> Result<()> {
 		Register::new()?.append(process::id(), &self.config)?;
 		let path_to_rules = PathToRules::new(&data.config);
-		let (mut watcher, rx) = self.setup(&data)?;
+		let path_to_recursive = PathToRecursive::new(&data);
+		let (mut watcher, rx) = self.setup(&path_to_recursive)?;
 		let config_parent = self.config.parent().unwrap();
 
 		loop {
@@ -122,7 +122,7 @@ impl<'a> Watch {
                                 if parent != config_parent && path.is_file() {
                                     let file = File::new(path);
                                     // std::thread::sleep(std::time::Duration::from_secs(1));
-                                    file.process(&data, &path_to_rules, self.simulate);
+                                    file.process(&data, &path_to_rules, &path_to_recursive, self.simulate);
                                 }
                             }
                         }
@@ -136,11 +136,12 @@ impl<'a> Watch {
                                                     watcher.unwatch(folder)?;
                                                 };
                                                 if cfg!(feature = "hot-reload") {
-                                                    watcher.unwatch(self.config.parent().unwrap())?;
+                                                    watcher.unwatch(config_parent)?;
                                                 }
                                                 std::mem::drop(path);
                                                 std::mem::drop(path_to_rules);
-                                                data.config = new_config;
+												std::mem::drop(path_to_recursive);
+												data.config = new_config;
                                                 info!("reloaded configuration: {}", self.config.display());
                                                 break self.start(data);
                                             }

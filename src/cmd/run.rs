@@ -33,15 +33,18 @@ impl<'a> Run {
 		let process = |entry: DirEntry| {
 			if entry.path().is_file() {
 				let file = File::new(entry.path());
-				file.process(&data, &path_to_rules, self.simulate)
+				file.process(&data, &path_to_rules, &path_to_recursive, self.simulate)
 			}
 		};
 		path_to_rules.keys().collect::<Vec<_>>().par_iter().for_each(|path| {
 			let (recursive, depth) = path_to_recursive.get(path).unwrap();
 			if recursive == &RecursiveMode::Recursive {
-				WalkDir::new(path)
-					.max_depth(depth.expect("depth is not defined but enabled is (check PathToRecursive::new)") as usize) // only direct descendants
-					.follow_links(true).into_iter().filter_map(|e| e.ok()).for_each(process);
+				let depth = depth.expect("depth is not defined but recursive is true");
+				if depth == 0 { // no limit
+					WalkDir::new(path).follow_links(true).into_iter().filter_map(|e| e.ok()).for_each(process);
+				} else {
+					WalkDir::new(path).max_depth(depth as usize).follow_links(true).into_iter().filter_map(|e| e.ok()).for_each(process);
+				}
 			} else {
 				WalkDir::new(path)
 					.max_depth(1) // only direct descendants, i.e. walk in a non recursive way

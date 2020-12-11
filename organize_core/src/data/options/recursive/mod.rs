@@ -2,6 +2,7 @@ mod de;
 
 use serde::{Serialize};
 use crate::utils::DefaultOpt;
+use num_traits::AsPrimitive;
 
 #[derive(Serialize, Debug, Clone, Eq, PartialEq)]
 pub struct Recursive {
