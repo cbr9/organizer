@@ -44,6 +44,7 @@ impl<'a> Run {
 					.follow_links(true).into_iter().filter_map(|e| e.ok()).for_each(process);
 			} else {
 				WalkDir::new(path)
+					.max_depth(1) // only direct descendants, i.e. walk in a non recursive way
 					.follow_links(true)
 					.into_iter()
 					.filter_map(|e| e.ok())
