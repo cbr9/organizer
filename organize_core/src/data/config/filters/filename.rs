@@ -44,91 +44,70 @@ impl AsFilter for Filename {
 
 #[cfg(test)]
 mod tests {
-	use std::{
-		io::{Error, ErrorKind, Result},
-		path::PathBuf,
-	};
+	use std::path::PathBuf;
 
 	use super::*;
 
 	#[test]
-	fn match_beginning_case_insensitive() -> Result<()> {
+	fn match_beginning_case_insensitive() {
 		let path = PathBuf::from("$HOME/Downloads/test.pdf");
 		let filename = Filename {
 			startswith: Some("TE".into()),
 			..Default::default()
 		};
-		match filename.matches(&path) {
-			true => Ok(()),
-			false => Err(Error::from(ErrorKind::Other)),
-		}
+		assert!(filename.matches(&path))
 	}
 
 	#[test]
-	fn match_ending_case_insensitive() -> Result<()> {
+	fn match_ending_case_insensitive() {
 		let path = PathBuf::from("$HOME/Downloads/test.pdf");
 		let filename = Filename {
 			endswith: Some("DF".into()),
 			..Default::default()
 		};
-		match filename.matches(&path) {
-			true => Ok(()),
-			false => Err(Error::from(ErrorKind::Other)),
-		}
+		assert!(filename.matches(&path))
 	}
 
 	#[test]
-	fn match_containing_case_insensitive() -> Result<()> {
+	fn match_containing_case_insensitive() {
 		let path = PathBuf::from("$HOME/Downloads/test.pdf");
 		let filename = Filename {
 			contains: Some("ES".into()),
 			..Default::default()
 		};
-		match filename.matches(&path) {
-			true => Ok(()),
-			false => Err(Error::from(ErrorKind::Other)),
-		}
+		assert!(filename.matches(&path))
 	}
 
 	#[test]
-	fn match_beginning_case_sensitive() -> Result<()> {
+	fn match_beginning_case_sensitive() {
 		let path = PathBuf::from("$HOME/Downloads/test.pdf");
 		let filename = Filename {
 			case_sensitive: true,
 			startswith: Some("TE".into()),
 			..Default::default()
 		};
-		match filename.matches(&path) {
-			false => Ok(()),
-			true => Err(Error::from(ErrorKind::Other)),
-		}
+        assert_eq!(filename.matches(path), false)
 	}
 
 	#[test]
-	fn match_ending_case_sensitive() -> Result<()> {
+	fn match_ending_case_sensitive() {
 		let path = PathBuf::from("$HOME/Downloads/test.pdf");
 		let filename = Filename {
 			case_sensitive: true,
 			startswith: Some("DF".into()),
 			..Default::default()
 		};
-		match filename.matches(&path) {
-			false => Ok(()),
-			true => Err(Error::from(ErrorKind::Other)),
-		}
+		assert_eq!(filename.matches(path), false)
 	}
 
 	#[test]
-	fn match_containing_case_sensitive() -> Result<()> {
+	fn match_containing_case_sensitive() {
 		let path = PathBuf::from("$HOME/Downloads/test.pdf");
 		let filename = Filename {
 			case_sensitive: true,
 			startswith: Some("ES".into()),
 			..Default::default()
 		};
-		match filename.matches(&path) {
-			false => Ok(()),
-			true => Err(Error::from(ErrorKind::Other)),
-		}
+		assert_eq!(filename.matches(path), false)
 	}
 }
