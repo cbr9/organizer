@@ -24,7 +24,7 @@ impl Deref for Regex {
 }
 
 impl AsFilter for Regex {
-	fn matches<T: AsRef<Path>>(&self, path: &T) -> bool {
+	fn matches<T: AsRef<Path>>(&self, path: T) -> bool {
 		match path.as_ref().file_name() {
 			None => false,
 			Some(filename) => {

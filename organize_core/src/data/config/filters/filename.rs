@@ -13,7 +13,7 @@ pub struct Filename {
 }
 
 impl AsFilter for Filename {
-	fn matches<T: AsRef<Path>>(&self, path: &T) -> bool {
+	fn matches<T: AsRef<Path>>(&self, path: T) -> bool {
 		let mut filename = path.as_ref().file_name().unwrap().to_str().unwrap().to_string();
 		let mut filter = self.clone();
 		if !self.case_sensitive {

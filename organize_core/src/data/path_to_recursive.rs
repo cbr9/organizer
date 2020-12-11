@@ -1,4 +1,4 @@
-use crate::{data::Data, utils::UnwrapRef};
+use crate::{data::Data};
 use notify::RecursiveMode;
 use std::{
 	collections::{

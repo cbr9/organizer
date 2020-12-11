@@ -29,11 +29,11 @@ pub enum Filter {
 }
 
 pub trait AsFilter {
-	fn matches<T: AsRef<Path>>(&self, path: &T) -> bool;
+	fn matches<T: AsRef<Path>>(&self, path: T) -> bool;
 }
 
 impl AsFilter for Filter {
-	fn matches<T: AsRef<Path>>(&self, path: &T) -> bool {
+	fn matches<T: AsRef<Path>>(&self, path: T) -> bool {
 		match self {
 			Filter::Regex(regex) => regex.matches(path),
 			Filter::Filename(filename) => filename.matches(path),

@@ -58,31 +58,31 @@ mod tests {
 	#[test]
 	fn test_new() {
 		let home = home_dir().unwrap();
-		let download_dir = home.join("Downloads");
-		if !download_dir.exists() {
-			std::fs::create_dir_all(&download_dir).unwrap();
+		let test1 = home.join("test1");
+		if !test1.exists() {
+			std::fs::create_dir_all(&test1).unwrap();
 		}
-		let document_dir = home.join("Documents");
-		if !document_dir.exists() {
-			std::fs::create_dir_all(&document_dir).unwrap();
+		let test2 = home.join("test2");
+		if !test2.exists() {
+			std::fs::create_dir_all(&test2).unwrap();
 		}
-		let picture_dir = home.join("Pictures");
-		if !picture_dir.exists() {
-			std::fs::create_dir_all(&picture_dir).unwrap();
+		let test3 = home.join("test3");
+		if !test3.exists() {
+			std::fs::create_dir_all(&test3).unwrap();
 		}
 
 		let rules = vec![
 			Rule {
 				folders: vec![
-					Folder::try_from(download_dir.clone()).unwrap(),
-					Folder::try_from(document_dir.clone()).unwrap(),
+					Folder::try_from(test1.clone()).unwrap(),
+					Folder::try_from(test2.clone()).unwrap(),
 				],
 				..Default::default()
 			},
 			Rule {
 				folders: vec![
-					Folder::try_from(picture_dir.clone()).unwrap(),
-					Folder::try_from(download_dir.clone()).unwrap(),
+					Folder::try_from(test3.clone()).unwrap(),
+					Folder::try_from(test1.clone()).unwrap(),
 				],
 				..Default::default()
 			},
@@ -92,11 +92,15 @@ mod tests {
 			defaults: Options::default_none(),
 		};
 
+		std::fs::remove_file(&test1).unwrap();
+		std::fs::remove_file(&test2).unwrap();
+		std::fs::remove_file(&test3).unwrap();
+
 		let value = PathToRules::new(&config).0;
 		let mut expected = HashMap::new();
-		expected.insert(&download_dir, vec![(0, 0), (1, 1)]);
-		expected.insert(&document_dir, vec![(0, 1)]);
-		expected.insert(&picture_dir, vec![(1, 0)]);
+		expected.insert(&test1, vec![(0, 0), (1, 1)]);
+		expected.insert(&test2, vec![(0, 1)]);
+		expected.insert(&test3, vec![(1, 0)]);
 
 		assert_eq!(value, expected)
 	}

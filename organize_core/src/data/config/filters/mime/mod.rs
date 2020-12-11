@@ -56,7 +56,7 @@ impl TryFrom<Vec<&str>> for MimeWrapper {
 }
 
 impl AsFilter for MimeWrapper {
-	fn matches<T: AsRef<Path>>(&self, path: &T) -> bool {
+	fn matches<T: AsRef<Path>>(&self, path: T) -> bool {
 		let guess = mime_guess::from_path(path.as_ref()).first_or_octet_stream();
 		self.iter().any(|mime| match (mime.type_(), mime.subtype()) {
 			(mime::STAR, subtype) => subtype == guess.subtype(),

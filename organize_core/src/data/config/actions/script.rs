@@ -52,7 +52,7 @@ where
 }
 
 impl AsFilter for Script {
-	fn matches<T: AsRef<Path>>(&self, path: &T) -> bool {
+	fn matches<T: AsRef<Path>>(&self, path: T) -> bool {
 		let out = self.run(path.as_ref());
 		out.map(|out| {
 			// get the last line in stdout and parse it as a boolean

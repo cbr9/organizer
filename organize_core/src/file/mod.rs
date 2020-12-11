@@ -1,7 +1,5 @@
 use crate::{
 	data::{options::r#match::Match, path_to_rules::PathToRules, Data},
-	path::IsHidden,
-	utils::UnwrapRef,
 };
 use std::path::PathBuf;
 
