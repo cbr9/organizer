@@ -28,7 +28,7 @@ pub struct Script {
 
 impl AsAction<Self> for Script {
 	fn act<'a>(&self, path: Cow<'a, Path>, simulate: bool) -> Result<Cow<'a, Path>> {
-        if !simulate {
+		if !simulate {
 			self.run(&path)?;
 		}
 		info!("({}) run script on {}", self.exec.bold(), path.display());

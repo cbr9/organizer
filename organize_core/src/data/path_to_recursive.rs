@@ -13,20 +13,9 @@ pub struct PathToRecursive<'a>(HashMap<&'a Path, RecursiveMode>);
 impl<'a> PathToRecursive<'a> {
 	pub fn new(data: &'a Data) -> Self {
 		let mut map = HashMap::with_capacity(data.config.rules.len());
-		data.config.rules.iter().for_each(|rule| {
-			rule.folders.iter().for_each(|folder| {
-				let recursive = folder.options.recursive.as_ref().unwrap_or_else(|| {
-					rule.options.recursive.as_ref().unwrap_or_else(|| {
-						data.config.defaults.recursive.as_ref().unwrap_or_else(|| {
-							data.settings
-								.defaults
-								.recursive
-								.as_ref()
-								.unwrap_or_else(|| data.defaults.recursive.unwrap_ref())
-						})
-					})
-				});
-				let recursive = if *recursive {
+		data.config.rules.iter().enumerate().for_each(|(i, rule)| {
+			rule.folders.iter().enumerate().for_each(|(j, folder)| {
+				let recursive = if *data.get_recursive(i, j) {
 					RecursiveMode::Recursive
 				} else {
 					RecursiveMode::NonRecursive

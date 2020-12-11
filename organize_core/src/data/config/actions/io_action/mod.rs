@@ -35,7 +35,7 @@ pub(crate) struct Copy;
 impl AsAction<Move> for IOAction {
 	fn act<'a>(&self, path: Cow<'a, Path>, simulate: bool) -> Result<Cow<'a, Path>> {
 		let to = Self::helper(&path, self, ActionType::Move)?;
-        if !simulate {
+		if !simulate {
 			std::fs::rename(&path, &to)?;
 		}
 		info!("({}) {} -> {}", ActionType::Move.to_string().bold(), path.display(), to.display());
@@ -46,7 +46,7 @@ impl AsAction<Move> for IOAction {
 impl AsAction<Rename> for IOAction {
 	fn act<'a>(&self, path: Cow<'a, Path>, simulate: bool) -> Result<Cow<'a, Path>> {
 		let to = IOAction::helper(&path, self, ActionType::Rename)?;
-        if !simulate {
+		if !simulate {
 			fs::rename(&path, &to)?;
 		}
 		info!("({}) {} -> {}", ActionType::Rename.to_string().bold(), path.display(), to.display());
@@ -57,7 +57,7 @@ impl AsAction<Rename> for IOAction {
 impl AsAction<Copy> for IOAction {
 	fn act<'a>(&self, path: Cow<'a, Path>, simulate: bool) -> Result<Cow<'a, Path>> {
 		let to = IOAction::helper(&path, self, ActionType::Copy)?;
-        if !simulate {
+		if !simulate {
 			std::fs::copy(&path, &to)?;
 		}
 		info!("({}) {} -> {}", ActionType::Copy.to_string().bold(), path.display(), to.display());

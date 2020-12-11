@@ -29,7 +29,7 @@ impl Cmd for Info {
 			let Options {
 				recursive,
 				watch,
-				ignore,
+				ignored_dirs,
 				hidden_files,
 				r#match,
 				apply,
@@ -37,7 +37,7 @@ impl Cmd for Info {
 			println!("{}:", "Defaults".bold().underline());
 			println!("  recursive = {}", recursive.unwrap().to_string().bright_purple());
 			println!("  watch = {}", watch.unwrap().to_string().bright_purple());
-			println!("  ignore = {:?}", ignore.unwrap());
+			println!("  ignored_dirs = {:?}", ignored_dirs.unwrap());
 			println!("  hidden_files = {}", hidden_files.unwrap().to_string().bright_purple());
 			println!("  match = {}", r#match.unwrap().to_string().bright_green());
 			println!("  apply.actions = {}", apply.actions.unwrap().to_string().bright_green());

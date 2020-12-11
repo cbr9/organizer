@@ -8,14 +8,12 @@ use std::{
 	path::{Path, PathBuf},
 };
 
+use crate::data::Data;
+use crate::PROJECT_NAME;
 use num_traits::AsPrimitive;
 use serde_json::error::Category;
-use std::{
-	ops::{Deref, DerefMut},
-};
+use std::ops::{Deref, DerefMut};
 use sysinfo::{Pid, RefreshKind, System, SystemExt};
-use crate::PROJECT_NAME;
-use crate::data::Data;
 
 /// File where watchers are registered with their PID and configuration
 #[derive(Default, Serialize)]
@@ -71,7 +69,7 @@ impl Register {
 	pub fn append<T, P>(mut self, pid: P, path: T) -> Result<Self>
 	where
 		T: AsRef<Path>,
-		P: AsPrimitive<Pid>
+		P: AsPrimitive<Pid>,
 	{
 		let section = Section {
 			path: path.as_ref().to_path_buf(),

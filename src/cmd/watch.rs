@@ -8,6 +8,7 @@ use colored::Colorize;
 use log::{debug, error, info};
 use notify::{watcher, DebouncedEvent, RecommendedWatcher, RecursiveMode, Watcher};
 
+use crate::cmd::run::Run;
 use crate::{Cmd, CONFIG_PATH_STR};
 use clap::Clap;
 use organize_core::data::settings::Settings;
@@ -19,14 +20,13 @@ use organize_core::{
 use std::path::PathBuf;
 use std::time::Duration;
 use sysinfo::{ProcessExt, RefreshKind, Signal, System, SystemExt};
-use crate::cmd::run::Run;
 
 #[derive(Clap, Debug)]
 pub struct Watch {
 	#[clap(long, short = 'c', default_value = &CONFIG_PATH_STR, about = "Config path")]
 	pub config: PathBuf,
 	#[clap(long, short = 'd', default_value = "2", about = "Seconds to wait before processing an event")]
-    delay: u8,
+	delay: u8,
 	#[clap(long, short = 'r', about = "Restart the instance running with the specified configuration")]
 	replace: bool,
 	#[clap(long, short = 's', about = "Do not change any files, but get output on the hypothetical changes")]
@@ -41,7 +41,7 @@ impl Cmd for Watch {
 		if self.clean {
 			let cmd = Run {
 				config: self.config.clone(),
-				simulate: self.simulate
+				simulate: self.simulate,
 			};
 			cmd.start(data.clone())?;
 		}

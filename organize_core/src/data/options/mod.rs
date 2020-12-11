@@ -14,7 +14,7 @@ pub struct Options {
 	/// defines whether or not subdirectories must be scanned
 	pub recursive: Option<bool>,
 	pub watch: Option<bool>,
-	pub ignore: Option<Vec<PathBuf>>,
+	pub ignored_dirs: Option<Vec<PathBuf>>,
 	pub hidden_files: Option<bool>,
 	pub r#match: Option<Match>,
 	#[serde(default = "DefaultOpt::default_none")]
@@ -26,7 +26,7 @@ impl DefaultOpt for Options {
 		Self {
 			recursive: None,
 			watch: None,
-			ignore: None,
+			ignored_dirs: None,
 			hidden_files: None,
 			r#match: None,
 			apply: DefaultOpt::default_none(),
@@ -37,7 +37,7 @@ impl DefaultOpt for Options {
 		Self {
 			recursive: Some(false),
 			watch: Some(true),
-			ignore: Some(Vec::new()),
+			ignored_dirs: Some(Vec::new()),
 			hidden_files: Some(false),
 			apply: DefaultOpt::default_some(),
 			r#match: Some(Match::default()),

@@ -175,7 +175,7 @@ mod tests {
 		value.options = Options {
 			recursive: Some(true),
 			watch: Some(true),
-			ignore: None,
+			ignored_dirs: None,
 			hidden_files: None,
 			r#match: None,
 			apply: ApplyWrapper::from(Apply::All),

@@ -85,7 +85,7 @@ impl<'de> Deserialize<'de> for Options {
 				Ok(Options {
 					recursive,
 					watch,
-					ignore,
+					ignored_dirs: ignore,
 					hidden_files,
 					r#match,
 					apply: apply.unwrap_or_default_none(),
