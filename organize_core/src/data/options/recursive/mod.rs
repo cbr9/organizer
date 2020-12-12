@@ -31,8 +31,8 @@ mod tests {
     #[test]
     fn test_validity() {
         let some = Recursive::default_some();
-        assert_eq!(some.depth.is_some() && some.enabled.is_some() && some.enabled.unwrap());
+        assert!(some.depth.is_some() && some.enabled.is_some() && some.enabled.unwrap());
         let none = Recursive::default_none();
-        assert_eq!(none.depth.is_none() && some.enabled.is_some() && !some.enabled.unwrap())
+        assert!(none.depth.is_none() && some.enabled.is_some() && !some.enabled.unwrap())
     }
 }
