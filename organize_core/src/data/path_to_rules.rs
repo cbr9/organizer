@@ -44,7 +44,7 @@ impl<'a> PathToRules<'a> {
 					(path, value)
 				})
 				.unwrap()
-		}, |(k, v)| (k.clone().clone(), v))
+		}, |(k, v)| ((*k).clone(), v))
 	}
 
 	pub fn get(&self, key: &PathBuf) -> &Vec<(usize, usize)> {
