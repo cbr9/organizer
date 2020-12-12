@@ -28,7 +28,7 @@ use crate::{
 	utils::DefaultOpt,
 	PROJECT_NAME,
 };
-use strum::AsStaticRef;
+
 
 // TODO: add tests for the custom deserializers
 
@@ -183,17 +183,21 @@ impl<'a> AsRef<Self> for Rule {
 mod tests {
 	use super::*;
 	use anyhow::Result;
+	use crate::utils::tests::project;
 
 	#[test]
 	fn set_cwd() -> Result<()> {
-		let original_pwd = std::env::current_dir()?;
+		let project_root = project();
+		if std::env::current_dir()? != project_root {
+			std::env::set_current_dir(&project_root)?;
+		}
 		Config::set_cwd(Config::default_path()).map(|cwd| -> Result<()> {
-				std::env::set_current_dir(&original_pwd)?;
-				assert_eq!(cwd, home_dir().ok_or(anyhow::Error::msg("cannot determine home directory"))?);
-				Ok(())
-			})??;
+			std::env::set_current_dir(&project_root)?;
+			assert_eq!(cwd, home_dir().ok_or(anyhow::Error::msg("cannot determine home directory"))?);
+			Ok(())
+		})??;
 		Config::set_cwd("examples/config.yml").map(|cwd| -> Result<()> {
-			std::env::set_current_dir(original_pwd)?;
+			std::env::set_current_dir(project_root)?;
 			assert_eq!(cwd, Path::new("examples/"));
 			Ok(())
 		})??;
