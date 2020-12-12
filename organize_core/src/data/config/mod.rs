@@ -28,6 +28,7 @@ use crate::{
 	utils::DefaultOpt,
 	PROJECT_NAME,
 };
+use strum::AsStaticRef;
 
 // TODO: add tests for the custom deserializers
 
@@ -82,11 +83,11 @@ impl Config {
 		}
 	}
 
-	pub fn create(path: &Path) -> anyhow::Result<()> {
-		let path = if path.exists() {
-			path.update(&ConflictOption::Rename, &Default::default()).unwrap() // safe unwrap (can only return an error if if_exists == Skip)
+	pub fn create<T: AsRef<Path>>(path: T) -> anyhow::Result<()> {
+		let path = if path.as_ref().exists() {
+			path.as_ref().update(&ConflictOption::Rename, &Default::default()).unwrap() // safe unwrap (can only return an error if if_exists == Skip)
 		} else {
-			Cow::Borrowed(path)
+			Cow::Borrowed(path.as_ref())
 		};
 
 		path.parent()
