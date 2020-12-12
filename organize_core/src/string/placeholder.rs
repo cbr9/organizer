@@ -79,13 +79,13 @@ impl Placeholder for str {
 							.extension()
 							.ok_or_else(|| placeholder_error(placeholder, &current_value, span.as_str()))?
 							.into(),
-						"to_uppercase" => current_value.to_str().unwrap().to_uppercase().into(),
-						"to_lowercase" => current_value.to_str().unwrap().to_lowercase().into(),
-						"capitalize" => current_value.to_str().unwrap().to_string().capitalize().into(),
+						"to_uppercase" => current_value.to_string_lossy().to_uppercase().into(),
+						"to_lowercase" => current_value.to_string_lossy().to_lowercase().into(),
+						"capitalize" => current_value.to_string_lossy().capitalize().into(),
 						_ => panic!("unknown placeholder"),
 					}
 				}
-				new = new.replace(&span.as_str(), current_value.to_str().unwrap());
+				new = new.replace(&span.as_str(), &*current_value.to_string_lossy());
 			}
 			Ok(Cow::Owned(new.replace("//", "/")))
 		} else {
