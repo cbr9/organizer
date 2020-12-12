@@ -84,12 +84,12 @@ getter!(from config, pub get_match, r#match, Match);
 impl Data {
 	pub fn new() -> Result<Self> {
 		let data = Config::parse(Config::path()).map(|config| {
-			Config::set_cwd(Config::path()).and_then(|_| {
-				Ok(Settings::new(Settings::path()).map(|settings| Self {
+			Config::set_cwd(Config::path()).map(|_| {
+				Settings::new(Settings::path()).map(|settings| Self {
 					defaults: Options::default_some(),
 					settings,
 					config,
-				}))
+				})
 			})
 		})???; // return the error from UserConfig::parse and from Settings::new
 		Ok(data)
