@@ -59,37 +59,75 @@ mod tests {
 	use crate::data::config::Rule;
 	use crate::data::options::Options;
 	use crate::utils::DefaultOpt;
-	use dirs::home_dir;
-	use std::convert::TryFrom;
+	use std::path::Path;
+	use crate::data::config::actions::Actions;
+	use crate::data::config::filters::Filters;
+
+	#[test]
+	fn test_key_value() {
+		let downloads = "$HOME/Downloads";
+		let docs = "$HOME/Documents";
+		let pdfs = Path::new(docs).join("pdfs");
+		let torrents = Path::new(downloads).join("torrents");
+		let config = Config {
+			rules: vec![
+				Rule {
+					actions: Actions(vec![]),
+					filters: Filters {
+						inner: vec![]
+					},
+					folders: vec![
+						Folder {
+							path: downloads.into(),
+							options: Options::default_none(),
+						},
+						Folder {
+							path: docs.into(),
+							options: Options::default_none(),
+						}
+					],
+					options: Options::default_none(),
+				}
+			],
+			defaults: Options::default_none(),
+		};
+		let path_to_rules = PathToRules::new(&config);
+        let (key, _) = path_to_rules.get_key_value(&torrents);
+		assert_eq!(key, Path::new(downloads));
+		let (key, _) = path_to_rules.get_key_value(&pdfs);
+		assert_eq!(key, Path::new(docs))
+	}
 
 	#[test]
 	fn test_new() {
-		let home = home_dir().unwrap();
-		let test1 = home.join("test1");
-		if !test1.exists() {
-			std::fs::create_dir_all(&test1).unwrap();
-		}
-		let test2 = home.join("test2");
-		if !test2.exists() {
-			std::fs::create_dir_all(&test2).unwrap();
-		}
-		let test3 = home.join("test3");
-		if !test3.exists() {
-			std::fs::create_dir_all(&test3).unwrap();
-		}
+		let test1 = PathBuf::from("test1");
+		let test2 = PathBuf::from("test2");
+		let test3 = PathBuf::from("test3");
 
 		let rules = vec![
 			Rule {
 				folders: vec![
-					Folder::try_from(test1.clone()).unwrap(),
-					Folder::try_from(test2.clone()).unwrap(),
+					Folder {
+						path: test1.clone(),
+						options: Options::default_none()
+					},
+					Folder {
+						path: test2.clone(),
+						options: Options::default_none()
+					}
 				],
 				..Default::default()
 			},
 			Rule {
 				folders: vec![
-					Folder::try_from(test3.clone()).unwrap(),
-					Folder::try_from(test1.clone()).unwrap(),
+					Folder {
+						path: test3.clone(),
+						options: Options::default_none()
+					},
+					Folder {
+						path: test1.clone(),
+						options: Options::default_none()
+					}
 				],
 				..Default::default()
 			},
@@ -98,10 +136,6 @@ mod tests {
 			rules,
 			defaults: Options::default_none(),
 		};
-
-		std::fs::remove_dir(&test1).unwrap();
-		std::fs::remove_dir(&test2).unwrap();
-		std::fs::remove_dir(&test3).unwrap();
 
 		let value = PathToRules::new(&config).0;
 		let mut expected = HashMap::new();

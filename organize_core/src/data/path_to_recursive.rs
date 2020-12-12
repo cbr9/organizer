@@ -53,3 +53,6 @@ impl<'a> PathToRecursive<'a> {
 		self.0.insert(key, value)
 	}
 }
+
+#[cfg(test)]
+mod tests {}
