@@ -1,4 +1,4 @@
-use std::{borrow::Cow, io, io::ErrorKind, path::Path};
+use std::{io, io::ErrorKind, path::Path};
 
 use crate::string::Capitalize;
 use lazy_static::lazy_static;
@@ -46,15 +46,16 @@ pub fn visit_placeholder_string(val: &str) -> Result<String, io::Error> {
 }
 
 pub trait Placeholder {
-	fn expand_placeholders(&self, path: &Path) -> io::Result<Cow<'_, str>>;
+	fn expand_placeholders(self, path: &Path) -> io::Result<String>;
 }
 
-impl Placeholder for str {
-	fn expand_placeholders(&self, path: &Path) -> io::Result<Cow<'_, str>> {
-		if VALID_PH_REGEX.is_match(self) {
+impl<T: AsRef<str>> Placeholder for T {
+	fn expand_placeholders(self, path: &Path) -> io::Result<String> {
+		let str = self.as_ref();
+		if VALID_PH_REGEX.is_match(str) {
 			// if the first condition is false, the second one won't be evaluated and REGEX won't be initialized
-			let mut new = self.to_string();
-			for span in VALID_PH_REGEX.find_iter(self) {
+			let mut new = str.to_string();
+			for span in VALID_PH_REGEX.find_iter(str) {
 				let placeholders = span.as_str().trim_matches(|x| x == '{' || x == '}').split('.');
 				let mut current_value = path.to_path_buf();
 				for placeholder in placeholders.into_iter() {
@@ -87,9 +88,9 @@ impl Placeholder for str {
 				}
 				new = new.replace(&span.as_str(), &*current_value.to_string_lossy());
 			}
-			Ok(Cow::Owned(new.replace("//", "/")))
+			Ok(new.replace("//", "/"))
 		} else {
-			Ok(Cow::Borrowed(self))
+			Ok(self.as_ref().to_string())
 		}
 	}
 }
