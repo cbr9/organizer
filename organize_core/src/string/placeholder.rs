@@ -275,6 +275,6 @@ pub mod tests {
 		let tested = "/home/cabero/Documents/test.pdf";
 		let dummy_path = PathBuf::from(tested);
 		let new = tested.expand_placeholders(&dummy_path).unwrap();
-		assert!(matches!(new, Cow::Borrowed(_)))
+		assert_eq!(new, tested)
 	}
 }

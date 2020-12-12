@@ -6,28 +6,31 @@ use std::{
 
 pub trait Expand {
 	// TODO: implement for str
-	fn expand_user(self) -> Result<Self, VarError>
+	fn expand_user(self) -> Result<PathBuf, VarError>
 	where
 		Self: Sized;
-	fn expand_vars(self) -> Result<Self, VarError>
+	fn expand_vars(self) -> Result<PathBuf, VarError>
 	where
 		Self: Sized;
 }
 
-impl Expand for PathBuf {
+impl<T: Into<PathBuf>> Expand for T {
 	fn expand_user(self) -> Result<PathBuf, VarError> {
-		let str = self.to_str().unwrap();
+		let path = self.into();
+		let str = path.to_string_lossy();
 		if str.contains('~') {
 			env::var("HOME").map(|home| str.replace("~", &home).into())
 		} else {
-			Ok(self)
+			Ok(path)
 		}
 	}
 
 	fn expand_vars(self) -> Result<PathBuf, VarError> {
-		if self.to_string_lossy().contains('$') {
+		let path = self.into();
+		let str = path.to_string_lossy();
+		if str.contains('$') {
 			let mut components = Vec::new();
-			for comp in self.components() {
+			for comp in path.components() {
 				let component: &Path = comp.as_ref();
 				let component = component.to_string_lossy();
 				if component.starts_with('$') {
@@ -38,7 +41,7 @@ impl Expand for PathBuf {
 			}
 			Ok(components.into_iter().collect::<PathBuf>())
 		} else {
-			Ok(self)
+			Ok(path)
 		}
 	}
 }
