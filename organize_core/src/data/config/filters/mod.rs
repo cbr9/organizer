@@ -17,7 +17,6 @@ use crate::data::{
 	},
 	options::apply::Apply,
 };
-use std::ffi::OsStr;
 
 #[derive(Debug, Clone, Deserialize, Eq, PartialEq)]
 #[serde(rename_all(deserialize = "lowercase"))]
@@ -62,7 +61,7 @@ impl Deref for Filters {
 
 impl Filters {
 	pub fn r#match<T: AsRef<Path>>(&self, path: T, apply: &Apply) -> bool {
-        match path.as_ref().extension() {
+		match path.as_ref().extension() {
 			None => {}
 			Some(extension) => {
 				let extension = extension.to_string_lossy();
@@ -105,6 +104,6 @@ mod tests {
 			inner: vec![Filter::Regex(regex)],
 		};
 		let path = PathBuf::from("$HOME/Downloads/test.crdownload");
-		assert!(!filters.r#match(&path, Apply::All))
+		assert!(!filters.r#match(&path, &Apply::All))
 	}
 }

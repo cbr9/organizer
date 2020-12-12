@@ -40,10 +40,16 @@ impl<'a> Run {
 			let (recursive, depth) = path_to_recursive.get(path).unwrap();
 			if recursive == &RecursiveMode::Recursive {
 				let depth = depth.expect("depth is not defined but recursive is true");
-				if depth == 0 { // no limit
+				if depth == 0 {
+					// no limit
 					WalkDir::new(path).follow_links(true).into_iter().filter_map(|e| e.ok()).for_each(process);
 				} else {
-					WalkDir::new(path).max_depth(depth as usize).follow_links(true).into_iter().filter_map(|e| e.ok()).for_each(process);
+					WalkDir::new(path)
+						.max_depth(depth as usize)
+						.follow_links(true)
+						.into_iter()
+						.filter_map(|e| e.ok())
+						.for_each(process);
 				}
 			} else {
 				WalkDir::new(path)

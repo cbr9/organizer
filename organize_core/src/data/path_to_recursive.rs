@@ -1,4 +1,4 @@
-use crate::{data::Data};
+use crate::data::Data;
 use notify::RecursiveMode;
 use std::{
 	collections::{
@@ -57,14 +57,14 @@ impl<'a> PathToRecursive<'a> {
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use crate::data::options::Options;
-	use crate::data::config::{Config, Rule};
-	use crate::utils::DefaultOpt;
-	use crate::data::settings::Settings;
 	use crate::data::config::actions::Actions;
 	use crate::data::config::filters::Filters;
 	use crate::data::config::folders::Folder;
+	use crate::data::config::{Config, Rule};
 	use crate::data::options::recursive::Recursive;
+	use crate::data::options::Options;
+	use crate::data::settings::Settings;
+	use crate::utils::DefaultOpt;
 
 	#[test]
 	fn new() {
@@ -77,46 +77,39 @@ mod tests {
 				rules: vec![
 					Rule {
 						actions: Actions(vec![]),
-						filters: Filters {
-							inner: vec![]
-						},
+						filters: Filters { inner: vec![] },
 						folders: vec![
 							Folder {
 								path: downloads.clone().into(),
-								options: Options::default_none()
+								options: Options::default_none(),
 							},
 							Folder {
 								path: documents.clone().into(),
-								options: Options::default_none()
+								options: Options::default_none(),
 							},
 						],
 						options: Options::default_none(),
 					},
 					Rule {
 						actions: Actions(vec![]),
-						filters: Filters {
-							inner: vec![]
-						},
-						folders: vec![
-							Folder {
-								path: downloads.clone().into(),
-								options: Options {
-									recursive: Recursive {
-										enabled: Some(true),
-										depth: Some(1)
-									},
-									..DefaultOpt::default_none()
-								}
+						filters: Filters { inner: vec![] },
+						folders: vec![Folder {
+							path: downloads.clone().into(),
+							options: Options {
+								recursive: Recursive {
+									enabled: Some(true),
+									depth: Some(1),
+								},
+								..DefaultOpt::default_none()
 							},
-						],
+						}],
 						options: Options::default_none(),
 					},
-
 				],
 				defaults: Options::default_none(),
-			}
+			},
 		};
-        let mut expected = HashMap::new();
+		let mut expected = HashMap::new();
 		expected.insert(Path::new(downloads), (RecursiveMode::Recursive, Some(1)));
 		expected.insert(Path::new(documents), (RecursiveMode::NonRecursive, None));
 		let path_to_recursive = PathToRecursive::new(&data);

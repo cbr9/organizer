@@ -84,12 +84,14 @@ getter!(from config, pub get_match, r#match, Match);
 impl Data {
 	pub fn new() -> Result<Self> {
 		let data = Config::parse(Config::path()).map(|config| {
-			Settings::new(Settings::path()).map(|settings| Self {
-				defaults: Options::default_some(),
-				settings,
-				config,
+			Config::set_cwd(Config::path()).and_then(|_| {
+				Ok(Settings::new(Settings::path()).map(|settings| Self {
+					defaults: Options::default_some(),
+					settings,
+					config,
+				}))
 			})
-		})??; // return the error from UserConfig::parse and from Settings::new
+		})???; // return the error from UserConfig::parse and from Settings::new
 		Ok(data)
 	}
 
@@ -141,57 +143,57 @@ impl Data {
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use crate::data::config::Rule;
 	use crate::data::config::actions::Actions;
 	use crate::data::config::filters::Filters;
 	use crate::data::config::folders::Folder;
+	use crate::data::config::Rule;
 
 	#[test]
 	fn should_ignore() {
-        let config = Path::new("$HOME/.config");
+		let config = Path::new("$HOME/.config");
 		let documents_cache = Path::new("$HOME/Documents/.cache");
 		let npm = Path::new("$HOME/.npm");
 		let downloads_config = Path::new("$HOME/Downloads/.config");
 
 		let data = Data {
 			defaults: Options::default_some(),
-			settings: Settings { defaults: Options {
-				ignored_dirs: Some(vec![config.clone().into()]),
-				..DefaultOpt::default_none()
-			} },
+			settings: Settings {
+				defaults: Options {
+					ignored_dirs: Some(vec![config.clone().into()]),
+					..DefaultOpt::default_none()
+				},
+			},
 			config: Config {
-				rules: vec![
-					Rule {
-						actions: Actions(vec![]),
-						filters: Filters { inner: vec![] },
-						folders: vec![
-							Folder {
-								path: "$HOME".into(),
-								options: Options {
-									ignored_dirs: Some(vec![npm.clone().into()]),
-									..DefaultOpt::default_none()
-								}
+				rules: vec![Rule {
+					actions: Actions(vec![]),
+					filters: Filters { inner: vec![] },
+					folders: vec![
+						Folder {
+							path: "$HOME".into(),
+							options: Options {
+								ignored_dirs: Some(vec![npm.clone().into()]),
+								..DefaultOpt::default_none()
 							},
-							Folder {
-								path: "$HOME/Downloads".into(),
-								options: Options::default_none(),
-							},
-							Folder {
-								path: "$HOME/Documents".into(),
-								options: Options::default_none(),
-							}
-						],
-						options: Options {
-							ignored_dirs: Some(vec![documents_cache.clone().into()]),
-							..DefaultOpt::default_none()
-						}
-					}
-				],
+						},
+						Folder {
+							path: "$HOME/Downloads".into(),
+							options: Options::default_none(),
+						},
+						Folder {
+							path: "$HOME/Documents".into(),
+							options: Options::default_none(),
+						},
+					],
+					options: Options {
+						ignored_dirs: Some(vec![documents_cache.clone().into()]),
+						..DefaultOpt::default_none()
+					},
+				}],
 				defaults: Options {
 					ignored_dirs: Some(vec![downloads_config.clone().into()]),
 					..DefaultOpt::default_none()
-				}
-			}
+				},
+			},
 		};
 		assert!(data.should_ignore(config.join("config.yml"), 0, 0));
 		assert!(data.should_ignore(documents_cache.join("cache.txt"), 0, 2));
@@ -200,5 +202,4 @@ mod tests {
 		assert!(data.should_ignore("$HOME/.config.yml", 0, 0));
 		assert!(!data.should_ignore("$HOME/config.yml", 0, 0));
 	}
-
 }

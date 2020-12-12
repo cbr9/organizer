@@ -1,9 +1,7 @@
-use crate::{
-	data::{options::r#match::Match, path_to_rules::PathToRules, Data},
-};
-use std::path::PathBuf;
 use crate::data::path_to_recursive::PathToRecursive;
+use crate::data::{options::r#match::Match, path_to_rules::PathToRules, Data};
 use notify::RecursiveMode;
+use std::path::PathBuf;
 
 pub struct File {
 	pub path: PathBuf,
@@ -40,13 +38,18 @@ impl File {
 		}
 	}
 
-	pub fn get_matching_rules<'a>(&self, data: &'a Data, path_to_rules: &'a PathToRules, path_to_recursive: &'a PathToRecursive) -> Vec<&'a (usize, usize)> {
+	pub fn get_matching_rules<'a>(
+		&self,
+		data: &'a Data,
+		path_to_rules: &'a PathToRules,
+		path_to_recursive: &'a PathToRecursive,
+	) -> Vec<&'a (usize, usize)> {
 		let (key, value) = path_to_rules.get_key_value(&self.path);
 		let (recursive, depth) = path_to_recursive.get(&key).unwrap();
 		if recursive == &RecursiveMode::Recursive {
-            let depth = depth.expect("folder is recursive but depth is not defined") as usize;
+			let depth = depth.expect("folder is recursive but depth is not defined") as usize;
 			if self.path.components().count() - key.components().count() > depth && depth != 0 {
-				return Vec::with_capacity(0)
+				return Vec::with_capacity(0);
 			}
 		}
 		value
@@ -57,4 +60,3 @@ impl File {
 			.collect::<Vec<_>>()
 	}
 }
-

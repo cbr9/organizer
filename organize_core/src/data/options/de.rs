@@ -1,3 +1,4 @@
+use crate::data::options::recursive::Recursive;
 use crate::{
 	data::options::{apply::wrapper::ApplyWrapper, r#match::Match, Options},
 	utils::UnwrapOrDefaultOpt,
@@ -7,7 +8,6 @@ use serde::{
 	Deserialize, Deserializer,
 };
 use std::{fmt, path::PathBuf};
-use crate::data::options::recursive::Recursive;
 
 impl<'de> Deserialize<'de> for Options {
 	// for some reason, the derived implementation of Deserialize for Options doesn't return an error

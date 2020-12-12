@@ -57,27 +57,28 @@ impl Config {
 	/// ### Errors
 	/// This constructor fails in the following cases:
 	/// - The configuration file does not exist
-	pub fn parse<T>(path: T) -> Result<Config>
-	where
-		T: AsRef<Path>,
-	{
-		let config_path = path.as_ref();
-		let parse = |path: &Path| {
-			if !path.exists() {
-				Self::create(&path)?;
-			}
-			fs::read_to_string(&path).map(|content| serde_yaml::from_str(&content).map_err(anyhow::Error::new))?
-		};
+	pub fn parse<T: AsRef<Path>>(path: T) -> Result<Config> {
+		fs::read_to_string(&path).map(|content| {
+			serde_yaml::from_str(&content).map_err(anyhow::Error::new)
+		})?
+	}
 
-		if config_path == Self::default_path() {
+	pub fn set_cwd<T: AsRef<Path>>(path: T) -> Result<PathBuf> {
+		if path.as_ref() == Self::default_path() {
 			home_dir()
-				.map(|path| std::env::set_current_dir(&path).map(|_| parse(&config_path))?)
-				.ok_or_else(|| anyhow::Error::msg("could not determine home directory"))?
+				.map(|path| -> Result<PathBuf> {
+					std::env::set_current_dir(&path).map_err(anyhow::Error::new)?;
+					Ok(path)
+				})
+				.ok_or(anyhow::Error::msg("could not determine home directory"))?
 		} else {
-			config_path
+			path.as_ref()
 				.parent()
-				.map(|path| std::env::set_current_dir(path).map(|_| parse(config_path))?)
-				.ok_or_else(|| anyhow::Error::msg("cannot determine config file directory"))?
+				.map(|path| -> Result<PathBuf> {
+					std::env::set_current_dir(path).map_err(anyhow::Error::new)?;
+					Ok(path.into())
+				})
+				.ok_or(anyhow::Error::msg("could not determine config directory"))?
 		}
 	}
 
@@ -93,7 +94,7 @@ impl Config {
 				if !parent.exists() {
 					std::fs::create_dir_all(parent).unwrap_or_else(|_| panic!("error: could not create config directory ({})", parent.display()));
 				}
-				let output = include_str!("../../../../examples/config.yml");
+				let output = include_str!("../../../../examples/blueprint.yml");
 				std::fs::write(&path, output).unwrap_or_else(|_| panic!("error: could not create config file ({})", path.display()));
 				println!("New config file created at {}", path.display());
 			})
@@ -174,5 +175,27 @@ impl Default for Rule {
 impl<'a> AsRef<Self> for Rule {
 	fn as_ref(&self) -> &Rule {
 		self
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+	use anyhow::Result;
+
+	#[test]
+	fn set_cwd() -> Result<()> {
+		let original_pwd = std::env::current_dir()?;
+		Config::set_cwd(Config::default_path()).map(|cwd| -> Result<()> {
+				std::env::set_current_dir(&original_pwd)?;
+				assert_eq!(cwd, home_dir().ok_or(anyhow::Error::msg("cannot determine home directory"))?);
+				Ok(())
+			})??;
+		Config::set_cwd("examples/config.yml").map(|cwd| -> Result<()> {
+			std::env::set_current_dir(original_pwd)?;
+			assert_eq!(cwd, Path::new("examples/"));
+			Ok(())
+		})??;
+		Ok(())
 	}
 }

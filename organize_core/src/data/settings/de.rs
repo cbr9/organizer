@@ -13,9 +13,9 @@ impl<'de> Deserialize<'de> for Settings {
 #[cfg(test)]
 mod tests {
 	use super::*;
+	use crate::data::options::recursive::Recursive;
 	use crate::utils::DefaultOpt;
 	use serde_test::{assert_de_tokens, Token};
-	use crate::data::options::recursive::Recursive;
 
 	#[test]
 	fn deserialize() {

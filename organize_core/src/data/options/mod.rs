@@ -7,9 +7,9 @@ use crate::data::options::r#match::Match;
 
 use crate::{data::options::apply::wrapper::ApplyWrapper, utils::DefaultOpt};
 
+use crate::data::options::recursive::Recursive;
 use serde::Serialize;
 use std::path::PathBuf;
-use crate::data::options::recursive::Recursive;
 
 #[derive(Serialize, Debug, Clone, Eq, PartialEq)]
 pub struct Options {

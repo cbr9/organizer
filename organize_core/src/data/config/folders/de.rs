@@ -69,13 +69,13 @@ impl<'de> Deserialize<'de> for Folder {
 #[cfg(test)]
 mod tests {
 	use super::*;
+	use crate::data::options::recursive::Recursive;
 	use crate::data::options::{
 		apply::{wrapper::ApplyWrapper, Apply},
 		Options,
 	};
 	use serde::de::{value::Error, Error as ErrorTrait};
 	use serde_test::{assert_de_tokens, assert_de_tokens_error, Token};
-	use crate::data::options::recursive::Recursive;
 
 	#[test]
 	fn deserialize_str() {

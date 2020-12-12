@@ -31,20 +31,23 @@ impl<'a> PathToRules<'a> {
 		self.0.keys()
 	}
 
-    pub fn get_key_value(&self, key: &PathBuf) -> (PathBuf, &Vec<(usize, usize)>) {
-		self.0.get_key_value(key).map_or_else(|| {
-			// if the path is some subdirectory not represented in the hashmap
-			let components = key.components().collect::<Vec<_>>();
-			(0..components.len())
-				.map(|i| PathBuf::from_iter(&components[0..i]))
-				.rev()
-				.find(|path| self.0.contains_key(&path))
-				.map(|path| {
-					let value = self.0.get(&path).unwrap();
-					(path, value)
-				})
-				.unwrap()
-		}, |(k, v)| ((*k).clone(), v))
+	pub fn get_key_value(&self, key: &PathBuf) -> (PathBuf, &Vec<(usize, usize)>) {
+		self.0.get_key_value(key).map_or_else(
+			|| {
+				// if the path is some subdirectory not represented in the hashmap
+				let components = key.components().collect::<Vec<_>>();
+				(0..components.len())
+					.map(|i| PathBuf::from_iter(&components[0..i]))
+					.rev()
+					.find(|path| self.0.contains_key(&path))
+					.map(|path| {
+						let value = self.0.get(&path).unwrap();
+						(path, value)
+					})
+					.unwrap()
+			},
+			|(k, v)| ((*k).clone(), v),
+		)
 	}
 
 	pub fn get(&self, key: &PathBuf) -> &Vec<(usize, usize)> {
@@ -55,13 +58,13 @@ impl<'a> PathToRules<'a> {
 #[cfg(test)]
 mod tests {
 	use super::*;
+	use crate::data::config::actions::Actions;
+	use crate::data::config::filters::Filters;
 	use crate::data::config::folders::Folder;
 	use crate::data::config::Rule;
 	use crate::data::options::Options;
 	use crate::utils::DefaultOpt;
 	use std::path::Path;
-	use crate::data::config::actions::Actions;
-	use crate::data::config::filters::Filters;
 
 	#[test]
 	fn test_key_value() {
@@ -70,29 +73,25 @@ mod tests {
 		let pdfs = Path::new(docs).join("pdfs");
 		let torrents = Path::new(downloads).join("torrents");
 		let config = Config {
-			rules: vec![
-				Rule {
-					actions: Actions(vec![]),
-					filters: Filters {
-						inner: vec![]
+			rules: vec![Rule {
+				actions: Actions(vec![]),
+				filters: Filters { inner: vec![] },
+				folders: vec![
+					Folder {
+						path: downloads.into(),
+						options: Options::default_none(),
 					},
-					folders: vec![
-						Folder {
-							path: downloads.into(),
-							options: Options::default_none(),
-						},
-						Folder {
-							path: docs.into(),
-							options: Options::default_none(),
-						}
-					],
-					options: Options::default_none(),
-				}
-			],
+					Folder {
+						path: docs.into(),
+						options: Options::default_none(),
+					},
+				],
+				options: Options::default_none(),
+			}],
 			defaults: Options::default_none(),
 		};
 		let path_to_rules = PathToRules::new(&config);
-        let (key, _) = path_to_rules.get_key_value(&torrents);
+		let (key, _) = path_to_rules.get_key_value(&torrents);
 		assert_eq!(key, Path::new(downloads));
 		let (key, _) = path_to_rules.get_key_value(&pdfs);
 		assert_eq!(key, Path::new(docs))
@@ -109,12 +108,12 @@ mod tests {
 				folders: vec![
 					Folder {
 						path: test1.clone(),
-						options: Options::default_none()
+						options: Options::default_none(),
 					},
 					Folder {
 						path: test2.clone(),
-						options: Options::default_none()
-					}
+						options: Options::default_none(),
+					},
 				],
 				..Default::default()
 			},
@@ -122,12 +121,12 @@ mod tests {
 				folders: vec![
 					Folder {
 						path: test3.clone(),
-						options: Options::default_none()
+						options: Options::default_none(),
 					},
 					Folder {
 						path: test1.clone(),
-						options: Options::default_none()
-					}
+						options: Options::default_none(),
+					},
 				],
 				..Default::default()
 			},
