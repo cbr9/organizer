@@ -46,18 +46,18 @@ pub fn visit_placeholder_string(val: &str) -> Result<String, io::Error> {
 }
 
 pub trait Placeholder {
-	fn expand_placeholders(self, path: &Path) -> io::Result<String>;
+	fn expand_placeholders<T: AsRef<Path>>(self, path: T) -> io::Result<String>;
 }
 
 impl<T: AsRef<str>> Placeholder for T {
-	fn expand_placeholders(self, path: &Path) -> io::Result<String> {
+	fn expand_placeholders<P: AsRef<Path>>(self, path: P) -> io::Result<String> {
 		let str = self.as_ref();
 		if VALID_PH_REGEX.is_match(str) {
 			// if the first condition is false, the second one won't be evaluated and REGEX won't be initialized
 			let mut new = str.to_string();
 			for span in VALID_PH_REGEX.find_iter(str) {
 				let placeholders = span.as_str().trim_matches(|x| x == '{' || x == '}').split('.');
-				let mut current_value = path.to_path_buf();
+				let mut current_value = path.as_ref().to_path_buf();
 				for placeholder in placeholders.into_iter() {
 					current_value = match placeholder {
 						"path" => current_value
