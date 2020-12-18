@@ -29,4 +29,5 @@ strum_macros = "0.20.1"
 strum = "0.20.0"
 
 [dev-dependencies]
+pretty_assertions = "0.6.1"
 serde_test = "1.0.117"

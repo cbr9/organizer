@@ -35,3 +35,6 @@ hot-reload = []
 
 [workspace]
 members = ["organize_core/"]
+
+[dev-dependencies]
+pretty_assertions = "0.6.1"
