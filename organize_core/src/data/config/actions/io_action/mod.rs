@@ -88,7 +88,7 @@ impl AsAction for Copy {
 			std::fs::copy(&path, &to)
 				.map(|_| {
 					info!("({}) {} -> {}", ActionType::Copy.to_string().bold(), path.display(), to.display());
-					to
+					path
 				})
 				.map_err(|e| debug!("{}", e))
 				.ok()

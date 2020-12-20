@@ -3,6 +3,7 @@ use std::{
 	env,
 	path::{Path, PathBuf},
 };
+use std::iter::FromIterator;
 
 pub trait Expand {
 	// TODO: implement for str
@@ -39,7 +40,7 @@ impl<T: Into<PathBuf>> Expand for T {
 					components.push(component.to_string());
 				}
 			}
-			Ok(components.into_iter().collect::<PathBuf>())
+			Ok(PathBuf::from_iter(components))
 		} else {
 			Ok(path)
 		}
@@ -73,7 +74,6 @@ mod tests {
 		env::set_var("PROJECT_DIR", project());
 		let original = PathBuf::from("$PROJECT_DIR/tests");
 		let expected = project().join("tests");
-		env::remove_var("PROJECT_DIR");
 		assert_eq!(original.expand_vars().unwrap(), expected)
 	}
 	#[test]
