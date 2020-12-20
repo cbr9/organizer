@@ -1,5 +1,4 @@
 use std::{
-	borrow::Cow,
 	fs,
 	io::Result,
 	ops::Deref,
@@ -10,7 +9,7 @@ use std::{
 };
 
 use colored::Colorize;
-use log::info;
+use log::{debug, info};
 use serde::{de::Error, Deserialize, Deserializer};
 
 use crate::{
@@ -26,13 +25,25 @@ pub struct Script {
 	content: String,
 }
 
-impl AsAction<Self> for Script {
-	fn act<'a>(&self, path: Cow<'a, Path>, simulate: bool) -> Result<Cow<'a, Path>> {
+impl AsAction for Script {
+	fn act<T: Into<PathBuf>>(&self, path: T, simulate: bool) -> Option<PathBuf> {
+		let path = path.into();
 		if !simulate {
-			self.run(&path)?;
+			match self.run(&path) {
+				Ok(output) => {
+					info!("({}) run script on {}", self.exec.bold(), path.display());
+					let output = String::from_utf8_lossy(&output.stdout);
+					output.lines().last().map(|last| PathBuf::from(&last.trim()))
+				}
+				Err(e) => {
+					debug!("{}", e);
+					None
+				}
+			}
+		} else {
+			info!("(simulate {}) run script on {}", self.exec.bold(), path.display());
+			None
 		}
-		info!("({}) run script on {}", self.exec.bold(), path.display());
-		Ok(path)
 	}
 }
 
@@ -41,14 +52,13 @@ where
 	D: Deserializer<'de>,
 {
 	let str = String::deserialize(deserializer)?;
-	let mut command = std::process::Command::new(&str);
-	match command.spawn() {
-		Ok(mut child) => {
-			child.kill().unwrap_or(());
-			Ok(str)
-		}
-		Err(_) => Err(D::Error::custom(format!("interpreter '{}' could not be run", str))),
-	}
+	std::process::Command::new(&str)
+		.spawn()
+		.map(|mut child| {
+			child.kill().ok();
+			str
+		})
+		.map_err(D::Error::custom)
 }
 
 impl AsFilter for Script {

@@ -1,9 +1,6 @@
 mod de;
 
 use std::{
-	borrow::Cow,
-	fs, io,
-	io::{ErrorKind, Result},
 	ops::Deref,
 	path::{Path, PathBuf},
 	result,
@@ -16,7 +13,7 @@ use crate::{
 	string::Placeholder,
 };
 use colored::Colorize;
-use log::info;
+use log::{info, debug};
 use serde::{Deserialize, Serialize};
 use std::convert::TryFrom;
 use std::env::VarError;
@@ -28,40 +25,76 @@ pub struct IOAction {
 	pub sep: Sep,
 }
 
-pub(crate) struct Move;
-pub(crate) struct Rename;
-pub(crate) struct Copy;
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+pub struct Move(IOAction);
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+pub struct Rename(IOAction);
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+pub struct Copy(IOAction);
 
-impl AsAction<Move> for IOAction {
-	fn act<'a>(&self, path: Cow<'a, Path>, simulate: bool) -> Result<Cow<'a, Path>> {
-		let to = Self::helper(&path, self, ActionType::Move)?;
+impl AsAction for Move {
+	fn act<T: Into<PathBuf>>(&self, path: T, simulate: bool) -> Option<PathBuf> {
+		let path = path.into();
+		let to = IOAction::helper(&path, &self.0, ActionType::Move)?;
 		if !simulate {
-			std::fs::rename(&path, &to)?;
+			match std::fs::rename(&path, &to) {
+				Ok(_) => {
+					info!("({}) {} -> {}", ActionType::Move.to_string().bold(), path.display(), to.display());
+					Some(to)
+				}
+				Err(e) => {
+					debug!("{}", e);
+					None
+				}
+			}
+		} else {
+			info!("(simulate {}) {} -> {}", ActionType::Move.to_string().bold(), path.display(), to.display());
+			Some(to)
 		}
-		info!("({}) {} -> {}", ActionType::Move.to_string().bold(), path.display(), to.display());
-		Ok(Cow::Owned(to))
 	}
 }
 
-impl AsAction<Rename> for IOAction {
-	fn act<'a>(&self, path: Cow<'a, Path>, simulate: bool) -> Result<Cow<'a, Path>> {
-		let to = IOAction::helper(&path, self, ActionType::Rename)?;
+impl AsAction for Rename {
+	fn act<T: Into<PathBuf>>(&self, path: T, simulate: bool) -> Option<PathBuf> {
+		let path = path.into();
+		let to = IOAction::helper(&path, &self.0, ActionType::Rename)?;
 		if !simulate {
-			fs::rename(&path, &to)?;
+			match std::fs::rename(&path, &to) {
+				Ok(_) => {
+					info!("({}) {} -> {}", ActionType::Rename.to_string().bold(), path.display(), to.display());
+					Some(to)
+				}
+				Err(e) => {
+					debug!("{}", e);
+					None
+				}
+			}
+		} else {
+			info!("(simulate {}) {} -> {}", ActionType::Rename.to_string().bold(), path.display(), to.display());
+			Some(to)
 		}
-		info!("({}) {} -> {}", ActionType::Rename.to_string().bold(), path.display(), to.display());
-		Ok(Cow::Owned(to))
 	}
 }
 
-impl AsAction<Copy> for IOAction {
-	fn act<'a>(&self, path: Cow<'a, Path>, simulate: bool) -> Result<Cow<'a, Path>> {
-		let to = IOAction::helper(&path, self, ActionType::Copy)?;
+impl AsAction for Copy {
+	fn act<T: Into<PathBuf>>(&self, path: T, simulate: bool) -> Option<PathBuf> {
+		let path = path.into();
+		let to = IOAction::helper(&path, &self.0, ActionType::Copy)?;
 		if !simulate {
-			std::fs::copy(&path, &to)?;
+			match std::fs::copy(&path, &to) {
+				Ok(_) => {
+					info!("({}) {} -> {}", ActionType::Copy.to_string().bold(), path.display(), to.display());
+					Some(path)
+				}
+				Err(e) => {
+					debug!("{}", e);
+					None
+				}
+			}
+		} else {
+			info!("(simulate {}) {} -> {}", ActionType::Copy.to_string().bold(), path.display(), to.display());
+			Some(path)
 		}
-		info!("({}) {} -> {}", ActionType::Copy.to_string().bold(), path.display(), to.display());
-		Ok(path)
 	}
 }
 
@@ -87,33 +120,22 @@ impl FromStr for IOAction {
 }
 
 impl IOAction {
-	fn helper<T>(path: T, action: &IOAction, kind: ActionType) -> Result<PathBuf>
+	fn helper<T>(path: T, action: &IOAction, kind: ActionType) -> Option<PathBuf>
 	where
 		T: AsRef<Path>,
 	{
-		debug_assert!([ActionType::Move, ActionType::Rename, ActionType::Copy].contains(&kind));
+		use ActionType::{Copy, Move};
 
-		let mut to: PathBuf = action.to.to_string_lossy().expand_placeholders(path.as_ref())?.deref().into();
-		if kind == ActionType::Copy || kind == ActionType::Move {
-			if !to.exists() {
-				fs::create_dir_all(&to)?;
-			}
-			// to = to.canonicalize().unwrap();
-			to.push(
-				path.as_ref()
-					.file_name()
-					.ok_or_else(|| io::Error::new(ErrorKind::Other, "path has no filename"))?,
-			);
+		let mut to: PathBuf = action.to.to_string_lossy().expand_placeholders(&path).ok()?.into();
+		match kind {
+			Copy | Move => to.push(path.as_ref().file_name()?),
+			_ => {}
 		}
-
 		if to.exists() {
-			match to.update(&action.if_exists, &action.sep) {
-				// FIXME: avoid the into_owned() call
-				Ok(new_path) => to = new_path.into_owned(),
-				Err(e) => return Err(e),
-			}
+			to.update(&action.if_exists, &action.sep)
+		} else {
+			Some(to)
 		}
-		Ok(to)
 	}
 }
 

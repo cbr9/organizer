@@ -3,7 +3,6 @@ pub mod filters;
 pub mod folders;
 
 use std::{
-	borrow::Cow,
 	fs,
 	path::{Path, PathBuf},
 };
@@ -28,7 +27,6 @@ use crate::{
 	utils::DefaultOpt,
 	PROJECT_NAME,
 };
-
 
 // TODO: add tests for the custom deserializers
 
@@ -59,9 +57,7 @@ impl Config {
 	/// This constructor fails in the following cases:
 	/// - The configuration file does not exist
 	pub fn parse<T: AsRef<Path>>(path: T) -> Result<Config> {
-		fs::read_to_string(&path).map(|content| {
-			serde_yaml::from_str(&content).map_err(anyhow::Error::new)
-		})?
+		fs::read_to_string(&path).map(|content| serde_yaml::from_str(&content).map_err(anyhow::Error::new))?
 	}
 
 	pub fn set_cwd<T: AsRef<Path>>(path: T) -> Result<PathBuf> {
@@ -87,7 +83,7 @@ impl Config {
 		let path = if path.as_ref().exists() {
 			path.as_ref().update(&ConflictOption::Rename, &Default::default()).unwrap() // safe unwrap (can only return an error if if_exists == Skip)
 		} else {
-			Cow::Borrowed(path.as_ref())
+			path.as_ref().into()
 		};
 
 		path.parent()
@@ -182,8 +178,8 @@ impl<'a> AsRef<Self> for Rule {
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use anyhow::Result;
 	use crate::utils::tests::project;
+	use anyhow::Result;
 
 	#[test]
 	fn set_cwd() -> Result<()> {

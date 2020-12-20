@@ -4,40 +4,41 @@ pub(crate) mod io_action;
 pub(crate) mod script;
 pub(crate) mod trash;
 
-use std::{borrow::Cow, io::Result, ops::Deref, path::Path};
+use std::{ops::Deref, path::Path};
 
 use crate::data::{
 	config::actions::{
 		delete::Delete,
 		echo::Echo,
-		io_action::{Copy, IOAction, Move, Rename},
+		io_action::{Copy, Move, Rename},
 		script::Script,
 		trash::Trash,
 	},
 	options::apply::Apply,
 };
-use log::error;
+
 use serde::Deserialize;
+
 use std::path::PathBuf;
 
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
 #[serde(rename_all(deserialize = "lowercase"))]
 pub enum Action {
-	Move(IOAction),
-	Copy(IOAction),
-	Rename(IOAction),
+	Move(Move),
+	Copy(Copy),
+	Rename(Rename),
 	Delete(Delete),
 	Echo(Echo),
 	Trash(Trash),
 	Script(Script),
 }
 
-impl AsAction<Action> for Action {
-	fn act<'a>(&self, path: Cow<'a, Path>, simulate: bool) -> Result<Cow<'a, Path>> {
+impl AsAction for Action {
+	fn act<T: Into<PathBuf>>(&self, path: T, simulate: bool) -> Option<PathBuf> {
 		match self {
-			Action::Copy(copy) => AsAction::<Copy>::act(copy, path, simulate), // IOAction has three different implementations of AsAction
-			Action::Move(r#move) => AsAction::<Move>::act(r#move, path, simulate), // so they must be called with turbo-fish syntax
-			Action::Rename(rename) => AsAction::<Rename>::act(rename, path, simulate),
+			Action::Copy(copy) => copy.act(path, simulate), // IOAction has three different implementations of AsAction
+			Action::Move(r#move) => r#move.act(path, simulate), // so they must be called with turbo-fish syntax
+			Action::Rename(rename) => rename.act(path, simulate),
 			Action::Delete(delete) => delete.act(path, simulate),
 			Action::Echo(echo) => echo.act(path, simulate),
 			Action::Trash(trash) => trash.act(path, simulate),
@@ -46,8 +47,8 @@ impl AsAction<Action> for Action {
 	}
 }
 
-pub(crate) trait AsAction<T> {
-	fn act<'a>(&self, path: Cow<'a, Path>, simulate: bool) -> Result<Cow<'a, Path>>;
+pub(crate) trait AsAction {
+	fn act<P: Into<PathBuf>>(&self, path: P, simulate: bool) -> Option<PathBuf>;
 }
 
 #[derive(Eq, PartialEq, ToString)]
@@ -74,45 +75,29 @@ impl Deref for Actions {
 }
 
 impl Actions {
-	pub fn run<A>(&self, path: &Path, apply: A, simulate: bool) -> Result<PathBuf>
-	where
-		A: AsRef<Apply>,
-	{
+	pub fn run<T: Into<PathBuf>>(&self, path: T, apply: &Apply, simulate: bool) -> Option<PathBuf> {
 		match apply.as_ref() {
-			Apply::Any | Apply::AnyOf(_) => {
-				panic!("deserializer should not have allowed variants 'any' or 'any_of' for field 'actions' in option 'apply'")
-			}
 			Apply::All => {
-				let mut path = Cow::from(path);
-				self.iter()
-					.try_for_each(|action| match action.act(path.clone(), simulate) {
-						Ok(new_path) => {
-							path = new_path;
-							Ok(())
-						}
-						Err(e) => {
-							error!("{}", e);
-							Err(e)
-						}
-					})
-					.map(|_| path.to_path_buf())
+				let mut path = path.into();
+				for action in self.iter() {
+					match action.act(path, simulate) {
+						None => return None,
+						Some(new_path) => path = new_path,
+					}
+				}
+				Some(path)
 			}
 			Apply::AllOf(indices) => {
-				let mut path = Cow::from(path);
-				indices
-					.iter()
-					.try_for_each(|i| match self.get(*i).unwrap().act(path.clone(), simulate) {
-						Ok(new_path) => {
-							path = new_path;
-							Ok(())
-						}
-						Err(e) => {
-							error!("{}", e);
-							Err(e)
-						}
-					})
-					.map(|_| path.to_path_buf())
+				let mut path = path.into();
+				for i in indices {
+					match self[*i].act(path, simulate) {
+						None => return None,
+						Some(new_path) => path = new_path,
+					}
+				}
+				Some(path)
 			}
+			_ => unreachable!("deserializer should not allow variants 'any' or 'any_of' in `apply.actions`"),
 		}
 	}
 }

@@ -46,7 +46,7 @@ pub fn visit_placeholder_string(val: &str) -> Result<String, io::Error> {
 }
 
 pub trait Placeholder {
-	fn expand_placeholders<T: AsRef<Path>>(self, path: T) -> io::Result<String>;
+	fn expand_placeholders<P: AsRef<Path>>(self, path: P) -> io::Result<String>;
 }
 
 impl<T: AsRef<str>> Placeholder for T {

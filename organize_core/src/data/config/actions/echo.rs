@@ -1,4 +1,4 @@
-use std::{borrow::Cow, io::Result, ops::Deref, path::Path};
+use std::{ops::Deref, path::Path};
 
 use crate::{
 	data::config::actions::{ActionType, AsAction},
@@ -7,6 +7,7 @@ use crate::{
 use colored::Colorize;
 use log::info;
 use serde::Deserialize;
+use std::path::PathBuf;
 
 #[derive(Debug, Clone, Deserialize, Default, Eq, PartialEq)]
 pub struct Echo(#[serde(deserialize_with = "deserialize_placeholder_string")] String);
@@ -19,9 +20,14 @@ impl Deref for Echo {
 	}
 }
 
-impl AsAction<Self> for Echo {
-	fn act<'a>(&self, path: Cow<'a, Path>, _simulate: bool) -> Result<Cow<'a, Path>> {
-		info!("({}) {}", ActionType::Echo.to_string().bold(), self.as_str().expand_placeholders(&path)?);
-		Ok(path)
+impl AsAction for Echo {
+	fn act<T: Into<PathBuf>>(&self, path: T, simulate: bool) -> Option<PathBuf> {
+		let path = path.into();
+		if !simulate {
+			info!("({}) {}", ActionType::Echo.to_string().bold(), self.as_str().expand_placeholders(&path).ok()?);
+		} else {
+			info!("(simulate {}) {}", ActionType::Echo.to_string().bold(), self.as_str().expand_placeholders(&path).ok()?);
+		}
+		Some(path)
 	}
 }

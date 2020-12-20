@@ -1,15 +1,12 @@
 use crate::data::config::actions::io_action::{ConflictOption, Sep};
-use std::{
-	borrow::Cow,
-	io::{Error, ErrorKind, Result},
-	path::Path,
-};
+use std::path::PathBuf;
+
 
 pub trait Update {
-	fn update(&self, if_exists: &ConflictOption, sep: &Sep) -> Result<Cow<Path>>;
+	fn update(self, if_exists: &ConflictOption, sep: &Sep) -> Option<PathBuf>;
 }
 
-impl Update for Path {
+impl<T: Into<PathBuf>> Update for T {
 	///  When trying to rename a file to a path that already exists, calling update() on the
 	///  target path will return a new valid path.
 	///  # Args
@@ -18,30 +15,21 @@ impl Update for Path {
 	/// * `is_watching`: whether this function is being run from a watcher or not
 	/// # Return
 	/// This function will return `Some(new_path)` if `if_exists` is not set to skip, otherwise it returns `None`
-	fn update(&self, if_exists: &ConflictOption, sep: &Sep) -> Result<Cow<Path>> {
-		if self.exists() {
-			match if_exists {
-				ConflictOption::Skip => Err(Error::from(ErrorKind::AlreadyExists)),
-				ConflictOption::Overwrite => Ok(Cow::Borrowed(self)),
-				ConflictOption::Rename => {
-					let extension = self.extension().unwrap_or_default().to_string_lossy();
-					let stem = match self.file_stem() {
-						Some(stem) => stem.to_string_lossy(),
-						None => return Err(Error::from(ErrorKind::InvalidInput)),
-					};
-					// let (stem, extension) = path::get_stem_and_extension(&self);
-					let mut new = self.to_path_buf();
-					let mut n = 1;
-					while new.exists() {
-						let new_filename = format!("{}{}({:?}).{}", stem, sep.as_str(), n, extension);
-						new.set_file_name(new_filename);
-						n += 1;
-					}
-					Ok(Cow::Owned(new))
+	fn update(self, if_exists: &ConflictOption, sep: &Sep) -> Option<PathBuf> {
+		match if_exists {
+			ConflictOption::Skip => None,
+			ConflictOption::Overwrite => Some(self.into()),
+			ConflictOption::Rename => {
+				let mut path = self.into();
+				let extension = path.extension().unwrap_or_default().to_string_lossy().to_string();
+				let stem = path.file_stem()?.to_string_lossy().to_string();
+				let mut n = 1;
+				while path.exists() {
+					path.set_file_name(format!("{}{}({:?}).{}", stem, sep.as_str(), n, extension));
+					n += 1;
 				}
+				Some(path)
 			}
-		} else {
-			Ok(Cow::Borrowed(self))
 		}
 	}
 }
@@ -62,13 +50,13 @@ mod tests {
 	#[test]
 	fn rename_with_overwrite_conflict() {
 		let original = project().join("tests").join("files").join("test2.txt");
-		let new_path = original.update(&ConflictOption::Overwrite, &Default::default()).unwrap();
+		let new_path = original.clone().update(&ConflictOption::Overwrite, &Default::default()).unwrap();
 		assert_eq!(new_path, original)
 	}
 
 	#[test]
 	fn rename_with_skip_conflict() {
 		let original = project().join("tests").join("files").join("test2.txt");
-		assert!(original.update(&ConflictOption::Skip, &Default::default()).is_err())
+		assert!(original.update(&ConflictOption::Skip, &Default::default()).is_none())
 	}
 }

@@ -1,41 +1,31 @@
-use std::{
-	borrow::Cow,
-	io::{Error, ErrorKind, Result},
-	ops::Deref,
-	path::Path,
-};
+
 
 use crate::data::config::actions::{ActionType, AsAction};
 use colored::Colorize;
-use log::info;
+use log::{debug, info};
 use serde::Deserialize;
+use std::path::PathBuf;
 
 #[derive(Debug, Clone, Deserialize, Default, Eq, PartialEq)]
 pub struct Trash(bool);
 
-impl Deref for Trash {
-	type Target = bool;
-
-	fn deref(&self) -> &Self::Target {
-		&self.0
-	}
-}
-
-impl AsAction<Self> for Trash {
-	fn act<'a>(&self, path: Cow<'a, Path>, simulate: bool) -> Result<Cow<'a, Path>> {
+impl AsAction for Trash {
+	fn act<T: Into<PathBuf>>(&self, path: T, simulate: bool) -> Option<PathBuf> {
 		if self.0 {
+			let path = path.into();
 			if !simulate {
-				return match trash::delete(&path) {
+				match trash::delete(&path) {
 					Ok(_) => {
 						info!("({}) {}", ActionType::Trash.to_string().bold(), path.display());
-						Ok(path)
 					}
-					Err(e) => Err(Error::new(ErrorKind::Other, e.to_string())),
-				};
+					Err(e) => {
+						debug!("{}", e);
+					}
+				}
 			} else {
-				info!("({}) {}", ActionType::Trash.to_string().bold(), path.display());
+				info!("(simulate {}) {}", ActionType::Trash.to_string().bold(), path.display());
 			}
 		}
-		Ok(path)
+		None
 	}
 }
