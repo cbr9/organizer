@@ -1,15 +1,17 @@
-use crate::{
-	data::config::actions::io_action::{ConflictOption, IOAction, Sep},
-	path::Expand,
-	string::visit_placeholder_string,
-};
+use std::{fmt, path::PathBuf, str::FromStr};
+
 use serde::{
 	de,
 	de::{Error, MapAccess, Visitor},
 	export::PhantomData,
 	Deserialize, Deserializer,
 };
-use std::{fmt, path::PathBuf, str::FromStr};
+
+use crate::{
+	data::config::actions::io_action::{ConflictOption, IOAction, Sep},
+	path::Expand,
+	string::visit_placeholder_string,
+};
 
 impl<'de> Deserialize<'de> for IOAction {
 	fn deserialize<D>(deserializer: D) -> Result<Self, <D as Deserializer<'de>>::Error>
@@ -37,38 +39,36 @@ impl<'de> Deserialize<'de> for IOAction {
 			where
 				M: MapAccess<'de>,
 			{
-				let mut action: IOAction = IOAction::default();
+				let mut to: Option<PathBuf> = None;
+				let mut if_exists: Option<ConflictOption> = None;
+				let mut sep: Option<Sep> = None;
 				while let Some((key, value)) = map.next_entry::<String, String>()? {
 					match key.as_str() {
 						"to" => {
-							action.to = match visit_placeholder_string(&value) {
-								Ok(str) => {
-									let path = PathBuf::from(str)
-										.expand_vars()
-										.map_err(M::Error::custom)?
-										.expand_user()
-										.map_err(M::Error::custom)?;
-									if !path.exists() {
-										return Err(M::Error::custom("path does not exist"));
-									}
-									path
-								}
-								Err(e) => return Err(M::Error::custom(e.to_string())),
-							}
+							to = {
+								let path = visit_placeholder_string(&value)
+									.map(|str| -> Result<PathBuf, M::Error> {
+										let path = PathBuf::from(str)
+											.expand_vars()
+											.map_err(M::Error::custom)?
+											.expand_user()
+											.map_err(M::Error::custom)?;
+										Ok(path)
+									})
+									.map_err(M::Error::custom)??;
+								Some(path)
+							};
 						}
-						"if_exists" => {
-							action.if_exists = match ConflictOption::from_str(&value) {
-								Ok(value) => value,
-								Err(e) => return Err(M::Error::custom(e)),
-							}
-						}
-						"sep" => action.sep = Sep(value),
-						_ => return Err(serde::de::Error::custom("unexpected key")),
+						"if_exists" => if_exists = Some(ConflictOption::from_str(&value).map_err(M::Error::custom)?),
+						"sep" => sep = Some(Sep(value)),
+						other => return Err(M::Error::unknown_field(other, &["to", "if_exists", "sep"])),
 					}
 				}
-				if action.to.to_string_lossy().is_empty() {
-					return Err(serde::de::Error::custom("missing path"));
-				}
+				let action = IOAction {
+					to: to.ok_or_else(|| M::Error::missing_field("to"))?,
+					if_exists: if_exists.unwrap_or_default(),
+					sep: sep.unwrap_or_default(),
+				};
 				Ok(action)
 			}
 		}

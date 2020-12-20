@@ -24,9 +24,17 @@ impl AsAction for Echo {
 	fn act<T: Into<PathBuf>>(&self, path: T, simulate: bool) -> Option<PathBuf> {
 		let path = path.into();
 		if !simulate {
-			info!("({}) {}", ActionType::Echo.to_string().bold(), self.as_str().expand_placeholders(&path).ok()?);
+			info!(
+				"({}) {}",
+				ActionType::Echo.to_string().bold(),
+				self.as_str().expand_placeholders(&path).ok()?
+			);
 		} else {
-			info!("(simulate {}) {}", ActionType::Echo.to_string().bold(), self.as_str().expand_placeholders(&path).ok()?);
+			info!(
+				"(simulate {}) {}",
+				ActionType::Echo.to_string().bold(),
+				self.as_str().expand_placeholders(&path).ok()?
+			);
 		}
 		Some(path)
 	}

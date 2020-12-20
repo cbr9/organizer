@@ -1,5 +1,3 @@
-
-
 use crate::data::config::actions::{ActionType, AsAction};
 use colored::Colorize;
 use log::{debug, info};
@@ -14,14 +12,10 @@ impl AsAction for Trash {
 		if self.0 {
 			let path = path.into();
 			if !simulate {
-				match trash::delete(&path) {
-					Ok(_) => {
-						info!("({}) {}", ActionType::Trash.to_string().bold(), path.display());
-					}
-					Err(e) => {
-						debug!("{}", e);
-					}
-				}
+				trash::delete(&path)
+					.map(|_| info!("({}) {}", ActionType::Trash.to_string().bold(), path.display()))
+					.map_err(|e| debug!("{}", e))
+					.ok()?;
 			} else {
 				info!("(simulate {}) {}", ActionType::Trash.to_string().bold(), path.display());
 			}

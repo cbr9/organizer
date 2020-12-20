@@ -13,7 +13,7 @@ use crate::{
 	string::Placeholder,
 };
 use colored::Colorize;
-use log::{info, debug};
+use log::{debug, info};
 use serde::{Deserialize, Serialize};
 use std::convert::TryFrom;
 use std::env::VarError;
@@ -37,18 +37,20 @@ impl AsAction for Move {
 		let path = path.into();
 		let to = IOAction::helper(&path, &self.0, ActionType::Move)?;
 		if !simulate {
-			match std::fs::rename(&path, &to) {
-				Ok(_) => {
+			std::fs::rename(&path, &to)
+				.map(|_| {
 					info!("({}) {} -> {}", ActionType::Move.to_string().bold(), path.display(), to.display());
-					Some(to)
-				}
-				Err(e) => {
-					debug!("{}", e);
-					None
-				}
-			}
+					to
+				})
+				.map_err(|e| debug!("{}", e))
+				.ok()
 		} else {
-			info!("(simulate {}) {} -> {}", ActionType::Move.to_string().bold(), path.display(), to.display());
+			info!(
+				"(simulate {}) {} -> {}",
+				ActionType::Move.to_string().bold(),
+				path.display(),
+				to.display()
+			);
 			Some(to)
 		}
 	}
@@ -59,18 +61,20 @@ impl AsAction for Rename {
 		let path = path.into();
 		let to = IOAction::helper(&path, &self.0, ActionType::Rename)?;
 		if !simulate {
-			match std::fs::rename(&path, &to) {
-				Ok(_) => {
+			std::fs::rename(&path, &to)
+				.map(|_| {
 					info!("({}) {} -> {}", ActionType::Rename.to_string().bold(), path.display(), to.display());
-					Some(to)
-				}
-				Err(e) => {
-					debug!("{}", e);
-					None
-				}
-			}
+					to
+				})
+				.map_err(|e| debug!("{}", e))
+				.ok()
 		} else {
-			info!("(simulate {}) {} -> {}", ActionType::Rename.to_string().bold(), path.display(), to.display());
+			info!(
+				"(simulate {}) {} -> {}",
+				ActionType::Rename.to_string().bold(),
+				path.display(),
+				to.display()
+			);
 			Some(to)
 		}
 	}
@@ -81,18 +85,20 @@ impl AsAction for Copy {
 		let path = path.into();
 		let to = IOAction::helper(&path, &self.0, ActionType::Copy)?;
 		if !simulate {
-			match std::fs::copy(&path, &to) {
-				Ok(_) => {
+			std::fs::copy(&path, &to)
+				.map(|_| {
 					info!("({}) {} -> {}", ActionType::Copy.to_string().bold(), path.display(), to.display());
-					Some(path)
-				}
-				Err(e) => {
-					debug!("{}", e);
-					None
-				}
-			}
+					to
+				})
+				.map_err(|e| debug!("{}", e))
+				.ok()
 		} else {
-			info!("(simulate {}) {} -> {}", ActionType::Copy.to_string().bold(), path.display(), to.display());
+			info!(
+				"(simulate {}) {} -> {}",
+				ActionType::Copy.to_string().bold(),
+				path.display(),
+				to.display()
+			);
 			Some(path)
 		}
 	}

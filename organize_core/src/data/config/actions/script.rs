@@ -29,17 +29,13 @@ impl AsAction for Script {
 	fn act<T: Into<PathBuf>>(&self, path: T, simulate: bool) -> Option<PathBuf> {
 		let path = path.into();
 		if !simulate {
-			match self.run(&path) {
-				Ok(output) => {
+			self.run(&path)
+				.map(|output| {
 					info!("({}) run script on {}", self.exec.bold(), path.display());
 					let output = String::from_utf8_lossy(&output.stdout);
 					output.lines().last().map(|last| PathBuf::from(&last.trim()))
-				}
-				Err(e) => {
-					debug!("{}", e);
-					None
-				}
-			}
+				})
+				.ok()?
 		} else {
 			info!("(simulate {}) run script on {}", self.exec.bold(), path.display());
 			None

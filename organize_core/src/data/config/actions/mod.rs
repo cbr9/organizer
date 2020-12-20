@@ -80,20 +80,15 @@ impl Actions {
 			Apply::All => {
 				let mut path = path.into();
 				for action in self.iter() {
-					match action.act(path, simulate) {
-						None => return None,
-						Some(new_path) => path = new_path,
-					}
+					path = action.act(path, simulate)?;
 				}
 				Some(path)
 			}
 			Apply::AllOf(indices) => {
 				let mut path = path.into();
 				for i in indices {
-					match self[*i].act(path, simulate) {
-						None => return None,
-						Some(new_path) => path = new_path,
-					}
+                    let action = self.0.get(*i)?;
+					path = action.act(path, simulate)?;
 				}
 				Some(path)
 			}

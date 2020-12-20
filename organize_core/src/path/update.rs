@@ -1,7 +1,6 @@
 use crate::data::config::actions::io_action::{ConflictOption, Sep};
 use std::path::PathBuf;
 
-
 pub trait Update {
 	fn update(self, if_exists: &ConflictOption, sep: &Sep) -> Option<PathBuf>;
 }

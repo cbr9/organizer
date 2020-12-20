@@ -23,14 +23,10 @@ impl AsAction for Delete {
 		let path = path.into();
 		if self.0 {
 			if !simulate {
-				match fs::remove_file(&path) {
-					Ok(_) => {
-						info!("({}) {}", ActionType::Delete.to_string().bold(), path.display());
-					}
-					Err(e) => {
-						debug!("{}", e)
-					}
-				}
+				fs::remove_file(&path)
+					.map(|_| info!("({}) {}", ActionType::Delete.to_string().bold(), path.display()))
+					.map_err(|e| debug!("{}", e))
+					.ok()?;
 			} else {
 				info!("(simulate {}) {}", ActionType::Delete.to_string().bold(), path.display());
 			}

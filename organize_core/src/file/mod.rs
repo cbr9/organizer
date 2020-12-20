@@ -19,7 +19,7 @@ impl File {
 				let rules = self.get_matching_rules(data, path_to_rules, path_to_recursive);
 				for (i, j) in rules {
 					let rule = &data.config.rules[*i];
-                    match rule.actions.run(&path, data.get_apply_actions(*i, *j), simulate) {
+					match rule.actions.run(&path, data.get_apply_actions(*i, *j), simulate) {
 						None => break,
 						Some(new_path) => {
 							path = new_path;

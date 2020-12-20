@@ -73,6 +73,7 @@ mod tests {
 		env::set_var("PROJECT_DIR", project());
 		let original = PathBuf::from("$PROJECT_DIR/tests");
 		let expected = project().join("tests");
+		env::remove_var("PROJECT_DIR");
 		assert_eq!(original.expand_vars().unwrap(), expected)
 	}
 	#[test]
