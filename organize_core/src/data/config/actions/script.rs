@@ -9,13 +9,14 @@ use std::{
 };
 
 use colored::Colorize;
-use log::{debug, info};
+use log::info;
 use serde::{de::Error, Deserialize, Deserializer};
 
 use crate::{
-	data::config::{actions::AsAction, filters::AsFilter, Config},
+	data::config::{actions::AsAction, Config, filters::AsFilter},
 	string::{deserialize_placeholder_string, Placeholder},
 };
+use crate::data::config::actions::ActionType;
 
 #[derive(Deserialize, Debug, Clone, Default, Eq, PartialEq)]
 pub struct Script {
@@ -40,6 +41,9 @@ impl AsAction for Script {
 			info!("(simulate {}) run script on {}", self.exec.bold(), path.display());
 			None
 		}
+	}
+	fn ty(&self) -> ActionType {
+		ActionType::Script
 	}
 }
 

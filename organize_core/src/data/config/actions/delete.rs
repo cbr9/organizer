@@ -1,11 +1,11 @@
-use std::{fs, io::Result, ops::Deref, path::Path};
+use std::{fs, ops::Deref, path::Path};
+use std::path::PathBuf;
 
-use crate::data::config::actions::{ActionType, AsAction};
 use colored::Colorize;
 use log::{debug, info};
 use serde::Deserialize;
 
-use std::path::PathBuf;
+use crate::data::config::actions::{ActionType, AsAction};
 
 #[derive(Debug, Clone, Deserialize, Default, PartialEq, Eq)]
 pub struct Delete(bool);
@@ -32,5 +32,8 @@ impl AsAction for Delete {
 			}
 		}
 		None
+	}
+	fn ty(&self) -> ActionType {
+		ActionType::Delete
 	}
 }

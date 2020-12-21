@@ -1,13 +1,14 @@
-use std::{ops::Deref, path::Path};
+use std::{ops::Deref};
+use std::path::PathBuf;
+
+use colored::Colorize;
+use log::info;
+use serde::Deserialize;
 
 use crate::{
 	data::config::actions::{ActionType, AsAction},
 	string::{deserialize_placeholder_string, Placeholder},
 };
-use colored::Colorize;
-use log::info;
-use serde::Deserialize;
-use std::path::PathBuf;
 
 #[derive(Debug, Clone, Deserialize, Default, Eq, PartialEq)]
 pub struct Echo(#[serde(deserialize_with = "deserialize_placeholder_string")] String);
@@ -37,5 +38,8 @@ impl AsAction for Echo {
 			);
 		}
 		Some(path)
+	}
+	fn ty(&self) -> ActionType {
+		ActionType::Echo
 	}
 }
