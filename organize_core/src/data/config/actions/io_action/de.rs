@@ -1,5 +1,4 @@
 use std::{fmt, path::PathBuf, str::FromStr};
-use std::ops::Deref;
 
 use serde::{
 	de,

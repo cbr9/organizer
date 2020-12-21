@@ -38,6 +38,9 @@ pub struct Copy(IOAction);
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
 pub struct Hardlink(IOAction);
 
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+pub struct Symlink(IOAction);
+
 macro_rules! io_action {
 	($id:ty) => {
 		impl AsAction for $id {
@@ -59,8 +62,10 @@ io_action!(Move);
 io_action!(Rename);
 io_action!(Copy);
 io_action!(Hardlink);
+io_action!(Symlink);
 
 fn helper(ty: ActionType, path: PathBuf, to: PathBuf, simulate: bool) -> Option<PathBuf> {
+	use ActionType::{Copy, Symlink, Hardlink, Move, Rename};
 	if !simulate {
 		if let Some(parent) = to.parent() {
 			if !parent.exists() {
@@ -68,16 +73,17 @@ fn helper(ty: ActionType, path: PathBuf, to: PathBuf, simulate: bool) -> Option<
 			}
 		}
 		match ty {
-			ActionType::Copy => std::fs::copy(&path, &to).map(|_| ()),
-			ActionType::Move | ActionType::Rename => std::fs::rename(&path, &to),
-			ActionType::Hardlink => std::fs::hard_link(&path, &to),
+			Copy => std::fs::copy(&path, &to).map(|_| ()),
+			Move | Rename => std::fs::rename(&path, &to),
+			Hardlink => std::fs::hard_link(&path, &to),
+			Symlink => std::os::unix::fs::symlink(&path, &to),
 			_ => unreachable!(),
 		}
 			.map(|_| {
 				info!("({}) {} -> {}", ty.to_string().bold(), path.display(), to.display());
 				match ty {
-					ActionType::Copy | ActionType::Hardlink => path,
-					ActionType::Move | ActionType::Rename => to,
+					Copy | Hardlink | Symlink => path,
+					Move | Rename => to,
 					_ => unreachable!(),
 				}
 			})
@@ -94,7 +100,7 @@ impl IOAction {
 		where
 			T: AsRef<Path>,
 	{
-		use ActionType::{Copy, Hardlink, Move, Rename};
+		use ActionType::{Copy, Hardlink, Move, Rename, Symlink};
 
 		let path = path.as_ref();
 		let mut to: PathBuf = self
@@ -106,7 +112,7 @@ impl IOAction {
 			.into();
 
 		match kind {
-			Copy | Move | Hardlink => {
+			Copy | Move | Hardlink | Symlink => {
 				if to.to_string_lossy().ends_with("/") || to.is_dir() {
 					to.push(path.file_name()?)
 				}

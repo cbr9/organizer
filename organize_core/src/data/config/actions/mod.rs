@@ -13,7 +13,7 @@ use crate::data::{
 	},
 	options::apply::Apply,
 };
-use crate::data::config::actions::io_action::Hardlink;
+use crate::data::config::actions::io_action::{Hardlink, Symlink};
 
 pub(crate) mod delete;
 pub(crate) mod echo;
@@ -28,6 +28,7 @@ pub enum Action {
 	Copy(Copy),
 	Rename(Rename),
 	Hardlink(Hardlink),
+	Symlink(Symlink),
 	Delete(Delete),
 	Echo(Echo),
 	Trash(Trash),
@@ -41,6 +42,7 @@ impl AsAction for Action {
 			Action::Move(r#move) => r#move.act(path, simulate), // so they must be called with turbo-fish syntax
 			Action::Rename(rename) => rename.act(path, simulate),
 			Action::Hardlink(hardlink) => hardlink.act(path, simulate),
+			Action::Symlink(symlink) => symlink.act(path, simulate),
 			Action::Delete(delete) => delete.act(path, simulate),
 			Action::Echo(echo) => echo.act(path, simulate),
 			Action::Trash(trash) => trash.act(path, simulate),
@@ -53,6 +55,7 @@ impl AsAction for Action {
 			Action::Move(r#move) => r#move.ty(),
 			Action::Rename(rename) => rename.ty(),
 			Action::Hardlink(hardlink) => hardlink.ty(),
+			Action::Symlink(symlink) => symlink.ty(),
 			Action::Delete(delete) => delete.ty(),
 			Action::Echo(echo) => echo.ty(),
 			Action::Trash(trash) => trash.ty(),
@@ -75,6 +78,7 @@ pub enum ActionType {
 	Move,
 	Rename,
 	Hardlink,
+	Symlink,
 	Script,
 	Trash,
 }

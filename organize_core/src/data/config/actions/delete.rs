@@ -1,4 +1,4 @@
-use std::{fs, ops::Deref, path::Path};
+use std::{fs, ops::Deref};
 use std::path::PathBuf;
 
 use colored::Colorize;
