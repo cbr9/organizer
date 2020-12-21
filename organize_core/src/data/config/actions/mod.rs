@@ -1,10 +1,7 @@
-pub(crate) mod delete;
-pub(crate) mod echo;
-pub(crate) mod io_action;
-pub(crate) mod script;
-pub(crate) mod trash;
+use std::ops::Deref;
+use std::path::PathBuf;
 
-use std::{ops::Deref, path::Path};
+use serde::Deserialize;
 
 use crate::data::{
 	config::actions::{
@@ -16,10 +13,13 @@ use crate::data::{
 	},
 	options::apply::Apply,
 };
+use crate::data::config::actions::io_action::{Hardlink, Symlink};
 
-use serde::Deserialize;
-
-use std::path::PathBuf;
+pub(crate) mod delete;
+pub(crate) mod echo;
+pub(crate) mod io_action;
+pub(crate) mod script;
+pub(crate) mod trash;
 
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
 #[serde(rename_all(deserialize = "lowercase"))]
@@ -27,6 +27,8 @@ pub enum Action {
 	Move(Move),
 	Copy(Copy),
 	Rename(Rename),
+	Hardlink(Hardlink),
+	Symlink(Symlink),
 	Delete(Delete),
 	Echo(Echo),
 	Trash(Trash),
@@ -39,19 +41,35 @@ impl AsAction for Action {
 			Action::Copy(copy) => copy.act(path, simulate), // IOAction has three different implementations of AsAction
 			Action::Move(r#move) => r#move.act(path, simulate), // so they must be called with turbo-fish syntax
 			Action::Rename(rename) => rename.act(path, simulate),
+			Action::Hardlink(hardlink) => hardlink.act(path, simulate),
+			Action::Symlink(symlink) => symlink.act(path, simulate),
 			Action::Delete(delete) => delete.act(path, simulate),
 			Action::Echo(echo) => echo.act(path, simulate),
 			Action::Trash(trash) => trash.act(path, simulate),
 			Action::Script(script) => script.act(path, simulate),
 		}
 	}
+	fn ty(&self) -> ActionType {
+		match self {
+			Action::Copy(copy) => copy.ty(),
+			Action::Move(r#move) => r#move.ty(),
+			Action::Rename(rename) => rename.ty(),
+			Action::Hardlink(hardlink) => hardlink.ty(),
+			Action::Symlink(symlink) => symlink.ty(),
+			Action::Delete(delete) => delete.ty(),
+			Action::Echo(echo) => echo.ty(),
+			Action::Trash(trash) => trash.ty(),
+			Action::Script(script) => script.ty(),
+		}
+	}
 }
 
 pub(crate) trait AsAction {
 	fn act<P: Into<PathBuf>>(&self, path: P, simulate: bool) -> Option<PathBuf>;
+	fn ty(&self) -> ActionType;
 }
 
-#[derive(Eq, PartialEq, ToString)]
+#[derive(Eq, PartialEq, ToString, EnumString)]
 #[strum(serialize_all = "lowercase")]
 pub enum ActionType {
 	Copy,
@@ -59,6 +77,8 @@ pub enum ActionType {
 	Echo,
 	Move,
 	Rename,
+	Hardlink,
+	Symlink,
 	Script,
 	Trash,
 }
@@ -87,7 +107,7 @@ impl Actions {
 			Apply::AllOf(indices) => {
 				let mut path = path.into();
 				for i in indices {
-                    let action = self.0.get(*i)?;
+					let action = self.0.get(*i)?;
 					path = action.act(path, simulate)?;
 				}
 				Some(path)

@@ -1,22 +1,23 @@
-mod de;
-
 use std::{
 	ops::Deref,
 	path::{Path, PathBuf},
 	result,
 	str::FromStr,
 };
+use std::convert::TryFrom;
+use std::env::VarError;
+
+use colored::Colorize;
+use log::{debug, info};
+use serde::{Deserialize, Serialize};
 
 use crate::{
 	data::config::actions::{ActionType, AsAction},
 	path::{Expand, Update},
 	string::Placeholder,
 };
-use colored::Colorize;
-use log::{debug, info};
-use serde::{Deserialize, Serialize};
-use std::convert::TryFrom;
-use std::env::VarError;
+
+mod de;
 
 #[derive(Debug, Clone, Eq, PartialEq, Default)]
 pub struct IOAction {
@@ -27,79 +28,105 @@ pub struct IOAction {
 
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
 pub struct Move(IOAction);
+
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
 pub struct Rename(IOAction);
+
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
 pub struct Copy(IOAction);
 
-impl AsAction for Move {
-	fn act<T: Into<PathBuf>>(&self, path: T, simulate: bool) -> Option<PathBuf> {
-		let path = path.into();
-		let to = IOAction::helper(&path, &self.0, ActionType::Move)?;
-		if !simulate {
-			std::fs::rename(&path, &to)
-				.map(|_| {
-					info!("({}) {} -> {}", ActionType::Move.to_string().bold(), path.display(), to.display());
-					to
-				})
-				.map_err(|e| debug!("{}", e))
-				.ok()
-		} else {
-			info!(
-				"(simulate {}) {} -> {}",
-				ActionType::Move.to_string().bold(),
-				path.display(),
-				to.display()
-			);
-			Some(to)
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+pub struct Hardlink(IOAction);
+
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+pub struct Symlink(IOAction);
+
+macro_rules! io_action {
+	($id:ty) => {
+		impl AsAction for $id {
+			fn act<T: Into<PathBuf>>(&self, path: T, simulate: bool) -> Option<PathBuf> {
+				let path = path.into();
+				let ty = self.ty();
+				let to = self.0.prepare_path(&path, &ty)?;
+				helper(ty, path, to, simulate)
+			}
+			fn ty(&self) -> ActionType {
+				let name = stringify!($id).to_lowercase();
+				ActionType::from_str(&name).expect(&format!("no variant associated with {}", name))
+			}
 		}
+	};
+}
+
+io_action!(Move);
+io_action!(Rename);
+io_action!(Copy);
+io_action!(Hardlink);
+io_action!(Symlink);
+
+fn helper(ty: ActionType, path: PathBuf, to: PathBuf, simulate: bool) -> Option<PathBuf> {
+	use ActionType::{Copy, Symlink, Hardlink, Move, Rename};
+	if !simulate {
+		if let Some(parent) = to.parent() {
+			if !parent.exists() {
+				std::fs::create_dir_all(parent).map_err(|e| debug!("{}", e)).ok()?;
+			}
+		}
+		match ty {
+			Copy => std::fs::copy(&path, &to).map(|_| ()),
+			Move | Rename => std::fs::rename(&path, &to),
+			Hardlink => std::fs::hard_link(&path, &to),
+			Symlink => std::os::unix::fs::symlink(&path, &to),
+			_ => unreachable!(),
+		}
+			.map(|_| {
+				info!("({}) {} -> {}", ty.to_string().bold(), path.display(), to.display());
+				match ty {
+					Copy | Hardlink | Symlink => path,
+					Move | Rename => to,
+					_ => unreachable!(),
+				}
+			})
+			.map_err(|e| debug!("{}", e))
+			.ok()
+	} else {
+		info!("(simulate {}) {} -> {}", ty.to_string().bold(), path.display(), to.display());
+		Some(to)
 	}
 }
 
-impl AsAction for Rename {
-	fn act<T: Into<PathBuf>>(&self, path: T, simulate: bool) -> Option<PathBuf> {
-		let path = path.into();
-		let to = IOAction::helper(&path, &self.0, ActionType::Rename)?;
-		if !simulate {
-			std::fs::rename(&path, &to)
-				.map(|_| {
-					info!("({}) {} -> {}", ActionType::Rename.to_string().bold(), path.display(), to.display());
-					to
-				})
-				.map_err(|e| debug!("{}", e))
-				.ok()
-		} else {
-			info!(
-				"(simulate {}) {} -> {}",
-				ActionType::Rename.to_string().bold(),
-				path.display(),
-				to.display()
-			);
-			Some(to)
-		}
-	}
-}
+impl IOAction {
+	fn prepare_path<T>(&self, path: T, kind: &ActionType) -> Option<PathBuf>
+		where
+			T: AsRef<Path>,
+	{
+		use ActionType::{Copy, Hardlink, Move, Rename, Symlink};
 
-impl AsAction for Copy {
-	fn act<T: Into<PathBuf>>(&self, path: T, simulate: bool) -> Option<PathBuf> {
-		let path = path.into();
-		let to = IOAction::helper(&path, &self.0, ActionType::Copy)?;
-		if !simulate {
-			std::fs::copy(&path, &to)
-				.map(|_| {
-					info!("({}) {} -> {}", ActionType::Copy.to_string().bold(), path.display(), to.display());
-					path
-				})
-				.map_err(|e| debug!("{}", e))
-				.ok()
+		let path = path.as_ref();
+		let mut to: PathBuf = self
+			.to
+			.to_string_lossy()
+			.expand_placeholders(&path)
+			.map_err(|e| debug!("{}", e))
+			.ok()?
+			.into();
+
+		match kind {
+			Copy | Move | Hardlink | Symlink => {
+				if to.to_string_lossy().ends_with("/") || to.is_dir() {
+					to.push(path.file_name()?)
+				}
+			}
+			Rename => {
+				to = path.with_file_name(to);
+			}
+			_ => unreachable!(),
+		}
+
+		if to.exists() {
+			to.update(&self.if_exists, &self.sep)
 		} else {
-			info!(
-				"(simulate {}) {} -> {}",
-				ActionType::Copy.to_string().bold(),
-				path.display(),
-				to.display()
-			);
-			Some(path)
+			Some(to)
 		}
 	}
 }
@@ -122,26 +149,6 @@ impl FromStr for IOAction {
 
 	fn from_str(s: &str) -> result::Result<Self, Self::Err> {
 		Self::try_from(PathBuf::from(s))
-	}
-}
-
-impl IOAction {
-	fn helper<T>(path: T, action: &IOAction, kind: ActionType) -> Option<PathBuf>
-	where
-		T: AsRef<Path>,
-	{
-		use ActionType::{Copy, Move};
-
-		let mut to: PathBuf = action.to.to_string_lossy().expand_placeholders(&path).ok()?.into();
-		match kind {
-			Copy | Move => to.push(path.as_ref().file_name()?),
-			_ => {}
-		}
-		if to.exists() {
-			to.update(&action.if_exists, &action.sep)
-		} else {
-			Some(to)
-		}
 	}
 }
 
@@ -182,15 +189,18 @@ impl Default for ConflictOption {
 
 #[cfg(test)]
 mod tests {
-	use super::*;
-	use crate::{data::config::actions::ActionType, utils::tests::project};
 	use serde_test::{assert_de_tokens, Token};
+
+	use crate::{data::config::actions::ActionType, utils::tests::project};
+
+	use super::*;
 
 	#[test]
 	fn deserialize_str() {
 		let value = IOAction::from_str("$HOME").unwrap();
 		assert_de_tokens(&value, &[Token::Str("$HOME")])
 	}
+
 	#[test]
 	fn deserialize_map() {
 		let mut value = IOAction::from_str("$HOME").unwrap();
@@ -219,7 +229,7 @@ mod tests {
 		assert!(target.join(original.file_name().unwrap()).exists());
 		assert!(!expected.exists());
 		let action = IOAction::try_from(target).unwrap();
-		let new_path = IOAction::helper(&original, &action, ActionType::Copy).unwrap();
+		let new_path = action.prepare_path(&original, &ActionType::Copy).unwrap();
 		assert_eq!(new_path, expected)
 	}
 
@@ -231,7 +241,7 @@ mod tests {
 		assert!(target.join(original.file_name().unwrap()).exists());
 		assert!(!expected.exists());
 		let action = IOAction::try_from(target).unwrap();
-		let new_path = IOAction::helper(&original, &action, ActionType::Move).unwrap();
+		let new_path = action.prepare_path(&original, &ActionType::Move).unwrap();
 		assert_eq!(new_path, expected)
 	}
 
@@ -243,7 +253,7 @@ mod tests {
 		assert!(target.exists());
 		assert!(!expected.exists());
 		let action = IOAction::try_from(target).unwrap();
-		let new_path = IOAction::helper(&original, &action, ActionType::Rename).unwrap();
+		let new_path = action.prepare_path(&original, &ActionType::Rename).unwrap();
 		assert_eq!(new_path, expected)
 	}
 }

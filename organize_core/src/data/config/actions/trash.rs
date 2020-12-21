@@ -1,8 +1,10 @@
-use crate::data::config::actions::{ActionType, AsAction};
+use std::path::PathBuf;
+
 use colored::Colorize;
 use log::{debug, info};
 use serde::Deserialize;
-use std::path::PathBuf;
+
+use crate::data::config::actions::{ActionType, AsAction};
 
 #[derive(Debug, Clone, Deserialize, Default, Eq, PartialEq)]
 pub struct Trash(bool);
@@ -21,5 +23,8 @@ impl AsAction for Trash {
 			}
 		}
 		None
+	}
+	fn ty(&self) -> ActionType {
+		ActionType::Trash
 	}
 }
