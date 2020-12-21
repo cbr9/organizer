@@ -159,7 +159,7 @@ mod tests {
 			defaults: Options::default_some(),
 			settings: Settings {
 				defaults: Options {
-					ignored_dirs: Some(vec![config.clone().into()]),
+					ignored_dirs: Some(vec![config.into()]),
 					..DefaultOpt::default_none()
 				},
 			},
@@ -171,7 +171,7 @@ mod tests {
 						Folder {
 							path: "$HOME".into(),
 							options: Options {
-								ignored_dirs: Some(vec![npm.clone().into()]),
+								ignored_dirs: Some(vec![npm.into()]),
 								..DefaultOpt::default_none()
 							},
 						},
@@ -185,12 +185,12 @@ mod tests {
 						},
 					],
 					options: Options {
-						ignored_dirs: Some(vec![documents_cache.clone().into()]),
+						ignored_dirs: Some(vec![documents_cache.into()]),
 						..DefaultOpt::default_none()
 					},
 				}],
 				defaults: Options {
-					ignored_dirs: Some(vec![downloads_config.clone().into()]),
+					ignored_dirs: Some(vec![downloads_config.into()]),
 					..DefaultOpt::default_none()
 				},
 			},

@@ -1,5 +1,5 @@
-use std::{fs, ops::Deref};
 use std::path::PathBuf;
+use std::{fs, ops::Deref};
 
 use colored::Colorize;
 use log::{debug, info};

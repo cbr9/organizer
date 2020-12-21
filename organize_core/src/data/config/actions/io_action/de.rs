@@ -3,25 +3,25 @@ use std::{fmt, path::PathBuf, str::FromStr};
 use serde::{
 	de,
 	de::{Error, MapAccess, Visitor},
-	Deserialize,
-	Deserializer, export::PhantomData,
+	export::PhantomData,
+	Deserialize, Deserializer,
 };
 
 use crate::{
-	data::config::actions::io_action::{ConflictOption, IOAction, Sep},
+	data::config::actions::io_action::{ConflictOption, Inner, Sep},
 	path::Expand,
 	string::visit_placeholder_string,
 };
 
-impl<'de> Deserialize<'de> for IOAction {
+impl<'de> Deserialize<'de> for Inner {
 	fn deserialize<D>(deserializer: D) -> Result<Self, <D as Deserializer<'de>>::Error>
 	where
 		D: Deserializer<'de>,
 	{
-		struct StringOrStruct(PhantomData<fn() -> IOAction>);
+		struct StringOrStruct(PhantomData<fn() -> Inner>);
 
 		impl<'de> Visitor<'de> for StringOrStruct {
-			type Value = IOAction;
+			type Value = Inner;
 
 			fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
 				formatter.write_str("string or map")
@@ -32,7 +32,7 @@ impl<'de> Deserialize<'de> for IOAction {
 				E: de::Error,
 			{
 				let string = visit_placeholder_string(value).map_err(E::custom)?;
-				IOAction::from_str(string.as_str()).map_err(E::custom)
+				Inner::from_str(string.as_str()).map_err(E::custom)
 			}
 
 			fn visit_map<M>(self, mut map: M) -> Result<Self::Value, M::Error>
@@ -64,7 +64,7 @@ impl<'de> Deserialize<'de> for IOAction {
 						other => return Err(M::Error::unknown_field(other, &["to", "if_exists", "sep"])),
 					}
 				}
-				let action = IOAction {
+				let action = Inner {
 					to: to.ok_or_else(|| M::Error::missing_field("to"))?,
 					if_exists: if_exists.unwrap_or_default(),
 					sep: sep.unwrap_or_default(),

@@ -80,11 +80,11 @@ mod tests {
 						filters: Filters { inner: vec![] },
 						folders: vec![
 							Folder {
-								path: downloads.clone().into(),
+								path: downloads.into(),
 								options: Options::default_none(),
 							},
 							Folder {
-								path: documents.clone().into(),
+								path: documents.into(),
 								options: Options::default_none(),
 							},
 						],
@@ -94,7 +94,7 @@ mod tests {
 						actions: Actions(vec![]),
 						filters: Filters { inner: vec![] },
 						folders: vec![Folder {
-							path: downloads.clone().into(),
+							path: downloads.into(),
 							options: Options {
 								recursive: Recursive {
 									enabled: Some(true),

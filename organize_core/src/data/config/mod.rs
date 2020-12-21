@@ -67,7 +67,7 @@ impl Config {
 					std::env::set_current_dir(&path).map_err(anyhow::Error::new)?;
 					Ok(path)
 				})
-				.ok_or(anyhow::Error::msg("could not determine home directory"))?
+				.ok_or_else(|| anyhow::Error::msg("could not determine home directory"))?
 		} else {
 			path.as_ref()
 				.parent()
@@ -75,7 +75,7 @@ impl Config {
 					std::env::set_current_dir(path).map_err(anyhow::Error::new)?;
 					Ok(path.into())
 				})
-				.ok_or(anyhow::Error::msg("could not determine config directory"))?
+				.ok_or_else(|| anyhow::Error::msg("could not determine config directory"))?
 		}
 	}
 
@@ -189,7 +189,7 @@ mod tests {
 		}
 		Config::set_cwd(Config::default_path()).map(|cwd| -> Result<()> {
 			std::env::set_current_dir(&project_root)?;
-			assert_eq!(cwd, home_dir().ok_or(anyhow::Error::msg("cannot determine home directory"))?);
+			assert_eq!(cwd, home_dir().ok_or_else(|| anyhow::Error::msg("cannot determine home directory"))?);
 			Ok(())
 		})??;
 		Config::set_cwd("examples/config.yml").map(|cwd| -> Result<()> {

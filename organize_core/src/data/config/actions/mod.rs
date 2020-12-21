@@ -3,6 +3,7 @@ use std::path::PathBuf;
 
 use serde::Deserialize;
 
+use crate::data::config::actions::io_action::{Hardlink, Symlink};
 use crate::data::{
 	config::actions::{
 		delete::Delete,
@@ -13,7 +14,6 @@ use crate::data::{
 	},
 	options::apply::Apply,
 };
-use crate::data::config::actions::io_action::{Hardlink, Symlink};
 
 pub(crate) mod delete;
 pub(crate) mod echo;
@@ -96,7 +96,7 @@ impl Deref for Actions {
 
 impl Actions {
 	pub fn run<T: Into<PathBuf>>(&self, path: T, apply: &Apply, simulate: bool) -> Option<PathBuf> {
-		match apply.as_ref() {
+		match apply {
 			Apply::All => {
 				let mut path = path.into();
 				for action in self.iter() {

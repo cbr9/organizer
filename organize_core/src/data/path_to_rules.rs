@@ -31,6 +31,7 @@ impl<'a> PathToRules<'a> {
 		self.0.keys()
 	}
 
+	#[allow(clippy::needless_collect)] // clippy doesn't seem to realize that we actually need the Vec<Component>
 	pub fn get_key_value(&self, key: &PathBuf) -> (PathBuf, &Vec<(usize, usize)>) {
 		self.0.get_key_value(key).map_or_else(
 			|| {

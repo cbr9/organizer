@@ -1,9 +1,9 @@
+use std::env::VarError;
+use std::iter::FromIterator;
 use std::{
 	env,
 	path::{Path, PathBuf},
 };
-use std::env::VarError;
-use std::iter::FromIterator;
 
 pub trait Expand {
 	// TODO: implement for str
@@ -40,8 +40,10 @@ impl<T: Into<PathBuf>> Expand for T {
 					components.push(component.to_string());
 				}
 			}
-			if str.ends_with("/") {
-				components.last_mut().map(|last| last.push('/'));
+			if str.ends_with('/') {
+				if let Some(last) = components.last_mut() {
+					last.push('/')
+				}
 			}
 			Ok(PathBuf::from_iter(components))
 		} else {
