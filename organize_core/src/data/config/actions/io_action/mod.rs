@@ -35,29 +35,9 @@ pub struct Rename(IOAction);
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
 pub struct Copy(IOAction);
 
-impl Deref for Move {
-	type Target = IOAction;
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+pub struct Hardlink(IOAction);
 
-	fn deref(&self) -> &Self::Target {
-		&self.0
-	}
-}
-
-impl Deref for Copy {
-	type Target = IOAction;
-
-	fn deref(&self) -> &Self::Target {
-		&self.0
-	}
-}
-
-impl Deref for Rename {
-	type Target = IOAction;
-
-	fn deref(&self) -> &Self::Target {
-		&self.0
-	}
-}
 
 macro_rules! io_action {
 	($id:ty) => {
@@ -65,7 +45,7 @@ macro_rules! io_action {
 			fn act<T: Into<PathBuf>>(&self, path: T, simulate: bool) -> Option<PathBuf> {
 				let path = path.into();
 				let ty = self.ty();
-				let to = self.prepare_path(&path, &ty)?;
+				let to = self.0.prepare_path(&path, &ty)?;
 				helper(ty, path, to, simulate)
 			}
 			fn ty(&self) -> ActionType {
@@ -79,6 +59,7 @@ macro_rules! io_action {
 io_action!(Move);
 io_action!(Rename);
 io_action!(Copy);
+io_action!(Hardlink);
 
 fn helper(ty: ActionType, path: PathBuf, to: PathBuf, simulate: bool) -> Option<PathBuf> {
 	if !simulate {
@@ -90,12 +71,13 @@ fn helper(ty: ActionType, path: PathBuf, to: PathBuf, simulate: bool) -> Option<
 		match ty {
 			ActionType::Copy => std::fs::copy(&path, &to).map(|_| ()),
 			ActionType::Move | ActionType::Rename => std::fs::rename(&path, &to),
+			ActionType::Hardlink => std::fs::hard_link(&path, &to),
 			_ => unreachable!(),
 		}
 			.map(|_| {
 				info!("({}) {} -> {}", ty.to_string().bold(), path.display(), to.display());
 				match ty {
-					ActionType::Copy => path,
+					ActionType::Copy | ActionType::Hardlink => path,
 					ActionType::Move | ActionType::Rename => to,
 					_ => unreachable!(),
 				}
@@ -113,7 +95,7 @@ impl IOAction {
 		where
 			T: AsRef<Path>,
 	{
-		use ActionType::{Copy, Move, Rename};
+		use ActionType::{Copy, Move, Rename, Hardlink};
 
 		let path = path.as_ref();
 		let mut to: PathBuf = self
@@ -125,7 +107,7 @@ impl IOAction {
 			.into();
 
 		match kind {
-			Copy | Move => {
+			Copy | Move | Hardlink => {
 				if to.to_string_lossy().ends_with("/") || to.is_dir() {
 					to.push(path.file_name()?)
 				}
