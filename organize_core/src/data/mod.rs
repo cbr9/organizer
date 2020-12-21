@@ -83,8 +83,9 @@ getter!(from config, pub get_match, r#match, Match);
 
 impl Data {
 	pub fn new() -> Result<Self> {
-		let data = Config::parse(Config::path()).map(|config| {
-			Config::set_cwd(Config::path()).map(|_| {
+        let path = Config::path();
+		let data = Config::parse(&path).map(|config| {
+			Config::set_cwd(path).map(|_| {
 				Settings::new(Settings::path()).map(|settings| Self {
 					defaults: Options::default_some(),
 					settings,

@@ -19,7 +19,7 @@ impl DefaultOpt for Recursive {
 
 	fn default_some() -> Self {
 		Self {
-			enabled: Some(true),
+			enabled: Some(false),
 			depth: Some(1),
 		}
 	}
