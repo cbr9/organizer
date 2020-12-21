@@ -39,6 +39,9 @@ impl<T: Into<PathBuf>> Expand for T {
 					components.push(component.to_string());
 				}
 			}
+			if str.ends_with("/") {
+				components.last_mut().map(|last| last.push('/'));
+			}
 			Ok(components.into_iter().collect::<PathBuf>())
 		} else {
 			Ok(path)

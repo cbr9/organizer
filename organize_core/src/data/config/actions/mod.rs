@@ -1,4 +1,4 @@
-use std::{ops::Deref};
+use std::ops::Deref;
 use std::path::PathBuf;
 
 use serde::Deserialize;

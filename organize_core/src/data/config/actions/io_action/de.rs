@@ -1,10 +1,11 @@
 use std::{fmt, path::PathBuf, str::FromStr};
+use std::ops::Deref;
 
 use serde::{
 	de,
 	de::{Error, MapAccess, Visitor},
-	export::PhantomData,
-	Deserialize, Deserializer,
+	Deserialize,
+	Deserializer, export::PhantomData,
 };
 
 use crate::{

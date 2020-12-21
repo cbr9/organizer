@@ -38,7 +38,6 @@ pub struct Copy(IOAction);
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
 pub struct Hardlink(IOAction);
 
-
 macro_rules! io_action {
 	($id:ty) => {
 		impl AsAction for $id {
@@ -53,7 +52,7 @@ macro_rules! io_action {
 				ActionType::from_str(&name).expect(&format!("no variant associated with {}", name))
 			}
 		}
-	}
+	};
 }
 
 io_action!(Move);
@@ -95,7 +94,7 @@ impl IOAction {
 		where
 			T: AsRef<Path>,
 	{
-		use ActionType::{Copy, Move, Rename, Hardlink};
+		use ActionType::{Copy, Hardlink, Move, Rename};
 
 		let path = path.as_ref();
 		let mut to: PathBuf = self
