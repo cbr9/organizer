@@ -78,14 +78,10 @@ impl Logger {
 			.error(Color::BrightRed)
 	}
 
-	pub fn parse(level: Level) -> std::io::Result<Vec<Log>> {
-		use Level::*;
-		let path = match level {
-			Error | Debug | Warn => Self::debug(),
-			Info => Self::actions(),
-			Trace => unreachable!(),
-		};
-		Ok(std::fs::read_to_string(path)?.lines().map(Log::from).collect())
+	pub fn parse(level: Level) -> Option<std::io::Result<Vec<Log>>> {
+		Self::path(level).map(|path| {
+			Ok(std::fs::read_to_string(path)?.lines().map(Log::from).collect())
+		})
 	}
 
 	fn plain_format(out: FormatCallback, message: &Arguments, record: &Record) {
@@ -98,16 +94,16 @@ impl Logger {
 		))
 	}
 
-	pub fn actions() -> PathBuf {
-		Data::dir().join("output.log")
+	fn path(level: Level) -> Option<PathBuf> {
+		match level {
+			Level::Error | Level::Warn => Some(Data::dir().join("errors.log")),
+			Level::Info => Some(Data::dir().join("output.log")),
+			Level::Debug | Level::Trace => None,
+		}
 	}
 
-	fn debug() -> PathBuf {
-		Data::dir().join("debug.log")
-	}
-
-	fn build_dispatchers<T: Into<Output> + Write>(level: Level, no_color: bool, path: PathBuf, writer: T) -> std::io::Result<(Dispatch, Dispatch)> {
-		let stdout = fern::Dispatch::new()
+	fn build_dispatchers<T: Into<Output> + Write>(level: Level, no_color: bool, writer: T) -> std::io::Result<(Dispatch, Option<Dispatch>)> {
+		let console_output = fern::Dispatch::new()
 			.filter(move |metadata| metadata.level() == level)
 			.format(move |out, args, record| {
 				if no_color {
@@ -117,29 +113,31 @@ impl Logger {
 				}
 			})
 			.chain(writer);
-		let file = fern::Dispatch::new()
-			.filter(move |metadata| metadata.level() == level)
-			.format(Self::plain_format) // we don't want ANSI escape codes to be written to the log file
-			.chain(fern::log_file(path)?);
 
-		Ok((stdout, file))
+		let file = Self::path(level).map(|path| {
+			fern::Dispatch::new()
+				.filter(move |metadata| metadata.level() == level)
+				.format(Self::plain_format) // we don't want ANSI escape codes to be written to the log file
+				.chain(fern::log_file(path).unwrap())
+		});
+
+		Ok((console_output, file))
 	}
 
 	pub fn setup(no_color: bool) -> Result<(), anyhow::Error> {
-		let info = Self::build_dispatchers(Level::Info, no_color, Self::actions(), std::io::stdout())?;
-		let debug = Self::build_dispatchers(Level::Debug, no_color, Self::debug(), std::io::stdout())?;
-		let error = Self::build_dispatchers(Level::Error, no_color, Self::debug(), std::io::stderr())?;
-		let warn = Self::build_dispatchers(Level::Warn, no_color, Self::debug(), std::io::stderr())?;
+		let info = Self::build_dispatchers(Level::Info, no_color, std::io::stdout())?;
+		let debug = Self::build_dispatchers(Level::Debug, no_color, std::io::stdout())?;
+		let error = Self::build_dispatchers(Level::Error, no_color, std::io::stderr())?;
+		let warn = Self::build_dispatchers(Level::Warn, no_color, std::io::stderr())?;
 
 		fern::Dispatch::new()
 			.chain(info.0)
-			.chain(info.1)
-			.chain(debug.0)
-			.chain(debug.1)
+			.chain(info.1.expect("level has no associated logfile"))
+			.chain(debug.0) // debug has no associated path so we don't chain it
 			.chain(error.0)
-			.chain(error.1)
+			.chain(error.1.expect("level has no associated logfile"))
 			.chain(warn.0)
-			.chain(warn.1)
+			.chain(warn.1.expect("level has no associated logfile"))
 			.apply()?;
 
 		Ok(())

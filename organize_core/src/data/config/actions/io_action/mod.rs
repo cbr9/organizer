@@ -7,7 +7,7 @@ use std::{
 use std::convert::TryFrom;
 use std::env::VarError;
 
-use log::{debug, info};
+use log::{error, info};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -68,7 +68,7 @@ fn helper(ty: ActionType, path: PathBuf, to: PathBuf, simulate: bool) -> Option<
 	if !simulate {
 		if let Some(parent) = to.parent() {
 			if !parent.exists() {
-				std::fs::create_dir_all(parent).map_err(|e| debug!("{}", e)).ok()?;
+				std::fs::create_dir_all(parent).map_err(|e| error!("{}", e)).ok()?;
 			}
 		}
 		match ty {
@@ -78,15 +78,15 @@ fn helper(ty: ActionType, path: PathBuf, to: PathBuf, simulate: bool) -> Option<
 			Symlink => std::os::unix::fs::symlink(&path, &to),
 			_ => unreachable!(),
 		}
-		.map(|_| {
-			info!("({}) {} -> {}", ty.to_string(), path.display(), to.display());
-			match ty {
-				Copy | Hardlink | Symlink => path,
-				Move | Rename => to,
-				_ => unreachable!(),
-			}
-		})
-		.map_err(|e| debug!("{}", e))
+			.map(|_| {
+				info!("({}) {} -> {}", ty.to_string(), path.display(), to.display());
+				match ty {
+					Copy | Hardlink | Symlink => path,
+					Move | Rename => to,
+					_ => unreachable!(),
+				}
+			})
+			.map_err(|e| error!("{}", e))
 		.ok()
 	} else {
 		info!("(simulate {}) {} -> {}", ty.to_string(), path.display(), to.display());
@@ -106,7 +106,7 @@ impl Inner {
 			.to
 			.to_string_lossy()
 			.expand_placeholders(&path)
-			.map_err(|e| debug!("{}", e))
+			.map_err(|e| error!("{}", e))
 			.ok()?
 			.into();
 
