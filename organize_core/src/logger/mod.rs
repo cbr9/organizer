@@ -1,13 +1,13 @@
 use std::fmt::Arguments;
 use std::fmt::Display;
-use std::iter::Map;
+use std::io::Write;
 use std::path::PathBuf;
-use std::str::{FromStr, Lines};
+use std::str::FromStr;
 
 use chrono::{Local, NaiveDateTime};
 use chrono::format::{DelayedFormat, StrftimeItems};
 use colored::Colorize;
-use fern::{Dispatch, FormatCallback};
+use fern::{Dispatch, FormatCallback, Output};
 use fern::colors::{Color, ColoredLevelConfig};
 use lazy_static::lazy_static;
 use log::{Level, Record};
@@ -106,36 +106,36 @@ impl Logger {
 		Data::dir().join("debug.log")
 	}
 
+	fn build_dispatchers<T: Into<Output> + Write>(level: Level, no_color: bool, path: PathBuf, writer: T) -> std::io::Result<(Dispatch, Dispatch)> {
+		let stdout = fern::Dispatch::new()
+			.filter(move |metadata| metadata.level() == level)
+			.format(move |out, args, record| {
+				if no_color {
+					Self::plain_format(out, args, record)
+				} else {
+					Self::colored_format(out, args, record);
+				}
+			})
+			.chain(writer);
+		let file = fern::Dispatch::new()
+			.filter(move |metadata| metadata.level() == level)
+			.format(Self::plain_format) // we don't want ANSI escape codes to be written to the log file
+			.chain(fern::log_file(path)?);
+
+		Ok((stdout, file))
+	}
+
 	pub fn setup(no_color: bool) -> Result<(), anyhow::Error> {
-		let config = fern::Dispatch::new();
-		let build_dispatchers = move |level: Level, no_color: bool, path: PathBuf| -> std::io::Result<(Dispatch, Dispatch)> {
-			let stdout = fern::Dispatch::new()
-				.filter(move |metadata| metadata.level() == level)
-				.format(move |out, args, record| {
-					if no_color {
-						Self::plain_format(out, args, record)
-					} else {
-						Self::colored_format(out, args, record);
-					}
-				})
-				.chain(std::io::stdout());
-			let file = fern::Dispatch::new()
-				.filter(move |metadata| metadata.level() == level)
-				.format(Self::plain_format) // we don't want ANSI escape codes to be written to the log file
-				.chain(fern::log_file(path)?);
+		let info = Self::build_dispatchers(Level::Info, no_color, Self::actions(), std::io::stdout())?;
+		let debug = Self::build_dispatchers(Level::Debug, no_color, Self::debug(), std::io::stdout())?;
+		let error = Self::build_dispatchers(Level::Error, no_color, Self::debug(), std::io::stderr())?;
+		let warn = Self::build_dispatchers(Level::Warn, no_color, Self::debug(), std::io::stderr())?;
 
-			Ok((stdout, file))
-		};
-		let info = build_dispatchers(Level::Info, no_color, Self::actions())?;
-		let debug = build_dispatchers(Level::Debug, no_color, Self::debug())?;
-		let error = build_dispatchers(Level::Error, no_color, Self::debug())?;
-		let warn = build_dispatchers(Level::Warn, no_color, Self::debug())?;
-
-		config
-			.chain(debug.0)
-			.chain(debug.1)
+		fern::Dispatch::new()
 			.chain(info.0)
 			.chain(info.1)
+			.chain(debug.0)
+			.chain(debug.1)
 			.chain(error.0)
 			.chain(error.1)
 			.chain(warn.0)
