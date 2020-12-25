@@ -1,7 +1,10 @@
+use clap::Clap;
+
+use organize_core::logger::Logger;
+
+use crate::cmd::{edit::Edit, logs::Logs, run::Run, stop::Stop, watch::Watch};
 use crate::cmd::info::Info;
 use crate::cmd::new::New;
-use crate::cmd::{edit::Edit, logs::Logs, run::Run, stop::Stop, watch::Watch};
-use clap::Clap;
 
 mod edit;
 mod info;
@@ -29,23 +32,30 @@ pub trait Cmd {
 
 impl Cmd for App {
 	fn run(self) -> anyhow::Result<()> {
+		use App::*;
 		match self {
-			App::Watch(mut watch) => {
+			Watch(mut watch) => {
+				Logger::setup(watch.no_color)?;
 				watch.config = watch.config.canonicalize()?;
 				watch.run()
 			}
-			App::Run(mut run) => {
+			Run(mut run) => {
+				Logger::setup(run.no_color)?;
 				run.config = run.config.canonicalize()?;
 				run.run()
 			}
-			App::Stop(mut stop) => {
+			Stop(mut stop) => {
+				Logger::setup(stop.no_color)?;
 				stop.config = stop.config.canonicalize()?;
 				stop.run()
 			}
-			App::Logs(logs) => logs.run(),
-			App::Edit(config) => config.run(),
-			App::New(new) => new.run(),
-			App::Info(info) => info.run(),
+			Logs(logs) => {
+				Logger::setup(logs.no_color)?;
+				logs.run()
+			}
+			Edit(config) => config.run(),
+			New(new) => new.run(),
+			Info(info) => info.run(),
 		}
 	}
 }

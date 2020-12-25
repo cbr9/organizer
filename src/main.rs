@@ -1,10 +1,12 @@
-use crate::cmd::{logs::Logs, App, Cmd};
+use std::{borrow::Cow, path::PathBuf};
 
 use clap::Clap;
 use lazy_static::lazy_static;
 use log::error;
+
 use organize_core::data::config::Config;
-use std::{borrow::Cow, path::PathBuf};
+
+use crate::cmd::{App, Cmd};
 
 lazy_static! {
 	pub static ref CONFIG_PATH: PathBuf = Config::path();
@@ -14,9 +16,8 @@ lazy_static! {
 mod cmd;
 
 fn main() -> anyhow::Result<()> {
-	Logs::setup()?;
-
 	let app: App = App::parse();
+
 	match app.run() {
 		Ok(_) => {}
 		Err(e) => {

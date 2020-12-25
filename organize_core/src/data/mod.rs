@@ -1,22 +1,23 @@
+use std::path::{Path, PathBuf};
+
+use anyhow::Result;
+use dirs::config_dir;
+
+use crate::{
+	data::{config::Config, options::Options, settings::Settings},
+	data::options::apply::Apply,
+	data::options::r#match::Match,
+	PROJECT_NAME,
+	utils::DefaultOpt,
+	utils::UnwrapRef,
+};
+use crate::path::IsHidden;
+
 pub mod config;
 pub mod options;
 pub mod path_to_recursive;
 pub mod path_to_rules;
 pub mod settings;
-
-use crate::{
-	data::options::apply::Apply,
-	data::options::r#match::Match,
-	data::{config::Config, options::Options, settings::Settings},
-	utils::DefaultOpt,
-	utils::UnwrapRef,
-	PROJECT_NAME,
-};
-use dirs::config_dir;
-
-use crate::path::IsHidden;
-use anyhow::Result;
-use std::path::{Path, PathBuf};
 
 #[derive(Debug, Clone)]
 pub struct Data {
@@ -83,7 +84,7 @@ getter!(from config, pub get_match, r#match, Match);
 
 impl Data {
 	pub fn new() -> Result<Self> {
-        let path = Config::path();
+		let path = Config::path();
 		let data = Config::parse(&path).map(|config| {
 			Config::set_cwd(path).map(|_| {
 				Settings::new(Settings::path()).map(|settings| Self {
@@ -143,11 +144,12 @@ impl Data {
 
 #[cfg(test)]
 mod tests {
-	use super::*;
 	use crate::data::config::actions::Actions;
 	use crate::data::config::filters::Filters;
 	use crate::data::config::folders::Folder;
 	use crate::data::config::Rule;
+
+	use super::*;
 
 	#[test]
 	fn should_ignore() {

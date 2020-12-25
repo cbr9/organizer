@@ -1,13 +1,12 @@
-use std::convert::TryFrom;
-use std::env::VarError;
 use std::{
 	ops::Deref,
 	path::{Path, PathBuf},
 	result,
 	str::FromStr,
 };
+use std::convert::TryFrom;
+use std::env::VarError;
 
-use colored::Colorize;
 use log::{debug, info};
 use serde::{Deserialize, Serialize};
 
@@ -80,7 +79,7 @@ fn helper(ty: ActionType, path: PathBuf, to: PathBuf, simulate: bool) -> Option<
 			_ => unreachable!(),
 		}
 		.map(|_| {
-			info!("({}) {} -> {}", ty.to_string().bold(), path.display(), to.display());
+			info!("({}) {} -> {}", ty.to_string(), path.display(), to.display());
 			match ty {
 				Copy | Hardlink | Symlink => path,
 				Move | Rename => to,
@@ -90,7 +89,7 @@ fn helper(ty: ActionType, path: PathBuf, to: PathBuf, simulate: bool) -> Option<
 		.map_err(|e| debug!("{}", e))
 		.ok()
 	} else {
-		info!("(simulate {}) {} -> {}", ty.to_string().bold(), path.display(), to.display());
+		info!("(simulate {}) {} -> {}", ty.to_string(), path.display(), to.display());
 		Some(to)
 	}
 }

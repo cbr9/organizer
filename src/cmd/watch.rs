@@ -1,29 +1,30 @@
-use anyhow::Result;
 use std::{
 	process,
 	sync::mpsc::{channel, Receiver},
 };
+use std::path::PathBuf;
+use std::time::Duration;
 
+use anyhow::Result;
+use clap::Clap;
 use colored::Colorize;
 use log::{debug, error, info};
-use notify::{watcher, DebouncedEvent, RecommendedWatcher, RecursiveMode, Watcher};
+use notify::{DebouncedEvent, RecommendedWatcher, RecursiveMode, watcher, Watcher};
+use sysinfo::{ProcessExt, RefreshKind, Signal, System, SystemExt};
 
-use crate::cmd::run::Run;
-use crate::{Cmd, CONFIG_PATH_STR};
-use clap::Clap;
-use organize_core::data::settings::Settings;
 use organize_core::{
-	data::{config::Config, path_to_recursive::PathToRecursive, path_to_rules::PathToRules, Data},
+	data::{config::Config, Data, path_to_recursive::PathToRecursive, path_to_rules::PathToRules},
 	file::File,
 	register::Register,
 };
-use std::path::PathBuf;
-use std::time::Duration;
-use sysinfo::{ProcessExt, RefreshKind, Signal, System, SystemExt};
+use organize_core::data::settings::Settings;
+
+use crate::{Cmd, CONFIG_PATH_STR};
+use crate::cmd::run::Run;
 
 #[derive(Clap, Debug)]
 pub struct Watch {
-	#[clap(long, short = 'c', default_value = &CONFIG_PATH_STR, about = "Config path")]
+	#[clap(long, short = 'c', default_value = & CONFIG_PATH_STR, about = "Config path")]
 	pub config: PathBuf,
 	#[clap(long, short = 'd', default_value = "2", about = "Seconds to wait before processing an event")]
 	delay: u8,
@@ -33,6 +34,8 @@ pub struct Watch {
 	simulate: bool,
 	#[clap(long, about = "Process existing files before processing events")]
 	clean: bool,
+	#[clap(long, about = "Do not print colored output")]
+	pub(crate) no_color: bool,
 }
 
 impl Cmd for Watch {
@@ -42,6 +45,7 @@ impl Cmd for Watch {
 			let cmd = Run {
 				config: self.config.clone(),
 				simulate: self.simulate,
+				no_color: self.no_color,
 			};
 			cmd.start(data.clone())?;
 		}

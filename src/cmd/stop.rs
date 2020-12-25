@@ -1,16 +1,21 @@
-use crate::{cmd::Cmd, CONFIG_PATH_STR};
+use std::path::PathBuf;
+
 use anyhow::Result;
 use clap::Clap;
-use organize_core::register::Register;
-use std::path::PathBuf;
 use sysinfo::{ProcessExt, RefreshKind, Signal, System, SystemExt};
+
+use organize_core::register::Register;
+
+use crate::{cmd::Cmd, CONFIG_PATH_STR};
 
 #[derive(Clap, Debug)]
 pub struct Stop {
 	#[clap(long)]
 	all: bool,
-	#[clap(long, default_value = &CONFIG_PATH_STR)]
+	#[clap(long, default_value = & CONFIG_PATH_STR)]
 	pub(crate) config: PathBuf,
+	#[clap(long, about = "Do not print colored output")]
+	pub(crate) no_color: bool,
 }
 
 impl Cmd for Stop {

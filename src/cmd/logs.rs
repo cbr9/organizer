@@ -1,55 +1,26 @@
-use crate::Cmd;
 use anyhow::Result;
 use clap::Clap;
-use colored::Colorize;
-use fern::colors::{Color, ColoredLevelConfig};
-use organize_core::data::Data;
-use std::{fs, path::PathBuf};
+use log::Level;
+
+use organize_core::logger::Logger;
+
+use crate::Cmd;
 
 #[derive(Debug, Clap)]
 pub struct Logs {
-	#[clap(long)]
-	clear: bool,
+	#[clap(long, about = "Do not print colored output")]
+	pub(crate) no_color: bool,
 }
 
 impl Cmd for Logs {
 	fn run(self) -> Result<()> {
-		if self.clear {
-			fs::remove_file(Self::path()).map_err(anyhow::Error::new)
+		let logs = Logger::parse(Level::Info)?;
+		if self.no_color {
+			logs.into_iter().map(|log| log.plain()).for_each(|line| println!("{}", line))
 		} else {
-			let text = fs::read_to_string(Self::path())?;
-			for line in text.lines() {
-				println!("{}", line);
-			}
-			Ok(())
-		}
-	}
-}
+			logs.into_iter().map(|log| log.colored()).for_each(|line| println!("{}", line))
+		};
 
-impl Logs {
-	pub fn path() -> PathBuf {
-		Data::dir().join("output.log")
-	}
-
-	pub(crate) fn setup() -> Result<(), fern::InitError> {
-		let colors = ColoredLevelConfig::new()
-			.info(Color::BrightGreen)
-			.warn(Color::BrightYellow)
-			.error(Color::BrightRed);
-
-		fern::Dispatch::new()
-			.format(move |out, message, record| {
-				out.finish(format_args!(
-					"{} {}: {}",
-					chrono::Local::now().format("[%Y-%m-%d][%H:%M:%S]").to_string().dimmed(),
-					colors.color(record.level()),
-					message
-				))
-			})
-			.level(log::LevelFilter::Debug)
-			.chain(std::io::stdout())
-			.chain(fern::log_file(Self::path())?)
-			.apply()?;
 		Ok(())
 	}
 }

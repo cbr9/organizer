@@ -1,25 +1,31 @@
-use crate::{Cmd, CONFIG_PATH_STR};
+use std::path::PathBuf;
+
 use anyhow::Result;
 use clap::Clap;
 use notify::RecursiveMode;
+use rayon::prelude::*;
+use walkdir::{DirEntry, WalkDir};
+
 use organize_core::{
-	data::{path_to_recursive::PathToRecursive, path_to_rules::PathToRules, Data},
+	data::{Data, path_to_recursive::PathToRecursive, path_to_rules::PathToRules},
 	file::File,
 };
-use rayon::prelude::*;
-use std::path::PathBuf;
-use walkdir::{DirEntry, WalkDir};
+
+use crate::{Cmd, CONFIG_PATH_STR};
 
 #[derive(Clap, Debug)]
 pub struct Run {
-	#[clap(long, short = 'c', default_value = &CONFIG_PATH_STR, about = "Config path")]
+	#[clap(long, short = 'c', default_value = & CONFIG_PATH_STR, about = "Config path")]
 	pub(crate) config: PathBuf,
 	#[clap(long, short = 's', about = "Do not change any files, but get output on the hypothetical changes")]
 	pub(crate) simulate: bool,
+	#[clap(long, about = "Do not print colored output")]
+	pub(crate) no_color: bool,
 }
 
 impl Cmd for Run {
 	fn run(self) -> Result<()> {
+		println!("{}", self.no_color);
 		let data = Data::new()?;
 		self.start(data)
 	}
