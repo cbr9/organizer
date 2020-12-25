@@ -18,6 +18,7 @@ use organize_core::{
 	register::Register,
 };
 use organize_core::data::settings::Settings;
+use organize_core::logger::Logger;
 
 use crate::{Cmd, CONFIG_PATH_STR};
 use crate::cmd::run::Run;
@@ -39,7 +40,9 @@ pub struct Watch {
 }
 
 impl Cmd for Watch {
-	fn run(self) -> Result<()> {
+	fn run(mut self) -> Result<()> {
+		Logger::setup(self.no_color)?;
+		self.config = self.config.canonicalize()?;
 		let data = Data::new()?;
 		if self.clean {
 			let cmd = Run {

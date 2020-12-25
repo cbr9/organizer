@@ -34,21 +34,9 @@ impl Cmd for App {
 	fn run(self) -> anyhow::Result<()> {
 		use App::*;
 		match self {
-			Watch(mut watch) => {
-				Logger::setup(watch.no_color)?;
-				watch.config = watch.config.canonicalize()?;
-				watch.run()
-			}
-			Run(mut run) => {
-				Logger::setup(run.no_color)?;
-				run.config = run.config.canonicalize()?;
-				run.run()
-			}
-			Stop(mut stop) => {
-				Logger::setup(stop.no_color)?;
-				stop.config = stop.config.canonicalize()?;
-				stop.run()
-			}
+			Watch(watch) => watch.run(),
+			Run(run) => run.run(),
+			Stop(stop) => stop.run(),
 			Logs(logs) => {
 				Logger::setup(logs.no_color)?;
 				logs.run()

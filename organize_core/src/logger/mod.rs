@@ -79,9 +79,7 @@ impl Logger {
 	}
 
 	pub fn parse(level: Level) -> Option<std::io::Result<Vec<Log>>> {
-		Self::path(level).map(|path| {
-			Ok(std::fs::read_to_string(path)?.lines().map(Log::from).collect())
-		})
+		Self::path(level).map(|path| Ok(std::fs::read_to_string(path)?.lines().map(Log::from).collect()))
 	}
 
 	fn plain_format(out: FormatCallback, message: &Arguments, record: &Record) {

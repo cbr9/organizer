@@ -10,6 +10,7 @@ use organize_core::{
 	data::{Data, path_to_recursive::PathToRecursive, path_to_rules::PathToRules},
 	file::File,
 };
+use organize_core::logger::Logger;
 
 use crate::{Cmd, CONFIG_PATH_STR};
 
@@ -24,8 +25,9 @@ pub struct Run {
 }
 
 impl Cmd for Run {
-	fn run(self) -> Result<()> {
-		println!("{}", self.no_color);
+	fn run(mut self) -> Result<()> {
+		Logger::setup(self.no_color)?;
+		self.config = self.config.canonicalize()?;
 		let data = Data::new()?;
 		self.start(data)
 	}

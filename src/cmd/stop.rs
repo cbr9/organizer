@@ -4,6 +4,7 @@ use anyhow::Result;
 use clap::Clap;
 use sysinfo::{ProcessExt, RefreshKind, Signal, System, SystemExt};
 
+use organize_core::logger::Logger;
 use organize_core::register::Register;
 
 use crate::{cmd::Cmd, CONFIG_PATH_STR};
@@ -19,7 +20,10 @@ pub struct Stop {
 }
 
 impl Cmd for Stop {
-	fn run(self) -> Result<()> {
+	fn run(mut self) -> Result<()> {
+		self.config = self.config.canonicalize()?;
+		Logger::setup(self.no_color)?;
+
 		let register = Register::new()?;
 		if register.is_empty() {
 			println!("No instance was found running.");
