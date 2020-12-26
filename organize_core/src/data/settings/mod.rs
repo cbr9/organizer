@@ -1,14 +1,16 @@
-mod de;
-
-use crate::{data::options::Options, utils::DefaultOpt};
-
-use crate::data::Data;
-use log::debug;
-use serde::Serialize;
 use std::{
 	fs,
 	path::{Path, PathBuf},
 };
+
+use log::debug;
+use serde::Serialize;
+
+use crate::{data::options::Options, utils::DefaultOpt};
+use crate::data::config::Config;
+use crate::data::Data;
+
+mod de;
 
 #[derive(Serialize, Eq, PartialEq, Debug, Clone)]
 pub struct Settings {
@@ -55,7 +57,7 @@ impl Settings {
 		})
 	}
 
-	pub fn path() -> PathBuf {
-		Data::dir().join("settings.toml")
+	pub fn path() -> anyhow::Result<PathBuf> {
+		Config::default_dir().map(|dir| dir.join("settings.toml"))
 	}
 }
