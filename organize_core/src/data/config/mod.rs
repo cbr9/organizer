@@ -1,32 +1,29 @@
-pub mod actions;
-pub mod filters;
-pub mod folders;
-
 use std::{
 	fs,
 	path::{Path, PathBuf},
 };
 
-use anyhow::Context;
-use anyhow::Result;
-use dirs::{config_dir, home_dir};
-use log::error;
-
+use anyhow::{Context, Result};
+use dirs::home_dir;
 use serde::Deserialize;
 
 use crate::{
 	data::{
 		config::{
-			actions::{io_action::ConflictOption, Actions},
+			actions::{Actions, io_action::ConflictOption},
 			filters::Filters,
 			folders::Folders,
 		},
 		options::Options,
 	},
 	path::Update,
-	utils::DefaultOpt,
 	PROJECT_NAME,
+	utils::DefaultOpt,
 };
+
+pub mod actions;
+pub mod filters;
+pub mod folders;
 
 // TODO: add tests for the custom deserializers
 
@@ -61,7 +58,7 @@ impl Config {
 	}
 
 	pub fn set_cwd<T: AsRef<Path>>(path: T) -> Result<PathBuf> {
-		if path.as_ref() == Self::default_path() {
+		if path.as_ref() == Self::default_path()? {
 			home_dir()
 				.map(|path| -> Result<PathBuf> {
 					std::env::set_current_dir(&path).map_err(anyhow::Error::new)?;
@@ -98,53 +95,47 @@ impl Config {
 			.ok_or_else(|| anyhow::Error::msg("config file's parent folder should be defined"))
 	}
 
-	pub fn default_dir() -> PathBuf {
-		let dir = config_dir().unwrap().join(PROJECT_NAME);
-		if !dir.exists() {
-			std::fs::create_dir(&dir).context("could not create config directory").unwrap();
-		}
-		dir
+	pub fn default_path() -> Result<PathBuf> {
+		Ok(Self::default_dir()?.join("config.yml"))
 	}
 
-	pub fn default_path() -> PathBuf {
-		Self::default_dir().join("config.yml")
-	}
-
-	pub fn path() -> PathBuf {
-		std::env::current_dir().map_or_else(
-			|e| {
-				// if the current dir could not be identified
-				error!("{}", e);
-				Self::default_path()
-			},
-			|dir| {
-				dir.read_dir().map_or_else(
-					|e| {
-						// if it could be identified but there was a problem reading its content
-						error!("{}", e);
-						Self::default_path()
-					},
-					|mut files| {
-						// if its content was successfully read, look for a `organize.yml` file, otherwise return the default
-						files
-							.find_map(|file| {
-								if let Ok(entry) = file {
-									let path = entry.path();
-									let mime_type = mime_guess::from_path(&entry.path()).first_or_octet_stream();
-									if path.file_stem().unwrap_or_default() == "organize" && mime_type == "text/x-yaml" {
-										Some(path)
-									} else {
-										None
-									}
-								} else {
-									None
-								}
-							})
-							.unwrap_or_else(Self::default_path)
-					},
+	pub fn default_dir() -> Result<PathBuf> {
+		let var = "ORGANIZE_CONFIG_DIR";
+		std::env::var_os(var).map_or_else(
+			|| {
+				Ok(
+					dirs::config_dir()
+						.ok_or_else(|| anyhow::Error::msg(format!("could not find config directory, please set {var} manually", var = var)))?
+						.join(PROJECT_NAME)
 				)
 			},
+			|path| {
+				let dir = PathBuf::from(path);
+				if !dir.exists() {
+					std::fs::create_dir_all(&dir).with_context(|| format!("could not create config directory specified in {var}", var = var))?;
+				}
+				Ok(dir)
+			},
 		)
+	}
+
+	pub fn path() -> Result<PathBuf> {
+		std::env::current_dir()
+			.context("cannot determine current directory")?
+			.read_dir()
+			.context("could not determine directory content")?
+			.find_map(|file| {
+				file.ok().map(|entry| {
+					let path = entry.path();
+					let mime_type = mime_guess::from_path(&entry.path()).first_or_octet_stream();
+					if path.file_stem().unwrap_or_default() == "organize" && mime_type == "text/x-yaml" {
+						Some(path)
+					} else {
+						None
+					}
+				})?
+			})
+			.map_or_else(Self::default_path, Ok)
 	}
 }
 
@@ -177,9 +168,11 @@ impl<'a> AsRef<Self> for Rule {
 
 #[cfg(test)]
 mod tests {
-	use super::*;
-	use crate::utils::tests::project;
 	use anyhow::Result;
+
+	use crate::utils::tests::project;
+
+	use super::*;
 
 	#[test]
 	fn set_cwd() -> Result<()> {
@@ -187,7 +180,7 @@ mod tests {
 		if std::env::current_dir()? != project_root {
 			std::env::set_current_dir(&project_root)?;
 		}
-		Config::set_cwd(Config::default_path()).map(|cwd| -> Result<()> {
+		Config::set_cwd(Config::default_path()?).map(|cwd| -> Result<()> {
 			std::env::set_current_dir(&project_root)?;
 			assert_eq!(cwd, home_dir().ok_or_else(|| anyhow::Error::msg("cannot determine home directory"))?);
 			Ok(())

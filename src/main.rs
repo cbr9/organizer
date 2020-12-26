@@ -9,7 +9,10 @@ use organize_core::data::config::Config;
 use crate::cmd::{App, Cmd};
 
 lazy_static! {
-	pub static ref CONFIG_PATH: PathBuf = Config::path();
+	pub static ref CONFIG_PATH: PathBuf = Config::path().unwrap_or_else(|e| {
+		error!("{:?}", e);
+		std::process::exit(0)
+	});
 	pub static ref CONFIG_PATH_STR: Cow<'static, str> = CONFIG_PATH.to_string_lossy();
 }
 

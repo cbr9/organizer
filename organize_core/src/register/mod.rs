@@ -1,19 +1,20 @@
-mod de;
-
-use serde::{Deserialize, Serialize};
 use std::{
 	fs,
 	fs::OpenOptions,
 	io::Result,
 	path::{Path, PathBuf},
 };
+use std::ops::{Deref, DerefMut};
+
+use num_traits::AsPrimitive;
+use serde::{Deserialize, Serialize};
+use serde_json::error::Category;
+use sysinfo::{Pid, RefreshKind, System, SystemExt};
 
 use crate::data::Data;
 use crate::PROJECT_NAME;
-use num_traits::AsPrimitive;
-use serde_json::error::Category;
-use std::ops::{Deref, DerefMut};
-use sysinfo::{Pid, RefreshKind, System, SystemExt};
+
+mod de;
 
 /// File where watchers are registered with their PID and configuration
 #[derive(Default, Serialize)]
@@ -96,7 +97,6 @@ impl Register {
 
 #[cfg(test)]
 mod tests {
-
 	use sysinfo::{Pid, ProcessExt, RefreshKind, Signal, System, SystemExt};
 
 	use crate::{data::config::Config, register::Register};
@@ -113,7 +113,7 @@ mod tests {
 		let pid: Pid = 1000000000;
 		let sys = System::new_with_specifics(RefreshKind::with_processes(RefreshKind::new()));
 		assert!(sys.get_process(pid).is_none());
-		let path = Config::path();
+		let path = Config::path().unwrap();
 		let register = Register::new().unwrap();
 		register.append(pid, &path).unwrap();
 	}

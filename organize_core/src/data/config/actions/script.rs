@@ -1,6 +1,5 @@
 use std::{
 	fs,
-	io::Result,
 	ops::Deref,
 	path::{Path, PathBuf},
 	process::{Command, Output, Stdio},
@@ -12,11 +11,11 @@ use colored::Colorize;
 use log::info;
 use serde::{de::Error, Deserialize, Deserializer};
 
-use crate::data::config::actions::ActionType;
 use crate::{
-	data::config::{actions::AsAction, filters::AsFilter, Config},
+	data::config::{actions::AsAction, Config, filters::AsFilter},
 	string::{deserialize_placeholder_string, Placeholder},
 };
+use crate::data::config::actions::ActionType;
 
 #[derive(Deserialize, Debug, Clone, Default, Eq, PartialEq)]
 pub struct Script {
@@ -87,10 +86,10 @@ impl Script {
 		}
 	}
 
-	fn write(&self, path: &Path) -> Result<PathBuf> {
+	fn write(&self, path: &Path) -> anyhow::Result<PathBuf> {
 		let content = self.content.as_str();
 		let content = content.expand_placeholders(path)?;
-		let dir = Config::default_dir().join("scripts");
+		let dir = Config::default_dir()?.join("scripts");
 		if !dir.exists() {
 			fs::create_dir_all(&dir)?;
 		}
@@ -99,7 +98,7 @@ impl Script {
 		Ok(script)
 	}
 
-	fn run<T: AsRef<Path>>(&self, path: T) -> Result<Output> {
+	fn run<T: AsRef<Path>>(&self, path: T) -> anyhow::Result<Output> {
 		let script = self.write(path.as_ref())?;
 		let output = Command::new(&self.exec).arg(&script).stdout(Stdio::piped()).spawn()?.wait_with_output()?;
 		Ok(output)

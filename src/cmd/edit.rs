@@ -1,13 +1,14 @@
-use crate::cmd::Cmd;
+use std::env;
+use std::path::Path;
+use std::process::{Command, ExitStatus};
+
 use anyhow::{Context, Result};
 use clap::Clap;
 
 use organize_core::data::config::Config;
-use std::process::{Command, ExitStatus};
-
 use organize_core::data::settings::Settings;
-use std::env;
-use std::path::Path;
+
+use crate::cmd::Cmd;
 
 #[derive(Clap, Debug)]
 pub enum Edit {
@@ -18,7 +19,7 @@ pub enum Edit {
 impl Cmd for Edit {
 	fn run(self) -> Result<()> {
 		match self {
-			Edit::Config => Self::launch_editor(Config::path()).map(|_| ()),
+			Edit::Config => Self::launch_editor(Config::path()?).map(|_| ()),
 			Edit::Settings => Self::launch_editor(Settings::path()).map(|_| ()),
 		}
 	}

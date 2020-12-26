@@ -57,7 +57,7 @@ impl Cmd for Watch {
 		} else {
 			let register = Register::new()?;
 			if register.iter().map(|section| &section.path).any(|config| config == &self.config) {
-				return if self.config == Config::default_path() {
+				return if self.config == Config::default_path()? {
 					println!("An existing instance is already running. Use --replace to restart it");
 					Ok(())
 				} else {
@@ -86,7 +86,7 @@ impl<'a> Watch {
 			}
 			None => {
 				// there is no running process
-				if self.config == Config::default_path() {
+				if self.config == Config::default_path()? {
 					println!("{}", "No instance was found running with the default configuration.".bold());
 				} else {
 					println!(

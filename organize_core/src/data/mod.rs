@@ -84,7 +84,7 @@ getter!(from config, pub get_match, r#match, Match);
 
 impl Data {
 	pub fn new() -> Result<Self> {
-		let path = Config::path();
+		let path = Config::path()?;
 		let data = Config::parse(&path).map(|config| {
 			Config::set_cwd(path).map(|_| {
 				Settings::new(Settings::path()).map(|settings| Self {
@@ -93,7 +93,7 @@ impl Data {
 					config,
 				})
 			})
-		})???; // return the error from UserConfig::parse and from Settings::new
+		})???; // return the error from UserConfig::parse, Config::set_cwd and from Settings::new
 		Ok(data)
 	}
 

@@ -85,6 +85,7 @@ impl Logger {
 	fn plain_format(out: FormatCallback, message: &Arguments, record: &Record) {
 		out.finish(format_args!("{}", format(Self::time(), record.level(), message)))
 	}
+
 	fn colored_format(out: FormatCallback, message: &Arguments, record: &Record) {
 		out.finish(format_args!(
 			"{}",
