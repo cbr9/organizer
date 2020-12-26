@@ -113,7 +113,7 @@ impl<'a> Watch {
 	}
 
 	fn start(&'a self, mut data: Data) -> Result<()> {
-		Register::new()?.add(process::id(), &self.config)?;
+		Register::new()?.push(process::id(), &self.config)?;
 		let path_to_rules = PathToRules::new(&data.config);
 		let path_to_recursive = PathToRecursive::new(&data);
 		let (mut watcher, rx) = self.setup(&path_to_recursive)?;

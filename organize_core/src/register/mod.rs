@@ -8,7 +8,7 @@ use sysinfo::{Pid, RefreshKind, System, SystemExt};
 
 use crate::data::Data;
 
-use anyhow::{Context};
+use anyhow::{Context, Result};
 
 
 
@@ -43,7 +43,7 @@ pub struct Section {
 }
 
 impl Register {
-	pub fn new() -> anyhow::Result<Self> {
+	pub fn new() -> Result<Self> {
 		let path = Self::path()?;
         if !path.exists() {
             // will be created later
@@ -69,11 +69,11 @@ impl Register {
 		}
 	}
 
-	fn path() -> anyhow::Result<PathBuf> {
+	fn path() -> Result<PathBuf> {
 		Data::dir().map(|dir| dir.join("register.db"))
 	}
 
-	pub fn add<T, P>(mut self, pid: P, path: T) -> anyhow::Result<Self>
+	pub fn push<T, P>(mut self, pid: P, path: T) -> Result<Self>
 	where
 		T: Into<PathBuf>,
 		P: AsPrimitive<Pid>,
@@ -86,15 +86,15 @@ impl Register {
 		Ok(self)
 	}
 
-	fn write(&self) -> anyhow::Result<()> {
+	fn write(&self) -> Result<()> {
 		if !self.path.parent().ok_or_else(|| anyhow::Error::msg("invalid data directory"))?.exists() {
 			std::fs::create_dir_all(&self.path).context("could not create data directory")?;
 		}
         std::fs::write(&self.path, bincode::serialize(&self.sections)?).context("could not write register")
 	}
 
-	pub fn update(mut self) -> anyhow::Result<Self> {
-		let sys = System::new_with_specifics(RefreshKind::with_processes(RefreshKind::new()));
+	pub fn update(mut self) -> Result<Self> {
+		let sys = System::new_with_specifics(RefreshKind::new().with_processes());
 		self.sections = self
 			.sections
 			.into_iter()
@@ -125,7 +125,7 @@ mod tests {
 		assert!(sys.get_process(pid).is_none());
 		let path = Config::path().unwrap();
 		let register = Register::new().unwrap();
-		register.add(pid, &path).unwrap();
+		register.push(pid, &path).unwrap();
 	}
 
 	#[test]
