@@ -14,7 +14,7 @@ pub struct Logs {
 
 impl Cmd for Logs {
 	fn run(self) -> Result<()> {
-		let logs = Logger::parse(Level::Info).expect("level has no associated logfile")?;
+		let logs = Logger::parse(Level::Info)?;
 		if self.no_color {
 			logs.into_iter().map(|log| log.plain()).for_each(|line| println!("{}", line))
 		} else {

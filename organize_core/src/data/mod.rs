@@ -1,17 +1,17 @@
 use std::path::{Path, PathBuf};
 
 use anyhow::Result;
-use dirs::config_dir;
 
+
+use crate::path::IsHidden;
 use crate::{
-	data::{config::Config, options::Options, settings::Settings},
 	data::options::apply::Apply,
 	data::options::r#match::Match,
-	PROJECT_NAME,
+	data::{config::Config, options::Options, settings::Settings},
 	utils::DefaultOpt,
 	utils::UnwrapRef,
+	PROJECT_NAME,
 };
-use crate::path::IsHidden;
 
 pub mod config;
 pub mod options;
@@ -97,8 +97,16 @@ impl Data {
 		Ok(data)
 	}
 
-	pub fn dir() -> PathBuf {
-		config_dir().unwrap().join(PROJECT_NAME)
+	pub fn dir() -> Result<PathBuf> {
+		let var = "ORGANIZE_DATA_DIR";
+		std::env::var_os(var).map_or_else(
+			|| {
+				Ok(dirs::data_local_dir()
+					.ok_or_else(|| anyhow::Error::msg(format!("could not find data directory, please set {var} manually", var = var)))?
+					.join(PROJECT_NAME))
+			},
+			|path| Ok(PathBuf::from(path)),
+		)
 	}
 
 	pub fn should_ignore<T: AsRef<Path>>(&self, path: T, rule: usize, folder: usize) -> bool {

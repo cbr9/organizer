@@ -1,27 +1,27 @@
+use std::path::PathBuf;
+use std::time::Duration;
 use std::{
 	process,
 	sync::mpsc::{channel, Receiver},
 };
-use std::path::PathBuf;
-use std::time::Duration;
 
 use anyhow::Result;
 use clap::Clap;
 use colored::Colorize;
 use log::{debug, error, info};
-use notify::{DebouncedEvent, RecommendedWatcher, RecursiveMode, watcher, Watcher};
+use notify::{watcher, DebouncedEvent, RecommendedWatcher, RecursiveMode, Watcher};
 use sysinfo::{ProcessExt, RefreshKind, Signal, System, SystemExt};
 
+use organize_core::data::settings::Settings;
+use organize_core::logger::Logger;
 use organize_core::{
-	data::{config::Config, Data, path_to_recursive::PathToRecursive, path_to_rules::PathToRules},
+	data::{config::Config, path_to_recursive::PathToRecursive, path_to_rules::PathToRules, Data},
 	file::File,
 	register::Register,
 };
-use organize_core::data::settings::Settings;
-use organize_core::logger::Logger;
 
-use crate::{Cmd, CONFIG_PATH_STR};
 use crate::cmd::run::Run;
+use crate::{Cmd, CONFIG_PATH_STR};
 
 #[derive(Clap, Debug)]
 pub struct Watch {
@@ -113,7 +113,7 @@ impl<'a> Watch {
 	}
 
 	fn start(&'a self, mut data: Data) -> Result<()> {
-		Register::new()?.append(process::id(), &self.config)?;
+		Register::new()?.add(process::id(), &self.config)?;
 		let path_to_rules = PathToRules::new(&data.config);
 		let path_to_recursive = PathToRecursive::new(&data);
 		let (mut watcher, rx) = self.setup(&path_to_recursive)?;

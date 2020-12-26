@@ -3,13 +3,12 @@ use std::{
 	path::{Path, PathBuf},
 };
 
-
 use serde::Serialize;
 
-use crate::{data::options::Options, utils::DefaultOpt};
 use crate::data::config::Config;
+use crate::{data::options::Options, utils::DefaultOpt};
 
-use std::io::{ErrorKind};
+use std::io::ErrorKind;
 
 mod de;
 
@@ -51,7 +50,7 @@ impl Settings {
 		match fs::read_to_string(&path) {
 			Ok(content) => toml::from_str(&content).map_err(anyhow::Error::new),
 			Err(e) if e.kind() == ErrorKind::NotFound => Ok(Settings::default_some()),
-			Err(e) => Err(e.into())
+			Err(e) => Err(e.into()),
 		}
 	}
 

@@ -1,11 +1,11 @@
+use std::convert::TryFrom;
+use std::env::VarError;
 use std::{
 	ops::Deref,
 	path::{Path, PathBuf},
 	result,
 	str::FromStr,
 };
-use std::convert::TryFrom;
-use std::env::VarError;
 
 use log::{error, info};
 use serde::{Deserialize, Serialize};
@@ -78,15 +78,15 @@ fn helper(ty: ActionType, path: PathBuf, to: PathBuf, simulate: bool) -> Option<
 			Symlink => std::os::unix::fs::symlink(&path, &to),
 			_ => unreachable!(),
 		}
-			.map(|_| {
-				info!("({}) {} -> {}", ty.to_string(), path.display(), to.display());
-				match ty {
-					Copy | Hardlink | Symlink => path,
-					Move | Rename => to,
-					_ => unreachable!(),
-				}
-			})
-			.map_err(|e| error!("{}", e))
+		.map(|_| {
+			info!("({}) {} -> {}", ty.to_string(), path.display(), to.display());
+			match ty {
+				Copy | Hardlink | Symlink => path,
+				Move | Rename => to,
+				_ => unreachable!(),
+			}
+		})
+		.map_err(|e| error!("{}", e))
 		.ok()
 	} else {
 		info!("(simulate {}) {} -> {}", ty.to_string(), path.display(), to.display());

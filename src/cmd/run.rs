@@ -6,11 +6,11 @@ use notify::RecursiveMode;
 use rayon::prelude::*;
 use walkdir::{DirEntry, WalkDir};
 
+use organize_core::logger::Logger;
 use organize_core::{
-	data::{Data, path_to_recursive::PathToRecursive, path_to_rules::PathToRules},
+	data::{path_to_recursive::PathToRecursive, path_to_rules::PathToRules, Data},
 	file::File,
 };
-use organize_core::logger::Logger;
 
 use crate::{Cmd, CONFIG_PATH_STR};
 

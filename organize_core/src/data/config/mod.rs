@@ -10,15 +10,15 @@ use serde::Deserialize;
 use crate::{
 	data::{
 		config::{
-			actions::{Actions, io_action::ConflictOption},
+			actions::{io_action::ConflictOption, Actions},
 			filters::Filters,
 			folders::Folders,
 		},
 		options::Options,
 	},
 	path::Update,
-	PROJECT_NAME,
 	utils::DefaultOpt,
+	PROJECT_NAME,
 };
 
 pub mod actions;
@@ -103,19 +103,11 @@ impl Config {
 		let var = "ORGANIZE_CONFIG_DIR";
 		std::env::var_os(var).map_or_else(
 			|| {
-				Ok(
-					dirs::config_dir()
-						.ok_or_else(|| anyhow::Error::msg(format!("could not find config directory, please set {var} manually", var = var)))?
-						.join(PROJECT_NAME)
-				)
+				Ok(dirs::config_dir()
+					.ok_or_else(|| anyhow::Error::msg(format!("could not find config directory, please set {var} manually", var = var)))?
+					.join(PROJECT_NAME))
 			},
-			|path| {
-				let dir = PathBuf::from(path);
-				if !dir.exists() {
-					std::fs::create_dir_all(&dir).with_context(|| format!("could not create config directory specified in {var}", var = var))?;
-				}
-				Ok(dir)
-			},
+			|path| Ok(PathBuf::from(path)),
 		)
 	}
 

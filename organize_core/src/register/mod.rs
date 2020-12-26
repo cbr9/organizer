@@ -1,18 +1,16 @@
-use std::{
-	fs,
-	fs::OpenOptions,
-	io::Result,
-	path::{PathBuf},
-};
 use std::ops::{Deref, DerefMut};
+use std::{path::PathBuf};
 
 use num_traits::AsPrimitive;
 use serde::{Deserialize, Serialize};
-use serde_json::error::Category;
+
 use sysinfo::{Pid, RefreshKind, System, SystemExt};
 
 use crate::data::Data;
-use crate::PROJECT_NAME;
+
+use anyhow::{Context};
+
+
 
 mod de;
 
@@ -45,43 +43,64 @@ pub struct Section {
 }
 
 impl Register {
-	pub fn new() -> Result<Self> {
-		let path = Data::dir().join(format!("{}.json", PROJECT_NAME));
-		let f = OpenOptions::new().create(true).write(true).read(true).open(&path)?;
-		let register = match serde_json::from_reader::<_, Self>(f) {
+	pub fn new() -> anyhow::Result<Self> {
+		let path = Self::path()?;
+        if !path.exists() {
+            // will be created later
+			return Ok(Register { path, ..Register::default() });
+		}
+		let content = std::fs::read_to_string(&path).context("could not read register")?;
+		if content.is_empty() {
+			return Ok(Register { path, ..Register::default() });
+		}
+
+		let register = match bincode::deserialize::<Self>(content.as_bytes()) {
 			Ok(mut register) => {
 				register.path = path;
 				Ok(register)
 			}
-			Err(e) if e.classify() == Category::Eof => Ok(Register {path, ..Register::default()}),
 			Err(e) => Err(e),
 		}?;
-		Ok(register.update()?)
+
+		if !register.sections.is_empty() {
+			register.update()
+		} else {
+			Ok(register)
+		}
 	}
 
-	pub fn append<T, P>(mut self, pid: P, path: T) -> Result<Self>
+	fn path() -> anyhow::Result<PathBuf> {
+		Data::dir().map(|dir| dir.join("register.db"))
+	}
+
+	pub fn add<T, P>(mut self, pid: P, path: T) -> anyhow::Result<Self>
 	where
 		T: Into<PathBuf>,
 		P: AsPrimitive<Pid>,
 	{
-		self.push(Section {
+		self.sections.push(Section {
 			path: path.into(),
 			pid: pid.as_(),
 		});
-		fs::write(&self.path, serde_json::to_string(&self.sections)?)?;
+		self.write()?;
 		Ok(self)
 	}
 
-	pub fn update(mut self) -> Result<Self> {
-		if !self.is_empty() {
-			let sys = System::new_with_specifics(RefreshKind::with_processes(RefreshKind::new()));
-			self.sections = self
-				.sections
-				.into_iter()
-				.filter(|section| sys.get_process(section.pid).is_some())
-				.collect::<Vec<_>>();
-			fs::write(&self.path, serde_json::to_string(&self.sections)?)?;
+	fn write(&self) -> anyhow::Result<()> {
+		if !self.path.parent().ok_or_else(|| anyhow::Error::msg("invalid data directory"))?.exists() {
+			std::fs::create_dir_all(&self.path).context("could not create data directory")?;
 		}
+        std::fs::write(&self.path, bincode::serialize(&self.sections)?).context("could not write register")
+	}
+
+	pub fn update(mut self) -> anyhow::Result<Self> {
+		let sys = System::new_with_specifics(RefreshKind::with_processes(RefreshKind::new()));
+		self.sections = self
+			.sections
+			.into_iter()
+			.filter(|section| sys.get_process(section.pid).is_some())
+			.collect::<Vec<_>>();
+		self.write()?;
 		Ok(self)
 	}
 }
@@ -106,7 +125,7 @@ mod tests {
 		assert!(sys.get_process(pid).is_none());
 		let path = Config::path().unwrap();
 		let register = Register::new().unwrap();
-		register.append(pid, &path).unwrap();
+		register.add(pid, &path).unwrap();
 	}
 
 	#[test]

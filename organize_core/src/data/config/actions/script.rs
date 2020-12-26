@@ -11,11 +11,11 @@ use colored::Colorize;
 use log::info;
 use serde::{de::Error, Deserialize, Deserializer};
 
+use crate::data::config::actions::ActionType;
 use crate::{
-	data::config::{actions::AsAction, Config, filters::AsFilter},
+	data::config::{actions::AsAction, filters::AsFilter, Config},
 	string::{deserialize_placeholder_string, Placeholder},
 };
-use crate::data::config::actions::ActionType;
 
 #[derive(Deserialize, Debug, Clone, Default, Eq, PartialEq)]
 pub struct Script {

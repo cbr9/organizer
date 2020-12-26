@@ -1,14 +1,14 @@
 use std::fmt::Arguments;
 use std::fmt::Display;
 use std::io::Write;
-use std::path::PathBuf;
+use std::path::{PathBuf};
 use std::str::FromStr;
 
-use chrono::{Local, NaiveDateTime};
 use chrono::format::{DelayedFormat, StrftimeItems};
+use chrono::{Local, NaiveDateTime};
 use colored::Colorize;
-use fern::{Dispatch, FormatCallback, Output};
 use fern::colors::{Color, ColoredLevelConfig};
+use fern::{Dispatch, FormatCallback, Output};
 use lazy_static::lazy_static;
 use log::{Level, Record};
 use regex::Regex;
@@ -78,8 +78,8 @@ impl Logger {
 			.error(Color::BrightRed)
 	}
 
-	pub fn parse(level: Level) -> Option<std::io::Result<Vec<Log>>> {
-		Self::path(level).map(|path| Ok(std::fs::read_to_string(path)?.lines().map(Log::from).collect()))
+	pub fn parse(level: Level) -> anyhow::Result<Vec<Log>> {
+		Self::path(level).map(|path| Ok(std::fs::read_to_string(path)?.lines().map(Log::from).collect()))?
 	}
 
 	fn plain_format(out: FormatCallback, message: &Arguments, record: &Record) {
@@ -93,15 +93,16 @@ impl Logger {
 		))
 	}
 
-	fn path(level: Level) -> Option<PathBuf> {
+	fn path(level: Level) -> anyhow::Result<PathBuf> {
+		let dir = Data::dir()?.join("logs");
 		match level {
-			Level::Error | Level::Warn => Some(Data::dir().join("errors.log")),
-			Level::Info => Some(Data::dir().join("output.log")),
-			Level::Debug | Level::Trace => None,
+			Level::Error | Level::Warn => Ok(dir.join("errors.log")),
+			Level::Info => Ok(dir.join("output.log")),
+			Level::Debug | Level::Trace => Ok(dir.join("debug.log")),
 		}
 	}
 
-	fn build_dispatchers<T: Into<Output> + Write>(level: Level, no_color: bool, writer: T) -> std::io::Result<(Dispatch, Option<Dispatch>)> {
+	fn build_dispatchers<T: Into<Output> + Write>(level: Level, no_color: bool, writer: T) -> anyhow::Result<(Dispatch, Dispatch)> {
 		let console_output = fern::Dispatch::new()
 			.filter(move |metadata| metadata.level() == level)
 			.format(move |out, args, record| {
@@ -113,12 +114,20 @@ impl Logger {
 			})
 			.chain(writer);
 
-		let file = Self::path(level).map(|path| {
-			fern::Dispatch::new()
+		let file = Self::path(level).map(|path| -> anyhow::Result<Dispatch> {
+			match path.parent() {
+				None => return Err(anyhow::Error::msg("could not determine parent directory")),
+				Some(parent) => {
+					if !parent.exists() {
+						std::fs::create_dir_all(&parent)?;
+					}
+				}
+			}
+			Ok(fern::Dispatch::new()
 				.filter(move |metadata| metadata.level() == level)
 				.format(Self::plain_format) // we don't want ANSI escape codes to be written to the log file
-				.chain(fern::log_file(path).unwrap())
-		});
+				.chain(fern::log_file(path)?))
+		})??;
 
 		Ok((console_output, file))
 	}
@@ -131,12 +140,12 @@ impl Logger {
 
 		fern::Dispatch::new()
 			.chain(info.0)
-			.chain(info.1.expect("level has no associated logfile"))
-			.chain(debug.0) // debug has no associated path so we don't chain it
+			.chain(info.1)
+			.chain(debug.0)
 			.chain(error.0)
-			.chain(error.1.expect("level has no associated logfile"))
+			.chain(error.1)
 			.chain(warn.0)
-			.chain(warn.1.expect("level has no associated logfile"))
+			.chain(warn.1)
 			.apply()?;
 
 		Ok(())

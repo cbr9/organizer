@@ -1,6 +1,7 @@
 use crate::cmd::Cmd;
 use clap::Clap;
 use colored::Colorize;
+use organize_core::data::config::Config;
 use organize_core::data::options::Options;
 use organize_core::data::Data;
 use organize_core::utils::DefaultOpt;
@@ -46,7 +47,8 @@ impl Cmd for Info {
 			println!()
 		}
 		if self.path {
-			println!("{}: {}", "Path".bold().underline(), Data::dir().display());
+			println!("{}: {}", "Data directory".bold().underline(), Data::dir()?.display());
+			println!("{}: {}", "Config directory".bold().underline(), Config::default_dir()?.display());
 			println!()
 		}
 		Ok(())
