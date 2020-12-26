@@ -87,7 +87,7 @@ impl Data {
 		let path = Config::path()?;
 		let data = Config::parse(&path).map(|config| {
 			Config::set_cwd(path).map(|_| {
-				Settings::new(Settings::path()).map(|settings| Self {
+				Settings::new(Settings::path()?).map(|settings| Self {
 					defaults: Options::default_some(),
 					settings,
 					config,

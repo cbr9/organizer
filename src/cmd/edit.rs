@@ -20,7 +20,7 @@ impl Cmd for Edit {
 	fn run(self) -> Result<()> {
 		match self {
 			Edit::Config => Self::launch_editor(Config::path()?).map(|_| ()),
-			Edit::Settings => Self::launch_editor(Settings::path()).map(|_| ()),
+			Edit::Settings => Self::launch_editor(Settings::path()?).map(|_| ()),
 		}
 	}
 }

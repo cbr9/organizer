@@ -3,13 +3,13 @@ use std::{
 	path::{Path, PathBuf},
 };
 
-use log::debug;
+
 use serde::Serialize;
 
 use crate::{data::options::Options, utils::DefaultOpt};
 use crate::data::config::Config;
-use crate::data::Data;
-use std::io::{Error, ErrorKind};
+
+use std::io::{ErrorKind};
 
 mod de;
 

@@ -118,6 +118,7 @@ impl<'a> Watch {
 		let path_to_recursive = PathToRecursive::new(&data);
 		let (mut watcher, rx) = self.setup(&path_to_recursive)?;
 		let config_parent = self.config.parent().unwrap();
+		let settings_path = Settings::path()?;
 
 		loop {
 			match rx.recv() {
@@ -157,8 +158,8 @@ impl<'a> Watch {
                                             debug!("could not reload configuration: {}", e);
                                         }
                                     };
-                                } else if path == Settings::path() {
-                                    match Settings::new(Settings::path()) {
+                                } else if path == settings_path {
+                                    match Settings::new(&settings_path) {
                                         Ok(settings) => {
 											if data.settings != settings {
 												info!("successfully reloaded settings");

@@ -2,7 +2,7 @@ use std::{
 	fs,
 	fs::OpenOptions,
 	io::Result,
-	path::{Path, PathBuf},
+	path::{PathBuf},
 };
 use std::ops::{Deref, DerefMut};
 
@@ -53,30 +53,21 @@ impl Register {
 				register.path = path;
 				Ok(register)
 			}
-			Err(e) => {
-				match e.classify() {
-					Category::Io | Category::Syntax | Category::Data => Err(e),
-					Category::Eof => {
-						// the file may be empty
-						let register = Register { path, ..Register::default() };
-						Ok(register)
-					}
-				}
-			}
+			Err(e) if e.classify() == Category::Eof => Ok(Register {path, ..Register::default()}),
+			Err(e) => Err(e),
 		}?;
 		Ok(register.update()?)
 	}
 
 	pub fn append<T, P>(mut self, pid: P, path: T) -> Result<Self>
 	where
-		T: AsRef<Path>,
+		T: Into<PathBuf>,
 		P: AsPrimitive<Pid>,
 	{
-		let section = Section {
-			path: path.as_ref().to_path_buf(),
+		self.push(Section {
+			path: path.into(),
 			pid: pid.as_(),
-		};
-		self.push(section);
+		});
 		fs::write(&self.path, serde_json::to_string(&self.sections)?)?;
 		Ok(self)
 	}
