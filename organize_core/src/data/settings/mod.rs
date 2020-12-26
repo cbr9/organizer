@@ -9,6 +9,7 @@ use serde::Serialize;
 use crate::{data::options::Options, utils::DefaultOpt};
 use crate::data::config::Config;
 use crate::data::Data;
+use std::io::{Error, ErrorKind};
 
 mod de;
 
@@ -45,16 +46,17 @@ impl From<Options> for Settings {
 }
 
 impl Settings {
-	pub fn new<T>(path: T) -> Result<Settings, toml::de::Error>
-	where
-		T: AsRef<Path>,
-	{
+	pub fn new<T: AsRef<Path>>(path: T) -> anyhow::Result<Settings> {
 		let path = path.as_ref();
-		fs::read_to_string(path).map(|str| toml::from_str(&str)).unwrap_or_else(|e| {
-			debug!("{:?}", e);
-			// using default_some is unnecessary as we already have a `defaults` field in crate::data::Data
-			Ok(Settings::default_none())
-		})
+		match fs::read_to_string(&path) {
+			Ok(content) => toml::from_str(&content).map_err(anyhow::Error::new),
+			Err(e) if e.kind() == ErrorKind::NotFound => {
+				let defaults = Settings::default_some();
+				fs::write(path, toml::to_string(&defaults).expect("unsupported format"));
+				Ok(defaults)
+			},
+			Err(e) => Err(e.into())
+		}
 	}
 
 	pub fn path() -> anyhow::Result<PathBuf> {
