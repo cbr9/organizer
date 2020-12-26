@@ -50,11 +50,7 @@ impl Settings {
 		let path = path.as_ref();
 		match fs::read_to_string(&path) {
 			Ok(content) => toml::from_str(&content).map_err(anyhow::Error::new),
-			Err(e) if e.kind() == ErrorKind::NotFound => {
-				let defaults = Settings::default_some();
-				fs::write(path, toml::to_string(&defaults).expect("unsupported format"));
-				Ok(defaults)
-			},
+			Err(e) if e.kind() == ErrorKind::NotFound => Ok(Settings::default_some()),
 			Err(e) => Err(e.into())
 		}
 	}
