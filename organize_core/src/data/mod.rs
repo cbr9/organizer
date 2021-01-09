@@ -2,7 +2,6 @@ use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 
-
 use crate::path::IsHidden;
 use crate::{
 	data::options::apply::Apply,

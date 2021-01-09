@@ -1,7 +1,7 @@
 use std::fmt::Arguments;
 use std::fmt::Display;
 use std::io::Write;
-use std::path::{PathBuf};
+use std::path::PathBuf;
 use std::str::FromStr;
 
 use chrono::format::{DelayedFormat, StrftimeItems};

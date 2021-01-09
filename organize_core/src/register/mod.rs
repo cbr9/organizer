@@ -1,5 +1,5 @@
 use std::ops::{Deref, DerefMut};
-use std::{path::PathBuf};
+use std::path::PathBuf;
 
 use num_traits::AsPrimitive;
 use serde::{Deserialize, Serialize};
@@ -9,8 +9,6 @@ use sysinfo::{Pid, RefreshKind, System, SystemExt};
 use crate::data::Data;
 
 use anyhow::{Context, Result};
-
-
 
 mod de;
 
@@ -45,8 +43,8 @@ pub struct Section {
 impl Register {
 	pub fn new() -> Result<Self> {
 		let path = Self::path()?;
-        if !path.exists() {
-            // will be created later
+		if !path.exists() {
+			// will be created later
 			return Ok(Register { path, ..Register::default() });
 		}
 		let content = std::fs::read_to_string(&path).context("could not read register")?;
@@ -90,7 +88,7 @@ impl Register {
 		if !self.path.parent().ok_or_else(|| anyhow::Error::msg("invalid data directory"))?.exists() {
 			std::fs::create_dir_all(&self.path).context("could not create data directory")?;
 		}
-        std::fs::write(&self.path, bincode::serialize(&self.sections)?).context("could not write register")
+		std::fs::write(&self.path, bincode::serialize(&self.sections)?).context("could not write register")
 	}
 
 	pub fn update(mut self) -> Result<Self> {

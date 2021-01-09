@@ -26,8 +26,10 @@ impl SimFiles {
         Ok(sim)
     }
 
-    fn watch_folder<T: Into<PathBuf>>(&mut self, folder: T) -> Result<(), notify::Error> {
+    fn watch_folder<T: Into<PathBuf>>(&mut self, folder: T) -> anyhow::Result<()> {
         let path = folder.into();
+        let files = path.read_dir()?.filter_map(|file| Some(file.ok()?.path()));
+        self.files.extend(files);
         self.watcher.watch(&path, RecursiveMode::NonRecursive)?;
         self.folders.insert(path);
         Ok(())
@@ -35,6 +37,14 @@ impl SimFiles {
 
     fn unwatch_folder<T: AsRef<Path>>(&mut self, folder: T) -> Result<(), notify::Error> {
         let folder = folder.as_ref();
+        let folders = &self.folders;
+        self.files.retain(|file| {
+            if let Some(parent) = file.parent() {
+                !folders.contains(parent)
+            } else {
+                false
+            }
+        });
         self.watcher.unwatch(folder)?;
         self.folders.remove(folder);
         Ok(())
