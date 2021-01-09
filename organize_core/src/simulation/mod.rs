@@ -45,9 +45,8 @@ impl SimFiles {
                 false
             }
         });
-        self.watcher.unwatch(folder)?;
         self.folders.remove(folder);
-        Ok(())
+        self.watcher.unwatch(folder)
     }
 
     fn insert_file<T: Into<PathBuf>>(&mut self, file: T) -> bool {
