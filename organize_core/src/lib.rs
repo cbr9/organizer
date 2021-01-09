@@ -23,5 +23,6 @@ pub mod file;
 pub mod logger;
 pub mod register;
 pub mod utils;
+mod simulation;
 
 pub const PROJECT_NAME: &str = "organize";
