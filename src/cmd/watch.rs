@@ -44,36 +44,36 @@ impl Cmd for Watch {
 		Logger::setup(self.no_color)?;
 		self.config = self.config.canonicalize()?;
 		let data = Data::new()?;
+
 		if self.clean {
-			let cmd = Run {
-				config: self.config.clone(),
-				simulate: self.simulate,
-				no_color: self.no_color,
-			};
-			cmd.start(data.clone())?;
+			self.cleanup(&data)?;
 		}
+
 		if self.replace {
-			self.replace()
-		} else {
-			let register = Register::new()?;
-			if register.iter().map(|section| &section.path).any(|config| config == &self.config) {
-				return if self.config == Config::default_path()? {
-					println!("An existing instance is already running. Use --replace to restart it");
-					Ok(())
-				} else {
-					println!(
-						"An existing instance is already running with the selected configuration. Use --replace --config {} to restart it",
-						self.config.display()
-					);
-					Ok(())
-				};
-			}
-			self.start(data)
+			return self.replace();
 		}
+
+		let mut register = Register::new()?;
+
+		if register.iter().any(|section| section.path == &self.config) {
+			println!("An existing instance is already running with the selected configuration. Add --replace to restart it");
+			return Ok(());
+		}
+		register.push(process::id(), &self.config)?;
+		self.start(data)
 	}
 }
 
 impl<'a> Watch {
+	fn cleanup(&self, data: &Data) -> Result<()> {
+		let cmd = Run {
+			config: self.config.clone(),
+			simulate: self.simulate,
+			no_color: self.no_color,
+		};
+		cmd.start(data.clone())
+	}
+
 	fn replace(&self) -> Result<()> {
 		let register = Register::new()?;
 		match register.iter().find(|section| section.path == self.config) {
