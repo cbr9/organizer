@@ -38,23 +38,9 @@ pub struct Config {
 	pub defaults: Options,
 }
 
-impl AsRef<Self> for Config {
-	fn as_ref(&self) -> &Config {
-		self
-	}
-}
-
 impl Config {
-	/// Creates a new UserConfig instance.
-	/// It parses the configuration file
-	/// and fills missing fields with either the defaults, in the case of global options,
-	/// or with the global options, in the case of folder-level options.
-	/// If the config file does not exist, it is created.
-	/// ### Errors
-	/// This constructor fails in the following cases:
-	/// - The configuration file does not exist
 	pub fn parse<T: AsRef<Path>>(path: T) -> Result<Config> {
-		fs::read_to_string(&path).map(|content| serde_yaml::from_str(&content).map_err(anyhow::Error::new))?
+		fs::read_to_string(&path).map(|ref content| serde_yaml::from_str(content).map_err(anyhow::Error::new))?
 	}
 
 	pub fn set_cwd<T: AsRef<Path>>(path: T) -> Result<PathBuf> {
