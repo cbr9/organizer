@@ -7,8 +7,9 @@ use crate::{
 use serde::{
 	de,
 	de::{Error, MapAccess, Visitor},
-	export, Deserialize, Deserializer,
+	Deserialize, Deserializer,
 };
+use std::fmt::Formatter;
 use std::path::PathBuf;
 
 impl<'de> Deserialize<'de> for Folder {
@@ -21,7 +22,7 @@ impl<'de> Deserialize<'de> for Folder {
 		impl<'de> Visitor<'de> for StringOrStruct {
 			type Value = Folder;
 
-			fn expecting(&self, formatter: &mut export::Formatter) -> fmt::Result {
+			fn expecting(&self, formatter: &mut Formatter) -> fmt::Result {
 				formatter.write_str("string or map")
 			}
 

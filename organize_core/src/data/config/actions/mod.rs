@@ -14,6 +14,8 @@ use crate::data::{
 	},
 	options::apply::Apply,
 };
+use crate::simulation::Simulation;
+use std::sync::{Arc, Mutex};
 
 pub(crate) mod delete;
 pub(crate) mod echo;
@@ -36,19 +38,34 @@ pub enum Action {
 }
 
 impl AsAction for Action {
-	fn act<T: Into<PathBuf>>(&self, path: T, simulate: bool) -> Option<PathBuf> {
+	fn act<T: Into<PathBuf>>(&self, path: T) -> Option<PathBuf> {
 		match self {
-			Action::Copy(copy) => copy.act(path, simulate), // IOAction has three different implementations of AsAction
-			Action::Move(r#move) => r#move.act(path, simulate), // so they must be called with turbo-fish syntax
-			Action::Rename(rename) => rename.act(path, simulate),
-			Action::Hardlink(hardlink) => hardlink.act(path, simulate),
-			Action::Symlink(symlink) => symlink.act(path, simulate),
-			Action::Delete(delete) => delete.act(path, simulate),
-			Action::Echo(echo) => echo.act(path, simulate),
-			Action::Trash(trash) => trash.act(path, simulate),
-			Action::Script(script) => script.act(path, simulate),
+			Action::Copy(copy) => copy.act(path),     // IOAction has three different implementations of AsAction
+			Action::Move(r#move) => r#move.act(path), // so they must be called with turbo-fish syntax
+			Action::Rename(rename) => rename.act(path),
+			Action::Hardlink(hardlink) => hardlink.act(path),
+			Action::Symlink(symlink) => symlink.act(path),
+			Action::Delete(delete) => delete.act(path),
+			Action::Echo(echo) => echo.act(path),
+			Action::Trash(trash) => trash.act(path),
+			Action::Script(script) => script.act(path),
 		}
 	}
+
+	fn simulate<T: Into<PathBuf>>(&self, path: T, simulation: &Arc<Mutex<Simulation>>) -> Option<PathBuf> {
+		match self {
+			Action::Move(r#move) => r#move.simulate(path, simulation),
+			Action::Copy(copy) => copy.simulate(path, simulation),
+			Action::Rename(rename) => rename.simulate(path, simulation),
+			Action::Hardlink(hardlink) => hardlink.simulate(path, simulation),
+			Action::Symlink(symlink) => symlink.simulate(path, simulation),
+			Action::Delete(delete) => delete.simulate(path, simulation),
+			Action::Echo(echo) => echo.simulate(path, simulation),
+			Action::Trash(trash) => trash.simulate(path, simulation),
+			Action::Script(script) => script.simulate(path, simulation),
+		}
+	}
+
 	fn ty(&self) -> ActionType {
 		match self {
 			Action::Copy(copy) => copy.ty(),
@@ -65,7 +82,8 @@ impl AsAction for Action {
 }
 
 pub(crate) trait AsAction {
-	fn act<P: Into<PathBuf>>(&self, path: P, simulate: bool) -> Option<PathBuf>;
+	fn act<T: Into<PathBuf>>(&self, path: T) -> Option<PathBuf>;
+	fn simulate<T: Into<PathBuf>>(&self, path: T, simulation: &Arc<Mutex<Simulation>>) -> Option<PathBuf>;
 	fn ty(&self) -> ActionType;
 }
 
@@ -95,12 +113,33 @@ impl Deref for Actions {
 }
 
 impl Actions {
-	pub fn run<T: Into<PathBuf>>(&self, path: T, apply: &Apply, simulate: bool) -> Option<PathBuf> {
+	pub fn simulate<T: Into<PathBuf>>(&self, path: T, apply: &Apply, simulation: &Arc<Mutex<Simulation>>) -> Option<PathBuf> {
 		match apply {
 			Apply::All => {
 				let mut path = path.into();
 				for action in self.iter() {
-					path = action.act(path, simulate)?;
+					path = action.simulate(path, simulation)?;
+				}
+				Some(path)
+			}
+			Apply::AllOf(indices) => {
+				let mut path = path.into();
+				for i in indices {
+					let action = &self.0[*i];
+					path = action.simulate(path, simulation)?;
+				}
+				Some(path)
+			}
+			_ => unreachable!("deserializer should not allow variants 'any' or 'any_of' in `apply.actions`"),
+		}
+	}
+
+	pub fn act<T: Into<PathBuf>>(&self, path: T, apply: &Apply) -> Option<PathBuf> {
+		match apply {
+			Apply::All => {
+				let mut path = path.into();
+				for action in self.iter() {
+					path = action.act(path)?;
 				}
 				Some(path)
 			}
@@ -108,7 +147,7 @@ impl Actions {
 				let mut path = path.into();
 				for i in indices {
 					let action = self.0.get(*i)?;
-					path = action.act(path, simulate)?;
+					path = action.act(path)?;
 				}
 				Some(path)
 			}

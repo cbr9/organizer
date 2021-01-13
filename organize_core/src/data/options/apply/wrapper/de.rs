@@ -1,9 +1,9 @@
 use crate::data::options::apply::{wrapper::ApplyWrapper, Apply};
 use serde::{
 	de::{Error, MapAccess, SeqAccess, Visitor},
-	export::Formatter,
 	Deserialize, Deserializer,
 };
+use std::fmt::Formatter;
 use std::{fmt, str::FromStr};
 
 impl<'de> Deserialize<'de> for ApplyWrapper {

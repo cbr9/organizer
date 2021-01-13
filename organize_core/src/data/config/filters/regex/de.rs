@@ -2,8 +2,9 @@ use crate::data::config::filters::regex::Regex;
 use serde::{
 	de,
 	de::{Error, SeqAccess, Visitor},
-	export, Deserialize, Deserializer,
+	Deserialize, Deserializer,
 };
+use std::fmt::Formatter;
 use std::{fmt, str::FromStr};
 
 impl<'de> Deserialize<'de> for Regex {
@@ -16,7 +17,7 @@ impl<'de> Deserialize<'de> for Regex {
 		impl<'de> Visitor<'de> for StringOrSeq {
 			type Value = Regex;
 
-			fn expecting(&self, formatter: &mut export::Formatter) -> fmt::Result {
+			fn expecting(&self, formatter: &mut Formatter) -> fmt::Result {
 				formatter.write_str("string or seq")
 			}
 

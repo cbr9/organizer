@@ -1,9 +1,10 @@
 use crate::data::options::apply::Apply;
 use serde::{
 	de::{Error, MapAccess, SeqAccess, Visitor},
-	export::{Formatter, PhantomData},
 	Deserialize, Deserializer,
 };
+use std::fmt::Formatter;
+use std::marker::PhantomData;
 use std::{fmt, str::FromStr};
 
 impl<'de> Deserialize<'de> for Apply {

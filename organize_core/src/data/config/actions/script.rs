@@ -12,10 +12,12 @@ use log::info;
 use serde::{de::Error, Deserialize, Deserializer};
 
 use crate::data::config::actions::ActionType;
+use crate::simulation::Simulation;
 use crate::{
 	data::config::{actions::AsAction, filters::AsFilter, Config},
 	string::{deserialize_placeholder_string, Placeholder},
 };
+use std::sync::{Arc, Mutex};
 
 #[derive(Deserialize, Debug, Clone, Default, Eq, PartialEq)]
 pub struct Script {
@@ -26,21 +28,23 @@ pub struct Script {
 }
 
 impl AsAction for Script {
-	fn act<T: Into<PathBuf>>(&self, path: T, simulate: bool) -> Option<PathBuf> {
+	fn act<T: Into<PathBuf>>(&self, path: T) -> Option<PathBuf> {
 		let path = path.into();
-		if !simulate {
-			self.run(&path)
-				.map(|output| {
-					info!("({}) run script on {}", self.exec.bold(), path.display());
-					let output = String::from_utf8_lossy(&output.stdout);
-					output.lines().last().map(|last| PathBuf::from(&last.trim()))
-				})
-				.ok()?
-		} else {
-			info!("(simulate {}) run script on {}", self.exec.bold(), path.display());
-			None
-		}
+		self.run(&path)
+			.map(|output| {
+				info!("({}) run script on {}", self.exec.bold(), path.display());
+				let output = String::from_utf8_lossy(&output.stdout);
+				output.lines().last().map(|last| PathBuf::from(&last.trim()))
+			})
+			.ok()?
 	}
+
+	fn simulate<T: Into<PathBuf>>(&self, _path: T, _simulation: &Arc<Mutex<Simulation>>) -> Option<PathBuf> {
+		// info!("(simulate {}) run script on {}", self.exec.bold(), path.display());
+		// None
+		unimplemented!()
+	}
+
 	fn ty(&self) -> ActionType {
 		ActionType::Script
 	}

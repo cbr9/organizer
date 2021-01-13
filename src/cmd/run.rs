@@ -13,6 +13,8 @@ use organize_core::{
 };
 
 use crate::{Cmd, CONFIG_PATH_STR};
+use organize_core::simulation::Simulation;
+use organize_core::utils::UnwrapRef;
 
 #[derive(Clap, Debug)]
 pub struct Run {
@@ -37,11 +39,16 @@ impl<'a> Run {
 	pub(crate) fn start(self, data: Data) -> Result<()> {
 		let path_to_recursive = PathToRecursive::new(&data);
 		let path_to_rules = PathToRules::new(&data.config);
-
+		let simulation = if self.simulate { Some(Simulation::new()?) } else { None };
+		// let simulate = self.simulate;
 		let process = |entry: DirEntry| {
 			if entry.path().is_file() {
 				let file = File::new(entry.path());
-				file.process(&data, &path_to_rules, &path_to_recursive, self.simulate)
+				if self.simulate {
+					file.simulate(&data, &path_to_rules, &path_to_recursive, simulation.unwrap_ref());
+				} else {
+					file.act(&data, &path_to_rules, &path_to_recursive);
+				}
 			}
 		};
 		path_to_rules.keys().collect::<Vec<_>>().par_iter().for_each(|path| {

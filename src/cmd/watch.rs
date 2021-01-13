@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::time::Duration;
 use std::{
 	process,
@@ -8,7 +8,7 @@ use std::{
 use anyhow::Result;
 use clap::Clap;
 use colored::Colorize;
-use log::{debug, error, info};
+use log::{debug, info};
 use notify::{watcher, DebouncedEvent, RecommendedWatcher, RecursiveMode, Watcher};
 use sysinfo::{ProcessExt, RefreshKind, Signal, System, SystemExt};
 
@@ -22,6 +22,8 @@ use organize_core::{
 
 use crate::cmd::run::Run;
 use crate::{Cmd, CONFIG_PATH_STR};
+use organize_core::simulation::Simulation;
+use std::sync::{Arc, Mutex};
 
 #[derive(Clap, Debug)]
 pub struct Watch {
@@ -55,7 +57,7 @@ impl Cmd for Watch {
 
 		let mut register = Register::new()?;
 
-		if register.iter().any(|section| section.path == &self.config) {
+		if register.iter().any(|section| section.path == self.config) {
 			println!("An existing instance is already running with the selected configuration. Add --replace to restart it");
 			return Ok(());
 		}
@@ -112,72 +114,85 @@ impl<'a> Watch {
 		Ok((watcher, rx))
 	}
 
+	fn on_create<T: AsRef<Path>, P: AsRef<Path>>(
+		path: T,
+		config_parent: P,
+		data: &Data,
+		path_to_rules: &PathToRules,
+		path_to_recursive: &PathToRecursive,
+		simulation: &Option<Arc<Mutex<Simulation>>>,
+	) {
+		let path = path.as_ref();
+		let config_parent = config_parent.as_ref();
+		if let Some(parent) = path.parent() {
+			if parent != config_parent && path.is_file() {
+				let file = File::new(path);
+				match simulation {
+					None => file.act(&data, &path_to_rules, &path_to_recursive),
+					Some(simulation) => file.simulate(&data, &path_to_rules, &path_to_recursive, simulation),
+				}
+			}
+		}
+	}
+
 	fn start(&'a self, mut data: Data) -> Result<()> {
-		Register::new()?.push(process::id(), &self.config)?;
 		let path_to_rules = PathToRules::new(&data.config);
 		let path_to_recursive = PathToRecursive::new(&data);
 		let (mut watcher, rx) = self.setup(&path_to_recursive)?;
 		let config_parent = self.config.parent().unwrap();
 		let settings_path = Settings::path()?;
+		let simulation = if self.simulate {
+			Some(Simulation::new()?)
+		} else {
+			None
+		};
 
 		loop {
-			match rx.recv() {
-				#[rustfmt::skip]
-                Ok(event) => {
-                    match event {
-                        DebouncedEvent::Create(path) => {
-                            if let Some(parent) = path.parent() {
-                                if parent != config_parent && path.is_file() {
-                                    let file = File::new(path);
-                                    // std::thread::sleep(std::time::Duration::from_secs(1));
-                                    file.process(&data, &path_to_rules, &path_to_recursive, self.simulate);
-                                }
-                            }
-                        }
-                        DebouncedEvent::Write(path) => {
-                            if cfg!(feature = "hot-reload") {
-                                if path == self.config {
-                                    match Config::parse(&self.config) {
-                                        Ok(new_config) => {
-                                            if new_config != data.config {
-                                                for folder in path_to_rules.keys() {
-                                                    watcher.unwatch(folder)?;
-                                                };
-                                                if cfg!(feature = "hot-reload") {
-                                                    watcher.unwatch(config_parent)?;
-                                                }
-                                                std::mem::drop(path);
-                                                std::mem::drop(path_to_rules);
-												std::mem::drop(path_to_recursive);
-												data.config = new_config;
-                                                info!("reloaded configuration: {}", self.config.display());
-                                                break self.start(data);
-                                            }
-                                        }
-                                        Err(e) => {
-                                            debug!("could not reload configuration: {}", e);
-                                        }
-                                    };
-                                } else if path == settings_path {
-                                    match Settings::new(&settings_path) {
-                                        Ok(settings) => {
-											if data.settings != settings {
-												info!("successfully reloaded settings");
-												data.settings = settings;
-												break self.start(data);
+			if let Ok(event) = rx.recv() {
+				match event {
+					DebouncedEvent::Create(path) => Self::on_create(path, config_parent, &data, &path_to_rules, &path_to_recursive, &simulation),
+					DebouncedEvent::Write(path) => {
+						if cfg!(feature = "hot-reload") {
+							if path == self.config {
+								match Config::parse(&self.config) {
+									Ok(new_config) => {
+										if new_config != data.config {
+											for folder in path_to_rules.keys() {
+												watcher.unwatch(folder)?;
 											}
+											if cfg!(feature = "hot-reload") {
+												watcher.unwatch(config_parent)?;
+											}
+											std::mem::drop(path);
+											std::mem::drop(path_to_rules);
+											std::mem::drop(path_to_recursive);
+											data.config = new_config;
+											info!("reloaded configuration: {}", self.config.display());
+											break self.start(data);
 										}
-                                        Err(e) => {
-                                            debug!("could not reload settings: {}", e);
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        _ => {}
-                    }
-                }
-				Err(e) => error!("{}", e.to_string()),
+									}
+									Err(e) => {
+										debug!("could not reload configuration: {}", e);
+									}
+								};
+							} else if path == settings_path {
+								match Settings::new(&settings_path) {
+									Ok(settings) => {
+										if data.settings != settings {
+											info!("successfully reloaded settings");
+											data.settings = settings;
+											break self.start(data);
+										}
+									}
+									Err(e) => {
+										debug!("could not reload settings: {}", e);
+									}
+								}
+							}
+						}
+					}
+					_ => {}
+				}
 			}
 		}
 	}

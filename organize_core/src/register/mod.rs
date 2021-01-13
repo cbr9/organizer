@@ -71,7 +71,7 @@ impl Register {
 		Data::dir().map(|dir| dir.join("register.db"))
 	}
 
-	pub fn push<T, P>(mut self, pid: P, path: T) -> Result<Self>
+	pub fn push<T, P>(&mut self, pid: P, path: T) -> Result<()>
 	where
 		T: Into<PathBuf>,
 		P: AsPrimitive<Pid>,
@@ -80,8 +80,7 @@ impl Register {
 			path: path.into(),
 			pid: pid.as_(),
 		});
-		self.write()?;
-		Ok(self)
+		self.write()
 	}
 
 	fn write(&self) -> Result<()> {
@@ -122,7 +121,7 @@ mod tests {
 		let sys = System::new_with_specifics(RefreshKind::with_processes(RefreshKind::new()));
 		assert!(sys.get_process(pid).is_none());
 		let path = Config::path().unwrap();
-		let register = Register::new().unwrap();
+		let mut register = Register::new().unwrap();
 		register.push(pid, &path).unwrap();
 	}
 

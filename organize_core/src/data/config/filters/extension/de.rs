@@ -2,10 +2,10 @@ use crate::data::config::filters::extension::Extension;
 use serde::{
 	de,
 	de::{SeqAccess, Visitor},
-	export::PhantomData,
 	Deserialize, Deserializer,
 };
 use std::fmt;
+use std::marker::PhantomData;
 
 impl<'de> Deserialize<'de> for Extension {
 	fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>

@@ -13,8 +13,10 @@ use serde::{Deserialize, Serialize};
 use crate::{
 	data::config::actions::{ActionType, AsAction},
 	path::{Expand, Update},
+	simulation::Simulation,
 	string::Placeholder,
 };
+use std::sync::{Arc, Mutex};
 
 mod de;
 
@@ -43,15 +45,21 @@ pub struct Symlink(Inner);
 macro_rules! as_action {
 	($id:ty) => {
 		impl AsAction for $id {
-			fn act<T: Into<PathBuf>>(&self, path: T, simulate: bool) -> Option<PathBuf> {
+			fn act<T: Into<PathBuf>>(&self, path: T) -> Option<PathBuf> {
 				let path = path.into();
 				let ty = self.ty();
-				let to = self.0.prepare_path(&path, &ty)?;
-				helper(ty, path, to, simulate)
+				let to = self.0.prepare_path(&path, &ty, None)?;
+				act(ty, path, to)
 			}
 			fn ty(&self) -> ActionType {
 				let name = stringify!($id).to_lowercase();
 				ActionType::from_str(&name).expect(&format!("no variant associated with {}", name))
+			}
+			fn simulate<T: Into<PathBuf>>(&self, path: T, simulation: &Arc<Mutex<Simulation>>) -> Option<PathBuf> {
+				let path = path.into();
+				let ty = self.ty();
+				let to = self.0.prepare_path(&path, &ty, Some(simulation))?;
+				simulate(ty, path, to, simulation)
 			}
 		}
 	};
@@ -63,39 +71,53 @@ as_action!(Copy);
 as_action!(Hardlink);
 as_action!(Symlink);
 
-fn helper(ty: ActionType, path: PathBuf, to: PathBuf, simulate: bool) -> Option<PathBuf> {
+fn simulate(ty: ActionType, from: PathBuf, to: PathBuf, simulation: &Arc<Mutex<Simulation>>) -> Option<PathBuf> {
 	use ActionType::{Copy, Hardlink, Move, Rename, Symlink};
-	if !simulate {
-		if let Some(parent) = to.parent() {
-			if !parent.exists() {
-				std::fs::create_dir_all(parent).map_err(|e| error!("{}", e)).ok()?;
-			}
+	let mut ptr = simulation.lock().unwrap();
+	ptr.watch_folder(to.parent()?).map_err(|e| eprintln!("{}", e)).ok()?;
+	info!("(simulate {}) {} -> {}", ty.to_string(), from.display(), to.display());
+	match ty {
+		Copy | Hardlink | Symlink => {
+			ptr.insert_file(to);
+			Some(from)
 		}
-		match ty {
-			Copy => std::fs::copy(&path, &to).map(|_| ()),
-			Move | Rename => std::fs::rename(&path, &to),
-			Hardlink => std::fs::hard_link(&path, &to),
-			Symlink => std::os::unix::fs::symlink(&path, &to),
-			_ => unreachable!(),
+		Move | Rename => {
+			ptr.remove_file(from);
+			ptr.insert_file(to.clone());
+			Some(to)
 		}
-		.map(|_| {
-			info!("({}) {} -> {}", ty.to_string(), path.display(), to.display());
-			match ty {
-				Copy | Hardlink | Symlink => path,
-				Move | Rename => to,
-				_ => unreachable!(),
-			}
-		})
-		.map_err(|e| error!("{}", e))
-		.ok()
-	} else {
-		info!("(simulate {}) {} -> {}", ty.to_string(), path.display(), to.display());
-		Some(to)
+		_ => unreachable!(),
 	}
 }
 
+fn act(ty: ActionType, from: PathBuf, to: PathBuf) -> Option<PathBuf> {
+	use ActionType::{Copy, Hardlink, Move, Rename, Symlink};
+	if let Some(parent) = to.parent() {
+		if !parent.exists() {
+			std::fs::create_dir_all(parent).map_err(|e| error!("{}", e)).ok()?;
+		}
+	}
+	match ty {
+		Copy => std::fs::copy(&from, &to).map(|_| ()),
+		Move | Rename => std::fs::rename(&from, &to),
+		Hardlink => std::fs::hard_link(&from, &to),
+		Symlink => std::os::unix::fs::symlink(&from, &to),
+		_ => unreachable!(),
+	}
+	.map(|_| {
+		info!("({}) {} -> {}", ty.to_string(), from.display(), to.display());
+		match ty {
+			Copy | Hardlink | Symlink => from,
+			Move | Rename => to,
+			_ => unreachable!(),
+		}
+	})
+	.map_err(|e| error!("{}", e))
+	.ok()
+}
+
 impl Inner {
-	fn prepare_path<T>(&self, path: T, kind: &ActionType) -> Option<PathBuf>
+	fn prepare_path<T>(&self, path: T, kind: &ActionType, simulation: Option<&Arc<Mutex<Simulation>>>) -> Option<PathBuf>
 	where
 		T: AsRef<Path>,
 	{
@@ -122,10 +144,22 @@ impl Inner {
 			_ => unreachable!(),
 		}
 
-		if to.exists() {
-			to.update(&self.if_exists, &self.sep)
-		} else {
-			Some(to)
+		match simulation {
+			None => {
+				if to.exists() {
+					to.update(&self.if_exists, &self.sep, None)
+				} else {
+					Some(to)
+				}
+			}
+			Some(sim) => {
+				let ptr = sim.lock().unwrap();
+				if ptr.files.contains(&to) {
+					to.update(&self.if_exists, &self.sep, Some(&ptr.files))
+				} else {
+					Some(to)
+				}
+			}
 		}
 	}
 }
@@ -228,7 +262,7 @@ mod tests {
 		assert!(target.join(original.file_name().unwrap()).exists());
 		assert!(!expected.exists());
 		let action = Inner::try_from(target).unwrap();
-		let new_path = action.prepare_path(&original, &ActionType::Copy).unwrap();
+		let new_path = action.prepare_path(&original, &ActionType::Copy, None).unwrap();
 		assert_eq!(new_path, expected)
 	}
 
@@ -240,7 +274,7 @@ mod tests {
 		assert!(target.join(original.file_name().unwrap()).exists());
 		assert!(!expected.exists());
 		let action = Inner::try_from(target).unwrap();
-		let new_path = action.prepare_path(&original, &ActionType::Move).unwrap();
+		let new_path = action.prepare_path(&original, &ActionType::Move, None).unwrap();
 		assert_eq!(new_path, expected)
 	}
 
@@ -252,7 +286,7 @@ mod tests {
 		assert!(target.exists());
 		assert!(!expected.exists());
 		let action = Inner::try_from(target).unwrap();
-		let new_path = action.prepare_path(&original, &ActionType::Rename).unwrap();
+		let new_path = action.prepare_path(&original, &ActionType::Rename, None).unwrap();
 		assert_eq!(new_path, expected)
 	}
 }

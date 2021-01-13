@@ -3,7 +3,6 @@ use std::{fmt, path::PathBuf, str::FromStr};
 use serde::{
 	de,
 	de::{Error, MapAccess, Visitor},
-	export::PhantomData,
 	Deserialize, Deserializer,
 };
 
@@ -12,6 +11,7 @@ use crate::{
 	path::Expand,
 	string::visit_placeholder_string,
 };
+use std::marker::PhantomData;
 
 impl<'de> Deserialize<'de> for Inner {
 	fn deserialize<D>(deserializer: D) -> Result<Self, <D as Deserializer<'de>>::Error>
