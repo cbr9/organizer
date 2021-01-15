@@ -171,7 +171,7 @@ impl Inner {
 			Some(sim) => {
 				let mut guard = sim.lock().unwrap();
 				if guard.files.contains(&to) {
-					to.update(&self.if_exists, &self.sep, Some(&mut guard.files))
+					to.update(&self.if_exists, &self.sep, Some(sim))
 				} else {
 					Some(to)
 				}

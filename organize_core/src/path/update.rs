@@ -3,9 +3,11 @@ use crate::data::config::actions::io_action::{ConflictOption, Sep};
 
 use std::collections::HashSet;
 use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
+use crate::simulation::Simulation;
 
 pub trait Update {
-	fn update(self, if_exists: &ConflictOption, sep: &Sep, files: Option<&mut HashSet<PathBuf>>) -> Option<PathBuf>;
+	fn update(self, if_exists: &ConflictOption, sep: &Sep, simulation: Option<&Arc<Mutex<Simulation>>>) -> Option<PathBuf>;
 }
 
 impl<T: Into<PathBuf>> Update for T {
@@ -17,7 +19,7 @@ impl<T: Into<PathBuf>> Update for T {
 	/// * `is_watching`: whether this function is being run from a watcher or not
 	/// # Return
 	/// This function will return `Some(new_path)` if `if_exists` is not set to skip, otherwise it returns `None`
-	fn update(self, if_exists: &ConflictOption, sep: &Sep, files: Option<&mut HashSet<PathBuf>>) -> Option<PathBuf> {
+	fn update(self, if_exists: &ConflictOption, sep: &Sep, simulation: Option<&Arc<Mutex<Simulation>>>) -> Option<PathBuf> {
 		use ConflictOption::*;
 		match if_exists {
 			Skip | Delete => None,
@@ -27,14 +29,16 @@ impl<T: Into<PathBuf>> Update for T {
 				let extension = path.extension().unwrap_or_default().to_string_lossy().to_string();
 				let stem = path.file_stem()?.to_string_lossy().to_string();
 				let mut n = 1;
-				match files {
+				match simulation {
 					None => {
 						while path.exists() {
 							path.set_file_name(format!("{}{}({:?}).{}", stem, sep.as_str(), n, extension));
 							n += 1;
 						}
 					}
-					Some(files) => {
+					Some(simulation) => {
+                        let guard = simulation.lock().unwrap();
+						let files = &guard.files;
 						while files.contains(&path) {
 							path.set_file_name(format!("{}{}({:?}).{}", stem, sep.as_str(), n, extension));
 							n += 1;
