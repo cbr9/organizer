@@ -1,10 +1,11 @@
 use crate::data::config::actions::io_action::{ConflictOption, Sep};
 
+
 use std::collections::HashSet;
 use std::path::PathBuf;
 
 pub trait Update {
-	fn update(self, if_exists: &ConflictOption, sep: &Sep, files: Option<&HashSet<PathBuf>>) -> Option<PathBuf>;
+	fn update(self, if_exists: &ConflictOption, sep: &Sep, files: Option<&mut HashSet<PathBuf>>) -> Option<PathBuf>;
 }
 
 impl<T: Into<PathBuf>> Update for T {
@@ -16,11 +17,12 @@ impl<T: Into<PathBuf>> Update for T {
 	/// * `is_watching`: whether this function is being run from a watcher or not
 	/// # Return
 	/// This function will return `Some(new_path)` if `if_exists` is not set to skip, otherwise it returns `None`
-	fn update(self, if_exists: &ConflictOption, sep: &Sep, files: Option<&HashSet<PathBuf>>) -> Option<PathBuf> {
+	fn update(self, if_exists: &ConflictOption, sep: &Sep, files: Option<&mut HashSet<PathBuf>>) -> Option<PathBuf> {
+		use ConflictOption::*;
 		match if_exists {
-			ConflictOption::Skip => None,
-			ConflictOption::Overwrite => Some(self.into()),
-			ConflictOption::Rename => {
+			Skip | Delete => None,
+			Overwrite => Some(self.into()),
+			Rename => {
 				let mut path = self.into();
 				let extension = path.extension().unwrap_or_default().to_string_lossy().to_string();
 				let stem = path.file_stem()?.to_string_lossy().to_string();
@@ -40,7 +42,7 @@ impl<T: Into<PathBuf>> Update for T {
 					}
 				}
 				Some(path)
-			}
+			},
 		}
 	}
 }

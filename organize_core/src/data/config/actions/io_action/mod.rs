@@ -17,6 +17,7 @@ use crate::{
 	string::Placeholder,
 };
 use std::sync::{Arc, Mutex};
+use log::warn;
 
 mod de;
 
@@ -48,8 +49,16 @@ macro_rules! as_action {
 			fn act<T: Into<PathBuf>>(&self, path: T) -> Option<PathBuf> {
 				let path = path.into();
 				let ty = self.ty();
-				let to = self.0.prepare_path(&path, &ty, None)?;
-				act(ty, path, to)
+				let to = self.0.prepare_path(&path, &ty, None);
+				if to.is_none() {
+					if self.0.if_exists == ConflictOption::Delete {
+						std::fs::remove_file(&path).map_err(|e| {
+							warn!("could not delete {} ({})", path.display(), e)
+						}).ok()?;
+					}
+					return None
+				}
+				act(ty, path, to.unwrap())
 			}
 			fn ty(&self) -> ActionType {
 				let name = stringify!($id).to_lowercase();
@@ -58,11 +67,18 @@ macro_rules! as_action {
 			fn simulate<T: Into<PathBuf>>(&self, path: T, simulation: &Arc<Mutex<Simulation>>) -> Option<PathBuf> {
 				let path = path.into();
 				let ty = self.ty();
-				let to = self.0.prepare_path(&path, &ty, Some(simulation))?;
-				simulate(ty, path, to, simulation)
+				let to = self.0.prepare_path(&path, &ty, Some(simulation));
+				if to.is_none() {
+					if self.0.if_exists == ConflictOption::Delete {
+						let mut guard = simulation.lock().unwrap();
+						guard.files.remove(&path);
+					}
+					return None
+				}
+				simulate(ty, path, to.unwrap(), simulation)
 			}
 		}
-	};
+	}
 }
 
 as_action!(Move);
@@ -153,9 +169,9 @@ impl Inner {
 				}
 			}
 			Some(sim) => {
-				let ptr = sim.lock().unwrap();
-				if ptr.files.contains(&to) {
-					to.update(&self.if_exists, &self.sep, Some(&ptr.files))
+				let mut guard = sim.lock().unwrap();
+				if guard.files.contains(&to) {
+					to.update(&self.if_exists, &self.sep, Some(&mut guard.files))
 				} else {
 					Some(to)
 				}
@@ -212,6 +228,7 @@ pub enum ConflictOption {
 	Overwrite,
 	Skip,
 	Rename,
+	Delete
 }
 
 impl Default for ConflictOption {
