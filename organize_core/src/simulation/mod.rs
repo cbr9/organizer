@@ -2,7 +2,7 @@ use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
 use crate::utils::UnwrapMut;
-use notify::{DebouncedEvent, Error, RecommendedWatcher, RecursiveMode, Watcher};
+use notify::{DebouncedEvent, Error, RecommendedWatcher, RecursiveMode, Watcher, RawEvent, Op};
 use std::sync::mpsc::channel;
 use std::sync::{Arc, Mutex};
 
@@ -71,43 +71,32 @@ impl Simulation {
 	}
 
 	fn sync(mut self) -> anyhow::Result<Arc<Mutex<Self>>> {
-		use DebouncedEvent::*;
 
 		let (sender, receiver) = channel();
-		self.watcher = Some(notify::watcher(sender, Duration::from_secs(0))?);
+		self.watcher = Some(notify::raw_watcher(sender)?);
 		let ptr = Arc::new(Mutex::new(self));
 		let sim = Arc::clone(&ptr);
 
-		std::thread::spawn(move || {
-			while let Ok(event) = receiver.recv() {
-				// when the object drops, INotifyWatcher::drop() will be called and this thread will terminate
-				match event {
-					Remove(path) => {
-						if path.is_file() {
-							let mut guard = sim.try_lock().unwrap();
-							guard.remove_file(path);
-						}
+		std::thread::spawn(move || loop {
+            match receiver.try_recv() {
+				Ok(RawEvent { path: Some(path), op: Ok(op), .. }) => {
+					match op {
+						Op::REMOVE => {
+							let mut guard = sim.lock().unwrap();
+							if guard.files.contains(&path) {
+								guard.remove_file(path);
+							}
+						},
+						Op::CREATE => {
+                            if path.is_file() {
+								let mut guard = sim.lock().unwrap();
+								guard.insert_file(path);
+							}
+						},
+						_ => continue
 					}
-					Create(path) => {
-						if path.is_file() {
-							let mut guard = sim.try_lock().unwrap();
-							guard.insert_file(path);
-						}
-					}
-					Rename(from, to) => {
-						let mut guard = sim.try_lock().unwrap();
-						if guard.folders.contains(&from) && to.is_dir() {
-							guard.unwatch_folder(&from).unwrap();
-							guard.watch_folder(&to).unwrap();
-							continue;
-						}
-						if guard.files.contains(&from) && to.is_file() {
-							guard.remove_file(from);
-							guard.insert_file(to);
-						}
-					}
-					_ => {}
-				};
+				},
+				_ => continue
 			}
 		});
 		Ok(ptr)
