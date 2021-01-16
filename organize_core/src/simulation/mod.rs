@@ -2,11 +2,9 @@ use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
 use crate::utils::UnwrapMut;
-use notify::{DebouncedEvent, Error, RecommendedWatcher, RecursiveMode, Watcher, RawEvent, Op};
+use notify::{Error, RecommendedWatcher, RecursiveMode, Watcher, RawEvent, Op};
 use std::sync::mpsc::channel;
 use std::sync::{Arc, Mutex};
-
-use std::time::Duration;
 
 pub struct Simulation {
 	pub files: HashSet<PathBuf>,
@@ -28,11 +26,13 @@ impl Simulation {
 	pub fn watch_folder<T: Into<PathBuf>>(&mut self, folder: T) -> anyhow::Result<()> {
 		debug_assert!(self.watcher.is_some());
 		let path = folder.into();
-		self.watcher.unwrap_mut().watch(&path, RecursiveMode::NonRecursive)?;
-		self.watcher.unwrap_mut().watch(path.parent().unwrap(), RecursiveMode::NonRecursive)?;
-		let files = path.read_dir()?.filter_map(|file| Some(file.ok()?.path()));
-		self.files.extend(files);
-		self.folders.insert(path);
+        if !self.folders.contains(&path) {
+			self.watcher.unwrap_mut().watch(&path, RecursiveMode::NonRecursive)?;
+			// self.watcher.unwrap_mut().watch(path.parent().unwrap(), RecursiveMode::NonRecursive)?;
+			let files = path.read_dir()?.filter_map(|file| Some(file.ok()?.path()));
+			self.files.extend(files);
+			self.folders.insert(path);
+		}
 		Ok(())
 	}
 
@@ -100,5 +100,41 @@ impl Simulation {
 			}
 		});
 		Ok(ptr)
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+	use crate::utils::AndWait;
+	use std::time::Duration;
+
+	#[test]
+	fn simulate() {
+		let simulation = Simulation::new().unwrap();
+		{
+			let mut guard = simulation.lock().unwrap();
+			guard.watch_folder("/home/cabero").unwrap();
+		}
+		let file = PathBuf::from("/home/cabero/simulate_test.pdf");
+		// this file must be unique across all tests
+		// otherwise if it's created or removed by a different test the thread will pick it up and this test will fail
+		std::fs::File::create_and_wait(&file).unwrap();
+		std::thread::sleep(Duration::from_millis(100));
+		// in most cases the parallel thread should process it before the guard in this thread is created
+		// but not in all cases
+		{
+			let guard = simulation.lock().unwrap();
+			assert!(guard.files.contains(&file));
+		}
+		std::fs::File::remove_and_wait(&file).unwrap();
+		std::thread::sleep(Duration::from_millis(100));
+		// in most cases the parallel thread should process it before the guard in this thread is created
+		// but not in all cases
+		{
+			let guard = simulation.lock().unwrap();
+			assert!(!guard.files.contains(&file));
+		}
+
 	}
 }
