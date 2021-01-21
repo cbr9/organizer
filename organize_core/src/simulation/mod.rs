@@ -2,7 +2,7 @@ use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
 use crate::utils::UnwrapMut;
-use notify::{Error, RecommendedWatcher, RecursiveMode, Watcher, RawEvent, Op};
+use notify::{Error, Op, RawEvent, RecommendedWatcher, RecursiveMode, Watcher};
 use std::sync::mpsc::channel;
 use std::sync::{Arc, Mutex};
 
@@ -26,9 +26,8 @@ impl Simulation {
 	pub fn watch_folder<T: Into<PathBuf>>(&mut self, folder: T) -> anyhow::Result<()> {
 		debug_assert!(self.watcher.is_some());
 		let path = folder.into();
-        if !self.folders.contains(&path) {
+		if !self.folders.contains(&path) {
 			self.watcher.unwrap_mut().watch(&path, RecursiveMode::NonRecursive)?;
-			// self.watcher.unwrap_mut().watch(path.parent().unwrap(), RecursiveMode::NonRecursive)?;
 			let files = path.read_dir()?.filter_map(|file| Some(file.ok()?.path()));
 			self.files.extend(files);
 			self.folders.insert(path);
@@ -37,28 +36,24 @@ impl Simulation {
 	}
 
 	pub fn unwatch_folder<T: AsRef<Path>>(&mut self, folder: T) -> Result<(), notify::Error> {
+		debug_assert!(self.watcher.is_some());
 		let folder = folder.as_ref();
-		match self.watcher {
-			None => {}
-			Some(ref mut watcher) => {
-				match watcher.unwatch(folder) {
-					Ok(_) => {}
-					Err(e) => match &e {
-						Error::Generic(_) | Error::Io(_) => return Err(e),
-						Error::PathNotFound | Error::WatchNotFound => {}
-					},
-				}
-				let folders = &self.folders;
-				self.files.retain(|file| {
-					if let Some(parent) = file.parent() {
-						!folders.contains(parent)
-					} else {
-						false
-					}
-				});
-				self.folders.remove(folder);
-			}
+		match self.watcher.unwrap_mut().unwatch(folder) {
+			Ok(_) => {}
+			Err(e) => match &e {
+				Error::Generic(_) | Error::Io(_) => return Err(e),
+				Error::PathNotFound | Error::WatchNotFound => {}
+			},
 		}
+		let folders = &self.folders;
+		self.files.retain(|file| {
+			if let Some(parent) = file.parent() {
+				!folders.contains(parent)
+			} else {
+				false
+			}
+		});
+		self.folders.remove(folder);
 		Ok(())
 	}
 
@@ -71,32 +66,33 @@ impl Simulation {
 	}
 
 	fn sync(mut self) -> anyhow::Result<Arc<Mutex<Self>>> {
-
 		let (sender, receiver) = channel();
 		self.watcher = Some(notify::raw_watcher(sender)?);
 		let ptr = Arc::new(Mutex::new(self));
 		let sim = Arc::clone(&ptr);
 
 		std::thread::spawn(move || loop {
-            match receiver.try_recv() {
-				Ok(RawEvent { path: Some(path), op: Ok(op), .. }) => {
-					match op {
-						Op::REMOVE => {
-							let mut guard = sim.lock().unwrap();
-							if guard.files.contains(&path) {
-								guard.remove_file(path);
-							}
-						},
-						Op::CREATE => {
-                            if path.is_file() {
-								let mut guard = sim.lock().unwrap();
-								guard.insert_file(path);
-							}
-						},
-						_ => continue
+			match receiver.try_recv() {
+				Ok(RawEvent {
+					path: Some(path),
+					op: Ok(op),
+					..
+				}) => match op {
+					Op::REMOVE => {
+						let mut guard = sim.lock().unwrap();
+						if guard.files.contains(&path) {
+							guard.remove_file(path);
+						}
 					}
+					Op::CREATE => {
+						if path.is_file() {
+							let mut guard = sim.lock().unwrap();
+							guard.insert_file(path);
+						}
+					}
+					_ => continue,
 				},
-				_ => continue
+				_ => continue,
 			}
 		});
 		Ok(ptr)
@@ -135,6 +131,5 @@ mod tests {
 			let guard = simulation.lock().unwrap();
 			assert!(!guard.files.contains(&file));
 		}
-
 	}
 }
