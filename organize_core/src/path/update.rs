@@ -1,7 +1,6 @@
 use crate::data::config::actions::io_action::{ConflictOption, Sep};
 
 
-use std::collections::HashSet;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use crate::simulation::Simulation;

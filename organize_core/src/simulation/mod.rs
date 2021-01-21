@@ -102,7 +102,7 @@ impl Simulation {
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use crate::utils::AndWait;
+	use crate::utils::tests::AndWait;
 	use std::time::Duration;
 
 	#[test]

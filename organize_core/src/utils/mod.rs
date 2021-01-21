@@ -1,7 +1,14 @@
+
 #[cfg(test)]
 pub mod tests {
+	use std::path::Path;
 	use crate::PROJECT_NAME;
 	use std::{env, path::PathBuf};
+    use anyhow::Result;
+	use std::fs::File;
+	use std::sync::mpsc::{channel, Receiver};
+	use notify::{Watcher, RecursiveMode, Op, RawEvent};
+	use std::time::Duration;
 
 	pub fn project() -> PathBuf {
 		let mut path = env::current_dir().unwrap();
@@ -9,6 +16,61 @@ pub mod tests {
 			path = path.parent().unwrap().to_path_buf();
 		}
 		path
+	}
+
+
+	pub trait AndWait {
+		fn create_and_wait<T: AsRef<Path>>(path: T) -> Result<File>;
+		fn remove_and_wait<T: AsRef<Path>>(path: T) -> Result<()>;
+		fn wait_for<T: AsRef<Path>>(path: T, event: Op, receiver: Receiver<RawEvent>) -> Result<()>;
+	}
+
+	impl AndWait for std::fs::File {
+		fn create_and_wait<T: AsRef<Path>>(path: T) -> Result<File> {
+			let (sender, receiver) = channel();
+			let mut watcher = notify::raw_watcher(sender)?;
+			watcher.watch(path.as_ref().parent().unwrap(), RecursiveMode::NonRecursive)?;
+    		let file = Self::create(&path)?;
+			Self::wait_for(path, Op::CREATE, receiver)?;
+			Ok(file)
+		}
+
+		fn remove_and_wait<T: AsRef<Path>>(path: T) -> Result<()> {
+			let (sender, receiver) = channel();
+			let mut watcher = notify::raw_watcher(sender)?;
+			watcher.watch(path.as_ref().parent().unwrap(), RecursiveMode::NonRecursive)?;
+			std::fs::remove_file(&path)?;
+			Self::wait_for(path, Op::REMOVE, receiver)
+		}
+
+		fn wait_for<T: AsRef<Path>>(path: T, event: Op, receiver: Receiver<RawEvent>) -> Result<()> {
+			let loop_ = || {
+				loop {
+					if let Ok(RawEvent { path: Some(new_path), op: Ok(op), .. }) = receiver.recv_timeout(Duration::from_secs(2)) {
+						if path.as_ref() == new_path && op == event {
+							break
+						}
+					}
+				}
+			};
+
+			match event {
+				Op::CREATE => {
+					if !path.as_ref().exists() {
+						loop_()
+					}
+					Ok(())
+				},
+				Op::REMOVE => {
+					if path.as_ref().exists() {
+						loop_()
+					}
+					Ok(())
+
+				},
+				_ => unimplemented!()
+			}
+		}
 	}
 }
 
