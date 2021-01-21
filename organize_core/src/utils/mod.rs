@@ -5,10 +5,22 @@ pub mod tests {
 	use crate::PROJECT_NAME;
 	use std::{env, path::PathBuf};
     use anyhow::Result;
-	use std::fs::File;
+	use std::fs::{File, create_dir_all};
 	use std::sync::mpsc::{channel, Receiver};
 	use notify::{Watcher, RecursiveMode, Op, RawEvent};
 	use std::time::Duration;
+	use lazy_static::lazy_static;
+	use std::env::temp_dir;
+
+	lazy_static! {
+	    pub static ref TEST_FILES_DIRECTORY: PathBuf = {
+	    	let dir = temp_dir().join("organize_test");
+	    	if !dir.exists() {
+	    		create_dir_all(&dir).unwrap();
+	    	}
+	    	dir
+	    };
+	}
 
 	pub fn project() -> PathBuf {
 		let mut path = env::current_dir().unwrap();
