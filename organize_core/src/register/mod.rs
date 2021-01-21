@@ -47,12 +47,12 @@ impl Register {
 			// will be created later
 			return Ok(Register { path, ..Register::default() });
 		}
-		let content = std::fs::read_to_string(&path).context("could not read register")?;
+		let content = std::fs::read(&path).context("could not read register")?;
 		if content.is_empty() {
 			return Ok(Register { path, ..Register::default() });
 		}
 
-		let register = match bincode::deserialize::<Self>(content.as_bytes()) {
+		let register = match bincode::deserialize::<Self>(content.as_slice()) {
 			Ok(mut register) => {
 				register.path = path;
 				Ok(register)
