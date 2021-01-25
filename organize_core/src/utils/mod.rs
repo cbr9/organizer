@@ -1,25 +1,31 @@
-
 #[cfg(test)]
 pub mod tests {
-	use std::path::Path;
 	use crate::PROJECT_NAME;
-	use std::{env, path::PathBuf};
-    use anyhow::Result;
-	use std::fs::{File, create_dir_all};
-	use std::sync::mpsc::{channel, Receiver};
-	use notify::{Watcher, RecursiveMode, Op, RawEvent};
-	use std::time::Duration;
+	use anyhow::Result;
 	use lazy_static::lazy_static;
+	use notify::{Op, RawEvent, RecursiveMode, Watcher};
 	use std::env::temp_dir;
+	use std::fs::{create_dir_all, File};
+	use std::path::Path;
+	use std::sync::mpsc::{channel, Receiver};
+	use std::time::Duration;
+	use std::{env, path::PathBuf};
 
 	lazy_static! {
-	    pub static ref TEST_FILES_DIRECTORY: PathBuf = {
-	    	let dir = temp_dir().join("organize_test");
-	    	if !dir.exists() {
-	    		create_dir_all(&dir).unwrap();
-	    	}
-	    	dir
-	    };
+		pub static ref TEST_FILES_DIRECTORY: PathBuf = {
+			let dir = temp_dir().join("organize_test");
+			if !dir.exists() {
+				create_dir_all(&dir).unwrap();
+			}
+			dir
+		};
+		pub static ref TEST_FILES_SUBDIRECTORY: PathBuf = {
+			let dir = temp_dir().join("organize_test").join("subdir");
+			if !dir.exists() {
+				create_dir_all(&dir).unwrap();
+			}
+			dir
+		};
 	}
 
 	pub fn project() -> PathBuf {
@@ -29,7 +35,6 @@ pub mod tests {
 		}
 		path
 	}
-
 
 	pub trait AndWait {
 		fn create_and_wait<T: AsRef<Path>>(path: T) -> Result<File>;
@@ -42,7 +47,7 @@ pub mod tests {
 			let (sender, receiver) = channel();
 			let mut watcher = notify::raw_watcher(sender)?;
 			watcher.watch(path.as_ref().parent().unwrap(), RecursiveMode::NonRecursive)?;
-    		let file = Self::create(&path)?;
+			let file = Self::create(&path)?;
 			Self::wait_for(path, Op::CREATE, receiver)?;
 			Ok(file)
 		}
@@ -56,12 +61,15 @@ pub mod tests {
 		}
 
 		fn wait_for<T: AsRef<Path>>(path: T, event: Op, receiver: Receiver<RawEvent>) -> Result<()> {
-			let loop_ = || {
-				loop {
-					if let Ok(RawEvent { path: Some(new_path), op: Ok(op), .. }) = receiver.recv_timeout(Duration::from_secs(2)) {
-						if path.as_ref() == new_path && op == event {
-							break
-						}
+			let loop_ = || loop {
+				if let Ok(RawEvent {
+					path: Some(new_path),
+					op: Ok(op),
+					..
+				}) = receiver.recv_timeout(Duration::from_secs(2))
+				{
+					if path.as_ref() == new_path && op == event {
+						break;
 					}
 				}
 			};
@@ -71,17 +79,15 @@ pub mod tests {
 					if !path.as_ref().exists() {
 						loop_()
 					}
-					Ok(())
-				},
+				}
 				Op::REMOVE => {
 					if path.as_ref().exists() {
 						loop_()
 					}
-					Ok(())
-
-				},
-				_ => unimplemented!()
+				}
+				_ => unimplemented!(),
 			}
+			Ok(())
 		}
 	}
 }
