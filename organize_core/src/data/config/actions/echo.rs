@@ -1,17 +1,17 @@
 use std::ops::Deref;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
-use colored::Colorize;
-use log::info;
+use log::{error, info};
 use serde::Deserialize;
 
+use crate::data::config::actions::{Act, Simulate};
 use crate::simulation::Simulation;
 use crate::{
 	data::config::actions::{ActionType, AsAction},
 	string::{deserialize_placeholder_string, Placeholder},
 };
-
-use std::sync::{Arc, Mutex};
+use anyhow::{Context, Result};
+use std::sync::{Arc, Mutex, MutexGuard};
 
 #[derive(Debug, Clone, Deserialize, Default, Eq, PartialEq)]
 pub struct Echo(#[serde(deserialize_with = "deserialize_placeholder_string")] String);
@@ -24,23 +24,65 @@ impl Deref for Echo {
 	}
 }
 
+impl Act for Echo {
+	fn act<T, P>(&self, from: T, _to: Option<P>) -> Result<Option<PathBuf>>
+	where
+		T: AsRef<Path> + Into<PathBuf>,
+		P: AsRef<Path> + Into<PathBuf>,
+	{
+		match self
+			.as_str()
+			.expand_placeholders(&from)
+			.with_context(|| format!("could not expand placeholders ({})", self.as_str()))
+		{
+			Ok(str) => {
+				info!("({}) {}", self.ty().to_string(), str);
+				Ok(Some(from.into()))
+			}
+			Err(e) => {
+				error!("{:?}", e);
+				Ok(None)
+			}
+		}
+	}
+}
+
+impl Simulate for Echo {
+	fn simulate<T, U>(&self, from: T, _to: Option<U>, _guard: MutexGuard<Simulation>) -> Result<Option<PathBuf>>
+	where
+		Self: Sized,
+		T: AsRef<Path> + Into<PathBuf>,
+		U: AsRef<Path> + Into<PathBuf>,
+	{
+		match self
+			.as_str()
+			.expand_placeholders(&from)
+			.with_context(|| format!("could not expand placeholders ({})", self.as_str()))
+		{
+			Ok(str) => {
+				info!("(simulate {}) {}", self.ty().to_string(), str);
+				Ok(Some(from.into()))
+			}
+			Err(e) => {
+				error!("{:?}", e);
+				Ok(None)
+			}
+		}
+	}
+}
+
 impl AsAction for Echo {
-	fn act<T: Into<PathBuf>>(&self, path: T) -> Option<PathBuf> {
+	fn process<T: Into<PathBuf> + AsRef<Path>>(&self, path: T, simulation: Option<&Arc<Mutex<Simulation>>>) -> Option<PathBuf> {
 		let path = path.into();
-		info!("({}) {}", self.ty().to_string().bold(), self.as_str().expand_placeholders(&path).ok()?);
-		Some(path)
+		let to: Option<T> = None;
+		match simulation {
+			None => self.act(path, to).unwrap(),
+			Some(simulation) => {
+				let guard = simulation.lock().unwrap();
+				self.simulate(path, to, guard).unwrap()
+			}
+		}
 	}
-
-	fn simulate<T: Into<PathBuf>>(&self, path: T, _simulation: &Arc<Mutex<Simulation>>) -> Option<PathBuf> {
-		let path = path.into();
-		info!(
-			"(simulate {}) {}",
-			self.ty().to_string().bold(),
-			self.as_str().expand_placeholders(&path).ok()?
-		);
-		Some(path)
-	}
-
 	fn ty(&self) -> ActionType {
 		ActionType::Echo
 	}

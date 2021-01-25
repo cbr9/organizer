@@ -11,13 +11,14 @@ use colored::Colorize;
 use log::info;
 use serde::{de::Error, Deserialize, Deserializer};
 
-use crate::data::config::actions::ActionType;
+use crate::data::config::actions::{Act, ActionType, Simulate};
 use crate::simulation::Simulation;
 use crate::{
 	data::config::{actions::AsAction, filters::AsFilter, Config},
 	string::{deserialize_placeholder_string, Placeholder},
 };
-use std::sync::{Arc, Mutex};
+use anyhow::Result;
+use std::sync::{Arc, Mutex, MutexGuard};
 
 #[derive(Deserialize, Debug, Clone, Default, Eq, PartialEq)]
 pub struct Script {
@@ -27,8 +28,29 @@ pub struct Script {
 	content: String,
 }
 
+impl Act for Script {
+	fn act<T, P>(&self, _from: T, _to: Option<P>) -> Result<Option<PathBuf>>
+	where
+		Self: Sized,
+		T: AsRef<Path> + Into<PathBuf>,
+		P: AsRef<Path> + Into<PathBuf>,
+	{
+		unimplemented!()
+	}
+}
+impl Simulate for Script {
+	fn simulate<T, P>(&self, _from: T, _to: Option<P>, _simulation: MutexGuard<Simulation>) -> Result<Option<PathBuf>>
+	where
+		Self: Sized,
+		T: AsRef<Path> + Into<PathBuf>,
+		P: AsRef<Path> + Into<PathBuf>,
+	{
+		unimplemented!()
+	}
+}
+
 impl AsAction for Script {
-	fn act<T: Into<PathBuf>>(&self, path: T) -> Option<PathBuf> {
+	fn process<T: Into<PathBuf>>(&self, path: T, _simulation: Option<&Arc<Mutex<Simulation>>>) -> Option<PathBuf> {
 		let path = path.into();
 		self.run(&path)
 			.map(|output| {
@@ -37,12 +59,6 @@ impl AsAction for Script {
 				output.lines().last().map(|last| PathBuf::from(&last.trim()))
 			})
 			.ok()?
-	}
-
-	fn simulate<T: Into<PathBuf>>(&self, _path: T, _simulation: &Arc<Mutex<Simulation>>) -> Option<PathBuf> {
-		// info!("(simulate {}) run script on {}", self.exec.bold(), path.display());
-		// None
-		unimplemented!()
 	}
 
 	fn ty(&self) -> ActionType {

@@ -16,7 +16,7 @@ use crate::{
 		},
 		options::Options,
 	},
-	path::Update,
+	path::ResolveConflict,
 	utils::DefaultOpt,
 	PROJECT_NAME,
 };
@@ -64,7 +64,7 @@ impl Config {
 
 	pub fn create<T: AsRef<Path>>(path: T) -> anyhow::Result<()> {
 		let path = if path.as_ref().exists() {
-			path.as_ref().update(&ConflictOption::default(), None).unwrap()
+			path.as_ref().resolve_naming_conflict(&ConflictOption::default(), None).unwrap()
 		} else {
 			path.as_ref().into()
 		};

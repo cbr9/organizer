@@ -1,5 +1,5 @@
 use std::ops::Deref;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use serde::Deserialize;
 
@@ -10,18 +10,19 @@ use crate::data::{
 		echo::Echo,
 		io_action::{Copy, Move, Rename},
 		script::Script,
-		trash::Trash,
 	},
 	options::apply::Apply,
 };
 use crate::simulation::Simulation;
-use std::sync::{Arc, Mutex};
+
+use crate::data::config::actions::delete::Trash;
+use anyhow::Result;
+use std::sync::{Arc, Mutex, MutexGuard};
 
 pub(crate) mod delete;
 pub(crate) mod echo;
 pub(crate) mod io_action;
 pub(crate) mod script;
-pub(crate) mod trash;
 
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
 #[serde(rename_all(deserialize = "lowercase"))]
@@ -37,54 +38,102 @@ pub enum Action {
 	Script(Script),
 }
 
-impl AsAction for Action {
-	fn act<T: Into<PathBuf>>(&self, path: T) -> Option<PathBuf> {
+impl Act for Action {
+	fn act<T, U>(&self, from: T, to: Option<U>) -> Result<Option<PathBuf>>
+	where
+		Self: Sized,
+		T: AsRef<Path> + Into<PathBuf>,
+		U: AsRef<Path> + Into<PathBuf>,
+	{
+		use Action::*;
 		match self {
-			Action::Copy(copy) => copy.act(path),     // IOAction has three different implementations of AsAction
-			Action::Move(r#move) => r#move.act(path), // so they must be called with turbo-fish syntax
-			Action::Rename(rename) => rename.act(path),
-			Action::Hardlink(hardlink) => hardlink.act(path),
-			Action::Symlink(symlink) => symlink.act(path),
-			Action::Delete(delete) => delete.act(path),
-			Action::Echo(echo) => echo.act(path),
-			Action::Trash(trash) => trash.act(path),
-			Action::Script(script) => script.act(path),
+			Copy(copy) => copy.act(from, to),     // IOAction has three different implementations of AsAction
+			Move(r#move) => r#move.act(from, to), // so they must be called with turbo-fish syntax
+			Rename(rename) => rename.act(from, to),
+			Hardlink(hardlink) => hardlink.act(from, to),
+			Symlink(symlink) => symlink.act(from, to),
+			Delete(delete) => delete.act(from, to),
+			Echo(echo) => echo.act(from, to),
+			Trash(trash) => trash.act(from, to),
+			Script(script) => script.act(from, to),
 		}
 	}
-
-	fn simulate<T: Into<PathBuf>>(&self, path: T, simulation: &Arc<Mutex<Simulation>>) -> Option<PathBuf> {
+}
+impl Simulate for Action {
+	fn simulate<T, U>(&self, from: T, to: Option<U>, guard: MutexGuard<Simulation>) -> Result<Option<PathBuf>>
+	where
+		Self: Sized,
+		T: AsRef<Path> + Into<PathBuf>,
+		U: AsRef<Path> + Into<PathBuf>,
+	{
+		use Action::*;
 		match self {
-			Action::Move(r#move) => r#move.simulate(path, simulation),
-			Action::Copy(copy) => copy.simulate(path, simulation),
-			Action::Rename(rename) => rename.simulate(path, simulation),
-			Action::Hardlink(hardlink) => hardlink.simulate(path, simulation),
-			Action::Symlink(symlink) => symlink.simulate(path, simulation),
-			Action::Delete(delete) => delete.simulate(path, simulation),
-			Action::Echo(echo) => echo.simulate(path, simulation),
-			Action::Trash(trash) => trash.simulate(path, simulation),
-			Action::Script(script) => script.simulate(path, simulation),
-		}
-	}
-
-	fn ty(&self) -> ActionType {
-		match self {
-			Action::Copy(copy) => copy.ty(),
-			Action::Move(r#move) => r#move.ty(),
-			Action::Rename(rename) => rename.ty(),
-			Action::Hardlink(hardlink) => hardlink.ty(),
-			Action::Symlink(symlink) => symlink.ty(),
-			Action::Delete(delete) => delete.ty(),
-			Action::Echo(echo) => echo.ty(),
-			Action::Trash(trash) => trash.ty(),
-			Action::Script(script) => script.ty(),
+			Move(r#move) => r#move.simulate(from, to, guard),
+			Copy(copy) => copy.simulate(from, to, guard),
+			Rename(rename) => rename.simulate(from, to, guard),
+			Hardlink(hardlink) => hardlink.simulate(from, to, guard),
+			Symlink(symlink) => symlink.simulate(from, to, guard),
+			Delete(delete) => delete.simulate(from, to, guard),
+			Echo(echo) => echo.simulate(from, to, guard),
+			Trash(trash) => trash.simulate(from, to, guard),
+			Script(script) => script.simulate(from, to, guard),
 		}
 	}
 }
 
-pub(crate) trait AsAction {
-	fn act<T: Into<PathBuf>>(&self, path: T) -> Option<PathBuf>;
-	fn simulate<T: Into<PathBuf>>(&self, path: T, simulation: &Arc<Mutex<Simulation>>) -> Option<PathBuf>;
-	fn ty(&self) -> ActionType;
+impl AsAction for Action {
+	fn process<T: Into<PathBuf> + AsRef<Path>>(&self, path: T, simulation: Option<&Arc<Mutex<Simulation>>>) -> Option<PathBuf> {
+		use Action::*;
+		match self {
+			Move(r#move) => r#move.process(path, simulation),
+			Copy(copy) => copy.process(path, simulation),
+			Rename(rename) => rename.process(path, simulation),
+			Hardlink(hardlink) => hardlink.process(path, simulation),
+			Symlink(symlink) => symlink.process(path, simulation),
+			Delete(delete) => delete.process(path, simulation),
+			Echo(echo) => echo.process(path, simulation),
+			Trash(trash) => trash.process(path, simulation),
+			Script(script) => script.process(path, simulation),
+		}
+	}
+	fn ty(&self) -> ActionType {
+		use Action::*;
+		match self {
+			Copy(copy) => copy.ty(),
+			Move(r#move) => r#move.ty(),
+			Rename(rename) => rename.ty(),
+			Hardlink(hardlink) => hardlink.ty(),
+			Symlink(symlink) => symlink.ty(),
+			Delete(delete) => delete.ty(),
+			Echo(echo) => echo.ty(),
+			Trash(trash) => trash.ty(),
+			Script(script) => script.ty(),
+		}
+	}
+}
+
+pub(crate) trait AsAction: Act + Simulate {
+	fn process<T: Into<PathBuf> + AsRef<Path>>(&self, path: T, simulation: Option<&Arc<Mutex<Simulation>>>) -> Option<PathBuf>
+	where
+		Self: Sized;
+	fn ty(&self) -> ActionType
+	where
+		Self: Sized;
+}
+
+pub trait Simulate {
+	fn simulate<T, U>(&self, from: T, to: Option<U>, guard: MutexGuard<Simulation>) -> Result<Option<PathBuf>>
+	where
+		Self: Sized,
+		T: AsRef<Path> + Into<PathBuf>,
+		U: AsRef<Path> + Into<PathBuf>;
+}
+pub trait Act {
+	fn act<T, U>(&self, from: T, to: Option<U>) -> Result<Option<PathBuf>>
+	where
+		Self: Sized,
+		T: AsRef<Path> + Into<PathBuf>,
+		U: AsRef<Path> + Into<PathBuf>;
 }
 
 #[derive(Eq, PartialEq, ToString, EnumString)]
@@ -99,6 +148,22 @@ pub enum ActionType {
 	Symlink,
 	Script,
 	Trash,
+}
+
+impl From<&Action> for ActionType {
+	fn from(action: &Action) -> Self {
+		match action {
+			Action::Move(_) => Self::Move,
+			Action::Copy(_) => Self::Copy,
+			Action::Rename(_) => Self::Rename,
+			Action::Hardlink(_) => Self::Hardlink,
+			Action::Symlink(_) => Self::Symlink,
+			Action::Delete(_) => Self::Delete,
+			Action::Echo(_) => Self::Echo,
+			Action::Trash(_) => Self::Trash,
+			Action::Script(_) => Self::Script,
+		}
+	}
 }
 
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
@@ -118,7 +183,7 @@ impl Actions {
 			Apply::All => {
 				let mut path = path.into();
 				for action in self.iter() {
-					path = action.simulate(path, simulation)?;
+					path = action.process(path, Some(simulation))?;
 				}
 				Some(path)
 			}
@@ -126,7 +191,7 @@ impl Actions {
 				let mut path = path.into();
 				for i in indices {
 					let action = &self.0[*i];
-					path = action.simulate(path, simulation)?;
+					path = action.process(path, Some(simulation))?;
 				}
 				Some(path)
 			}
@@ -139,7 +204,7 @@ impl Actions {
 			Apply::All => {
 				let mut path = path.into();
 				for action in self.iter() {
-					path = action.act(path)?;
+					path = action.process(path, None)?;
 				}
 				Some(path)
 			}
@@ -147,7 +212,7 @@ impl Actions {
 				let mut path = path.into();
 				for i in indices {
 					let action = self.0.get(*i)?;
-					path = action.act(path)?;
+					path = action.process(path, None)?;
 				}
 				Some(path)
 			}

@@ -10,14 +10,20 @@ use std::{
 use log::{error, info};
 use serde::{Deserialize, Serialize};
 
+use crate::data::config::actions::{Act, Simulate};
 use crate::{
 	data::config::actions::{ActionType, AsAction},
-	path::{Expand, Update},
+	path::{Expand, ResolveConflict},
 	simulation::Simulation,
 	string::Placeholder,
+	utils::UnwrapRef,
 };
-use std::sync::{Arc, Mutex};
-use log::warn;
+use anyhow::Context;
+use anyhow::Result;
+
+use regex::Regex;
+use serde::de::{Error};
+use std::sync::{Arc, Mutex, MutexGuard};
 
 mod de;
 
@@ -45,39 +51,77 @@ pub struct Symlink(Inner);
 macro_rules! as_action {
 	($id:ty) => {
 		impl AsAction for $id {
-			fn act<T: Into<PathBuf>>(&self, path: T) -> Option<PathBuf> {
+			fn process<T: Into<PathBuf>>(&self, path: T, simulation: Option<&Arc<Mutex<Simulation>>>) -> Option<PathBuf> {
 				let path = path.into();
 				let ty = self.ty();
-				let to = self.0.prepare_path(&path, &ty, None);
+				let to = self.0.prepare_path(&path, &ty, simulation);
 				if to.is_none() {
 					if self.0.if_exists == ConflictOption::Delete {
-						std::fs::remove_file(&path).map_err(|e| {
-							warn!("could not delete {} ({})", path.display(), e)
-						}).ok()?;
+						match simulation {
+							None => {
+								if let Err(e) = std::fs::remove_file(&path).with_context(|| format!("could not delete {}", path.display())) {
+									error!("{:?}", e);
+								}
+							}
+							Some(simulation) => {
+								let mut guard = simulation.lock().unwrap();
+								guard.remove_file(&path);
+							}
+						}
 					}
-					return None
+					return None;
 				}
-				act(ty, path, to.unwrap())
+				if simulation.is_none() {
+					match to.unwrap_ref().parent() {
+						Some(parent) => {
+							if !parent.exists() {
+								if let Err(e) = std::fs::create_dir_all(parent)
+									.with_context(|| format!("could not create parent directory for {}", to.unwrap_ref().display()))
+								{
+									error!("{:?}", e);
+									return None;
+								}
+							}
+						}
+						None => {
+							error!("{} has an invalid parent", to.unwrap().display());
+							return None;
+						}
+					}
+				}
+				match simulation {
+					Some(simulation) => {
+						let mut guard = simulation.lock().unwrap();
+						guard.watch_folder(to.unwrap_ref().parent()?).map_err(|e| eprintln!("{}", e)).ok()?;
+						match self.simulate(&path, Some(to.unwrap_ref()), guard) {
+							Ok(new_path) => {
+								info!("(simulate {}) {} -> {}", ty.to_string(), path.display(), to.unwrap().display());
+								new_path
+							}
+							Err(e) => {
+								error!("{:?}", e);
+								None
+							}
+						}
+					}
+					None => match self.act(&path, Some(to.unwrap_ref())) {
+						Ok(new_path) => {
+							info!("({}) {} -> {}", ty.to_string(), path.display(), to.unwrap().display());
+							new_path
+						}
+						Err(e) => {
+							error!("{:?}", e);
+							None
+						}
+					},
+				}
 			}
 			fn ty(&self) -> ActionType {
 				let name = stringify!($id).to_lowercase();
 				ActionType::from_str(&name).expect(&format!("no variant associated with {}", name))
 			}
-			fn simulate<T: Into<PathBuf>>(&self, path: T, simulation: &Arc<Mutex<Simulation>>) -> Option<PathBuf> {
-				let path = path.into();
-				let ty = self.ty();
-				let to = self.0.prepare_path(&path, &ty, Some(simulation));
-				if to.is_none() {
-					if self.0.if_exists == ConflictOption::Delete {
-						let mut guard = simulation.lock().unwrap();
-						guard.files.remove(&path);
-					}
-					return None
-				}
-				simulate(ty, path, to.unwrap(), simulation)
-			}
 		}
-	}
+	};
 }
 
 as_action!(Move);
@@ -86,49 +130,141 @@ as_action!(Copy);
 as_action!(Hardlink);
 as_action!(Symlink);
 
-fn simulate(ty: ActionType, from: PathBuf, to: PathBuf, simulation: &Arc<Mutex<Simulation>>) -> Option<PathBuf> {
-	use ActionType::{Copy, Hardlink, Move, Rename, Symlink};
-	let mut ptr = simulation.lock().unwrap();
-	ptr.watch_folder(to.parent()?).map_err(|e| eprintln!("{}", e)).ok()?;
-	info!("(simulate {}) {} -> {}", ty.to_string(), from.display(), to.display());
-	match ty {
-		Copy | Hardlink | Symlink => {
-			ptr.insert_file(to);
-			Some(from)
-		}
-		Move | Rename => {
-			ptr.remove_file(from);
-			ptr.insert_file(to.clone());
-			Some(to)
-		}
-		_ => unreachable!(),
+impl Simulate for Move {
+	fn simulate<T, U>(&self, from: T, to: Option<U>, mut guard: MutexGuard<Simulation>) -> Result<Option<PathBuf>>
+	where
+		Self: Sized,
+		T: AsRef<Path> + Into<PathBuf>,
+		U: AsRef<Path> + Into<PathBuf>,
+	{
+		let to = to.unwrap().into();
+		guard.remove_file(from);
+		guard.insert_file(&to);
+		Ok(Some(to))
 	}
 }
 
-fn act(ty: ActionType, from: PathBuf, to: PathBuf) -> Option<PathBuf> {
-	use ActionType::{Copy, Hardlink, Move, Rename, Symlink};
-	if let Some(parent) = to.parent() {
-		if !parent.exists() {
-			std::fs::create_dir_all(parent).map_err(|e| error!("{}", e)).ok()?;
-		}
+impl Act for Move {
+	fn act<T, P>(&self, from: T, to: Option<P>) -> Result<Option<PathBuf>>
+	where
+		T: AsRef<Path> + Into<PathBuf>,
+		P: AsRef<Path> + Into<PathBuf>,
+	{
+		std::fs::rename(&from, to.unwrap_ref())
+			.with_context(|| format!("could not move ({} -> {})", from.as_ref().display(), to.unwrap_ref().as_ref().display()))
+			.map(|_| Some(to.unwrap().into()))
 	}
-	match ty {
-		Copy => std::fs::copy(&from, &to).map(|_| ()),
-		Move | Rename => std::fs::rename(&from, &to),
-		Hardlink => std::fs::hard_link(&from, &to),
-		Symlink => std::os::unix::fs::symlink(&from, &to),
-		_ => unreachable!(),
+}
+
+impl Simulate for Copy {
+	fn simulate<T, U>(&self, from: T, to: Option<U>, mut guard: MutexGuard<Simulation>) -> Result<Option<PathBuf>>
+	where
+		Self: Sized,
+		T: AsRef<Path> + Into<PathBuf>,
+		U: AsRef<Path> + Into<PathBuf>,
+	{
+		guard.insert_file(to.unwrap());
+		Ok(Some(from.into()))
 	}
-	.map(|_| {
-		info!("({}) {} -> {}", ty.to_string(), from.display(), to.display());
-		match ty {
-			Copy | Hardlink | Symlink => from,
-			Move | Rename => to,
-			_ => unreachable!(),
-		}
-	})
-	.map_err(|e| error!("{}", e))
-	.ok()
+}
+
+impl Act for Copy {
+	fn act<T, P>(&self, from: T, to: Option<P>) -> Result<Option<PathBuf>>
+	where
+		T: AsRef<Path> + Into<PathBuf>,
+		P: AsRef<Path> + Into<PathBuf>,
+	{
+		std::fs::copy(&from, to.unwrap_ref())
+			.with_context(|| format!("could not copy ({} -> {})", from.as_ref().display(), to.unwrap().as_ref().display()))
+			.map(|_| Some(from.into()))
+	}
+}
+
+impl Simulate for Rename {
+	fn simulate<T, U>(&self, from: T, to: Option<U>, mut guard: MutexGuard<Simulation>) -> Result<Option<PathBuf>>
+	where
+		Self: Sized,
+		T: AsRef<Path> + Into<PathBuf>,
+		U: AsRef<Path> + Into<PathBuf>,
+	{
+		let to = to.unwrap().into();
+		guard.remove_file(from);
+		guard.insert_file(&to);
+		Ok(Some(to))
+	}
+}
+
+impl Act for Rename {
+	fn act<T, P>(&self, from: T, to: Option<P>) -> Result<Option<PathBuf>>
+	where
+		T: AsRef<Path> + Into<PathBuf>,
+		P: AsRef<Path> + Into<PathBuf>,
+	{
+		std::fs::rename(&from, to.unwrap_ref())
+			.with_context(|| format!("could not rename ({} -> {})", from.as_ref().display(), to.unwrap_ref().as_ref().display()))
+			.map(|_| Some(to.unwrap().into()))
+	}
+}
+
+impl Simulate for Hardlink {
+	fn simulate<T, U>(&self, from: T, to: Option<U>, mut guard: MutexGuard<Simulation>) -> Result<Option<PathBuf>>
+	where
+		Self: Sized,
+		T: AsRef<Path> + Into<PathBuf>,
+		U: AsRef<Path> + Into<PathBuf>,
+	{
+		guard.insert_file(to.unwrap());
+		Ok(Some(from.into()))
+	}
+}
+
+impl Act for Hardlink {
+	fn act<T, P>(&self, from: T, to: Option<P>) -> Result<Option<PathBuf>>
+	where
+		T: AsRef<Path> + Into<PathBuf>,
+		P: AsRef<Path> + Into<PathBuf>,
+	{
+		std::fs::hard_link(&from, to.unwrap_ref())
+			.with_context(|| {
+				format!(
+					"could not create hardlink ({} -> {})",
+					from.as_ref().display(),
+					to.unwrap_ref().as_ref().display()
+				)
+			})
+			.map(|_| Some(from.into()))
+	}
+}
+
+impl Simulate for Symlink {
+	fn simulate<T, U>(&self, from: T, to: Option<U>, mut guard: MutexGuard<Simulation>) -> Result<Option<PathBuf>>
+	where
+		Self: Sized,
+		T: AsRef<Path> + Into<PathBuf>,
+		U: AsRef<Path> + Into<PathBuf>,
+	{
+		guard.insert_file(to.unwrap());
+		Ok(Some(from.into()))
+	}
+}
+
+#[cfg(any(target_os = "linux", target_os = "macos"))]
+impl Act for Symlink {
+	fn act<T, P>(&self, from: T, to: Option<P>) -> Result<Option<PathBuf>>
+	where
+		T: AsRef<Path> + Into<PathBuf>,
+		P: AsRef<Path> + Into<PathBuf>,
+	{
+		std::os::unix::fs::symlink(&from, to.unwrap_ref())
+			.with_context(|| {
+				format!(
+					"could not create symlink ({} -> {})",
+					from.as_ref().display(),
+					to.unwrap_ref().as_ref().display()
+				)
+			})
+			.map(|_| Some(from.into()))
+	}
 }
 
 impl Inner {
@@ -162,7 +298,7 @@ impl Inner {
 		match simulation {
 			None => {
 				if to.exists() {
-					to.update(&self.if_exists, None)
+					to.resolve_naming_conflict(&self.if_exists, None)
 				} else {
 					Some(to)
 				}
@@ -170,7 +306,7 @@ impl Inner {
 			Some(sim) => {
 				let guard = sim.lock().unwrap();
 				if guard.files.contains(&to) {
-					to.update(&self.if_exists, Some(sim))
+					to.resolve_naming_conflict(&self.if_exists, Some(guard))
 				} else {
 					Some(to)
 				}
@@ -250,7 +386,11 @@ impl Default for ConflictOption {
 mod tests {
 	use serde_test::{assert_de_tokens, Token};
 
-	use crate::{data::config::actions::ActionType, utils::tests::project};
+	use crate::{
+		data::config::actions::ActionType,
+		utils::tests::{project, AndWait, TEST_FILES_DIRECTORY, TEST_FILES_SUBDIRECTORY},
+	};
+	use anyhow::Result;
 
 	use super::*;
 
