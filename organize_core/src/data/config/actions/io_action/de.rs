@@ -7,7 +7,7 @@ use serde::{
 };
 
 use crate::{
-	data::config::actions::io_action::{ConflictOption, Inner, Sep},
+	data::config::actions::io_action::{ConflictOption, Inner},
 	path::Expand,
 	string::visit_placeholder_string,
 };
@@ -41,7 +41,6 @@ impl<'de> Deserialize<'de> for Inner {
 			{
 				let mut to: Option<PathBuf> = None;
 				let mut if_exists: Option<ConflictOption> = None;
-				let mut sep: Option<Sep> = None;
 				while let Some((key, value)) = map.next_entry::<String, String>()? {
 					match key.as_str() {
 						"to" => {
@@ -60,14 +59,12 @@ impl<'de> Deserialize<'de> for Inner {
 							};
 						}
 						"if_exists" => if_exists = Some(ConflictOption::from_str(&value).map_err(M::Error::custom)?),
-						"sep" => sep = Some(Sep(value)),
 						other => return Err(M::Error::unknown_field(other, &["to", "if_exists", "sep"])),
 					}
 				}
 				let action = Inner {
 					to: to.ok_or_else(|| M::Error::missing_field("to"))?,
 					if_exists: if_exists.unwrap_or_default(),
-					sep: sep.unwrap_or_default(),
 				};
 				Ok(action)
 			}

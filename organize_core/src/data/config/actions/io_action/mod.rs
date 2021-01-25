@@ -25,7 +25,6 @@ mod de;
 struct Inner {
 	pub to: PathBuf,
 	pub if_exists: ConflictOption,
-	pub sep: Sep,
 }
 
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
@@ -163,7 +162,7 @@ impl Inner {
 		match simulation {
 			None => {
 				if to.exists() {
-					to.update(&self.if_exists, &self.sep, None)
+					to.update(&self.if_exists, None)
 				} else {
 					Some(to)
 				}
@@ -171,7 +170,7 @@ impl Inner {
 			Some(sim) => {
 				let guard = sim.lock().unwrap();
 				if guard.files.contains(&to) {
-					to.update(&self.if_exists, &self.sep, Some(sim))
+					to.update(&self.if_exists, Some(sim))
 				} else {
 					Some(to)
 				}
@@ -187,7 +186,6 @@ impl TryFrom<PathBuf> for Inner {
 		let action = Self {
 			to: value.expand_user()?.expand_vars()?,
 			if_exists: Default::default(),
-			sep: Default::default(),
 		};
 		Ok(action)
 	}
@@ -201,39 +199,50 @@ impl FromStr for Inner {
 	}
 }
 
-#[derive(Debug, Clone, Deserialize, Eq, PartialEq)]
-pub struct Sep(pub String);
-
-impl Deref for Sep {
-	type Target = String;
-
-	fn deref(&self) -> &Self::Target {
-		&self.0
-	}
-}
-
-impl Default for Sep {
-	fn default() -> Self {
-		Self(" ".into())
-	}
-}
-
 /// Defines the options available to resolve a naming conflict,
 /// i.e. how the application should proceed when a file exists
 /// but it should move/rename/copy some file to that existing path
-#[derive(Eq, PartialEq, Debug, Clone, Copy, Deserialize, Serialize, EnumString)]
-#[strum(serialize_all = "lowercase")]
+#[derive(Eq, PartialEq, Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all(serialize = "lowercase", deserialize = "lowercase"))]
 pub enum ConflictOption {
 	Overwrite,
 	Skip,
-	Rename,
-	Delete
+	Rename { counter_separator: String },
+	Delete,
+}
+
+impl FromStr for ConflictOption {
+	type Err = serde::de::value::Error;
+
+	fn from_str(s: &str) -> Result<Self, Self::Err> {
+		let variant = match s {
+			"delete" => Self::Delete,
+			"overwrite" => Self::Overwrite,
+			"skip" => Self::Skip,
+			"rename" => Self::default(),
+			other => {
+				let re = Regex::new("rename with \"(?P<counter_separator>.*)\"").unwrap();
+				let captures = re.captures(other).ok_or_else(|| {
+					Self::Err::unknown_variant(
+						other,
+						&["skip", "delete", "overwrite", "rename", "rename with \"<counter_separator>\""],
+					)
+				})?;
+				let counter_separator = captures.name("counter_separator").unwrap();
+				Self::Rename {
+					counter_separator: counter_separator.as_str().into(),
+				}
+			}
+		};
+		Ok(variant)
+	}
 }
 
 impl Default for ConflictOption {
 	fn default() -> Self {
-		ConflictOption::Rename
+		ConflictOption::Rename {
+			counter_separator: " ".to_string(),
+		}
 	}
 }
 
@@ -254,8 +263,9 @@ mod tests {
 	#[test]
 	fn deserialize_map() {
 		let mut value = Inner::from_str("$HOME").unwrap();
-		value.if_exists = ConflictOption::Rename;
-		value.sep = Sep("-".into());
+		value.if_exists = ConflictOption::Rename {
+			counter_separator: "-".into(),
+		};
 		assert_de_tokens(
 			&value,
 			&[
