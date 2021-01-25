@@ -141,11 +141,7 @@ impl<'a> Watch {
 		let (mut watcher, rx) = self.setup(&path_to_recursive)?;
 		let config_parent = self.config.parent().unwrap();
 		let settings_path = Settings::path()?;
-		let simulation = if self.simulate {
-			Some(Simulation::new()?)
-		} else {
-			None
-		};
+		let simulation = if self.simulate { Some(Simulation::new()?) } else { None };
 
 		loop {
 			if let Ok(event) = rx.recv() {
