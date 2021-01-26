@@ -1,5 +1,5 @@
 use anyhow::{anyhow, bail, Context, Result};
-use std::path::{Path, PathBuf};
+use std::path::{Path};
 
 use crate::string::Capitalize;
 use lazy_static::lazy_static;
@@ -48,18 +48,18 @@ pub fn visit_placeholder_string(val: &str) -> Result<String> {
 }
 
 pub trait Placeholder {
-	fn expand_placeholders<P: Into<PathBuf>>(self, path: P) -> Result<String>;
+	fn expand_placeholders<P: AsRef<Path>>(self, path: P) -> Result<String>;
 }
 
 impl<T: AsRef<str>> Placeholder for T {
-	fn expand_placeholders<P: Into<PathBuf>>(self, path: P) -> Result<String> {
+	fn expand_placeholders<P: AsRef<Path>>(self, path: P) -> Result<String> {
 		let str = self.as_ref();
 		if VALID_PH_REGEX.is_match(str) {
 			// if the first condition is false, the second one won't be evaluated and REGEX won't be initialized
 			let mut new = str.to_string();
 			for span in VALID_PH_REGEX.find_iter(str) {
 				let placeholders = span.as_str().trim_matches(|x| x == '{' || x == '}').split('.'); // split a placeholder like {path.filename.extension} into [path, filename, extension]
-				let mut current_value = path.into();
+				let mut current_value = path.as_ref().to_path_buf();
 				for placeholder in placeholders.into_iter() {
 					current_value = match placeholder {
 						"path" => current_value
@@ -67,7 +67,7 @@ impl<T: AsRef<str>> Placeholder for T {
 							.with_context(|| format!("could not retrieve the absolute path of {}", current_value.display()))?,
 						"parent" => current_value
 							.parent()
-							.ok_or_else(|| anyhow!("{} does not have a parent directory", self.0.display()))?
+							.ok_or_else(|| anyhow!("{} does not have a parent directory", current_value.display()))?
 							.into(),
 						"filename" => current_value
 							.file_name()

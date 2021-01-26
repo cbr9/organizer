@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use anyhow::Result;
+use anyhow::{Result, anyhow};
 
 use crate::path::IsHidden;
 use crate::{
@@ -73,7 +73,7 @@ macro_rules! getter {
 	};
 }
 
-getter!(from folder, struct, pub get_recursive_depth, recursive, depth, u16);
+getter!(from folder, struct, pub get_recursive_depth, recursive, depth, u16); // try to get recursive.depth from `folder` up until `defaults`
 getter!(from folder, struct, pub get_recursive_enabled, recursive, enabled, bool);
 getter!(from folder, pub get_watch, watch, bool);
 getter!(from folder, pub get_hidden_files, hidden_files, bool);
@@ -84,15 +84,14 @@ getter!(from config, pub get_match, r#match, Match);
 impl Data {
 	pub fn new() -> Result<Self> {
 		let path = Config::path()?;
-		let data = Config::parse(&path).map(|config| {
-			Config::set_cwd(path).map(|_| {
-				Settings::new(Settings::path()?).map(|settings| Self {
-					defaults: Options::default_some(),
-					settings,
-					config,
-				})
-			})
-		})???; // return the error from UserConfig::parse, Config::set_cwd and from Settings::new
+		let config = Config::parse(&path)?;
+		Config::set_cwd(path)?;
+		let settings = Settings::new(Settings::path()?)?;
+		let data = Self {
+			defaults: Options::default_some(),
+			settings,
+			config
+		};
 		Ok(data)
 	}
 
@@ -101,7 +100,7 @@ impl Data {
 		std::env::var_os(var).map_or_else(
 			|| {
 				Ok(dirs::data_local_dir()
-					.ok_or_else(|| anyhow::Error::msg(format!("could not find data directory, please set {var} manually", var = var)))?
+					.ok_or_else(|| anyhow!("could not find data directory, please set {} manually", var))?
 					.join(PROJECT_NAME))
 			},
 			|path| Ok(PathBuf::from(path)),

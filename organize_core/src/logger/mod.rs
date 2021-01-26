@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use std::str::FromStr;
 
 use chrono::format::{DelayedFormat, StrftimeItems};
-use chrono::{Local, NaiveDateTime, NaiveDate};
+use chrono::{Local, NaiveDateTime};
 use colored::Colorize;
 use fern::colors::{Color, ColoredLevelConfig};
 use fern::{Dispatch, FormatCallback, Output};
