@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use std::str::FromStr;
 
 use chrono::format::{DelayedFormat, StrftimeItems};
-use chrono::{Local, NaiveDateTime};
+use chrono::{Local, NaiveDateTime, NaiveDate};
 use colored::Colorize;
 use fern::colors::{Color, ColoredLevelConfig};
 use fern::{Dispatch, FormatCallback, Output};
@@ -18,6 +18,8 @@ use crate::data::Data;
 lazy_static! {
 	static ref COLORS: ColoredLevelConfig = Logger::colors();
 	static ref TIME_FORMAT: &'static str = "[%F][%T]";
+	pub static ref LOG_PATTERN: Regex =
+		Regex::new(r"(?P<timestamp>\[\d{4}?-\d{2}-\d{2}]\[\d{2}:\d{2}:\d{2}]) (?P<level>INFO|DEBUG|WARN|ERROR|TRACE): (?P<message>.+$)").unwrap();
 }
 
 pub struct Log {
@@ -26,14 +28,6 @@ pub struct Log {
 	message: String,
 }
 
-lazy_static! {
-	pub static ref LOG_PATTERN: Regex =
-		Regex::new(r"(?P<timestamp>\[\d{4}?-\d{2}-\d{2}]\[\d{2}:\d{2}:\d{2}]) (?P<level>INFO|DEBUG|WARN|ERROR|TRACE): (?P<message>.+$)").unwrap();
-}
-
-fn format<T: Display, Q: Display, P: Display>(timestamp: T, level: Q, message: P) -> String {
-	format!("{timestamp} {level}: {message}", timestamp = timestamp, level = level, message = message)
-}
 
 impl<T: AsRef<str>> From<T> for Log {
 	fn from(s: T) -> Self {
@@ -52,15 +46,18 @@ impl<T: AsRef<str>> From<T> for Log {
 }
 
 impl Log {
+	fn format<T: Display, Q: Display, P: Display>(timestamp: T, level: Q, message: P) -> String {
+		format!("{} {}: {}", timestamp, level, message)
+	}
+
 	pub fn colored(self) -> String {
-		format(
-			self.timestamp.format(*TIME_FORMAT).to_string().dimmed(),
-			COLORS.color(self.level),
-			self.message,
-		)
+        let timestamp = self.timestamp.format(*TIME_FORMAT).to_string().dimmed();
+		let level = COLORS.color(self.level);
+		let message = self.message;
+		Self::format(timestamp, level, message)
 	}
 	pub fn plain(self) -> String {
-		format(self.timestamp.format(*TIME_FORMAT), self.level, self.message)
+		Self::format(self.timestamp.format(*TIME_FORMAT), self.level, self.message)
 	}
 }
 
@@ -83,13 +80,13 @@ impl Logger {
 	}
 
 	fn plain_format(out: FormatCallback, message: &Arguments, record: &Record) {
-		out.finish(format_args!("{}", format(Self::time(), record.level(), message)))
+		out.finish(format_args!("{}", Log::format(Self::time(), record.level(), message)))
 	}
 
 	fn colored_format(out: FormatCallback, message: &Arguments, record: &Record) {
 		out.finish(format_args!(
 			"{}",
-			format(Self::time().to_string().dimmed(), COLORS.color(record.level()), message)
+			Log::format(Self::time().to_string().dimmed(), COLORS.color(record.level()), message)
 		))
 	}
 
@@ -133,19 +130,20 @@ impl Logger {
 	}
 
 	pub fn setup(no_color: bool) -> Result<(), anyhow::Error> {
-		let info = Self::build_dispatchers(Level::Info, no_color, std::io::stdout())?;
-		let debug = Self::build_dispatchers(Level::Debug, no_color, std::io::stdout())?;
-		let error = Self::build_dispatchers(Level::Error, no_color, std::io::stderr())?;
-		let warn = Self::build_dispatchers(Level::Warn, no_color, std::io::stderr())?;
+		let (info_stdout, info_file) = Self::build_dispatchers(Level::Info, no_color, std::io::stdout())?;
+		let (debug_stdout, debug_file) = Self::build_dispatchers(Level::Debug, no_color, std::io::stdout())?;
+		let (error_stderr, error_file) = Self::build_dispatchers(Level::Error, no_color, std::io::stderr())?;
+		let (warn_stderr, warn_file) = Self::build_dispatchers(Level::Warn, no_color, std::io::stderr())?;
 
 		fern::Dispatch::new()
-			.chain(info.0)
-			.chain(info.1)
-			.chain(debug.0)
-			.chain(error.0)
-			.chain(error.1)
-			.chain(warn.0)
-			.chain(warn.1)
+			.chain(info_stdout)
+			.chain(info_file)
+			.chain(debug_stdout)
+			.chain(debug_file)
+			.chain(error_stderr)
+			.chain(error_file)
+			.chain(warn_stderr)
+			.chain(warn_file)
 			.apply()?;
 
 		Ok(())

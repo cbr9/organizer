@@ -12,6 +12,7 @@ pub struct Logs {
 	pub(crate) no_color: bool,
 }
 
+// TODO: Add options to show errors and debug messages
 impl Cmd for Logs {
 	fn run(self) -> Result<()> {
 		let logs = Logger::parse(Level::Info)?;
