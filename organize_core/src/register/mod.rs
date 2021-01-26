@@ -8,7 +8,7 @@ use sysinfo::{Pid, RefreshKind, System, SystemExt};
 
 use crate::data::Data;
 
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, anyhow};
 
 mod de;
 
@@ -84,8 +84,9 @@ impl Register {
 	}
 
 	fn write(&self) -> Result<()> {
-		if !self.path.parent().ok_or_else(|| anyhow::Error::msg("invalid data directory"))?.exists() {
-			std::fs::create_dir_all(&self.path).context("could not create data directory")?;
+		let parent = self.path.parent().ok_or_else(|| anyhow!("invalid data directory"))?;
+		if !parent.exists() {
+			std::fs::create_dir_all(&parent).context("could not create data directory")?;
 		}
 		std::fs::write(&self.path, bincode::serialize(&self.sections)?).context("could not write register")
 	}
@@ -105,7 +106,7 @@ impl Register {
 #[cfg(test)]
 mod tests {
 	use sysinfo::{Pid, ProcessExt, RefreshKind, Signal, System, SystemExt};
-
+	// TODO: improve these tests
 	use crate::{data::config::Config, register::Register};
 
 	fn stop() {
