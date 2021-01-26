@@ -1,7 +1,5 @@
 use std::convert::TryFrom;
-use std::env::VarError;
 use std::{
-	ops::Deref,
 	path::{Path, PathBuf},
 	result,
 	str::FromStr,
@@ -22,7 +20,7 @@ use anyhow::Context;
 use anyhow::Result;
 
 use regex::Regex;
-use serde::de::{Error};
+use serde::de::Error;
 use std::sync::{Arc, Mutex, MutexGuard};
 
 mod de;
@@ -316,7 +314,7 @@ impl Inner {
 }
 
 impl TryFrom<PathBuf> for Inner {
-	type Error = VarError;
+	type Error = anyhow::Error;
 
 	fn try_from(value: PathBuf) -> result::Result<Self, Self::Error> {
 		let action = Self {
@@ -328,7 +326,7 @@ impl TryFrom<PathBuf> for Inner {
 }
 
 impl FromStr for Inner {
-	type Err = VarError;
+	type Err = anyhow::Error;
 
 	fn from_str(s: &str) -> result::Result<Self, Self::Err> {
 		Self::try_from(PathBuf::from(s))
@@ -359,10 +357,7 @@ impl FromStr for ConflictOption {
 			other => {
 				let re = Regex::new("rename with \"(?P<counter_separator>.*)\"").unwrap();
 				let captures = re.captures(other).ok_or_else(|| {
-					Self::Err::unknown_variant(
-						other,
-						&["skip", "delete", "overwrite", "rename", "rename with \"<counter_separator>\""],
-					)
+					Self::Err::unknown_variant(other, &["skip", "delete", "overwrite", "rename", "rename with \"<counter_separator>\""])
 				})?;
 				let counter_separator = captures.name("counter_separator").unwrap();
 				Self::Rename {
@@ -388,9 +383,8 @@ mod tests {
 
 	use crate::{
 		data::config::actions::ActionType,
-		utils::tests::{project, AndWait, TEST_FILES_DIRECTORY, TEST_FILES_SUBDIRECTORY},
+		utils::tests::{project},
 	};
-	use anyhow::Result;
 
 	use super::*;
 

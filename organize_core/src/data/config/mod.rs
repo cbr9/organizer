@@ -25,12 +25,6 @@ pub mod actions;
 pub mod filters;
 pub mod folders;
 
-// TODO: add tests for the custom deserializers
-
-/// Represents the user's configuration file
-/// ### Fields
-/// * `path`: the path the user's config, either the default one or some other passed with the --with-config argument
-/// * `rules`: a list of parsed rules defined by the user
 #[derive(Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Config {
 	pub rules: Vec<Rule>,

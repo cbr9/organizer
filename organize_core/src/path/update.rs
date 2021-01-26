@@ -2,7 +2,7 @@ use crate::data::config::actions::io_action::ConflictOption;
 
 use crate::simulation::Simulation;
 use std::path::PathBuf;
-use std::sync::{MutexGuard};
+use std::sync::MutexGuard;
 
 pub trait ResolveConflict {
 	fn resolve_naming_conflict(self, if_exists: &ConflictOption, simulation: Option<MutexGuard<Simulation>>) -> Option<PathBuf>;

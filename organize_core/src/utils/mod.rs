@@ -61,7 +61,7 @@ pub mod tests {
 		}
 
 		fn wait_for<T: AsRef<Path>>(path: T, event: Op, receiver: Receiver<RawEvent>) -> Result<()> {
-			let loop_ = || loop {
+			let wait = || loop {
 				if let Ok(RawEvent {
 					path: Some(new_path),
 					op: Ok(op),
@@ -77,12 +77,12 @@ pub mod tests {
 			match event {
 				Op::CREATE => {
 					if !path.as_ref().exists() {
-						loop_()
+						wait()
 					}
 				}
 				Op::REMOVE => {
 					if path.as_ref().exists() {
-						loop_()
+						wait()
 					}
 				}
 				_ => unimplemented!(),
