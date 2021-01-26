@@ -1,12 +1,11 @@
-use anyhow::{Context, Result, anyhow, bail};
+use anyhow::{anyhow, Context, Result};
+use dirs::home_dir;
+use std::ffi::{OsStr, OsString};
 use std::iter::FromIterator;
 use std::{
 	env,
 	path::{Path, PathBuf},
 };
-use std::ffi::{OsStr, OsString};
-use std::path::Component;
-use dirs::home_dir;
 
 pub trait Expand {
 	fn expand_user(self) -> Result<PathBuf>
@@ -28,7 +27,7 @@ impl<T: Into<PathBuf>> Expand for T {
                 return Ok(path)
 			}
 		}
-        Ok(path)
+		Ok(path)
 	}
 
 	fn expand_vars(self) -> Result<PathBuf> {
@@ -90,7 +89,7 @@ mod tests {
 	}
 	#[test]
 	fn new_var() {
-        let var = "PROJECT_DIR";
+		let var = "PROJECT_DIR";
 		env::set_var(var, project());
 		let original = format!("${}/tests", var);
 		let expected = project().join("tests");
