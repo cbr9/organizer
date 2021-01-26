@@ -1,4 +1,5 @@
-use std::{io, io::ErrorKind, path::Path};
+use anyhow::{anyhow, bail, Context, Result};
+use std::path::{Path, PathBuf};
 
 use crate::string::Capitalize;
 use lazy_static::lazy_static;
@@ -16,6 +17,7 @@ lazy_static! {
 			r"\{(?:(?:extension|stem)(?:\.to_lowercase|\.to_uppercase|\.capitalize)?)\}" // match placeholders that involve files and only deal with extension/stem
 		];
 		let whole = vec.iter().enumerate().map(|(i, str)| {
+			// stick together the regex in `vec`
 			if i == vec.len()-1 {
 				format!("(?:{})", str)
 			} else {
@@ -36,54 +38,53 @@ where
 }
 
 // used inside Visitor impls
-pub fn visit_placeholder_string(val: &str) -> Result<String, io::Error> {
+pub fn visit_placeholder_string(val: &str) -> Result<String> {
 	if !(POTENTIAL_PH_REGEX.is_match(val) ^ VALID_PH_REGEX.is_match(val)) {
 		// if there are no matches or there are only valid ones
 		Ok(val.to_string())
 	} else {
-		Err(io::Error::new(ErrorKind::Other, "invalid placeholder")) // if there are matches but they're invalid
+		bail!("invalid placeholder")
 	}
 }
 
 pub trait Placeholder {
-	fn expand_placeholders<P: AsRef<Path>>(self, path: P) -> io::Result<String>;
+	fn expand_placeholders<P: Into<PathBuf>>(self, path: P) -> Result<String>;
 }
 
 impl<T: AsRef<str>> Placeholder for T {
-	fn expand_placeholders<P: AsRef<Path>>(self, path: P) -> io::Result<String> {
+	fn expand_placeholders<P: Into<PathBuf>>(self, path: P) -> Result<String> {
 		let str = self.as_ref();
 		if VALID_PH_REGEX.is_match(str) {
 			// if the first condition is false, the second one won't be evaluated and REGEX won't be initialized
 			let mut new = str.to_string();
 			for span in VALID_PH_REGEX.find_iter(str) {
-				let placeholders = span.as_str().trim_matches(|x| x == '{' || x == '}').split('.');
-				let mut current_value = path.as_ref().to_path_buf();
+				let placeholders = span.as_str().trim_matches(|x| x == '{' || x == '}').split('.'); // split a placeholder like {path.filename.extension} into [path, filename, extension]
+				let mut current_value = path.into();
 				for placeholder in placeholders.into_iter() {
 					current_value = match placeholder {
 						"path" => current_value
 							.canonicalize()
-							.ok()
-							.ok_or_else(|| placeholder_error(placeholder, &current_value, span.as_str()))?,
+							.with_context(|| format!("could not retrieve the absolute path of {}", current_value.display()))?,
 						"parent" => current_value
 							.parent()
-							.ok_or_else(|| placeholder_error(placeholder, &current_value, span.as_str()))?
+							.ok_or_else(|| anyhow!("{} does not have a parent directory", self.0.display()))?
 							.into(),
 						"filename" => current_value
 							.file_name()
-							.ok_or_else(|| placeholder_error(placeholder, &current_value, span.as_str()))?
+							.ok_or_else(|| anyhow!("{} does not have a filename", current_value.display()))?
 							.into(),
 						"stem" => current_value
 							.file_stem()
-							.ok_or_else(|| placeholder_error(placeholder, &current_value, span.as_str()))?
+							.ok_or_else(|| anyhow!("{} does not have a filestem", current_value.display()))?
 							.into(),
 						"extension" => current_value
 							.extension()
-							.ok_or_else(|| placeholder_error(placeholder, &current_value, span.as_str()))?
+							.ok_or_else(|| anyhow!("{} does not have an extension", current_value.display()))?
 							.into(),
 						"to_uppercase" => current_value.to_string_lossy().to_uppercase().into(),
 						"to_lowercase" => current_value.to_string_lossy().to_lowercase().into(),
 						"capitalize" => current_value.to_string_lossy().capitalize().into(),
-						_ => panic!("unknown placeholder"),
+						placeholder => bail!("unknown placeholder {}", placeholder),
 					}
 				}
 				new = new.replace(&span.as_str(), &*current_value.to_string_lossy());
@@ -93,16 +94,6 @@ impl<T: AsRef<str>> Placeholder for T {
 			Ok(self.as_ref().to_string())
 		}
 	}
-}
-
-fn placeholder_error(placeholder: &str, current_value: &Path, span: &str) -> std::io::Error {
-	let message = format!(
-		"tried to retrieve the {} from {}, but it does not contain it (placeholder: {})",
-		placeholder,
-		current_value.display(),
-		span
-	);
-	std::io::Error::new(ErrorKind::Other, message)
 }
 
 #[cfg(test)]
