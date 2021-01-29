@@ -8,7 +8,7 @@ use sysinfo::{Pid, RefreshKind, System, SystemExt};
 
 use crate::data::Data;
 
-use anyhow::{Context, Result, anyhow};
+use anyhow::{anyhow, Context, Result};
 
 mod de;
 

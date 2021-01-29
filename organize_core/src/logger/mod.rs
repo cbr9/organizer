@@ -28,7 +28,6 @@ pub struct Log {
 	message: String,
 }
 
-
 impl<T: AsRef<str>> From<T> for Log {
 	fn from(s: T) -> Self {
 		let s = s.as_ref();
@@ -51,7 +50,7 @@ impl Log {
 	}
 
 	pub fn colored(self) -> String {
-        let timestamp = self.timestamp.format(*TIME_FORMAT).to_string().dimmed();
+		let timestamp = self.timestamp.format(*TIME_FORMAT).to_string().dimmed();
 		let level = COLORS.color(self.level);
 		let message = self.message;
 		Self::format(timestamp, level, message)

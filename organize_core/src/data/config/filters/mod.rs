@@ -45,17 +45,13 @@ impl AsFilter for Filter {
 }
 
 #[derive(Debug, Clone, Deserialize, Eq, PartialEq)]
-#[serde(transparent)]
-pub struct Filters {
-	#[serde(flatten)]
-	pub(crate) inner: Vec<Filter>,
-}
+pub struct Filters(pub(crate) Vec<Filter>);
 
 impl Deref for Filters {
 	type Target = Vec<Filter>;
 
 	fn deref(&self) -> &Self::Target {
-		&self.inner
+		&self.0
 	}
 }
 
@@ -100,9 +96,7 @@ mod tests {
 	#[test]
 	fn do_not_match_partial_file() {
 		let regex = Regex::from_str(".*").unwrap();
-		let filters = Filters {
-			inner: vec![Filter::Regex(regex)],
-		};
+		let filters = Filters(vec![Filter::Regex(regex)]);
 		let path = PathBuf::from("$HOME/Downloads/test.crdownload");
 		assert!(!filters.r#match(&path, &Apply::All))
 	}

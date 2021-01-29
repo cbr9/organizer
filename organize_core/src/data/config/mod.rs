@@ -125,7 +125,7 @@ impl Default for Rule {
 	fn default() -> Self {
 		Self {
 			actions: Actions(vec![]),
-			filters: Filters { inner: vec![] },
+			filters: Filters(vec![]),
 			folders: vec![],
 			options: Options::default_none(),
 		}

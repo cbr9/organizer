@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 
 use crate::path::IsHidden;
 use crate::{
@@ -90,7 +90,7 @@ impl Data {
 		let data = Self {
 			defaults: Options::default_some(),
 			settings,
-			config
+			config,
 		};
 		Ok(data)
 	}
@@ -175,7 +175,7 @@ mod tests {
 			config: Config {
 				rules: vec![Rule {
 					actions: Actions(vec![]),
-					filters: Filters { inner: vec![] },
+					filters: Filters(vec![]),
 					folders: vec![
 						Folder {
 							path: "$HOME".into(),

@@ -24,7 +24,7 @@ impl<T: Into<PathBuf>> Expand for T {
 			if component.as_os_str() == OsStr::new("~") {
 				let mut path = home_dir().ok_or_else(|| anyhow!("could not find home directory"))?;
 				path.extend(components);
-                return Ok(path)
+				return Ok(path);
 			}
 		}
 		Ok(path)
