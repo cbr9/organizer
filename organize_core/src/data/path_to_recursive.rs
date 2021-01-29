@@ -21,16 +21,14 @@ impl<'a> PathToRecursive<'a> {
 				} else {
 					RecursiveMode::NonRecursive
 				};
-				match map.get(folder.path.as_path()) {
-					None => {
-						map.insert(folder.path.as_path(), (recursive, None));
-					}
-					Some(value) => {
-						if recursive == RecursiveMode::Recursive && value.0 == RecursiveMode::NonRecursive {
-							map.insert(folder.path.as_path(), (recursive, Some(*data.get_recursive_depth(i, j))));
+				map.entry(folder.path.as_path())
+					.and_modify(|entry: &mut (RecursiveMode, Option<u16>)| {
+						if recursive == RecursiveMode::Recursive && entry.0 == RecursiveMode::NonRecursive {
+							let depth = data.get_recursive_depth(i, j);
+							*entry = (recursive, Some(*depth));
 						}
-					}
-				}
+					})
+					.or_insert((recursive, None));
 			})
 		});
 		map.shrink_to_fit();
@@ -57,8 +55,6 @@ impl<'a> PathToRecursive<'a> {
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use crate::data::config::actions::Actions;
-	use crate::data::config::filters::Filters;
 	use crate::data::config::folders::Folder;
 	use crate::data::config::{Config, Rule};
 	use crate::data::options::recursive::Recursive;
@@ -76,8 +72,6 @@ mod tests {
 			config: Config {
 				rules: vec![
 					Rule {
-						actions: Actions(vec![]),
-						filters: Filters { inner: vec![] },
 						folders: vec![
 							Folder {
 								path: downloads.into(),
@@ -85,14 +79,18 @@ mod tests {
 							},
 							Folder {
 								path: documents.into(),
-								options: Options::default_none(),
+								options: Options {
+									recursive: Recursive {
+										enabled: Some(false),
+										depth: None,
+									},
+									..DefaultOpt::default_none()
+								}
 							},
 						],
-						options: Options::default_none(),
+						..Rule::default()
 					},
 					Rule {
-						actions: Actions(vec![]),
-						filters: Filters { inner: vec![] },
 						folders: vec![Folder {
 							path: downloads.into(),
 							options: Options {
@@ -103,7 +101,7 @@ mod tests {
 								..DefaultOpt::default_none()
 							},
 						}],
-						options: Options::default_none(),
+						..Rule::default()
 					},
 				],
 				defaults: Options::default_none(),

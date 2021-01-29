@@ -75,8 +75,8 @@ impl File {
 		path_to_rules: &'a PathToRules,
 		path_to_recursive: &'a PathToRecursive,
 	) -> Vec<&'a (usize, usize)> {
-		let (key, value) = path_to_rules.get_key_value(&self.path);
-		let (recursive, depth) = path_to_recursive.get(&key).unwrap();
+		let (key, value) = path_to_rules.get_key_value(&self.path).unwrap();
+		let (recursive, depth) = path_to_recursive.get(key).unwrap();
 		if recursive == &RecursiveMode::Recursive {
 			let depth = depth.expect("folder is recursive but depth is not defined") as usize;
 			if self.path.components().count() - key.components().count() > depth && depth != 0 {
