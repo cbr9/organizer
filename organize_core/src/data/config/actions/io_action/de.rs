@@ -59,7 +59,7 @@ impl<'de> Deserialize<'de> for Inner {
 							};
 						}
 						"if_exists" => if_exists = Some(ConflictOption::from_str(&value).map_err(M::Error::custom)?),
-						other => return Err(M::Error::unknown_field(other, &["to", "if_exists", "sep"])),
+						other => return Err(M::Error::unknown_field(other, &["to", "if_exists"])),
 					}
 				}
 				let action = Inner {
@@ -70,5 +70,43 @@ impl<'de> Deserialize<'de> for Inner {
 			}
 		}
 		deserializer.deserialize_any(StringOrStruct(PhantomData))
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use serde_test::{assert_de_tokens, Token};
+
+	use super::*;
+	use dirs::home_dir;
+
+	#[test]
+	fn deserialize_str() {
+		let value = Inner {
+			to: home_dir().unwrap(),
+			if_exists: Default::default(),
+		};
+		assert_de_tokens(&value, &[Token::Str("$HOME")])
+	}
+
+	#[test]
+	fn deserialize_map() {
+		let value = Inner {
+			to: home_dir().unwrap(),
+			if_exists: ConflictOption::Rename {
+				counter_separator: "-".into(),
+			},
+		};
+		assert_de_tokens(
+			&value,
+			&[
+				Token::Map { len: Some(3) },
+				Token::Str("to"),
+				Token::Str("$HOME"),
+				Token::Str("if_exists"),
+				Token::Str("rename with \"-\""),
+				Token::MapEnd,
+			],
+		)
 	}
 }

@@ -90,7 +90,10 @@ macro_rules! as_action {
 				match simulation {
 					Some(simulation) => {
 						let mut guard = simulation.lock().unwrap();
-						guard.watch_folder(to.unwrap_ref().parent()?).map_err(|e| eprintln!("{}", e)).ok()?;
+						let parent = to.unwrap_ref().parent()?;
+						if parent.exists() {
+							guard.watch_folder(parent).map_err(|e| eprintln!("Error: {} ({})", e, parent.display())).ok()?;
+						}
 						match self.simulate(&path, Some(to.unwrap_ref()), guard) {
 							Ok(new_path) => {
 								info!("(simulate {}) {} -> {}", ty.to_string(), path.display(), to.unwrap().display());
@@ -273,13 +276,13 @@ impl Inner {
 		use ActionType::{Copy, Hardlink, Move, Rename, Symlink};
 
 		let path = path.as_ref();
-		let mut to: PathBuf = self
-			.to
-			.to_string_lossy()
-			.expand_placeholders(&path)
-			.map_err(|e| error!("{}", e))
-			.ok()?
-			.into();
+		let mut to = match self.to.to_string_lossy().expand_placeholders(path) {
+			Ok(str) => PathBuf::from(str),
+			Err(e) => {
+				error!("{:?}", e);
+				return None;
+			}
+		};
 
 		match kind {
 			Copy | Move | Hardlink | Symlink => {
@@ -379,52 +382,66 @@ impl Default for ConflictOption {
 
 #[cfg(test)]
 mod tests {
-	use serde_test::{assert_de_tokens, Token};
 
 	use crate::{
 		data::config::actions::ActionType,
-		utils::tests::{project},
+		utils::tests::{project, AndWait, TEST_FILES_DIRECTORY, TEST_FILES_SUBDIRECTORY},
 	};
+	use std::fs::File;
 
 	use super::*;
+	use anyhow::Result;
+	use std::ops::Deref;
 
 	#[test]
-	fn deserialize_str() {
-		let value = Inner::from_str("$HOME").unwrap();
-		assert_de_tokens(&value, &[Token::Str("$HOME")])
+	fn conflict_option_from_str() -> Result<()> {
+		assert_eq!(ConflictOption::from_str("skip")?, ConflictOption::Skip);
+		assert_eq!(ConflictOption::from_str("delete")?, ConflictOption::Delete);
+		assert_eq!(ConflictOption::from_str("overwrite")?, ConflictOption::Overwrite);
+		assert_eq!(ConflictOption::from_str("rename")?, ConflictOption::default());
+		assert_eq!(
+			ConflictOption::from_str("rename with \" - \"")?,
+			ConflictOption::Rename {
+				counter_separator: " - ".to_string()
+			}
+		);
+		assert!(ConflictOption::from_str("rename with").is_err());
+		assert!(ConflictOption::from_str("rename with \"").is_err());
+		assert!(ConflictOption::from_str("rename with \" - ").is_err());
+		Ok(())
 	}
 
 	#[test]
-	fn deserialize_map() {
-		let mut value = Inner::from_str("$HOME").unwrap();
-		value.if_exists = ConflictOption::Rename {
-			counter_separator: "-".into(),
-		};
-		assert_de_tokens(
-			&value,
-			&[
-				Token::Map { len: Some(3) },
-				Token::Str("to"),
-				Token::Str("$HOME"),
-				Token::Str("if_exists"),
-				Token::Str("rename"),
-				Token::Str("sep"),
-				Token::Str("-"),
-				Token::MapEnd,
-			],
-		)
+	fn prepare_path_copy_rename_exists() -> Result<()> {
+		let filename = "test.txt";
+		let from = TEST_FILES_DIRECTORY.join(filename);
+		let to = TEST_FILES_SUBDIRECTORY.deref();
+		File::create_and_wait(&from)?;
+		File::create_and_wait(to.join(filename))?;
+		let expected = to.join("test (1).txt");
+		let action = Inner::try_from(to.clone())?;
+		let new_path = action.prepare_path(&from, &ActionType::Copy, None).unwrap();
+		File::remove_and_wait(from)?;
+		File::remove_and_wait(to.join(filename))?;
+		assert_eq!(new_path, expected);
+		Ok(())
 	}
-
 	#[test]
-	fn prepare_path_copy() {
-		let original = project().join("tests").join("files").join("test1.txt");
-		let target = project().join("tests").join("files").join("test_dir");
-		let expected = target.join("test1 (1).txt");
-		assert!(target.join(original.file_name().unwrap()).exists());
-		assert!(!expected.exists());
-		let action = Inner::try_from(target).unwrap();
-		let new_path = action.prepare_path(&original, &ActionType::Copy, None).unwrap();
-		assert_eq!(new_path, expected)
+	fn prepare_path_copy_simulation() -> Result<()> {
+		let simulation = Simulation::new()?;
+		let filename = "prepare_path_copy_simulation.txt";
+		let from = TEST_FILES_DIRECTORY.join(filename);
+		let to = TEST_FILES_SUBDIRECTORY.deref();
+		{
+			let mut guard = simulation.lock().unwrap();
+			guard.insert_file(&from);
+			guard.insert_file(to.join(filename));
+		}
+		let expected = to.join("prepare_path_copy_simulation (1).txt");
+		let action = Inner::try_from(to.clone())?;
+		let new_path = action.prepare_path(&from, &ActionType::Copy, Some(&simulation)).unwrap();
+		assert_eq!(new_path, expected);
+		Ok(())
 	}
 
 	#[test]
