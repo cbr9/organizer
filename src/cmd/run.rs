@@ -4,7 +4,7 @@ use anyhow::Result;
 use clap::Clap;
 use notify::RecursiveMode;
 use rayon::prelude::*;
-use walkdir::{DirEntry, WalkDir};
+use walkdir::WalkDir;
 
 use organize_core::logger::Logger;
 use organize_core::{
@@ -40,40 +40,25 @@ impl<'a> Run {
 		let path_to_recursive = PathToRecursive::new(&data);
 		let path_to_rules = PathToRules::new(&data.config);
 		let simulation = if self.simulate { Some(Simulation::new()?) } else { None };
-		// let simulate = self.simulate;
-		let process = |entry: DirEntry| {
-			if entry.path().is_file() {
-				let file = File::new(entry.path());
-				if self.simulate {
-					file.simulate(&data, &path_to_rules, &path_to_recursive, simulation.unwrap_ref());
-				} else {
-					file.act(&data, &path_to_rules, &path_to_recursive);
-				}
-			}
-		};
+
 		path_to_rules.keys().collect::<Vec<_>>().par_iter().for_each(|path| {
 			let (recursive, depth) = path_to_recursive.get(path).unwrap();
-			if recursive == &RecursiveMode::Recursive {
-				let depth = depth.expect("depth is not defined but recursive is true");
-				if depth == 0 {
-					// no limit
-					WalkDir::new(path).follow_links(true).into_iter().filter_map(|e| e.ok()).for_each(process);
-				} else {
-					WalkDir::new(path)
-						.max_depth(depth as usize)
-						.follow_links(true)
-						.into_iter()
-						.filter_map(|e| e.ok())
-						.for_each(process);
-				}
-			} else {
-				WalkDir::new(path)
-					.max_depth(1) // only direct descendants, i.e. walk in a non recursive way
-					.follow_links(true)
-					.into_iter()
-					.filter_map(|e| e.ok())
-					.for_each(process);
+			let depth = depth.unwrap_or(1);
+			let walker = match (recursive, depth) {
+				(RecursiveMode::Recursive, 0) => WalkDir::new(path).follow_links(true),
+				(RecursiveMode::Recursive, depth) => WalkDir::new(path).max_depth(depth as usize),
+				(RecursiveMode::NonRecursive, _) => WalkDir::new(path).max_depth(1),
 			};
+			walker.into_iter().filter_map(|e| e.ok()).for_each(|entry| {
+				if entry.path().is_file() {
+					let file = File::new(entry.path());
+					if self.simulate {
+						file.simulate(&data, &path_to_rules, &path_to_recursive, simulation.unwrap_ref());
+					} else {
+						file.act(&data, &path_to_rules, &path_to_recursive);
+					}
+				}
+			});
 		});
 		Ok(())
 	}
