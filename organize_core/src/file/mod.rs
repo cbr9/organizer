@@ -21,24 +21,13 @@ impl File {
 		simulation: &Arc<Mutex<Simulation>>,
 	) {
 		let mut path = self.path.clone();
-		match data.get_match() {
-			Match::All => {
-				let rules = self.get_matching_rules(data, path_to_rules, path_to_recursive);
-				for (i, j) in rules {
-					let rule = &data.config.rules[*i];
-					match rule.actions.simulate(&path, data.get_apply_actions(*i, *j), simulation) {
-						None => break,
-						Some(new_path) => {
-							path = new_path;
-						}
-					}
-				}
-			}
-			Match::First => {
-				let rules = self.get_matching_rules(data, path_to_rules, path_to_recursive);
-				if let Some((i, j)) = rules.first() {
-					let rule = &data.config.rules[*i];
-					rule.actions.simulate(&path, data.get_apply_actions(*i, *j), simulation);
+		let rules = self.get_matching_rules(data, path_to_rules, path_to_recursive);
+		for (i, j) in rules {
+			let rule = &data.config.rules[*i];
+			match rule.actions.simulate(&path, data.get_apply_actions(*i, *j), simulation) {
+				None => break,
+				Some(new_path) => {
+					path = new_path;
 				}
 			}
 		}
@@ -46,24 +35,13 @@ impl File {
 
 	pub fn act<'a>(self, data: &'a Data, path_to_rules: &'a PathToRules, path_to_recursive: &'a PathToRecursive) {
 		let mut path = self.path.clone();
-		match data.get_match() {
-			Match::All => {
-				let rules = self.get_matching_rules(data, path_to_rules, path_to_recursive);
-				for (i, j) in rules {
-					let rule = &data.config.rules[*i];
-					match rule.actions.act(&path, data.get_apply_actions(*i, *j)) {
-						None => break,
-						Some(new_path) => {
-							path = new_path;
-						}
-					}
-				}
-			}
-			Match::First => {
-				let rules = self.get_matching_rules(data, path_to_rules, path_to_recursive);
-				if let Some((i, j)) = rules.first() {
-					let rule = &data.config.rules[*i];
-					rule.actions.act(&path, data.get_apply_actions(*i, *j));
+		let rules = self.get_matching_rules(data, path_to_rules, path_to_recursive);
+		for (i, j) in rules {
+			let rule = &data.config.rules[*i];
+			match rule.actions.act(&path, data.get_apply_actions(*i, *j)) {
+				None => break,
+				Some(new_path) => {
+					path = new_path;
 				}
 			}
 		}
@@ -83,11 +61,19 @@ impl File {
 				return Vec::with_capacity(0);
 			}
 		}
-		value
-			.iter()
-			.filter(|(i, j)| {
-				!data.should_ignore(&self.path, *i, *j) && data.config.rules[*i].filters.r#match(&self.path, data.get_apply_filters(*i, *j))
-			})
-			.collect::<Vec<_>>()
+		match data.get_match() {
+			Match::All => value
+				.iter()
+				.filter(|(i, j)| {
+					!data.should_ignore(&self.path, *i, *j) && data.config.rules[*i].filters.r#match(&self.path, data.get_apply_filters(*i, *j))
+				})
+				.collect::<Vec<_>>(),
+			Match::First => value
+				.iter()
+				.find(|(i, j)| {
+					!data.should_ignore(&self.path, *i, *j) && data.config.rules[*i].filters.r#match(&self.path, data.get_apply_filters(*i, *j))
+				})
+				.map_or_else(|| Vec::with_capacity(0), |value| vec![value]),
+		}
 	}
 }
