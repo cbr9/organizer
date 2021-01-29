@@ -42,26 +42,75 @@ impl<T: Into<PathBuf>> ResolveConflict for T {
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use crate::utils::tests::project;
+	use crate::utils::tests::{AndWait, TEST_FILES_DIRECTORY};
+	use anyhow::Result;
+	use std::fs::File;
 
 	#[test]
-	fn rename_with_rename_conflict() {
-		let original = project().join("tests").join("files").join("test2.txt");
-		let expected = original.with_file_name("test2 (1).txt");
-		let new_path = original.resolve_naming_conflict(&ConflictOption::default(), None).unwrap();
-		assert_eq!(new_path, expected)
+	fn rename_non_existent() -> Result<()> {
+		let path = TEST_FILES_DIRECTORY.join("rename_non_existent.txt");
+		let option = ConflictOption::Rename {
+			counter_separator: " ".to_string(),
+		};
+		assert_eq!(path, path.clone().resolve_naming_conflict(&option, None).unwrap());
+		Ok(())
+	}
+	#[test]
+	fn rename_existent() -> Result<()> {
+		let path = TEST_FILES_DIRECTORY.join("rename_existent.txt");
+		File::create_and_wait(&path)?;
+		let option = ConflictOption::Rename {
+			counter_separator: " ".to_string(),
+		};
+		let new_path = path.clone().resolve_naming_conflict(&option, None).unwrap();
+		let is_ok = new_path == TEST_FILES_DIRECTORY.join("rename_existent (1).txt");
+		File::remove_and_wait(path)?;
+		assert!(is_ok);
+		Ok(())
+	}
+	#[test]
+	fn rename_existent_simulated() -> Result<()> {
+		let simulation = Simulation::new()?;
+		let path = TEST_FILES_DIRECTORY.join("test.txt");
+		{
+			let mut guard = simulation.lock().unwrap();
+			guard.insert_file(&path);
+		}
+		let option = ConflictOption::Rename {
+			counter_separator: " ".to_string(),
+		};
+		let new_path = path.resolve_naming_conflict(&option, Some(simulation.lock().unwrap())).unwrap();
+		assert_eq!(new_path, TEST_FILES_DIRECTORY.join("test (1).txt"));
+		Ok(())
+	}
+	#[test]
+	fn rename_non_existent_simulated() -> Result<()> {
+		let simulation = Simulation::new()?;
+		let path = TEST_FILES_DIRECTORY.join("test.txt");
+		let option = ConflictOption::Rename {
+			counter_separator: " ".to_string(),
+		};
+		let new_path = path.resolve_naming_conflict(&option, Some(simulation.lock().unwrap())).unwrap();
+		assert_eq!(new_path, TEST_FILES_DIRECTORY.join("test.txt"));
+		Ok(())
+	}
+	#[test]
+	fn overwrite() -> Result<()> {
+		let path = TEST_FILES_DIRECTORY.join("test.txt");
+		let option = ConflictOption::Overwrite;
+		assert_eq!(path, path.clone().resolve_naming_conflict(&option, None).unwrap());
+		Ok(())
 	}
 
 	#[test]
-	fn rename_with_overwrite_conflict() {
-		let original = project().join("tests").join("files").join("test2.txt");
-		let new_path = original.clone().resolve_naming_conflict(&ConflictOption::Overwrite, None).unwrap();
-		assert_eq!(new_path, original)
+	fn skip() {
+		let path = TEST_FILES_DIRECTORY.join("test.txt");
+		assert!(path.resolve_naming_conflict(&ConflictOption::Skip, None).is_none())
 	}
 
 	#[test]
-	fn rename_with_skip_conflict() {
-		let original = project().join("tests").join("files").join("test2.txt");
-		assert!(original.resolve_naming_conflict(&ConflictOption::Skip, None).is_none())
+	fn delete() {
+		let path = TEST_FILES_DIRECTORY.join("test.txt");
+		assert!(path.resolve_naming_conflict(&ConflictOption::Delete, None).is_none())
 	}
 }
