@@ -1,5 +1,5 @@
 use anyhow::{anyhow, bail, Context, Result};
-use std::path::{Path};
+use std::path::Path;
 
 use crate::string::Capitalize;
 use lazy_static::lazy_static;

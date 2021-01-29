@@ -48,21 +48,19 @@ mod tests {
 		let torrents = Path::new(downloads).join("torrents");
 
 		let config = Config {
-			rules: vec![
-				Rule {
-					folders: vec![
-						Folder {
-							path: downloads.into(),
-							options: Options::default_none(),
-						},
-						Folder {
-							path: docs.into(),
-							options: Options::default_none(),
-						},
-					],
-					..Rule::default()
-				},
-			],
+			rules: vec![Rule {
+				folders: vec![
+					Folder {
+						path: downloads.into(),
+						options: Options::default_none(),
+					},
+					Folder {
+						path: docs.into(),
+						options: Options::default_none(),
+					},
+				],
+				..Rule::default()
+			}],
 			defaults: Options::default_none(),
 		};
 
@@ -80,41 +78,47 @@ mod tests {
 		let test3 = PathBuf::from("test3");
 
 		let rules = vec![
-			Rule { // 0
+			Rule {
+				// 0
 				folders: vec![
-					Folder { // 0
+					Folder {
+						// 0
 						path: test1.clone(),
 						options: Options::default_none(),
 					},
-					Folder { // 1
+					Folder {
+						// 1
 						path: test2.clone(),
 						options: Options::default_none(),
 					},
 				],
 				..Default::default()
 			},
-			Rule { // 1
+			Rule {
+				// 1
 				folders: vec![
-					Folder { // 0
+					Folder {
+						// 0
 						path: test3.clone(),
 						options: Options::default_none(),
 					},
-					Folder { // 1
+					Folder {
+						// 1
 						path: test1.clone(),
 						options: Options::default_none(),
 					},
 				],
 				..Default::default()
 			},
-			Rule { // 2
-				folders: vec![
-					Folder { // 0
-						path: test3.clone(),
-						options: Options::default_none(),
-					},
-				],
+			Rule {
+				// 2
+				folders: vec![Folder {
+					// 0
+					path: test3.clone(),
+					options: Options::default_none(),
+				}],
 				..Default::default()
-			}
+			},
 		];
 		let config = Config {
 			rules,
@@ -129,5 +133,4 @@ mod tests {
 
 		assert_eq!(value, expected)
 	}
-
 }

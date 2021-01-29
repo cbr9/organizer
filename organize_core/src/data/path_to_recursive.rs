@@ -85,7 +85,7 @@ mod tests {
 										depth: None,
 									},
 									..DefaultOpt::default_none()
-								}
+								},
 							},
 						],
 						..Rule::default()
