@@ -10,7 +10,7 @@ impl<'de> Deserialize<'de> for Register {
 	{
 		let reg = Register {
 			path: Default::default(),
-			sections: Vec::deserialize(deserializer)?,
+			processes: Vec::deserialize(deserializer)?,
 		};
 		Ok(reg)
 	}

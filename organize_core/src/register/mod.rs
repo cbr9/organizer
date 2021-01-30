@@ -19,37 +19,37 @@ pub struct Register {
 	#[serde(skip)]
 	path: PathBuf,
 	#[serde(flatten)]
-	sections: Vec<Section>,
+	processes: Vec<Process>,
 }
 
 impl Deref for Register {
-	type Target = Vec<Section>;
+	type Target = Vec<Process>;
 
 	fn deref(&self) -> &Self::Target {
-		&self.sections
+		&self.processes
 	}
 }
 impl DerefMut for Register {
 	fn deref_mut(&mut self) -> &mut Self::Target {
-		&mut self.sections
+		&mut self.processes
 	}
 }
 
 #[derive(Deserialize, Serialize, Debug)]
-pub struct Section {
+pub struct Process {
 	pub path: PathBuf,
 	pub pid: Pid,
 }
 
 impl Contains<Pid> for Register {
 	fn contains(&self, pid: Pid) -> bool {
-		self.sections.iter().any(|section| section.pid == pid)
+		self.processes.iter().any(|section| section.pid == pid)
 	}
 }
 
 impl Contains<&Path> for Register {
 	fn contains(&self, path: &Path) -> bool {
-		self.sections.iter().any(|section| section.path == path)
+		self.processes.iter().any(|section| section.path == path)
 	}
 }
 
@@ -68,7 +68,7 @@ impl Register {
 		let mut register = bincode::deserialize::<Self>(content.as_slice())?;
 		register.path = path;
 
-		if !register.sections.is_empty() {
+		if !register.processes.is_empty() {
 			register.update()?;
 		}
 		Ok(register)
@@ -83,7 +83,7 @@ impl Register {
 		T: Into<PathBuf>,
 		P: AsPrimitive<Pid>,
 	{
-		self.sections.push(Section {
+		self.processes.push(Process {
 			path: path.into(),
 			pid: pid.as_(),
 		});
@@ -92,7 +92,7 @@ impl Register {
 
 	#[cfg(test)]
 	fn clear(&mut self) -> Result<()> {
-		self.sections.clear();
+		self.processes.clear();
 		self.persist()
 	}
 
@@ -101,13 +101,13 @@ impl Register {
 		if !parent.exists() {
 			std::fs::create_dir_all(&parent).context("could not create data directory")?;
 		}
-		let bytes = bincode::serialize(&self.sections).context("could not serialize register")?;
+		let bytes = bincode::serialize(&self.processes).context("could not serialize register")?;
 		std::fs::write(&self.path, bytes).context("could not write register")
 	}
 
 	pub fn update(&mut self) -> Result<()> {
 		let sys = System::new_with_specifics(RefreshKind::new().with_processes());
-		self.sections.retain(|section| sys.get_process(section.pid).is_some());
+		self.processes.retain(|section| sys.get_process(section.pid).is_some());
 		self.persist()
 	}
 }
