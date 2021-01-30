@@ -12,6 +12,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 #[derive(Debug, Clone, Deserialize, Default, PartialEq, Eq)]
 pub struct Delete(bool);
 
+#[cfg(feature = "action_trash")]
 #[derive(Debug, Clone, Deserialize, Default, Eq, PartialEq)]
 pub struct Trash(bool);
 
@@ -78,6 +79,7 @@ macro_rules! as_action {
 }
 
 as_action!(Delete);
+#[cfg(feature = "action_trash")]
 as_action!(Trash);
 
 impl Simulate for Delete {
@@ -104,6 +106,7 @@ impl Act for Delete {
 	}
 }
 
+#[cfg(feature = "action_trash")]
 impl Act for Trash {
 	fn act<T, P>(&self, from: T, _to: Option<P>) -> Result<Option<PathBuf>>
 	where
@@ -116,6 +119,7 @@ impl Act for Trash {
 	}
 }
 
+#[cfg(feature = "action_trash")]
 impl Simulate for Trash {
 	fn simulate<T, U>(&self, from: T, _to: Option<U>, mut guard: MutexGuard<Simulation>) -> Result<Option<PathBuf>>
 	where
@@ -201,6 +205,7 @@ mod tests {
 		Ok(())
 	}
 
+	#[cfg(feature = "action_trash")]
 	#[test]
 	fn trash_act_true() -> Result<()> {
 		let path = TEST_FILES_DIRECTORY.join("trash_act_true.pdf");
@@ -214,6 +219,7 @@ mod tests {
 		Ok(())
 	}
 
+	#[cfg(feature = "action_trash")]
 	#[test]
 	fn trash_act_false() -> Result<()> {
 		let path = TEST_FILES_DIRECTORY.join("trash_act_false.pdf");
@@ -227,6 +233,7 @@ mod tests {
 		Ok(())
 	}
 
+	#[cfg(feature = "action_trash")]
 	#[test]
 	fn trash_simulate_false() -> Result<()> {
 		let simulation = Simulation::new()?;
@@ -245,6 +252,7 @@ mod tests {
 		Ok(())
 	}
 
+	#[cfg(feature = "action_trash")]
 	#[test]
 	fn trash_simulate_true() -> Result<()> {
 		let simulation = Simulation::new()?;

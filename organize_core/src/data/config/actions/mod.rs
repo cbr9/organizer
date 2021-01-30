@@ -15,6 +15,7 @@ use crate::data::{
 };
 use crate::simulation::Simulation;
 
+#[cfg(feature = "action_trash")]
 use crate::data::config::actions::delete::Trash;
 use anyhow::Result;
 use std::sync::{Arc, Mutex, MutexGuard};
@@ -34,6 +35,7 @@ pub enum Action {
 	Symlink(Symlink),
 	Delete(Delete),
 	Echo(Echo),
+	#[cfg(feature = "action_trash")]
 	Trash(Trash),
 	Script(Script),
 }
@@ -54,6 +56,7 @@ impl Act for Action {
 			Symlink(symlink) => symlink.act(from, to),
 			Delete(delete) => delete.act(from, to),
 			Echo(echo) => echo.act(from, to),
+			#[cfg(feature = "action_trash")]
 			Trash(trash) => trash.act(from, to),
 			Script(script) => script.act(from, to),
 		}
@@ -75,6 +78,7 @@ impl Simulate for Action {
 			Symlink(symlink) => symlink.simulate(from, to, guard),
 			Delete(delete) => delete.simulate(from, to, guard),
 			Echo(echo) => echo.simulate(from, to, guard),
+			#[cfg(feature = "action_trash")]
 			Trash(trash) => trash.simulate(from, to, guard),
 			Script(script) => script.simulate(from, to, guard),
 		}
@@ -92,6 +96,7 @@ impl AsAction for Action {
 			Symlink(symlink) => symlink.process(path, simulation),
 			Delete(delete) => delete.process(path, simulation),
 			Echo(echo) => echo.process(path, simulation),
+			#[cfg(feature = "action_trash")]
 			Trash(trash) => trash.process(path, simulation),
 			Script(script) => script.process(path, simulation),
 		}
@@ -106,6 +111,7 @@ impl AsAction for Action {
 			Symlink(symlink) => symlink.ty(),
 			Delete(delete) => delete.ty(),
 			Echo(echo) => echo.ty(),
+			#[cfg(feature = "action_trash")]
 			Trash(trash) => trash.ty(),
 			Script(script) => script.ty(),
 		}
@@ -160,6 +166,7 @@ impl From<&Action> for ActionType {
 			Action::Symlink(_) => Self::Symlink,
 			Action::Delete(_) => Self::Delete,
 			Action::Echo(_) => Self::Echo,
+			#[cfg(feature = "action_trash")]
 			Action::Trash(_) => Self::Trash,
 			Action::Script(_) => Self::Script,
 		}

@@ -7,6 +7,10 @@ description = "file automation for the poweruser"
 repository = "https://github.com/cbr9/organize"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[features]
+hot-reload = []
+action_trash = ["organize_core/action_trash"]
+
 
 [dependencies]
 notify = "4.0.15"
@@ -21,7 +25,6 @@ colored = "2.0.0"
 sysinfo = "0.15.3"
 lazy_static = "1.4.0"
 rayon = "1.5"
-trash = "1.2.0"
 log = "0.4"
 fern = {version = "0.5", features = ["colored"] }
 toml = "0.5.7"
@@ -29,9 +32,6 @@ anyhow = "1.0.34"
 organize_core = { path = "organize_core/" }
 path-clean = "0.1.0"
 walkdir = "2.3.1"
-
-[features]
-hot-reload = []
 
 [workspace]
 members = ["organize_core/"]
