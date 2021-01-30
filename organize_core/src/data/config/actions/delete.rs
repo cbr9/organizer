@@ -135,8 +135,6 @@ mod tests {
 	use anyhow::Result;
 	use std::fs::File;
 	use std::time::Duration;
-	use std::sync::mpsc::channel;
-	use notify::{Watcher, RecursiveMode, Op};
 
 	#[test]
 	fn delete_act_true() -> Result<()> {
