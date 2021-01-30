@@ -104,15 +104,20 @@ mod tests {
 	use super::*;
 	use crate::utils::tests::AndWait;
 	use std::time::Duration;
+	use anyhow::Result;
 
 	#[test]
-	fn simulate() {
-		let simulation = Simulation::new().unwrap();
+	fn simulate() -> Result<()> {
+		let simulation = Simulation::new()?;
+		let dir = std::env::current_dir()?.join("simulate_test");
+		if !dir.exists() {
+			std::fs::create_dir_all(&dir)?;
+		}
 		{
 			let mut guard = simulation.lock().unwrap();
-			guard.watch_folder("/home/cabero").unwrap();
+			guard.watch_folder(&dir).unwrap();
 		}
-		let file = PathBuf::from("/home/cabero/simulate_test.pdf");
+		let file = dir.join("simulate_test.pdf");
 		// this file must be unique across all tests
 		// otherwise if it's created or removed by a different test the thread will pick it up and this test will fail
 		std::fs::File::create_and_wait(&file).unwrap();
@@ -129,7 +134,9 @@ mod tests {
 		// but not in all cases
 		{
 			let guard = simulation.lock().unwrap();
+			std::fs::remove_dir_all(dir)?;
 			assert!(!guard.files.contains(&file));
 		}
+        Ok(())
 	}
 }
