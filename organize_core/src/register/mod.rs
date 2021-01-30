@@ -87,16 +87,16 @@ impl Register {
 			path: path.into(),
 			pid: pid.as_(),
 		});
-		self.write()
+		self.persist()
 	}
 
 	#[cfg(test)]
 	fn clear(&mut self) -> Result<()> {
 		self.sections.clear();
-		self.write()
+		self.persist()
 	}
 
-	fn write(&self) -> Result<()> {
+	fn persist(&self) -> Result<()> {
 		let parent = self.path.parent().ok_or_else(|| anyhow!("invalid data directory"))?;
 		if !parent.exists() {
 			std::fs::create_dir_all(&parent).context("could not create data directory")?;
@@ -108,7 +108,7 @@ impl Register {
 	pub fn update(&mut self) -> Result<()> {
 		let sys = System::new_with_specifics(RefreshKind::new().with_processes());
 		self.sections.retain(|section| sys.get_process(section.pid).is_some());
-		self.write()
+		self.persist()
 	}
 }
 
