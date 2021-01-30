@@ -99,8 +99,8 @@ impl Config {
 			.find_map(|file| {
 				file.ok().map(|entry| {
 					let path = entry.path();
-					let mime_type = mime_guess::from_path(&entry.path()).first_or_octet_stream();
-					if path.file_stem().unwrap_or_default() == "organize" && mime_type == "text/x-yaml" {
+					let extension = path.extension().unwrap_or_default();
+					if path.file_stem().unwrap_or_default() == "organize" && (extension == "yaml" || extension == "yml")  {
 						Some(path)
 					} else {
 						None

@@ -7,13 +7,16 @@ use filename::Filename;
 
 mod extension;
 mod filename;
+#[cfg(feature = "filter_mime")]
 mod mime;
 mod regex;
 
+#[cfg(feature = "filter_mime")]
+use crate::data::config::filters::mime::MimeWrapper;
 use crate::data::{
 	config::{
 		actions::script::Script,
-		filters::{mime::MimeWrapper, regex::Regex},
+		filters::regex::Regex,
 	},
 	options::apply::Apply,
 };
@@ -25,6 +28,7 @@ pub enum Filter {
 	Filename(Filename),
 	Extension(Extension),
 	Script(Script),
+	#[cfg(feature = "filter_mime")]
 	Mime(MimeWrapper),
 }
 
@@ -39,6 +43,7 @@ impl AsFilter for Filter {
 			Filter::Filename(filename) => filename.matches(path),
 			Filter::Extension(extension) => extension.matches(path),
 			Filter::Script(script) => script.matches(path),
+			#[cfg(feature = "filter_mime")]
 			Filter::Mime(mime) => mime.matches(path),
 		}
 	}

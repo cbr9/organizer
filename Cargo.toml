@@ -10,6 +10,7 @@ repository = "https://github.com/cbr9/organize"
 [features]
 hot-reload = []
 action_trash = ["organize_core/action_trash"]
+filter_mime = ["organize_core/filter_mime"]
 
 
 [dependencies]

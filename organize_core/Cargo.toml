@@ -22,8 +22,8 @@ log = "0.4"
 toml = "0.5.7"
 anyhow = "1.0.34"
 num-traits = "0.2.14"
-mime_guess = "2.0.3"
-mime = "0.3.16"
+mime_guess = { version = "2.0.3", optional = true }
+mime = { version = "0.3.16", optional = true }
 strum_macros = "0.20.1"
 strum = "0.20.0"
 fern = { version = "0.5", features = ["colored"] }
@@ -37,3 +37,4 @@ rand = "0.8.3"
 
 [features]
 action_trash = ["trash"]
+filter_mime = ["mime", "mime_guess"]
