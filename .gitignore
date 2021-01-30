@@ -1,6 +1,6 @@
 /target
 /Cargo.lock
-tfeldmann-organize/
 venv/
 Dockerfile
 .idea/
+/.run
