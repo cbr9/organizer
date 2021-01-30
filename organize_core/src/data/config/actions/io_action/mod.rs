@@ -92,7 +92,10 @@ macro_rules! as_action {
 						let mut guard = simulation.lock().unwrap();
 						let parent = to.unwrap_ref().parent()?;
 						if parent.exists() {
-							guard.watch_folder(parent).map_err(|e| eprintln!("Error: {} ({})", e, parent.display())).ok()?;
+							guard
+								.watch_folder(parent)
+								.map_err(|e| eprintln!("Error: {} ({})", e, parent.display()))
+								.ok()?;
 						}
 						match self.simulate(&path, Some(to.unwrap_ref()), guard) {
 							Ok(new_path) => {
