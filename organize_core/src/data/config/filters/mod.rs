@@ -14,10 +14,7 @@ mod regex;
 #[cfg(feature = "filter_mime")]
 use crate::data::config::filters::mime::MimeWrapper;
 use crate::data::{
-	config::{
-		actions::script::Script,
-		filters::regex::Regex,
-	},
+	config::{actions::script::Script, filters::regex::Regex},
 	options::apply::Apply,
 };
 

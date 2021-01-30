@@ -1,8 +1,8 @@
 use crate::cmd::edit::Edit;
 use crate::cmd::Cmd;
-use clap::crate_name;
 use clap::Clap;
 use organize_core::data::config::Config;
+use anyhow::Result;
 use std::env;
 
 #[derive(Clap, Debug)]
@@ -12,9 +12,10 @@ pub struct New {
 }
 
 impl Cmd for New {
-	fn run(self) -> anyhow::Result<()> {
-		let config_file = env::current_dir()?.join(format!("{}.yml", crate_name!()));
-		Config::create(&config_file)?;
-		Edit::launch_editor(config_file).map(|_| ())
+	fn run(self) -> Result<()> {
+		let path = Config::create_in(env::current_dir()?)?;
+		Edit::launch_editor(&path)?;
+		println!("new config file created at {}", path.display());
+		Ok(())
 	}
 }

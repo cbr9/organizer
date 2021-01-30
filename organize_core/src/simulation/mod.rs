@@ -103,8 +103,8 @@ impl Simulation {
 mod tests {
 	use super::*;
 	use crate::utils::tests::AndWait;
-	use std::time::Duration;
 	use anyhow::Result;
+	use std::time::Duration;
 
 	#[test]
 	fn simulate() -> Result<()> {
@@ -137,6 +137,6 @@ mod tests {
 			std::fs::remove_dir_all(dir)?;
 			assert!(!guard.files.contains(&file));
 		}
-        Ok(())
+		Ok(())
 	}
 }

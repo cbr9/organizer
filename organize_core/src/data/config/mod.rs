@@ -3,20 +3,19 @@ use std::{
 	path::{Path, PathBuf},
 };
 
-use anyhow::{Context, Result};
+use anyhow::{ensure, anyhow, Context, Result};
 use dirs::home_dir;
 use serde::Deserialize;
 
 use crate::{
 	data::{
 		config::{
-			actions::{io_action::ConflictOption, Actions},
+			actions::{Actions},
 			filters::Filters,
 			folders::Folders,
 		},
 		options::Options,
 	},
-	path::ResolveConflict,
 	utils::DefaultOpt,
 	PROJECT_NAME,
 };
@@ -34,7 +33,8 @@ pub struct Config {
 
 impl Config {
 	pub fn parse<T: AsRef<Path>>(path: T) -> Result<Config> {
-		fs::read_to_string(&path).map(|ref content| serde_yaml::from_str(content).map_err(anyhow::Error::new))?
+		fs::read_to_string(&path)
+			.map(|ref content| serde_yaml::from_str(content).with_context(|| format!("could not deserialize {}", path.as_ref().display())))?
 	}
 
 	pub fn set_cwd<T: AsRef<Path>>(path: T) -> Result<PathBuf> {
@@ -44,7 +44,7 @@ impl Config {
 					std::env::set_current_dir(&path).map_err(anyhow::Error::new)?;
 					Ok(path)
 				})
-				.ok_or_else(|| anyhow::Error::msg("could not determine home directory"))?
+				.ok_or_else(|| anyhow!("could not determine home directory"))?
 		} else {
 			path.as_ref()
 				.parent()
@@ -52,27 +52,20 @@ impl Config {
 					std::env::set_current_dir(path).map_err(anyhow::Error::new)?;
 					Ok(path.into())
 				})
-				.ok_or_else(|| anyhow::Error::msg("could not determine config directory"))?
+				.ok_or_else(|| anyhow!("could not determine config directory"))?
 		}
 	}
 
-	pub fn create<T: AsRef<Path>>(path: T) -> anyhow::Result<()> {
-		let path = if path.as_ref().exists() {
-			path.as_ref().resolve_naming_conflict(&ConflictOption::default(), None).unwrap()
-		} else {
-			path.as_ref().into()
-		};
-
-		path.parent()
-			.map(|parent| {
-				if !parent.exists() {
-					std::fs::create_dir_all(parent).unwrap_or_else(|_| panic!("error: could not create config directory ({})", parent.display()));
-				}
-				let output = include_str!("../../../../examples/blueprint.yml");
-				std::fs::write(&path, output).unwrap_or_else(|_| panic!("error: could not create config file ({})", path.display()));
-				println!("New config file created at {}", path.display());
-			})
-			.ok_or_else(|| anyhow::Error::msg("config file's parent folder should be defined"))
+	pub fn create_in<T: AsRef<Path>>(folder: T) -> Result<PathBuf> {
+		let dir = folder.as_ref();
+		let path = dir.join(format!("{}.yml", PROJECT_NAME));
+		ensure!(!path.exists(), format!("a config file already exists in `{}`", dir.display()));
+		if !dir.exists() {
+			std::fs::create_dir_all(dir).with_context(|| format!("error: could not create config directory ({})", dir.display()))?;
+		}
+		let output = include_str!("../../../../examples/blueprint.yml");
+		std::fs::write(&path, output).with_context(|| format!("error: could not create config file ({})", path.display()))?;
+		Ok(path)
 	}
 
 	pub fn default_path() -> Result<PathBuf> {
@@ -84,7 +77,7 @@ impl Config {
 		std::env::var_os(var).map_or_else(
 			|| {
 				Ok(dirs::config_dir()
-					.ok_or_else(|| anyhow::Error::msg(format!("could not find config directory, please set {var} manually", var = var)))?
+					.ok_or_else(|| anyhow!("could not find config directory, please set {} manually", var))?
 					.join(PROJECT_NAME))
 			},
 			|path| Ok(PathBuf::from(path)),
@@ -97,15 +90,13 @@ impl Config {
 			.read_dir()
 			.context("could not determine directory content")?
 			.find_map(|file| {
-				file.ok().map(|entry| {
-					let path = entry.path();
-					let extension = path.extension().unwrap_or_default();
-					if path.file_stem().unwrap_or_default() == "organize" && (extension == "yaml" || extension == "yml")  {
-						Some(path)
-					} else {
-						None
-					}
-				})?
+				let path = file.ok()?.path();
+				let extension = path.extension().unwrap_or_default();
+				if path.file_stem().unwrap_or_default() == PROJECT_NAME && (extension == "yaml" || extension == "yml") {
+					Some(path)
+				} else {
+					None
+				}
 			})
 			.map_or_else(Self::default_path, Ok)
 	}
@@ -132,36 +123,65 @@ impl Default for Rule {
 	}
 }
 
-impl<'a> AsRef<Self> for Rule {
-	fn as_ref(&self) -> &Rule {
-		self
-	}
-}
-
 #[cfg(test)]
 mod tests {
-	use anyhow::Result;
+	use anyhow::{anyhow, Result};
 
-	use crate::utils::tests::project;
+	use crate::utils::tests::{project, AndWait};
 
 	use super::*;
+	use std::fs::File;
 
 	#[test]
-	fn set_cwd() -> Result<()> {
+	fn create() -> Result<()> {
+		let dir = std::env::current_dir()?;
+		let path = Config::create_in(&dir);
+		let first = path.is_ok();
+		let second = Config::create_in(&dir).is_err();
+		File::remove_and_wait(path?)?;
+		assert!(first);
+		assert!(second);
+		Ok(())
+	}
+
+	#[test]
+	fn path_custom_yml() -> Result<()> {
+		let config: PathBuf = format!("{}.yml", PROJECT_NAME).into();
+		File::create_and_wait(&config)?;
+		let is_ok = config.canonicalize()? == Config::path()?;
+		File::remove_and_wait(config)?;
+		assert!(is_ok);
+		let config: PathBuf = format!("{}.yaml", PROJECT_NAME).into();
+		File::create_and_wait(&config)?;
+		let is_ok = config.canonicalize()? == Config::path()?;
+		File::remove_and_wait(config)?;
+		assert!(is_ok);
+		Ok(())
+	}
+
+	#[test]
+	fn path_custom_default() -> Result<()> {
+		["yml", "yaml"].iter().for_each(|extension| {
+			let path = format!("{}.{}", PROJECT_NAME, extension);
+			assert!(PathBuf::from(path).canonicalize().is_err()) // assert they don't exist in the current dir
+		});
+		assert_eq!(Config::default_path()?, Config::path()?);
+		Ok(())
+	}
+
+	#[test]
+	fn set_cwd_default() -> Result<()> {
+		let cwd = Config::set_cwd(Config::default_path()?)?;
+		assert_eq!(cwd, home_dir().ok_or_else(|| anyhow!("cannot determine home directory"))?);
+		Ok(())
+	}
+
+	#[test]
+	fn set_cwd_custom() -> Result<()> {
 		let project_root = project();
-		if std::env::current_dir()? != project_root {
-			std::env::set_current_dir(&project_root)?;
-		}
-		Config::set_cwd(Config::default_path()?).map(|cwd| -> Result<()> {
-			std::env::set_current_dir(&project_root)?;
-			assert_eq!(cwd, home_dir().ok_or_else(|| anyhow::Error::msg("cannot determine home directory"))?);
-			Ok(())
-		})??;
-		Config::set_cwd("examples/config.yml").map(|cwd| -> Result<()> {
-			std::env::set_current_dir(project_root)?;
-			assert_eq!(cwd, Path::new("examples/"));
-			Ok(())
-		})??;
+		std::env::set_current_dir(&project_root)?;
+		let cwd = Config::set_cwd("examples/config.yml")?;
+		assert_eq!(cwd, Path::new("examples/"));
 		Ok(())
 	}
 }

@@ -1,5 +1,5 @@
 use std::ops::{Deref, DerefMut};
-use std::path::{PathBuf, Path};
+use std::path::{Path, PathBuf};
 
 use num_traits::AsPrimitive;
 use serde::{Deserialize, Serialize};
@@ -8,8 +8,8 @@ use sysinfo::{Pid, RefreshKind, System, SystemExt};
 
 use crate::data::Data;
 
-use anyhow::{anyhow, Context, Result};
 use crate::utils::Contains;
+use anyhow::{anyhow, Context, Result};
 
 mod de;
 
