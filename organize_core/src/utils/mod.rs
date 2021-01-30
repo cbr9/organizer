@@ -140,3 +140,8 @@ impl<T> UnwrapMut<T> for Option<T> {
 		self.as_mut().unwrap()
 	}
 }
+
+pub trait Contains<T> {
+	fn contains(&self, value: T) -> bool;
+}
+
