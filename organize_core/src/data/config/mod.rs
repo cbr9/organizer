@@ -3,7 +3,7 @@ use std::{
 	path::{Path, PathBuf},
 };
 
-use anyhow::{ensure, anyhow, Context, Result};
+use anyhow::{bail, anyhow, Context, Result};
 use dirs::home_dir;
 use serde::Deserialize;
 
@@ -36,7 +36,6 @@ impl Config {
 		fs::read_to_string(&path)
 			.map(|ref content| serde_yaml::from_str(content).with_context(|| format!("could not deserialize {}", path.as_ref().display())))?
 	}
-
 	pub fn set_cwd<T: AsRef<Path>>(path: T) -> Result<PathBuf> {
 		if path.as_ref() == Self::default_path()? {
 			home_dir()
@@ -56,16 +55,19 @@ impl Config {
 		}
 	}
 
+	pub fn create_in_cwd() -> Result<PathBuf> {
+		let dir = std::env::current_dir()?;
+		Self::create_in(dir)
+	}
+
 	pub fn create_in<T: AsRef<Path>>(folder: T) -> Result<PathBuf> {
-		let dir = folder.as_ref();
-		let path = dir.join(format!("{}.yml", PROJECT_NAME));
-		ensure!(!path.exists(), format!("a config file already exists in `{}`", dir.display()));
-		if !dir.exists() {
-			std::fs::create_dir_all(dir).with_context(|| format!("error: could not create config directory ({})", dir.display()))?;
+		let path = folder.as_ref().join(format!("{}.yml", PROJECT_NAME));
+        if path.exists() {
+			bail!("a config file already exists in `{}`", folder.as_ref().display())
 		}
 		let output = include_str!("../../../../examples/blueprint.yml");
 		std::fs::write(&path, output).with_context(|| format!("error: could not create config file ({})", path.display()))?;
-		Ok(path)
+		Ok(path.canonicalize()?)
 	}
 
 	pub fn default_path() -> Result<PathBuf> {
@@ -88,11 +90,12 @@ impl Config {
 		std::env::current_dir()
 			.context("cannot determine current directory")?
 			.read_dir()
-			.context("could not determine directory content")?
+			.context("cannot determine directory content")?
 			.find_map(|file| {
 				let path = file.ok()?.path();
 				let extension = path.extension().unwrap_or_default();
-				if path.file_stem().unwrap_or_default() == PROJECT_NAME && (extension == "yaml" || extension == "yml") {
+				let stem = path.file_stem().unwrap_or_default();
+				if stem == PROJECT_NAME && (extension == "yaml" || extension == "yml") {
 					Some(path)
 				} else {
 					None
@@ -134,10 +137,9 @@ mod tests {
 
 	#[test]
 	fn create() -> Result<()> {
-		let dir = std::env::current_dir()?;
-		let path = Config::create_in(&dir);
+		let path = Config::create_in_cwd();
 		let first = path.is_ok();
-		let second = Config::create_in(&dir).is_err();
+		let second = Config::create_in_cwd().is_err();
 		File::remove_and_wait(path?)?;
 		assert!(first);
 		assert!(second);
@@ -145,7 +147,7 @@ mod tests {
 	}
 
 	#[test]
-	fn path_custom_yml() -> Result<()> {
+	fn path_custom() -> Result<()> {
 		let config: PathBuf = format!("{}.yml", PROJECT_NAME).into();
 		File::create_and_wait(&config)?;
 		let is_ok = config.canonicalize()? == Config::path()?;
@@ -160,7 +162,7 @@ mod tests {
 	}
 
 	#[test]
-	fn path_custom_default() -> Result<()> {
+	fn path_default() -> Result<()> {
 		["yml", "yaml"].iter().for_each(|extension| {
 			let path = format!("{}.{}", PROJECT_NAME, extension);
 			assert!(PathBuf::from(path).canonicalize().is_err()) // assert they don't exist in the current dir

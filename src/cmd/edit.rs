@@ -26,7 +26,7 @@ impl Cmd for Edit {
 }
 
 impl Edit {
-	pub(crate) fn launch_editor<T: AsRef<Path>>(path: T) -> anyhow::Result<ExitStatus> {
+	pub(crate) fn launch_editor<T: AsRef<Path>>(path: T) -> Result<ExitStatus> {
 		Ok(env::var("EDITOR").map(|editor| {
 			let mut command = Command::new(&editor);
 			command
