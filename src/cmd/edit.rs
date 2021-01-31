@@ -1,12 +1,13 @@
-use std::env;
-use std::path::Path;
-use std::process::{Command, ExitStatus};
+use std::{
+	env,
+	path::Path,
+	process::{Command, ExitStatus},
+};
 
 use anyhow::{Context, Result};
 use clap::Clap;
 
-use organize_core::data::config::Config;
-use organize_core::data::settings::Settings;
+use organize_core::data::{config::Config, settings::Settings};
 
 use crate::cmd::Cmd;
 
@@ -27,14 +28,13 @@ impl Cmd for Edit {
 
 impl Edit {
 	pub(crate) fn launch_editor<T: AsRef<Path>>(path: T) -> Result<ExitStatus> {
-		Ok(env::var("EDITOR").map(|editor| {
-			let mut command = Command::new(&editor);
-			command
+		env::var("EDITOR").map(|editor| {
+			Command::new(&editor)
 				.arg(path.as_ref())
 				.spawn()
 				.context(editor)?
 				.wait()
 				.context("command wasn't running")
-		})??)
+		})?
 	}
 }

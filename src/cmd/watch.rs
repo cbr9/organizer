@@ -1,8 +1,8 @@
-use std::path::{Path, PathBuf};
-use std::time::Duration;
 use std::{
+	path::{Path, PathBuf},
 	process,
 	sync::mpsc::{channel, Receiver},
+	time::Duration,
 };
 
 use anyhow::Result;
@@ -12,16 +12,14 @@ use log::{debug, info};
 use notify::{watcher, DebouncedEvent, RecommendedWatcher, RecursiveMode, Watcher};
 use sysinfo::{ProcessExt, RefreshKind, Signal, System, SystemExt};
 
-use organize_core::data::settings::Settings;
-use organize_core::logger::Logger;
 use organize_core::{
-	data::{config::Config, path_to_recursive::PathToRecursive, path_to_rules::PathToRules, Data},
+	data::{config::Config, path_to_recursive::PathToRecursive, path_to_rules::PathToRules, settings::Settings, Data},
 	file::File,
+	logger::Logger,
 	register::Register,
 };
 
-use crate::cmd::run::Run;
-use crate::{Cmd, CONFIG_PATH_STR};
+use crate::{cmd::run::Run, Cmd, CONFIG_PATH_STR};
 use organize_core::simulation::Simulation;
 use std::sync::{Arc, Mutex};
 

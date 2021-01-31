@@ -18,26 +18,10 @@ lazy_static! {
 
 mod cmd;
 
-fn main() -> anyhow::Result<()> {
+fn main() {
 	let app: App = App::parse();
-	// let sim = Simulation::new()?;
-	// {
-	// 	let mut lock = sim.lock().unwrap();
-	// 	lock.watch_folder("/home/cabero")?;
-	// 	lock.watch_folder("/home/cabero/Documents")?;
-	// }
-	//
-	// {
-	// 	let lock = sim.lock().unwrap();
-	// lock.watcher = None;
-	// }
-	match app.run() {
-		Ok(_) => {}
-		Err(e) => {
-			error!("{:?}", e);
-			std::process::exit(0)
-		}
+	if let Err(e) = app.run() {
+		error!("{:?}", e);
+		std::process::exit(0)
 	}
-	// handle.join().unwrap();
-	Ok(())
 }

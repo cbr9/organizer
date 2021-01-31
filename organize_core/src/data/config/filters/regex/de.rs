@@ -2,10 +2,10 @@ use crate::data::config::filters::regex::Regex;
 use serde::{
 	de,
 	de::{Error, SeqAccess, Visitor},
-	Deserialize, Deserializer,
+	Deserialize,
+	Deserializer,
 };
-use std::fmt::Formatter;
-use std::{fmt, str::FromStr};
+use std::{fmt, fmt::Formatter, str::FromStr};
 
 impl<'de> Deserialize<'de> for Regex {
 	fn deserialize<D>(deserializer: D) -> Result<Self, <D as Deserializer<'de>>::Error>

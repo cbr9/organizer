@@ -1,5 +1,5 @@
-use std::convert::TryFrom;
 use std::{
+	convert::TryFrom,
 	path::{Path, PathBuf},
 	result,
 	str::FromStr,
@@ -8,16 +8,14 @@ use std::{
 use log::{error, info};
 use serde::{Deserialize, Serialize};
 
-use crate::data::config::actions::{Act, Simulate};
 use crate::{
-	data::config::actions::{ActionType, AsAction},
+	data::config::actions::{Act, ActionType, AsAction, Simulate},
 	path::{Expand, ResolveConflict},
 	simulation::Simulation,
 	string::Placeholder,
 	utils::UnwrapRef,
 };
-use anyhow::Context;
-use anyhow::Result;
+use anyhow::{Context, Result};
 
 use regex::Regex;
 use serde::de::Error;
@@ -120,6 +118,7 @@ macro_rules! as_action {
 					},
 				}
 			}
+
 			fn ty(&self) -> ActionType {
 				let name = stringify!($id).to_lowercase();
 				ActionType::from_str(&name).expect(&format!("no variant associated with {}", name))
@@ -402,12 +401,9 @@ mod tests {
 		assert_eq!(ConflictOption::from_str("delete")?, ConflictOption::Delete);
 		assert_eq!(ConflictOption::from_str("overwrite")?, ConflictOption::Overwrite);
 		assert_eq!(ConflictOption::from_str("rename")?, ConflictOption::default());
-		assert_eq!(
-			ConflictOption::from_str("rename with \" - \"")?,
-			ConflictOption::Rename {
-				counter_separator: " - ".to_string()
-			}
-		);
+		assert_eq!(ConflictOption::from_str("rename with \" - \"")?, ConflictOption::Rename {
+			counter_separator: " - ".to_string()
+		});
 		assert!(ConflictOption::from_str("rename with").is_err());
 		assert!(ConflictOption::from_str("rename with \"").is_err());
 		assert!(ConflictOption::from_str("rename with \" - ").is_err());

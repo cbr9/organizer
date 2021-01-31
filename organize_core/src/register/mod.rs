@@ -1,5 +1,7 @@
-use std::ops::{Deref, DerefMut};
-use std::path::{Path, PathBuf};
+use std::{
+	ops::{Deref, DerefMut},
+	path::{Path, PathBuf},
+};
 
 use num_traits::AsPrimitive;
 use serde::{Deserialize, Serialize};

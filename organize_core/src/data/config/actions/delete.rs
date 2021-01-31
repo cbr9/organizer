@@ -1,13 +1,19 @@
-use std::ops::Deref;
-use std::path::{Path, PathBuf};
+use std::{
+	ops::Deref,
+	path::{Path, PathBuf},
+};
 
-use crate::data::config::actions::{Act, ActionType, AsAction, Simulate};
-use crate::simulation::Simulation;
+use crate::{
+	data::config::actions::{Act, ActionType, AsAction, Simulate},
+	simulation::Simulation,
+};
 use anyhow::{Context, Result};
 use log::{error, info};
 use serde::Deserialize;
-use std::str::FromStr;
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::{
+	str::FromStr,
+	sync::{Arc, Mutex, MutexGuard},
+};
 
 #[derive(Debug, Clone, Deserialize, Default, PartialEq, Eq)]
 pub struct Delete(bool);
@@ -70,6 +76,7 @@ macro_rules! as_action {
 					Some(path)
 				}
 			}
+
 			fn ty(&self) -> ActionType {
 				let name = stringify!($id).to_lowercase();
 				ActionType::from_str(&name).expect(&format!("no variant associated with {}", name))
@@ -137,8 +144,7 @@ mod tests {
 	use super::*;
 	use crate::utils::tests::{AndWait, TEST_FILES_DIRECTORY};
 	use anyhow::Result;
-	use std::fs::File;
-	use std::time::Duration;
+	use std::{fs::File, time::Duration};
 
 	#[test]
 	fn delete_act_true() -> Result<()> {

@@ -6,15 +6,14 @@ use notify::RecursiveMode;
 use rayon::prelude::*;
 use walkdir::WalkDir;
 
-use organize_core::logger::Logger;
 use organize_core::{
 	data::{path_to_recursive::PathToRecursive, path_to_rules::PathToRules, Data},
 	file::File,
+	logger::Logger,
 };
 
 use crate::{Cmd, CONFIG_PATH_STR};
-use organize_core::simulation::Simulation;
-use organize_core::utils::UnwrapRef;
+use organize_core::{simulation::Simulation, utils::UnwrapRef};
 
 #[derive(Clap, Debug)]
 pub struct Run {

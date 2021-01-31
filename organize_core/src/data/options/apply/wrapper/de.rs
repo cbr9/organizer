@@ -1,10 +1,10 @@
 use crate::data::options::apply::{wrapper::ApplyWrapper, Apply};
 use serde::{
 	de::{Error, MapAccess, SeqAccess, Visitor},
-	Deserialize, Deserializer,
+	Deserialize,
+	Deserializer,
 };
-use std::fmt::Formatter;
-use std::{fmt, str::FromStr};
+use std::{fmt, fmt::Formatter, str::FromStr};
 
 impl<'de> Deserialize<'de> for ApplyWrapper {
 	fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
@@ -119,23 +119,20 @@ mod tests {
 			actions: Some(Apply::AllOf(vec![0, 1])),
 			filters: Some(Apply::All),
 		};
-		assert_de_tokens(
-			&value,
-			&[
-				Token::Map { len: Some(2) },
-				Token::Str("actions"),
-				Token::Map { len: Some(1) },
-				Token::Str("all_of"),
-				Token::Seq { len: Some(2) },
-				Token::U8(0),
-				Token::U8(1),
-				Token::SeqEnd,
-				Token::MapEnd,
-				Token::Str("filters"),
-				Token::Str("all"),
-				Token::MapEnd,
-			],
-		)
+		assert_de_tokens(&value, &[
+			Token::Map { len: Some(2) },
+			Token::Str("actions"),
+			Token::Map { len: Some(1) },
+			Token::Str("all_of"),
+			Token::Seq { len: Some(2) },
+			Token::U8(0),
+			Token::U8(1),
+			Token::SeqEnd,
+			Token::MapEnd,
+			Token::Str("filters"),
+			Token::Str("all"),
+			Token::MapEnd,
+		])
 	}
 
 	#[test]
@@ -144,17 +141,14 @@ mod tests {
 			actions: Some(Apply::All),
 			filters: Some(Apply::Any),
 		};
-		assert_de_tokens(
-			&value,
-			&[
-				Token::Map { len: Some(2) },
-				Token::Str("actions"),
-				Token::Str("all"),
-				Token::Str("filters"),
-				Token::Str("any"),
-				Token::MapEnd,
-			],
-		)
+		assert_de_tokens(&value, &[
+			Token::Map { len: Some(2) },
+			Token::Str("actions"),
+			Token::Str("all"),
+			Token::Str("filters"),
+			Token::Str("any"),
+			Token::MapEnd,
+		])
 	}
 
 	#[test]
@@ -163,10 +157,12 @@ mod tests {
 			actions: Some(Apply::All),
 			filters: None,
 		};
-		assert_de_tokens(
-			&value,
-			&[Token::Map { len: Some(1) }, Token::Str("actions"), Token::Str("all"), Token::MapEnd],
-		)
+		assert_de_tokens(&value, &[
+			Token::Map { len: Some(1) },
+			Token::Str("actions"),
+			Token::Str("all"),
+			Token::MapEnd,
+		])
 	}
 
 	#[test]
@@ -175,10 +171,12 @@ mod tests {
 			actions: None,
 			filters: Some(Apply::All),
 		};
-		assert_de_tokens(
-			&value,
-			&[Token::Map { len: Some(1) }, Token::Str("filters"), Token::Str("all"), Token::MapEnd],
-		)
+		assert_de_tokens(&value, &[
+			Token::Map { len: Some(1) },
+			Token::Str("filters"),
+			Token::Str("all"),
+			Token::MapEnd,
+		])
 	}
 	#[test]
 	fn test_apply_wrapper_invalid_actions_any() {

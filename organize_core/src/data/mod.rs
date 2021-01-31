@@ -2,13 +2,14 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{anyhow, Result};
 
-use crate::path::IsHidden;
 use crate::{
-	data::options::apply::Apply,
-	data::options::r#match::Match,
-	data::{config::Config, options::Options, settings::Settings},
-	utils::DefaultOpt,
-	utils::UnwrapRef,
+	data::{
+		config::Config,
+		options::{apply::Apply, r#match::Match, Options},
+		settings::Settings,
+	},
+	path::IsHidden,
+	utils::{DefaultOpt, UnwrapRef},
 	PROJECT_NAME,
 };
 
@@ -150,10 +151,7 @@ impl Data {
 
 #[cfg(test)]
 mod tests {
-	use crate::data::config::actions::Actions;
-	use crate::data::config::filters::Filters;
-	use crate::data::config::folders::Folder;
-	use crate::data::config::Rule;
+	use crate::data::config::{actions::Actions, filters::Filters, folders::Folder, Rule};
 
 	use super::*;
 

@@ -11,10 +11,13 @@ use colored::Colorize;
 use log::info;
 use serde::{de::Error, Deserialize, Deserializer};
 
-use crate::data::config::actions::{Act, ActionType, Simulate};
-use crate::simulation::Simulation;
 use crate::{
-	data::config::{actions::AsAction, filters::AsFilter, Config},
+	data::config::{
+		actions::{Act, ActionType, AsAction, Simulate},
+		filters::AsFilter,
+		Config,
+	},
+	simulation::Simulation,
 	string::{deserialize_placeholder_string, Placeholder},
 };
 use anyhow::Result;

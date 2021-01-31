@@ -55,12 +55,14 @@ impl<'a> PathToRecursive<'a> {
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use crate::data::config::folders::Folder;
-	use crate::data::config::{Config, Rule};
-	use crate::data::options::recursive::Recursive;
-	use crate::data::options::Options;
-	use crate::data::settings::Settings;
-	use crate::utils::DefaultOpt;
+	use crate::{
+		data::{
+			config::{folders::Folder, Config, Rule},
+			options::{recursive::Recursive, Options},
+			settings::Settings,
+		},
+		utils::DefaultOpt,
+	};
 
 	#[test]
 	fn new() {

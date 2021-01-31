@@ -13,6 +13,7 @@ pub struct Folder {
 
 impl TryFrom<PathBuf> for Folder {
 	type Error = anyhow::Error;
+
 	fn try_from(path: PathBuf) -> Result<Self, Self::Error> {
 		path.expand_user()?
 			.expand_vars()?

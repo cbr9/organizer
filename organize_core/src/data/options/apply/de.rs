@@ -1,11 +1,10 @@
 use crate::data::options::apply::Apply;
 use serde::{
 	de::{Error, MapAccess, SeqAccess, Visitor},
-	Deserialize, Deserializer,
+	Deserialize,
+	Deserializer,
 };
-use std::fmt::Formatter;
-use std::marker::PhantomData;
-use std::{fmt, str::FromStr};
+use std::{fmt, fmt::Formatter, marker::PhantomData, str::FromStr};
 
 impl<'de> Deserialize<'de> for Apply {
 	fn deserialize<D>(deserializer: D) -> Result<Self, <D as Deserializer<'de>>::Error>
@@ -76,45 +75,42 @@ mod tests {
 	#[test]
 	fn test_apply_str_vec() {
 		let value = Apply::AllOf(vec![0, 1, 2]);
-		assert_de_tokens(
-			&value,
-			&[Token::Seq { len: Some(3) }, Token::U8(0), Token::U8(1), Token::U8(2), Token::SeqEnd],
-		)
+		assert_de_tokens(&value, &[
+			Token::Seq { len: Some(3) },
+			Token::U8(0),
+			Token::U8(1),
+			Token::U8(2),
+			Token::SeqEnd,
+		])
 	}
 
 	#[test]
 	fn test_apply_all_of() {
 		let value = Apply::AllOf(vec![0, 1, 2]);
-		assert_de_tokens(
-			&value,
-			&[
-				Token::Map { len: Some(1) },
-				Token::Str("all_of"),
-				Token::Seq { len: Some(3) },
-				Token::U8(0),
-				Token::U8(1),
-				Token::U8(2),
-				Token::SeqEnd,
-				Token::MapEnd,
-			],
-		)
+		assert_de_tokens(&value, &[
+			Token::Map { len: Some(1) },
+			Token::Str("all_of"),
+			Token::Seq { len: Some(3) },
+			Token::U8(0),
+			Token::U8(1),
+			Token::U8(2),
+			Token::SeqEnd,
+			Token::MapEnd,
+		])
 	}
 
 	#[test]
 	fn test_apply_any_of() {
 		let value = Apply::AnyOf(vec![0, 1, 2]);
-		assert_de_tokens(
-			&value,
-			&[
-				Token::Map { len: Some(1) },
-				Token::Str("any_of"),
-				Token::Seq { len: Some(3) },
-				Token::U8(0),
-				Token::U8(1),
-				Token::U8(2),
-				Token::SeqEnd,
-				Token::MapEnd,
-			],
-		)
+		assert_de_tokens(&value, &[
+			Token::Map { len: Some(1) },
+			Token::Str("any_of"),
+			Token::Seq { len: Some(3) },
+			Token::U8(0),
+			Token::U8(1),
+			Token::U8(2),
+			Token::SeqEnd,
+			Token::MapEnd,
+		])
 	}
 }

@@ -4,12 +4,14 @@ pub mod tests {
 	use anyhow::Result;
 	use lazy_static::lazy_static;
 	use notify::{Op, RawEvent, RecursiveMode, Watcher};
-	use std::env::temp_dir;
-	use std::fs::{create_dir_all, File};
-	use std::path::Path;
-	use std::sync::mpsc::{channel, Receiver};
-	use std::time::Duration;
-	use std::{env, path::PathBuf};
+	use std::{
+		env,
+		env::temp_dir,
+		fs::{create_dir_all, File},
+		path::{Path, PathBuf},
+		sync::mpsc::{channel, Receiver},
+		time::Duration,
+	};
 
 	lazy_static! {
 		pub static ref TEST_FILES_DIRECTORY: PathBuf = {

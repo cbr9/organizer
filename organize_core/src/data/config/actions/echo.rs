@@ -1,13 +1,14 @@
-use std::ops::Deref;
-use std::path::{Path, PathBuf};
+use std::{
+	ops::Deref,
+	path::{Path, PathBuf},
+};
 
 use log::{error, info};
 use serde::Deserialize;
 
-use crate::data::config::actions::{Act, Simulate};
-use crate::simulation::Simulation;
 use crate::{
-	data::config::actions::{ActionType, AsAction},
+	data::config::actions::{Act, ActionType, AsAction, Simulate},
+	simulation::Simulation,
 	string::{deserialize_placeholder_string, Placeholder},
 };
 use anyhow::{Context, Result};
@@ -85,6 +86,7 @@ impl AsAction for Echo {
 			}
 		}
 	}
+
 	fn ty(&self) -> ActionType {
 		ActionType::Echo
 	}

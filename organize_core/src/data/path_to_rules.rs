@@ -1,7 +1,7 @@
 use crate::data::config::Config;
 use std::{
 	collections::{hash_map::Keys, HashMap},
-	path::PathBuf,
+	path::{Path, PathBuf},
 };
 
 pub struct PathToRules<'a>(HashMap<&'a PathBuf, Vec<(usize, usize)>>);
@@ -22,11 +22,13 @@ impl<'a> PathToRules<'a> {
 		self.0.keys()
 	}
 
-	pub fn get_key_value(&self, key: &PathBuf) -> Option<(&&PathBuf, &Vec<(usize, usize)>)> {
-		key.ancestors().find_map(|ancestor| self.0.get_key_value(&ancestor.to_path_buf()))
+	pub fn get_key_value<T: AsRef<Path>>(&self, key: T) -> Option<(&&PathBuf, &Vec<(usize, usize)>)> {
+		key.as_ref()
+			.ancestors()
+			.find_map(|ancestor| self.0.get_key_value(&ancestor.to_path_buf()))
 	}
 
-	pub fn get(&self, key: &PathBuf) -> Option<&Vec<(usize, usize)>> {
+	pub fn get<T: AsRef<Path>>(&self, key: T) -> Option<&Vec<(usize, usize)>> {
 		self.get_key_value(key).map(|(_, value)| value)
 	}
 }
@@ -34,10 +36,13 @@ impl<'a> PathToRules<'a> {
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use crate::data::config::folders::Folder;
-	use crate::data::config::Rule;
-	use crate::data::options::Options;
-	use crate::utils::DefaultOpt;
+	use crate::{
+		data::{
+			config::{folders::Folder, Rule},
+			options::Options,
+		},
+		utils::DefaultOpt,
+	};
 	use std::path::Path;
 
 	#[test]

@@ -5,8 +5,10 @@ use std::{
 
 use serde::Serialize;
 
-use crate::data::config::Config;
-use crate::{data::options::Options, utils::DefaultOpt};
+use crate::{
+	data::{config::Config, options::Options},
+	utils::DefaultOpt,
+};
 
 use std::io::ErrorKind;
 

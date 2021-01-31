@@ -1,8 +1,7 @@
 use crate::data::config::actions::io_action::ConflictOption;
 
 use crate::simulation::Simulation;
-use std::path::PathBuf;
-use std::sync::MutexGuard;
+use std::{path::PathBuf, sync::MutexGuard};
 
 pub trait ResolveConflict {
 	fn resolve_naming_conflict(self, if_exists: &ConflictOption, simulation: Option<MutexGuard<Simulation>>) -> Option<PathBuf>;
@@ -47,13 +46,12 @@ mod tests {
 	use std::fs::File;
 
 	#[test]
-	fn rename_non_existent() -> Result<()> {
+	fn rename_non_existent() {
 		let path = TEST_FILES_DIRECTORY.join("rename_non_existent.txt");
 		let option = ConflictOption::Rename {
 			counter_separator: " ".to_string(),
 		};
 		assert_eq!(path, path.clone().resolve_naming_conflict(&option, None).unwrap());
-		Ok(())
 	}
 	#[test]
 	fn rename_existent() -> Result<()> {
@@ -95,11 +93,10 @@ mod tests {
 		Ok(())
 	}
 	#[test]
-	fn overwrite() -> Result<()> {
+	fn overwrite() {
 		let path = TEST_FILES_DIRECTORY.join("test.txt");
 		let option = ConflictOption::Overwrite;
 		assert_eq!(path, path.clone().resolve_naming_conflict(&option, None).unwrap());
-		Ok(())
 	}
 
 	#[test]

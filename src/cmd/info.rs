@@ -1,10 +1,10 @@
 use crate::cmd::Cmd;
 use clap::Clap;
 use colored::Colorize;
-use organize_core::data::config::Config;
-use organize_core::data::options::Options;
-use organize_core::data::Data;
-use organize_core::utils::DefaultOpt;
+use organize_core::{
+	data::{config::Config, options::Options, Data},
+	utils::DefaultOpt,
+};
 
 #[derive(Clap, Debug)]
 pub struct Info {

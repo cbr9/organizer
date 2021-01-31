@@ -7,10 +7,10 @@ use crate::{
 use serde::{
 	de,
 	de::{Error, MapAccess, Visitor},
-	Deserialize, Deserializer,
+	Deserialize,
+	Deserializer,
 };
-use std::fmt::Formatter;
-use std::path::PathBuf;
+use std::{fmt::Formatter, path::PathBuf};
 
 impl<'de> Deserialize<'de> for Folder {
 	fn deserialize<D>(deserializer: D) -> result::Result<Self, D::Error>
@@ -70,9 +70,9 @@ impl<'de> Deserialize<'de> for Folder {
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use crate::data::options::recursive::Recursive;
 	use crate::data::options::{
 		apply::{wrapper::ApplyWrapper, Apply},
+		recursive::Recursive,
 		Options,
 	};
 	use serde::de::{value::Error, Error as ErrorTrait};
@@ -185,23 +185,20 @@ mod tests {
 			r#match: None,
 			apply: ApplyWrapper::from(Apply::All),
 		};
-		assert_de_tokens(
-			&value,
-			&[
-				Token::Map { len: Some(2) },
-				Token::Str("path"),
-				Token::Str("$HOME"),
-				Token::Str("options"),
-				Token::Map { len: Some(3) },
-				Token::Str("recursive"),
-				Token::Bool(true),
-				Token::Str("apply"),
-				Token::Str("all"),
-				Token::Str("watch"),
-				Token::Bool(true),
-				Token::MapEnd,
-				Token::MapEnd,
-			],
-		)
+		assert_de_tokens(&value, &[
+			Token::Map { len: Some(2) },
+			Token::Str("path"),
+			Token::Str("$HOME"),
+			Token::Str("options"),
+			Token::Map { len: Some(3) },
+			Token::Str("recursive"),
+			Token::Bool(true),
+			Token::Str("apply"),
+			Token::Str("all"),
+			Token::Str("watch"),
+			Token::Bool(true),
+			Token::MapEnd,
+			Token::MapEnd,
+		])
 	}
 }

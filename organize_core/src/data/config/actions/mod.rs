@@ -1,19 +1,22 @@
-use std::ops::Deref;
-use std::path::{Path, PathBuf};
+use std::{
+	ops::Deref,
+	path::{Path, PathBuf},
+};
 
 use serde::Deserialize;
 
-use crate::data::config::actions::io_action::{Hardlink, Symlink};
-use crate::data::{
-	config::actions::{
-		delete::Delete,
-		echo::Echo,
-		io_action::{Copy, Move, Rename},
-		script::Script,
+use crate::{
+	data::{
+		config::actions::{
+			delete::Delete,
+			echo::Echo,
+			io_action::{Copy, Hardlink, Move, Rename, Symlink},
+			script::Script,
+		},
+		options::apply::Apply,
 	},
-	options::apply::Apply,
+	simulation::Simulation,
 };
-use crate::simulation::Simulation;
 
 #[cfg(feature = "action_trash")]
 use crate::data::config::actions::delete::Trash;
@@ -101,6 +104,7 @@ impl AsAction for Action {
 			Script(script) => script.process(path, simulation),
 		}
 	}
+
 	fn ty(&self) -> ActionType {
 		use Action::*;
 		match self {

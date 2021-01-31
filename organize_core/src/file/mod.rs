@@ -1,9 +1,12 @@
-use crate::data::path_to_recursive::PathToRecursive;
-use crate::data::{options::r#match::Match, path_to_rules::PathToRules, Data};
-use crate::simulation::Simulation;
+use crate::{
+	data::{options::r#match::Match, path_to_recursive::PathToRecursive, path_to_rules::PathToRules, Data},
+	simulation::Simulation,
+};
 use notify::RecursiveMode;
-use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
+use std::{
+	path::PathBuf,
+	sync::{Arc, Mutex},
+};
 
 pub struct File {
 	pub path: PathBuf,
@@ -13,6 +16,7 @@ impl File {
 	pub fn new<T: Into<PathBuf>>(path: T) -> Self {
 		Self { path: path.into() }
 	}
+
 	pub fn simulate<'a>(
 		self,
 		data: &'a Data,

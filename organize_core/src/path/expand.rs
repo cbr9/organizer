@@ -1,9 +1,9 @@
 use anyhow::{anyhow, Context, Result};
 use dirs::home_dir;
-use std::ffi::{OsStr, OsString};
-use std::iter::FromIterator;
 use std::{
 	env,
+	ffi::{OsStr, OsString},
+	iter::FromIterator,
 	path::{Path, PathBuf},
 };
 

@@ -1,6 +1,9 @@
 use super::*;
-use serde::de::{Error, Visitor};
-use serde::{Deserialize, Deserializer};
+use serde::{
+	de::{Error, Visitor},
+	Deserialize,
+	Deserializer,
+};
 use std::fmt;
 
 impl<'de> Deserialize<'de> for Recursive {

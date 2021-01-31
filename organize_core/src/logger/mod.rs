@@ -1,14 +1,22 @@
-use std::fmt::Arguments;
-use std::fmt::Display;
-use std::io::Write;
-use std::path::PathBuf;
-use std::str::FromStr;
+use std::{
+	fmt::{Arguments, Display},
+	io::Write,
+	path::PathBuf,
+	str::FromStr,
+};
 
-use chrono::format::{DelayedFormat, StrftimeItems};
-use chrono::{Local, NaiveDateTime};
+use chrono::{
+	format::{DelayedFormat, StrftimeItems},
+	Local,
+	NaiveDateTime,
+};
 use colored::Colorize;
-use fern::colors::{Color, ColoredLevelConfig};
-use fern::{Dispatch, FormatCallback, Output};
+use fern::{
+	colors::{Color, ColoredLevelConfig},
+	Dispatch,
+	FormatCallback,
+	Output,
+};
 use lazy_static::lazy_static;
 use log::{Level, Record};
 use regex::Regex;
@@ -55,6 +63,7 @@ impl Log {
 		let message = self.message;
 		Self::format(timestamp, level, message)
 	}
+
 	pub fn plain(self) -> String {
 		Self::format(self.timestamp.format(*TIME_FORMAT), self.level, self.message)
 	}

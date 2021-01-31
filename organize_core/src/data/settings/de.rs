@@ -13,8 +13,7 @@ impl<'de> Deserialize<'de> for Settings {
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use crate::data::options::recursive::Recursive;
-	use crate::utils::DefaultOpt;
+	use crate::{data::options::recursive::Recursive, utils::DefaultOpt};
 	use serde_test::{assert_de_tokens, Token};
 
 	#[test]
@@ -27,18 +26,15 @@ mod tests {
 			depth: None,
 		};
 		let value = Settings { defaults };
-		assert_de_tokens(
-			&value,
-			&[
-				Token::Map { len: Some(3) },
-				Token::Str("hidden_files"),
-				Token::Bool(true),
-				Token::Str("watch"),
-				Token::Bool(false),
-				Token::Str("recursive"),
-				Token::Bool(true),
-				Token::MapEnd,
-			],
-		)
+		assert_de_tokens(&value, &[
+			Token::Map { len: Some(3) },
+			Token::Str("hidden_files"),
+			Token::Bool(true),
+			Token::Str("watch"),
+			Token::Bool(false),
+			Token::Str("recursive"),
+			Token::Bool(true),
+			Token::MapEnd,
+		])
 	}
 }

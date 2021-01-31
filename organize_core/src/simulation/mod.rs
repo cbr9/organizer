@@ -1,10 +1,11 @@
-use std::collections::HashSet;
-use std::path::{Path, PathBuf};
+use std::{
+	collections::HashSet,
+	path::{Path, PathBuf},
+};
 
 use crate::utils::UnwrapMut;
 use notify::{Error, Op, RawEvent, RecommendedWatcher, RecursiveMode, Watcher};
-use std::sync::mpsc::channel;
-use std::sync::{Arc, Mutex};
+use std::sync::{mpsc::channel, Arc, Mutex};
 
 pub struct Simulation {
 	pub files: HashSet<PathBuf>,

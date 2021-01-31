@@ -3,17 +3,13 @@ use std::{
 	path::{Path, PathBuf},
 };
 
-use anyhow::{bail, anyhow, Context, Result};
+use anyhow::{anyhow, bail, Context, Result};
 use dirs::home_dir;
 use serde::Deserialize;
 
 use crate::{
 	data::{
-		config::{
-			actions::{Actions},
-			filters::Filters,
-			folders::Folders,
-		},
+		config::{actions::Actions, filters::Filters, folders::Folders},
 		options::Options,
 	},
 	utils::DefaultOpt,
@@ -36,6 +32,7 @@ impl Config {
 		fs::read_to_string(&path)
 			.map(|ref content| serde_yaml::from_str(content).with_context(|| format!("could not deserialize {}", path.as_ref().display())))?
 	}
+
 	pub fn set_cwd<T: AsRef<Path>>(path: T) -> Result<PathBuf> {
 		if path.as_ref() == Self::default_path()? {
 			home_dir()
@@ -62,7 +59,7 @@ impl Config {
 
 	pub fn create_in<T: AsRef<Path>>(folder: T) -> Result<PathBuf> {
 		let path = folder.as_ref().join(format!("{}.yml", PROJECT_NAME));
-        if path.exists() {
+		if path.exists() {
 			bail!("a config file already exists in `{}`", folder.as_ref().display())
 		}
 		let output = include_str!("../../../../examples/blueprint.yml");

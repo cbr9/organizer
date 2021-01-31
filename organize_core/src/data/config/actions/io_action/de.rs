@@ -3,7 +3,8 @@ use std::{fmt, path::PathBuf, str::FromStr};
 use serde::{
 	de,
 	de::{Error, MapAccess, Visitor},
-	Deserialize, Deserializer,
+	Deserialize,
+	Deserializer,
 };
 
 use crate::{
@@ -97,16 +98,13 @@ mod tests {
 				counter_separator: "-".into(),
 			},
 		};
-		assert_de_tokens(
-			&value,
-			&[
-				Token::Map { len: Some(3) },
-				Token::Str("to"),
-				Token::Str("$HOME"),
-				Token::Str("if_exists"),
-				Token::Str("rename with \"-\""),
-				Token::MapEnd,
-			],
-		)
+		assert_de_tokens(&value, &[
+			Token::Map { len: Some(3) },
+			Token::Str("to"),
+			Token::Str("$HOME"),
+			Token::Str("if_exists"),
+			Token::Str("rename with \"-\""),
+			Token::MapEnd,
+		])
 	}
 }
