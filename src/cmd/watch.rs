@@ -8,6 +8,8 @@ use std::{
 use anyhow::Result;
 use clap::Clap;
 use colored::Colorize;
+#[cfg(feature = "interactive")]
+use dialoguer::{theme::ColorfulTheme, Confirm, Select};
 use log::{debug, info};
 use notify::{watcher, DebouncedEvent, RecommendedWatcher, RecursiveMode, Watcher};
 use sysinfo::{ProcessExt, RefreshKind, Signal, System, SystemExt};
@@ -86,15 +88,19 @@ impl<'a> Watch {
 			}
 			None => {
 				// there is no running process
-				if self.config == Config::default_path()? {
-					println!("{}", "No instance was found running with the default configuration.".bold());
-				} else {
-					println!(
-						"{} ({})",
-						"No instance was found running with the desired configuration".bold(),
-						self.config.display().to_string().underline()
-					);
-				};
+				println!(
+					"{} {}",
+					"No instance was found running with configuration:".bold(),
+					self.config.display().to_string().underline()
+				);
+				if cfg!(feature = "interactive") {
+					let prompt = Confirm::with_theme(&ColorfulTheme::default())
+						.with_prompt("Do you wish to start an instance?")
+						.interact()?;
+					if prompt {
+						self.start(Data::new()?)?;
+					}
+				}
 				Ok(())
 			}
 		}
