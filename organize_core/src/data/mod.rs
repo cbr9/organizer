@@ -26,10 +26,10 @@ pub struct Data {
 	pub config: Config,
 }
 
-macro_rules! getter {
-	(from folder, $v:vis $name:ident, $field:tt, $typ:ty) => {
+macro_rules! getters {
+	($($v:vis fn $name:ident(&self, rule: $rul:ty, folder: $fol:ty) -> $typ:ty {$field:tt})+) => {
 		impl Data {
-			$v fn $name(&self, rule: usize, folder: usize) -> &$typ {
+			$($v fn $name(&self, rule: $rul, folder: $fol) -> &$typ {
 				let rule = &self.config.rules[rule];
 				let folder = &rule.folders[folder];
 				folder.options.$field.as_ref().unwrap_or_else(|| {
@@ -41,23 +41,23 @@ macro_rules! getter {
 						})
 					})
 				})
-			}
+			})+
 		}
 	};
-	(from config, $v:vis $name:ident, $field:tt, $typ:ty) => {
+	($($v:vis fn $name:ident(&self) -> $typ:ty {$field:tt} )+) => {
 		impl Data {
-			$v fn $name(&self) -> &$typ {
+			$($v fn $name(&self) -> &$typ {
 				self.config.defaults.$field.as_ref().unwrap_or_else(|| {
 					self.settings.defaults.$field.as_ref().unwrap_or_else(|| {
 						self.defaults.$field.unwrap_ref()
 					})
 				})
-			}
+			})+
 		}
 	};
-	(from folder, struct, $v:vis $name:ident, $field:tt, $subfield:tt, $typ:ty) => {
+	($($v:vis fn $name:ident(&self, rule: $rul:ty, folder: $fol:ty) -> $typ:ty { $field:tt.$subfield:tt })+) => {
 		impl Data {
-			$v fn $name(&self, rule: usize, folder: usize) -> &$typ {
+			$($v fn $name(&self, rule: $rul, folder: $fol) -> &$typ {
 				let rule = &self.config.rules[rule];
 				let folder = &rule.folders[folder];
 				folder.options.$field.$subfield.as_ref().unwrap_or_else(|| {
@@ -69,18 +69,43 @@ macro_rules! getter {
 						})
 					})
 				})
-			}
+			})+
 		}
 	};
 }
 
-getter!(from folder, struct, pub get_recursive_depth, recursive, depth, u16); // try to get recursive.depth from `folder` up until `defaults`
-getter!(from folder, struct, pub get_recursive_enabled, recursive, enabled, bool);
-getter!(from folder, pub get_watch, watch, bool);
-getter!(from folder, pub get_hidden_files, hidden_files, bool);
-getter!(from folder, struct, pub get_apply_actions, apply, actions, Apply);
-getter!(from folder, struct, pub get_apply_filters, apply, filters, Apply);
-getter!(from config, pub get_match, r#match, Match);
+getters! {
+	pub fn get_watch(&self) -> bool {
+		watch
+	}
+	pub fn get_match(&self) -> Match {
+		r#match
+	}
+}
+
+getters! {
+	pub fn get_partial_files(&self, rule: usize, folder: usize) -> bool {
+		partial_files
+	}
+	pub fn get_hidden_files(&self, rule: usize, folder: usize) -> bool {
+		hidden_files
+	}
+}
+
+getters! {
+	pub fn get_recursive_depth(&self, rule: usize, folder: usize) -> u16 {
+		recursive.depth
+	}
+	pub fn get_recursive_enabled(&self, rule: usize, folder: usize) -> bool {
+		recursive.enabled
+	}
+	pub fn get_apply_actions(&self, rule: usize, folder: usize) -> Apply {
+		apply.actions
+	}
+	pub fn get_apply_filters(&self, rule: usize, folder: usize) -> Apply {
+		apply.filters
+	}
+}
 
 impl Data {
 	pub fn new() -> Result<Self> {
