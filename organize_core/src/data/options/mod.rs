@@ -19,6 +19,7 @@ pub struct Options {
 	pub ignored_dirs: Option<Vec<PathBuf>>,
 	pub hidden_files: Option<bool>,
 	pub r#match: Option<Match>,
+	pub partial_files: Option<bool>,
 	#[serde(default = "DefaultOpt::default_none")]
 	pub apply: ApplyWrapper,
 }
@@ -30,6 +31,7 @@ impl DefaultOpt for Options {
 			watch: None,
 			ignored_dirs: None,
 			hidden_files: None,
+			partial_files: None,
 			r#match: None,
 			apply: DefaultOpt::default_none(),
 		}
@@ -41,6 +43,7 @@ impl DefaultOpt for Options {
 			watch: Some(true),
 			ignored_dirs: Some(Vec::new()),
 			hidden_files: Some(false),
+			partial_files: Some(false),
 			apply: DefaultOpt::default_some(),
 			r#match: Some(Match::default()),
 		}

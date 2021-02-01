@@ -183,6 +183,7 @@ mod tests {
 			ignored_dirs: None,
 			hidden_files: None,
 			r#match: None,
+			partial_files: None,
 			apply: ApplyWrapper::from(Apply::All),
 		};
 		assert_de_tokens(&value, &[

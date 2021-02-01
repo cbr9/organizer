@@ -59,16 +59,6 @@ impl Deref for Filters {
 
 impl Filters {
 	pub fn r#match<T: AsRef<Path>>(&self, path: T, apply: &Apply) -> bool {
-		match path.as_ref().extension() {
-			None => {}
-			Some(extension) => {
-				let extension = extension.to_string_lossy();
-				let temp_files = ["crdownload" /* chrome download */, "part"];
-				if temp_files.iter().any(|temp| temp == &extension) {
-					return false;
-				}
-			}
-		}
 		match apply {
 			Apply::All => self.iter().all(|filter| filter.matches(&path)),
 			Apply::Any => self.iter().any(|filter| filter.matches(&path)),

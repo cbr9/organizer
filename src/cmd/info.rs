@@ -32,6 +32,7 @@ impl Cmd for Info {
 				watch,
 				ignored_dirs,
 				hidden_files,
+				partial_files,
 				r#match,
 				apply,
 			} = Options::default_some();
@@ -41,6 +42,7 @@ impl Cmd for Info {
 			println!("  watch = {}", watch.unwrap().to_string().bright_purple());
 			println!("  ignored_dirs = {:?}", ignored_dirs.unwrap());
 			println!("  hidden_files = {}", hidden_files.unwrap().to_string().bright_purple());
+			println!("  partial_files = {}", partial_files.unwrap().to_string().bright_purple());
 			println!("  match = {}", r#match.unwrap().to_string().bright_green());
 			println!("  apply.actions = {}", apply.actions.unwrap().to_string().bright_green());
 			println!("  apply.filters = {}", apply.filters.unwrap().to_string().bright_green());

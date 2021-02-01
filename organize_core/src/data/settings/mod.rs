@@ -12,18 +12,13 @@ use crate::{
 
 use std::io::ErrorKind;
 
+use anyhow::Result;
 mod de;
 
 #[derive(Serialize, Eq, PartialEq, Debug, Clone)]
 pub struct Settings {
 	#[serde(flatten)]
 	pub defaults: Options,
-}
-
-impl AsRef<Self> for Settings {
-	fn as_ref(&self) -> &Settings {
-		self
-	}
 }
 
 impl DefaultOpt for Settings {
@@ -47,16 +42,16 @@ impl From<Options> for Settings {
 }
 
 impl Settings {
-	pub fn new<T: AsRef<Path>>(path: T) -> anyhow::Result<Settings> {
+	pub fn new<T: AsRef<Path>>(path: T) -> Result<Self> {
 		let path = path.as_ref();
 		match fs::read_to_string(&path) {
-			Ok(content) => toml::from_str(&content).map_err(anyhow::Error::new),
+			Ok(content) => toml::from_str(&content).map_err(Into::into),
 			Err(e) if e.kind() == ErrorKind::NotFound => Ok(Settings::default_some()),
 			Err(e) => Err(e.into()),
 		}
 	}
 
-	pub fn path() -> anyhow::Result<PathBuf> {
+	pub fn path() -> Result<PathBuf> {
 		Config::default_dir().map(|dir| dir.join("settings.toml"))
 	}
 }

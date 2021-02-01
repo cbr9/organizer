@@ -31,6 +31,7 @@ impl<'de> Deserialize<'de> for Options {
 			{
 				let mut apply: Option<ApplyWrapper> = None;
 				let mut hidden_files: Option<bool> = None;
+				let mut partial_files: Option<bool> = None;
 				let mut ignore: Option<Vec<PathBuf>> = None;
 				let mut r#match: Option<Match> = None;
 				let mut recursive: Option<Recursive> = None;
@@ -58,6 +59,12 @@ impl<'de> Deserialize<'de> for Options {
 						}
 						"hidden_files" => {
 							hidden_files = match hidden_files.is_none() {
+								true => Some(map.next_value()?),
+								false => return Err(A::Error::duplicate_field("hidden_files")),
+							}
+						}
+						"partial_files" => {
+							partial_files = match partial_files.is_none() {
 								true => Some(map.next_value()?),
 								false => return Err(A::Error::duplicate_field("hidden_files")),
 							}
@@ -91,6 +98,7 @@ impl<'de> Deserialize<'de> for Options {
 					watch,
 					ignored_dirs: ignore,
 					hidden_files,
+					partial_files,
 					r#match,
 					recursive: recursive.unwrap_or_default_none(),
 					apply: apply.unwrap_or_default_none(),

@@ -50,11 +50,11 @@ impl<'a> Run {
 			};
 			walker.into_iter().filter_map(|e| e.ok()).for_each(|entry| {
 				if entry.path().is_file() {
-					let file = File::new(entry.path());
+					let file = File::new(entry.path(), &data);
 					if self.simulate {
-						file.simulate(&data, &path_to_rules, &path_to_recursive, simulation.unwrap_ref());
+						file.simulate(&path_to_rules, simulation.unwrap_ref());
 					} else {
-						file.act(&data, &path_to_rules, &path_to_recursive);
+						file.act(&path_to_rules);
 					}
 				}
 			});

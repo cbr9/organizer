@@ -117,17 +117,16 @@ impl<'a> Watch {
 		config_parent: P,
 		data: &Data,
 		path_to_rules: &PathToRules,
-		path_to_recursive: &PathToRecursive,
 		simulation: &Option<Arc<Mutex<Simulation>>>,
 	) {
 		let path = path.as_ref();
 		let config_parent = config_parent.as_ref();
 		if let Some(parent) = path.parent() {
 			if parent != config_parent && path.is_file() {
-				let file = File::new(path);
+				let file = File::new(path, data);
 				match simulation {
-					None => file.act(&data, &path_to_rules, &path_to_recursive),
-					Some(simulation) => file.simulate(&data, &path_to_rules, &path_to_recursive, simulation),
+					None => file.act(&path_to_rules),
+					Some(simulation) => file.simulate(&path_to_rules, simulation),
 				}
 			}
 		}
@@ -144,7 +143,7 @@ impl<'a> Watch {
 		loop {
 			if let Ok(event) = rx.recv() {
 				match event {
-					DebouncedEvent::Create(path) => Self::on_create(path, config_parent, &data, &path_to_rules, &path_to_recursive, &simulation),
+					DebouncedEvent::Create(path) => Self::on_create(path, config_parent, &data, &path_to_rules, &simulation),
 					DebouncedEvent::Write(path) => {
 						if cfg!(feature = "hot-reload") {
 							if path == self.config {
