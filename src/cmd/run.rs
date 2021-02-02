@@ -3,7 +3,6 @@ use std::path::PathBuf;
 use anyhow::Result;
 use clap::Clap;
 use notify::RecursiveMode;
-use rayon::prelude::*;
 use walkdir::WalkDir;
 
 use organize_core::{
@@ -11,6 +10,7 @@ use organize_core::{
 	file::File,
 	logger::Logger,
 };
+use rayon::prelude::*;
 
 use crate::{Cmd, CONFIG_PATH_STR};
 use organize_core::{simulation::Simulation, utils::UnwrapRef};
@@ -40,8 +40,8 @@ impl<'a> Run {
 		let path_to_rules = PathToRules::new(&data.config);
 		let simulation = if self.simulate { Some(Simulation::new()?) } else { None };
 
-		path_to_rules.keys().collect::<Vec<_>>().par_iter().for_each(|path| {
-			let (recursive, depth) = path_to_recursive.get(path).unwrap();
+		path_to_rules.par_iter().for_each(|(path, _)| {
+			let (recursive, depth) = path_to_recursive.get(path.as_ref()).unwrap();
 			let depth = depth.unwrap_or(1);
 			let walker = match (recursive, depth) {
 				(RecursiveMode::Recursive, 0) => WalkDir::new(path).follow_links(true),

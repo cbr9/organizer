@@ -3,6 +3,7 @@ use std::{
 	collections::{hash_map::Keys, HashMap},
 	path::{Path, PathBuf},
 };
+use rayon::{prelude::*, collections::hash_map::Iter};
 
 pub struct PathToRules<'a>(HashMap<&'a PathBuf, Vec<(usize, usize)>>);
 
@@ -16,6 +17,10 @@ impl<'a> PathToRules<'a> {
 		});
 		map.shrink_to_fit();
 		Self(map)
+	}
+
+	pub fn par_iter(&self) -> Iter<&'a PathBuf, Vec<(usize, usize)>> {
+		self.0.par_iter()
 	}
 
 	pub fn keys(&self) -> Keys<'_, &'a PathBuf, Vec<(usize, usize)>> {
