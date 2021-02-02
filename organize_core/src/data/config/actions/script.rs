@@ -85,19 +85,19 @@ where
 
 impl AsFilter for Script {
 	fn matches<T: AsRef<Path>>(&self, path: T) -> bool {
-		let out = self.run(path.as_ref());
-		out.map(|out| {
-			// get the last line in stdout and parse it as a boolean
-			// if it can't be parsed, return false
-			let out = String::from_utf8_lossy(&out.stdout);
-			out.lines()
-				.last()
-				.map(|last| bool::from_str(&last.to_lowercase().trim()).unwrap_or_default())
-		})
-		// unwrap the underlying boolean: if there was no line in stdout, return false
-		.map(|x| x.unwrap_or_default())
-		// unwrap the underlying boolean: if running the script produced an error, return false
-		.unwrap_or_default()
+		self.run(path)
+			.map(|output| {
+				// get the last line in stdout and parse it as a boolean
+				// if it can't be parsed, return false
+				let out = String::from_utf8_lossy(&output.stdout);
+				out.lines().last().map(|last| {
+					let last = last.trim().to_lowercase();
+					bool::from_str(&last).unwrap_or_default()
+				})
+			})
+			.ok()
+			.flatten()
+			.unwrap_or_default()
 	}
 }
 
