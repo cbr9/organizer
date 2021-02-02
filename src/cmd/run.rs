@@ -50,7 +50,7 @@ impl<'a> Run {
 			};
 			walker.into_iter().filter_map(|e| e.ok()).for_each(|entry| {
 				if entry.path().is_file() {
-					let file = File::new(entry.path(), &data);
+					let file = File::new(entry.path(), &data, false);
 					if self.simulate {
 						file.simulate(&path_to_rules, simulation.unwrap_ref());
 					} else {

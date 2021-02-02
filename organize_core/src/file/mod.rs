@@ -11,11 +11,16 @@ use std::{
 pub struct File<'a> {
 	pub path: PathBuf,
 	data: &'a Data,
+	is_watching: bool,
 }
 
 impl<'a> File<'a> {
-	pub fn new<T: Into<PathBuf>>(path: T, data: &'a Data) -> Self {
-		Self { path: path.into(), data }
+	pub fn new<T: Into<PathBuf>>(path: T, data: &'a Data, is_watching: bool) -> Self {
+		Self {
+			path: path.into(),
+			data,
+			is_watching,
+		}
 	}
 
 	pub fn simulate(mut self, path_to_rules: &'a PathToRules, simulation: &Arc<Mutex<Simulation>>) {
@@ -98,11 +103,16 @@ impl<'a> File<'a> {
 		true
 	}
 
+	fn filter_by_watch(&self, rule: usize, folder: usize) -> bool {
+		!self.is_watching || *self.data.get_watch(rule, folder)
+	}
+
 	fn filter_by_options<T: AsRef<Path>>(&self, ancestor: T, rule: usize, folder: usize) -> bool {
 		self.filter_by_recursive(ancestor, rule, folder)
 			&& self.filter_by_hidden_files(rule, folder)
 			&& self.filter_by_ignored_dirs(rule, folder)
 			&& self.filter_by_partial_files(rule, folder)
+			&& self.filter_by_watch(rule, folder)
 	}
 
 	fn filter_by_filters(&self, rule: usize, folder: usize) -> bool {

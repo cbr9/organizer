@@ -1,4 +1,4 @@
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use anyhow::{anyhow, Result};
 
@@ -8,7 +8,6 @@ use crate::{
 		options::{apply::Apply, r#match::Match, Options},
 		settings::Settings,
 	},
-	path::IsHidden,
 	utils::{DefaultOpt, UnwrapRef},
 	PROJECT_NAME,
 };
@@ -75,15 +74,15 @@ macro_rules! getters {
 }
 
 getters! {
-	pub fn get_watch(&self) -> bool {
-		watch
-	}
 	pub fn get_match(&self) -> Match {
 		r#match
 	}
 }
 
 getters! {
+	pub fn get_watch(&self, rule: usize, folder: usize) -> bool {
+		watch
+	}
 	pub fn get_partial_files(&self, rule: usize, folder: usize) -> bool {
 		partial_files
 	}

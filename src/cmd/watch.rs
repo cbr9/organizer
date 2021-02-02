@@ -129,7 +129,7 @@ impl<'a> Watch {
 		let config_parent = config_parent.as_ref();
 		if let Some(parent) = path.parent() {
 			if parent != config_parent && path.is_file() {
-				let file = File::new(path, data);
+				let file = File::new(path, data, true);
 				match simulation {
 					None => file.act(&path_to_rules),
 					Some(simulation) => file.simulate(&path_to_rules, simulation),
