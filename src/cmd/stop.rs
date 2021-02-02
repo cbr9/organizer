@@ -29,13 +29,17 @@ impl Cmd for Stop {
 		} else {
 			let sys = System::new_with_specifics(RefreshKind::with_processes(RefreshKind::new()));
 			if self.all {
-				for section in register.iter() {
-					sys.get_process(section.pid).unwrap().kill(Signal::Kill);
+				for process in register.iter() {
+					if let Some(process) = sys.get_process(process.pid) {
+						process.kill(Signal::Term);
+					}
 				}
 			} else {
 				match register.iter().find(|section| section.path == self.config) {
-					Some(section) => {
-						sys.get_process(section.pid).unwrap().kill(Signal::Kill);
+					Some(process) => {
+						if let Some(process) = sys.get_process(process.pid) {
+							process.kill(Signal::Term);
+						}
 					}
 					None => println!("No instance was found running with configuration: {}", self.config.display()),
 				}

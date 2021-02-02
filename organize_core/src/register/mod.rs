@@ -127,7 +127,7 @@ mod tests {
 		let sys = System::new_with_specifics(RefreshKind::with_processes(RefreshKind::new()));
 		register.iter().for_each(|section| {
 			if let Some(process) = sys.get_process(section.pid) {
-				process.kill(Signal::Kill);
+				process.kill(Signal::Term);
 			}
 		});
 		let existing_pid = sys

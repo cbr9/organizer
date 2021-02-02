@@ -5,11 +5,12 @@ use std::{
 	time::Duration,
 };
 
+#[cfg(feature = "interactive")]
+use dialoguer::{theme::ColorfulTheme, Confirm};
+
 use anyhow::Result;
 use clap::Clap;
 use colored::Colorize;
-#[cfg(feature = "interactive")]
-use dialoguer::{theme::ColorfulTheme, Confirm, Select};
 use log::{debug, info};
 use notify::{watcher, DebouncedEvent, RecommendedWatcher, RecursiveMode, Watcher};
 use sysinfo::{ProcessExt, RefreshKind, Signal, System, SystemExt};
@@ -82,28 +83,38 @@ impl<'a> Watch {
 			Some(section) => {
 				let sys = System::new_with_specifics(RefreshKind::with_processes(RefreshKind::new()));
 				if let Some(process) = sys.get_process(section.pid) {
-					process.kill(Signal::Kill);
+					process.kill(Signal::Term);
 				}
 				self.start(Data::new()?)
 			}
-			None => {
-				// there is no running process
-				println!(
-					"{} {}",
-					"No instance was found running with configuration:".bold(),
-					self.config.display().to_string().underline()
-				);
-				if cfg!(feature = "interactive") {
-					let prompt = Confirm::with_theme(&ColorfulTheme::default())
-						.with_prompt("Do you wish to start an instance?")
-						.interact()?;
-					if prompt {
-						self.start(Data::new()?)?;
-					}
-				}
-				Ok(())
-			}
+			None => self.replace_none(),
 		}
+	}
+
+	#[cfg(feature = "interactive")]
+	fn replace_none(&self) -> Result<()> {
+		println!(
+			"{} {}",
+			"No instance was found running with configuration:".bold(),
+			self.config.display().to_string().underline()
+		);
+		let prompt = Confirm::with_theme(&ColorfulTheme::default())
+			.with_prompt("Do you wish to start an instance?")
+			.interact()?;
+		if prompt {
+			return self.start(Data::new()?);
+		}
+		Ok(())
+	}
+
+	#[cfg(not(feature = "interactive"))]
+	fn replace_none(&self) -> Result<()> {
+		println!(
+			"{} {}",
+			"No instance was found running with configuration:".bold(),
+			self.config.display().to_string().underline()
+		);
+		Ok(())
 	}
 
 	fn setup(&'a self, path_to_recursive: &PathToRecursive) -> Result<(RecommendedWatcher, Receiver<DebouncedEvent>)> {
