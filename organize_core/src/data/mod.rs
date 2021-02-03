@@ -11,6 +11,7 @@ use crate::{
 	utils::{DefaultOpt, UnwrapRef},
 	PROJECT_NAME,
 };
+use notify::RecursiveMode;
 
 pub mod config;
 pub mod options;
@@ -95,7 +96,7 @@ getters! {
 	pub fn get_recursive_depth(&self, rule: usize, folder: usize) -> u16 {
 		recursive.depth
 	}
-	pub fn get_recursive_enabled(&self, rule: usize, folder: usize) -> bool {
+	pub fn get_recursive_enabled(&self, rule: usize, folder: usize) -> RecursiveMode {
 		recursive.enabled
 	}
 	pub fn get_apply_actions(&self, rule: usize, folder: usize) -> Apply {

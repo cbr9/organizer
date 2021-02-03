@@ -16,11 +16,7 @@ impl<'a> PathToRecursive<'a> {
 		let mut map = HashMap::with_capacity(data.config.rules.len());
 		data.config.rules.iter().enumerate().for_each(|(i, rule)| {
 			rule.folders.iter().enumerate().for_each(|(j, folder)| {
-				let recursive = if *data.get_recursive_enabled(i, j) {
-					RecursiveMode::Recursive
-				} else {
-					RecursiveMode::NonRecursive
-				};
+				let recursive = *data.get_recursive_enabled(i, j);
 				map.entry(folder.path.as_path())
 					.and_modify(|entry: &mut (RecursiveMode, Option<u16>)| {
 						if recursive == RecursiveMode::Recursive && entry.0 == RecursiveMode::NonRecursive {
@@ -83,7 +79,7 @@ mod tests {
 								path: documents.into(),
 								options: Options {
 									recursive: Recursive {
-										enabled: Some(false),
+										enabled: Some(RecursiveMode::NonRecursive),
 										depth: None,
 									},
 									..DefaultOpt::default_none()
@@ -97,7 +93,7 @@ mod tests {
 							path: downloads.into(),
 							options: Options {
 								recursive: Recursive {
-									enabled: Some(true),
+									enabled: Some(RecursiveMode::Recursive),
 									depth: Some(1),
 								},
 								..DefaultOpt::default_none()

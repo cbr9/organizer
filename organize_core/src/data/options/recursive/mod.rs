@@ -1,25 +1,26 @@
 mod de;
+mod se;
 
 use crate::utils::DefaultOpt;
-use serde::Serialize;
+use notify::RecursiveMode;
 
-#[derive(Serialize, Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Recursive {
-	pub enabled: Option<bool>,
+	pub enabled: Option<RecursiveMode>,
 	pub depth: Option<u16>, // if depth is some, enabled should be true
 }
 
 impl DefaultOpt for Recursive {
 	fn default_none() -> Self {
 		Self {
-			enabled: Some(false),
+			enabled: None,
 			depth: None,
 		}
 	}
 
 	fn default_some() -> Self {
 		Self {
-			enabled: Some(false),
+			enabled: Some(RecursiveMode::NonRecursive),
 			depth: Some(1),
 		}
 	}

@@ -15,6 +15,7 @@ mod tests {
 	use super::*;
 	use crate::{data::options::recursive::Recursive, utils::DefaultOpt};
 	use serde_test::{assert_de_tokens, Token};
+	use notify::RecursiveMode;
 
 	#[test]
 	fn deserialize() {
@@ -22,7 +23,7 @@ mod tests {
 		defaults.watch = Some(false);
 		defaults.hidden_files = Some(true);
 		defaults.recursive = Recursive {
-			enabled: Some(true),
+			enabled: Some(RecursiveMode::Recursive),
 			depth: None,
 		};
 		let value = Settings { defaults };
