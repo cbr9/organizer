@@ -23,8 +23,12 @@ impl<'de> Deserialize<'de> for Recursive {
 			where
 				E: Error,
 			{
+                let enabled = match v {
+					true => RecursiveMode::Recursive,
+					false => RecursiveMode::NonRecursive
+				};
 				Ok(Recursive {
-					enabled: Some(v),
+					enabled: Some(enabled),
 					depth: None,
 				})
 			}
@@ -33,8 +37,13 @@ impl<'de> Deserialize<'de> for Recursive {
 			where
 				E: Error,
 			{
+				let enabled = match v {
+					0 => RecursiveMode::Recursive,
+					1 => RecursiveMode::NonRecursive,
+					_ => RecursiveMode::Recursive,
+				};
 				Ok(Recursive {
-					enabled: Some(true),
+					enabled: Some(enabled),
 					depth: Some(v as u16),
 				})
 			}

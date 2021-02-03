@@ -77,6 +77,7 @@ mod tests {
 	};
 	use serde::de::{value::Error, Error as ErrorTrait};
 	use serde_test::{assert_de_tokens, assert_de_tokens_error, Token};
+	use notify::RecursiveMode;
 
 	#[test]
 	fn deserialize_str() {
@@ -176,7 +177,7 @@ mod tests {
 		let mut value = Folder::from_str("$HOME").unwrap();
 		value.options = Options {
 			recursive: Recursive {
-				enabled: Some(true),
+				enabled: Some(RecursiveMode::Recursive),
 				depth: None,
 			},
 			watch: Some(true),
