@@ -11,7 +11,6 @@ use crate::{
 	utils::{DefaultOpt, UnwrapRef},
 	PROJECT_NAME,
 };
-use notify::RecursiveMode;
 
 pub mod config;
 pub mod options;
@@ -75,19 +74,19 @@ macro_rules! getters {
 }
 
 getters! {
-	pub fn get_match(&self) -> Match {
+	pub fn match_rules(&self) -> Match {
 		r#match
 	}
 }
 
 getters! {
-	pub fn get_watch(&self, rule: usize, folder: usize) -> bool {
+	pub fn allows_watching(&self, rule: usize, folder: usize) -> bool {
 		watch
 	}
-	pub fn get_partial_files(&self, rule: usize, folder: usize) -> bool {
+	pub fn allows_partial_files(&self, rule: usize, folder: usize) -> bool {
 		partial_files
 	}
-	pub fn get_hidden_files(&self, rule: usize, folder: usize) -> bool {
+	pub fn allows_hidden_files(&self, rule: usize, folder: usize) -> bool {
 		hidden_files
 	}
 }
@@ -95,9 +94,6 @@ getters! {
 getters! {
 	pub fn get_recursive_depth(&self, rule: usize, folder: usize) -> u16 {
 		recursive.depth
-	}
-	pub fn get_recursive_enabled(&self, rule: usize, folder: usize) -> RecursiveMode {
-		recursive.enabled
 	}
 	pub fn get_apply_actions(&self, rule: usize, folder: usize) -> Apply {
 		apply.actions
