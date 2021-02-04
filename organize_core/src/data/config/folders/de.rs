@@ -75,9 +75,9 @@ mod tests {
 		recursive::Recursive,
 		Options,
 	};
+
 	use serde::de::{value::Error, Error as ErrorTrait};
 	use serde_test::{assert_de_tokens, assert_de_tokens_error, Token};
-	use notify::RecursiveMode;
 
 	#[test]
 	fn deserialize_str() {
@@ -176,10 +176,7 @@ mod tests {
 	fn deserialize_map_valid() {
 		let mut value = Folder::from_str("$HOME").unwrap();
 		value.options = Options {
-			recursive: Recursive {
-				enabled: Some(RecursiveMode::Recursive),
-				depth: None,
-			},
+			recursive: Recursive { depth: None },
 			watch: Some(true),
 			ignored_dirs: None,
 			hidden_files: None,
@@ -192,9 +189,7 @@ mod tests {
 			Token::Str("path"),
 			Token::Str("$HOME"),
 			Token::Str("options"),
-			Token::Map { len: Some(3) },
-			Token::Str("recursive"),
-			Token::Bool(true),
+			Token::Map { len: Some(2) },
 			Token::Str("apply"),
 			Token::Str("all"),
 			Token::Str("watch"),
