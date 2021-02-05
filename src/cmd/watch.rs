@@ -108,7 +108,7 @@ impl<'a> Watch {
 	}
 
 	#[cfg(not(feature = "interactive"))]
-	fn replace_none(&self) -> () {
+	fn replace_none(&self) -> Result<()> {
 		println!(
 			"{} {}",
 			"No instance was found running with configuration:".bold(),
