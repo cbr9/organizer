@@ -39,8 +39,8 @@ impl<'a> Run {
 		let simulation = if self.simulate { Some(Simulation::new()?) } else { None };
 
 		path_to_rules.par_iter().for_each(|(path, _)| {
-			let recursive = path_to_recursive.get(path.as_ref()).unwrap();
-			let walker = recursive.to_walker(&path);
+			let recursive = path_to_recursive.get(path).unwrap();
+			let walker = recursive.to_walker(path);
 			walker.into_iter().filter_map(|e| e.ok()).for_each(|entry| {
 				if entry.path().is_file() {
 					let file = File::new(entry.path(), &data, false);

@@ -41,12 +41,12 @@ impl<'a> PathToRecursive<'a> {
 		self.0.iter()
 	}
 
-	pub fn get(&self, key: &Path) -> Option<&Recursive> {
-		self.0.get(key)
+	pub fn get<T: AsRef<Path>>(&self, key: T) -> Option<&Recursive> {
+		self.0.get(key.as_ref())
 	}
 
-	pub fn insert(&mut self, key: &'a Path, value: Recursive) -> Option<Recursive> {
-		self.0.insert(key, value)
+	pub fn insert<T: AsRef<Path>>(&mut self, key: &'a T, value: Recursive) -> Option<Recursive> {
+		self.0.insert(key.as_ref(), value)
 	}
 }
 
