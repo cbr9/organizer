@@ -87,15 +87,7 @@ macro_rules! as_action {
 				}
 				match simulation {
 					Some(simulation) => {
-						let mut guard = simulation.lock().unwrap();
-						let parent = to.unwrap_ref().parent()?;
-						if parent.exists() {
-							guard
-								.watch_folder(parent)
-								.map_err(|e| eprintln!("Error: {} ({})", e, parent.display()))
-								.ok()?;
-						}
-						match self.simulate(&path, Some(to.unwrap_ref()), guard) {
+						match self.simulate(&path, Some(to.unwrap_ref()), simulation.lock().unwrap()) {
 							Ok(new_path) => {
 								info!("(simulate {}) {} -> {}", ty.to_string(), path.display(), to.unwrap().display());
 								new_path
@@ -307,7 +299,14 @@ impl Inner {
 				}
 			}
 			Some(sim) => {
-				let guard = sim.lock().unwrap();
+				let mut guard = sim.lock().unwrap();
+				if let Some(parent) = to.parent() {
+					if parent.exists() {
+						guard.watch_folder(parent)
+							.map_err(|e| eprintln!("Error: {} ({})", e, parent.display()))
+							.ok()?;
+					}
+				}
 				if guard.files.contains(&to) {
 					to.resolve_naming_conflict(&self.if_exists, Some(guard))
 				} else {
