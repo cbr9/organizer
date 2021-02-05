@@ -84,7 +84,7 @@ mod tests {
 		options::apply::Apply,
 	};
 	use std::{path::PathBuf, str::FromStr};
-
+	// TODO: create tests for all variants of Apply
 	#[test]
 	fn do_not_match_partial_file() {
 		let regex = Regex::from_str(".*").unwrap();

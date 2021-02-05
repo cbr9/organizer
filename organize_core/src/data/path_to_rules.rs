@@ -1,9 +1,9 @@
 use crate::data::config::Config;
+use rayon::{collections::hash_map::Iter, prelude::*};
 use std::{
 	collections::{hash_map::Keys, HashMap},
 	path::{Path, PathBuf},
 };
-use rayon::{prelude::*, collections::hash_map::Iter};
 
 pub struct PathToRules<'a>(HashMap<&'a PathBuf, Vec<(usize, usize)>>);
 

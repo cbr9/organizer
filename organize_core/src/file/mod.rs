@@ -50,32 +50,27 @@ impl<'a> File<'a> {
 	}
 
 	fn filter_by_recursive<T: AsRef<Path>>(&self, ancestor: T, rule: usize, folder: usize) -> bool {
-		if let Some(parent) = self.path.parent() {
-			if parent != ancestor.as_ref() {
-				// if it's being scanned because an ancestor is recursive
-				let depth = *self.data.get_recursive_depth(rule, folder) as usize;
-				if self.path.components().count() - ancestor.as_ref().components().count() > depth && depth != 0 {
-					return false;
-				}
+		let depth = *self.data.get_recursive_depth(rule, folder) as usize;
+		if depth == 0 {
+			return true;
+		}
+		return self.path.components().count() - ancestor.as_ref().components().count() <= depth;
+	}
+
+	fn filter_by_partial_files(&self, rule: usize, folder: usize) -> bool {
+		if !*self.data.allows_partial_files(rule, folder) {
+			// if partial files are allowed
+			if let Some(extension) = self.path.extension() {
+				let partial_extensions = &["crdownload", "part"];
+				let extension = extension.to_string_lossy();
+				return !partial_extensions.contains(&&*extension);
 			}
 		}
 		true
 	}
 
-	fn filter_by_partial_files(&self, rule: usize, folder: usize) -> bool {
-		if *self.data.get_partial_files(rule, folder) {
-			// if partial files are allowed
-			if let Some(extension) = self.path.extension() {
-				let partial_extensions = &["crdownload", "part"];
-				let extension = extension.to_string_lossy();
-				return partial_extensions.contains(&&*extension);
-			}
-		}
-		false
-	}
-
 	fn filter_by_hidden_files(&self, rule: usize, folder: usize) -> bool {
-		(self.path.is_hidden() && *self.data.get_hidden_files(rule, folder)) || !self.path.is_hidden()
+		(self.path.is_hidden() && *self.data.allows_hidden_files(rule, folder)) || !self.path.is_hidden()
 	}
 
 	fn filter_by_ignored_dirs(&self, rule: usize, folder: usize) -> bool {
@@ -104,7 +99,7 @@ impl<'a> File<'a> {
 	}
 
 	fn filter_by_watch(&self, rule: usize, folder: usize) -> bool {
-		!self.is_watching || *self.data.get_watch(rule, folder)
+		!self.is_watching || *self.data.allows_watching(rule, folder)
 	}
 
 	fn filter_by_options<T: AsRef<Path>>(&self, ancestor: T, rule: usize, folder: usize) -> bool {
@@ -128,7 +123,7 @@ impl<'a> File<'a> {
 
 	pub fn get_matching_rules(&mut self, path_to_rules: &'a PathToRules) -> Vec<&'a (usize, usize)> {
 		let (ancestor, rules) = path_to_rules.get_key_value(&self.path).unwrap();
-		match self.data.get_match() {
+		match self.data.match_rules() {
 			Match::First => rules
 				.iter()
 				.find(|(rule, folder)| self.filter(ancestor, rule, folder))

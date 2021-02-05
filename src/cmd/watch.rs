@@ -108,7 +108,7 @@ impl<'a> Watch {
 	}
 
 	#[cfg(not(feature = "interactive"))]
-	fn replace_none(&self) -> Result<()> {
+	fn replace_none(&self) -> () {
 		println!(
 			"{} {}",
 			"No instance was found running with configuration:".bold(),
@@ -120,8 +120,11 @@ impl<'a> Watch {
 	fn setup(&'a self, path_to_recursive: &PathToRecursive) -> Result<(RecommendedWatcher, Receiver<DebouncedEvent>)> {
 		let (tx, rx) = channel();
 		let mut watcher = watcher(tx, Duration::from_secs(self.delay as u64)).unwrap();
-		for (folder, (recursive, _)) in path_to_recursive.iter() {
-			watcher.watch(folder, *recursive)?
+		for (folder, recursive) in path_to_recursive.iter() {
+			watcher.watch(folder, match recursive.is_recursive() {
+				true => RecursiveMode::Recursive,
+				false => RecursiveMode::NonRecursive,
+			})?
 		}
 		if cfg!(feature = "hot-reload") && self.config.parent().is_some() {
 			watcher.watch(self.config.parent().unwrap(), RecursiveMode::NonRecursive)?;

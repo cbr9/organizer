@@ -1,7 +1,7 @@
 pub mod apply;
 mod de;
 pub(crate) mod r#match;
-pub(crate) mod recursive;
+pub mod recursive;
 
 use crate::data::options::r#match::Match;
 

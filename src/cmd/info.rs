@@ -1,11 +1,11 @@
 use crate::cmd::Cmd;
 use clap::Clap;
 use colored::Colorize;
+
 use organize_core::{
 	data::{config::Config, options::Options, Data},
 	utils::DefaultOpt,
 };
-use notify::RecursiveMode;
 
 #[derive(Clap, Debug)]
 pub struct Info {
@@ -38,8 +38,7 @@ impl Cmd for Info {
 				apply,
 			} = Options::default_some();
 			println!("{}:", "Defaults".bold().underline());
-			println!("  recursive.enabled = {}", (recursive.enabled.unwrap() == RecursiveMode::Recursive).to_string().bright_purple());
-			println!("  recursive.depth = {}", recursive.depth.unwrap().to_string().bright_purple());
+			println!("  recursive = {}", recursive.depth.unwrap().to_string().bright_purple());
 			println!("  watch = {}", watch.unwrap().to_string().bright_purple());
 			println!("  ignored_dirs = {:?}", ignored_dirs.unwrap());
 			println!("  hidden_files = {}", hidden_files.unwrap().to_string().bright_purple());

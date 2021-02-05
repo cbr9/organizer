@@ -2,8 +2,6 @@ use std::path::PathBuf;
 
 use anyhow::Result;
 use clap::Clap;
-use notify::RecursiveMode;
-use walkdir::WalkDir;
 
 use organize_core::{
 	data::{path_to_recursive::PathToRecursive, path_to_rules::PathToRules, Data},
@@ -41,13 +39,8 @@ impl<'a> Run {
 		let simulation = if self.simulate { Some(Simulation::new()?) } else { None };
 
 		path_to_rules.par_iter().for_each(|(path, _)| {
-			let (recursive, depth) = path_to_recursive.get(path.as_ref()).unwrap();
-			let depth = depth.unwrap_or(1);
-			let walker = match (recursive, depth) {
-				(RecursiveMode::Recursive, 0) => WalkDir::new(path).follow_links(true),
-				(RecursiveMode::Recursive, depth) => WalkDir::new(path).max_depth(depth as usize),
-				(RecursiveMode::NonRecursive, _) => WalkDir::new(path).max_depth(1),
-			};
+			let recursive = path_to_recursive.get(path.as_ref()).unwrap();
+			let walker = recursive.to_walker(&path);
 			walker.into_iter().filter_map(|e| e.ok()).for_each(|entry| {
 				if entry.path().is_file() {
 					let file = File::new(entry.path(), &data, false);
