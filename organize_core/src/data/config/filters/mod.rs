@@ -83,13 +83,56 @@ mod tests {
 		config::filters::{regex::Regex, Filter},
 		options::apply::Apply,
 	};
-	use std::{path::PathBuf, str::FromStr};
-	// TODO: create tests for all variants of Apply
+	use std::{str::FromStr};
+
 	#[test]
-	fn do_not_match_partial_file() {
-		let regex = Regex::from_str(".*").unwrap();
-		let filters = Filters(vec![Filter::Regex(regex)]);
-		let path = PathBuf::from("$HOME/Downloads/test.crdownload");
-		assert!(!filters.r#match(&path, &Apply::All))
+	fn match_all() {
+		let filters = Filters(vec![
+			Filter::Regex(Regex::from_str(".*unsplash.*").unwrap()),
+			Filter::Regex(Regex::from_str(".*\\.jpg").unwrap()),
+		]);
+		assert!(filters.r#match("$HOME/Downloads/unsplash_image.jpg", &Apply::All));
+		assert!(!filters.r#match("$HOME/Downloads/unsplash_doc.pdf", &Apply::All));
+	}
+
+	#[test]
+	fn match_any() {
+		let regex = Regex::from_str(".*unsplash.*").unwrap();
+		let filters = Filters(vec![
+			Filter::Regex(regex),
+			Filter::Regex(Regex::from_str(".*\\.jpg").unwrap()),
+		]);
+		assert!(filters.r#match("$HOME/Downloads/test.jpg", &Apply::Any))
+	}
+
+	#[test]
+	fn match_any_of() {
+		let regex = Regex::from_str(".*unsplash.*").unwrap();
+		let filters = Filters(vec![
+			Filter::Regex(regex),
+			Filter::Regex(Regex::from_str(".*\\.pdf").unwrap()),
+			Filter::Filename(Filename {case_sensitive: true, startswith: Some("random".into()), ..Filename::default()})
+		]);
+		let path = "$HOME/Downloads/unsplash.jpg";
+		assert!(filters.r#match(&path, &Apply::AnyOf(vec![0, 1])));
+		assert!(!filters.r#match(&path, &Apply::AnyOf(vec![1, 2])));
+		assert!(filters.r#match(&path, &Apply::AnyOf(vec![0, 2])));
+	}
+
+	#[test]
+	fn match_all_of() {
+		let filters = Filters(vec![
+			Filter::Regex(Regex::from_str(".*unsplash.*").unwrap()),
+			Filter::Regex(Regex::from_str(".*\\.pdf").unwrap()),
+			Filter::Filename(Filename {case_sensitive: true, startswith: Some("random".into()), ..Filename::default()}),
+			Filter::Regex(Regex::from_str(".*\\.jpg").unwrap()),
+		]);
+		let path = "$HOME/Downloads/unsplash.jpg";
+		assert!(!filters.r#match(&path, &Apply::AllOf(vec![0, 1])));
+		assert!(!filters.r#match(&path, &Apply::AllOf(vec![1, 2])));
+		assert!(!filters.r#match(&path, &Apply::AllOf(vec![1, 3])));
+		assert!(!filters.r#match(&path, &Apply::AllOf(vec![2, 3])));
+		assert!(!filters.r#match(&path, &Apply::AllOf(vec![0, 2])));
+		assert!(filters.r#match(&path, &Apply::AllOf(vec![0, 3])));
 	}
 }
