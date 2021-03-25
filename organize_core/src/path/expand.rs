@@ -89,10 +89,10 @@ mod tests {
 	}
 	#[test]
 	fn new_var() {
-		let var = "PROJECT_DIR";
-		env::set_var(var, project());
+		let var = "DIR";
+		env::set_var(var, "DIR");
 		let original = format!("${}/tests", var);
-		let expected = project().join("tests");
+		let expected = PathBuf::from("DIR").join("tests");
 		assert_eq!(original.expand_vars().unwrap(), expected)
 	}
 	#[test]
