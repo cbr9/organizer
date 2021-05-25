@@ -1,7 +1,7 @@
 use crate::cmd::{edit::Edit, Cmd};
 use anyhow::Result;
 use clap::Clap;
-use organize_core::{data::config::Config, logger::Logger};
+use libalfred::{data::config::Config, logger::Logger};
 use std::path::PathBuf;
 
 #[derive(Clap, Debug)]

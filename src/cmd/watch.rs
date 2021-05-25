@@ -15,7 +15,7 @@ use log::{debug, info};
 use notify::{watcher, DebouncedEvent, RecommendedWatcher, RecursiveMode, Watcher};
 use sysinfo::{ProcessExt, RefreshKind, Signal, System, SystemExt};
 
-use organize_core::{
+use libalfred::{
 	data::{config::Config, path_to_recursive::PathToRecursive, path_to_rules::PathToRules, settings::Settings, Data},
 	file::File,
 	logger::Logger,
@@ -23,7 +23,7 @@ use organize_core::{
 };
 
 use crate::{cmd::run::Run, Cmd, CONFIG_PATH_STR};
-use organize_core::simulation::Simulation;
+use libalfred::simulation::Simulation;
 use std::sync::{Arc, Mutex};
 
 #[derive(Clap, Debug)]
@@ -121,10 +121,13 @@ impl<'a> Watch {
 		let (tx, rx) = channel();
 		let mut watcher = watcher(tx, Duration::from_secs(self.delay as u64)).unwrap();
 		for (folder, recursive) in path_to_recursive.iter() {
-			watcher.watch(folder, match recursive.is_recursive() {
-				true => RecursiveMode::Recursive,
-				false => RecursiveMode::NonRecursive,
-			})?
+			watcher.watch(
+				folder,
+				match recursive.is_recursive() {
+					true => RecursiveMode::Recursive,
+					false => RecursiveMode::NonRecursive,
+				},
+			)?
 		}
 		if cfg!(feature = "hot-reload") && self.config.parent().is_some() {
 			watcher.watch(self.config.parent().unwrap(), RecursiveMode::NonRecursive)?;

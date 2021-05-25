@@ -2,7 +2,7 @@ use crate::cmd::Cmd;
 use clap::Clap;
 use colored::Colorize;
 
-use organize_core::{
+use libalfred::{
 	data::{config::Config, options::Options, Data},
 	utils::DefaultOpt,
 };

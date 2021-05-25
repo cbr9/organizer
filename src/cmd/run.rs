@@ -3,15 +3,16 @@ use std::path::PathBuf;
 use anyhow::Result;
 use clap::Clap;
 
-use organize_core::{
+use libalfred::{
 	data::{path_to_recursive::PathToRecursive, path_to_rules::PathToRules, Data},
 	file::File,
 	logger::Logger,
+	simulation::Simulation,
+	utils::UnwrapRef
 };
 use rayon::prelude::*;
 
 use crate::{Cmd, CONFIG_PATH_STR};
-use organize_core::{simulation::Simulation, utils::UnwrapRef};
 
 #[derive(Clap, Debug)]
 pub struct Run {
