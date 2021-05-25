@@ -24,10 +24,10 @@ log = "0.4"
 fern = {version = "0.5", features = ["colored"] }
 toml = "0.5.7"
 anyhow = "1.0.34"
-libalfred = { path = "libalfred/" }
+libalfred = { path = "libalfred" }
 path-clean = "0.1.0"
 walkdir = "2.3.1"
-dialoguer = { version = "0.7.1", optional = true }
+dialoguer = { version = "0.8.0", optional = true }
 dirs-next = "2.0.0"
 
 [features]
@@ -37,7 +37,7 @@ action_trash = ["libalfred/action_trash"]
 filter_mime = ["libalfred/filter_mime"]
 
 [workspace]
-members = ["libalfred/"]
+members = ["libalfred"]
 
 [dev-dependencies]
 pretty_assertions = "0.6.1"
