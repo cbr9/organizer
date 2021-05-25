@@ -15,7 +15,6 @@ branches:
     - staging # bors r+
     - trying # bors try
     - master
-    - alpha-2.0
 
 dist: xenial
 cache: cargo
