@@ -1,0 +1,14 @@
+unstable_features = true
+imports_layout = "HorizontalVertical"
+merge_imports = true
+max_width = 150
+chain_width = 80
+overflow_delimited_expr = true
+reorder_impl_items = true
+reorder_imports = true
+reorder_modules = true
+condense_wildcard_suffixes = true
+format_strings = true
+hard_tabs = true
+merge_derives = true
+normalize_comments = true

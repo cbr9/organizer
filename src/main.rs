@@ -1,38 +1,27 @@
-mod cli;
-mod config;
-mod file;
-mod logger;
-mod notifier;
+use std::{borrow::Cow, path::PathBuf};
 
-#[macro_use]
-extern crate clap;
-use crate::config::Config;
-use crate::notifier::Notifier;
-use std::env;
-use std::process::Command;
+use lazy_static::lazy_static;
+use log::error;
 
-fn main() {
-    let config = Config::new();
-    match config {
-        Ok(config) if config.args.daemon => start_daemon(),
-        Ok(config) => {
-            let mut notifier = Notifier::new();
-            notifier.watch(config);
-        }
-        Err(e) => eprintln!("{}", e),
-    }
+use libalfred::data::config::Config;
+
+use crate::cmd::{App, Cmd};
+use clap::Clap;
+
+lazy_static! {
+	pub static ref CONFIG_PATH: PathBuf = Config::path().unwrap_or_else(|e| {
+		error!("{:?}", e);
+		std::process::exit(0)
+	});
+	pub static ref CONFIG_PATH_STR: Cow<'static, str> = CONFIG_PATH.to_string_lossy();
 }
 
-fn start_daemon() {
-    let mut args = env::args();
-    let command = args.next().unwrap(); // must've been started through a command
-    let args: Vec<_> = args.filter(|arg| arg != "--daemon").collect();
+mod cmd;
 
-    let pid = Command::new(command)
-        .args(&args)
-        .spawn()
-        .expect("couldn't start daemon")
-        .id();
-
-    println!("daemon started with PID {}", pid);
+fn main() {
+	let app: App = App::parse();
+	if let Err(e) = app.run() {
+		error!("{:?}", e);
+		std::process::exit(0)
+	}
 }

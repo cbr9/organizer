@@ -3,11 +3,12 @@ language: rust
 rust:
   - stable
 
-script: | 
+os:
+  - linux
+
+script:
   cargo build --verbose &&
-  cargo test --verbose &&
-  cargo fmt &&
-  cargo clippy --verbose
+  cargo test --all --verbose
 
 branches:
   only:
@@ -16,15 +17,20 @@ branches:
     - master
     - alpha-2.0
 
+dist: xenial
 cache: cargo
 
-matrix:
+jobs:
   fast_finish: true
   include:
-      sudo: required # travis-ci/travis-ci#9061
-      before_script:
-        - rustup component add rustfmt-preview
-        - rustup component add clippy-preview
+      - before_script:
+          - rm target/debug/deps/alfred-* || true
+          - rm target/debug/deps/libalfred-* || true
+          - rustup component add rustfmt-preview
+          - rustup component add clippy-preview
+        script:
+          - cargo fmt
+          - cargo clippy
 
 addons: # required for kcov
   apt:
@@ -48,7 +54,7 @@ after_success: |
   make install DESTDIR=../../kcov-build &&
   cd ../.. &&
   rm -rf kcov-master &&
-  for file in target/debug/organize-*; do [ -x "${file}" ] || continue; mkdir -p "target/cov/$(basename $file)"; ./kcov-build/usr/local/bin/kcov --exclude-pattern=/.cargo,/usr/lib --verify "target/cov/$(basename $file)" "$file"; done &&
+  for file in target/debug/deps/organize-*; do [ -x "${file}" ] || continue; mkdir -p "target/cov/$(basename $file)"; ./kcov-build/usr/local/bin/kcov --exclude-pattern=/.cargo,/usr/lib --verify "target/cov/$(basename $file)" "$file"; done &&
+  for file in target/debug/deps/organize_core-*; do [ -x "${file}" ] || continue; mkdir -p "target/cov/$(basename $file)"; ./kcov-build/usr/local/bin/kcov --exclude-pattern=/.cargo,/usr/lib --verify "target/cov/$(basename $file)" "$file"; done &&
   bash <(curl -s https://codecov.io/bash) &&
   echo "Uploaded code coverage"
-

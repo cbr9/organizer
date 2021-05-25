@@ -1,15 +1,43 @@
 [package]
-name = "d-organizer"
-version = "0.1.0"
+name = "alfred"
+version = "0.2.0"
 authors = ["KBR9 <cabero96@protonmail.com>"]
 edition = "2018"
+description = "file butler for the poweruser"
+repository = "https://github.com/cbr9/organize"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-notify = "4.0.12"
-crossbeam-channel = "0.4.0"
-regex = "1"
-clap = { version = "2.33.1", features = ["yaml"] }
-serde = { version = "1.0", features = ["derive"] }
-serde_yaml = "0.8"
+notify = "4.0.15"
+crossbeam-channel = "0.5.0"
+regex = "1.4.1"
+clap = { version = "3.0.0-beta.2", features = ["yaml"] }
+serde = { version = "1.0.117", features = ["derive"] }
+serde_yaml = "0.8.13"
+chrono = "0.4.19"
+colored = "2.0.0"
+sysinfo = "0.15.3"
+lazy_static = "1.4.0"
+rayon = "1.5"
+log = "0.4"
+fern = {version = "0.5", features = ["colored"] }
+toml = "0.5.7"
+anyhow = "1.0.34"
+libalfred = { path = "libalfred/" }
+path-clean = "0.1.0"
+walkdir = "2.3.1"
+dialoguer = { version = "0.7.1", optional = true }
+dirs-next = "2.0.0"
+
+[features]
+interactive = ["dialoguer"]
+hot-reload = []
+action_trash = ["libalfred/action_trash"]
+filter_mime = ["libalfred/filter_mime"]
+
+[workspace]
+members = ["libalfred/"]
+
+[dev-dependencies]
+pretty_assertions = "0.6.1"
