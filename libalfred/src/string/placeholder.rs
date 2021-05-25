@@ -1,31 +1,47 @@
 use anyhow::{anyhow, bail, Context, Result};
 use std::path::Path;
 
-use crate::string::Capitalize;
+use crate::{transitions, transition, fsa::{FSA, Transition}, string::Capitalize};
 use lazy_static::lazy_static;
 use regex::Regex;
 use serde::{de::Error, Deserialize, Deserializer};
 
 lazy_static! {
-	// forgive me god for this monstrosity
 	static ref POTENTIAL_PH_REGEX: Regex = Regex::new(r"\{\w+(?:\.\w+)*}").unwrap(); // a panic here indicates a compile-time bug
-	static ref VALID_PH_REGEX: Regex = {
-		let vec = vec![
-			r"\{(?:(?:path|parent)(?:\.path|\.parent)*)(?:\.filename)?(?:\.to_lowercase|\.to_uppercase|\.capitalize)?\}", // match placeholders that involve directories
-			r"\{path(?:\.filename)?(?:\.extension|\.stem)?(?:\.to_lowercase|\.to_uppercase|\.capitalize)?\}", // match placeholders that involve files and start with path
-			r"\{filename(?:\.extension|\.stem)?(?:\.to_lowercase|\.to_uppercase|\.capitalize)?\}", // match placeholders that involve files and start with filename
-			r"\{(?:(?:extension|stem)(?:\.to_lowercase|\.to_uppercase|\.capitalize)?)\}" // match placeholders that involve files and only deal with extension/stem
-		];
-		let whole = vec.iter().enumerate().map(|(i, str)| {
-			// stick together the regex in `vec`
-			if i == vec.len()-1 {
-				format!("(?:{})", str)
-			} else {
-				format!("(?:{})|", str)
-			}
-		}).collect::<String>();
-		Regex::new(whole.as_str()).unwrap() // a panic here indicates a compile-time bug
-	};
+	static ref PARSER: FSA<'static, u8> = FSA::new(
+		&[0, 1, 2, 3, 4],
+		&["path", "parent", "filename", "stem", "extension", "to_lowercase", "to_uppercase", "capitalize"],
+		0,
+		&[0, 1, 2, 3, 4],
+		transitions![
+			("path", 0) => 0,
+			("parent", 0) => 1,
+			("filename", 0) => 2,
+			("stem", 0) => 4,
+			("extension", 0) => 4,
+			("to_lowercase", 0) => 3,
+			("to_uppercase", 0) => 3,
+			("capitalize", 0) => 3,
+            // --------------------
+			("filename", 1) => 2,
+			("path", 1) => 1,
+			("parent", 1) => 1,
+			("to_lowercase", 1) => 3,
+			("to_uppercase", 1) => 3,
+			("capitalize", 1) => 3,
+            // --------------------
+			("stem", 2) => 4,
+			("extension", 2) => 4,
+			("to_lowercase", 2) => 3,
+			("to_uppercase", 2) => 3,
+			("capitalize", 2) => 3,
+			// --------------------
+			("to_lowercase", 4) => 3,
+			("to_uppercase", 4) => 3,
+			("capitalize", 4) => 3
+		]
+	);
+
 }
 
 // used in #[serde(deserialize_with = "..."] flags
@@ -39,12 +55,18 @@ where
 
 // used inside Visitor impls
 pub fn visit_placeholder_string(val: &str) -> Result<String> {
-	if !(POTENTIAL_PH_REGEX.is_match(val) ^ VALID_PH_REGEX.is_match(val)) {
-		// if there are no matches or there are only valid ones
-		Ok(val.to_string())
-	} else {
-		bail!("invalid placeholder")
+	if let Some(matches) = POTENTIAL_PH_REGEX.captures(val) {
+		if matches.iter().all(|capture| {
+			if let Some(capture) = capture {
+				let pieces = capture.as_str().trim_matches(|pat| pat == '{' || pat == '}').split(".");
+				return PARSER.accepts(pieces)
+			}
+			false
+		}) {
+			return Ok(val.to_string())
+		}
 	}
+	bail!("invalid placeholder")
 }
 
 pub trait Placeholder {
@@ -54,45 +76,41 @@ pub trait Placeholder {
 impl<T: AsRef<str>> Placeholder for T {
 	fn expand_placeholders<P: AsRef<Path>>(self, path: P) -> Result<String> {
 		let str = self.as_ref();
-		if VALID_PH_REGEX.is_match(str) {
 			// if the first condition is false, the second one won't be evaluated and REGEX won't be initialized
-			let mut new = str.to_string();
-			for span in VALID_PH_REGEX.find_iter(str) {
-				let placeholders = span.as_str().trim_matches(|x| x == '{' || x == '}').split('.'); // split a placeholder like {path.filename.extension} into [path, filename, extension]
-				let mut current_value = path.as_ref().to_path_buf();
-				for placeholder in placeholders.into_iter() {
-					current_value = match placeholder {
-						"path" => current_value
-							.canonicalize()
-							.with_context(|| format!("could not retrieve the absolute path of {}", current_value.display()))?,
-						"parent" => current_value
-							.parent()
-							.ok_or_else(|| anyhow!("{} does not have a parent directory", current_value.display()))?
-							.into(),
-						"filename" => current_value
-							.file_name()
-							.ok_or_else(|| anyhow!("{} does not have a filename", current_value.display()))?
-							.into(),
-						"stem" => current_value
-							.file_stem()
-							.ok_or_else(|| anyhow!("{} does not have a filestem", current_value.display()))?
-							.into(),
-						"extension" => current_value
-							.extension()
-							.ok_or_else(|| anyhow!("{} does not have an extension", current_value.display()))?
-							.into(),
-						"to_uppercase" => current_value.to_string_lossy().to_uppercase().into(),
-						"to_lowercase" => current_value.to_string_lossy().to_lowercase().into(),
-						"capitalize" => current_value.to_string_lossy().capitalize().into(),
-						placeholder => bail!("unknown placeholder {}", placeholder),
-					}
+		let mut new = str.to_string();
+		for span in POTENTIAL_PH_REGEX.find_iter(str) {
+			let placeholders = span.as_str().trim_matches(|x| x == '{' || x == '}').split('.'); // split a placeholder like {path.filename.extension} into [path, filename, extension]
+			let mut current_value = path.as_ref().to_path_buf();
+			for placeholder in placeholders.into_iter() {
+				current_value = match placeholder {
+					"path" => current_value
+						.canonicalize()
+						.with_context(|| format!("could not retrieve the absolute path of {}", current_value.display()))?,
+					"parent" => current_value
+						.parent()
+						.ok_or_else(|| anyhow!("{} does not have a parent directory", current_value.display()))?
+						.into(),
+					"filename" => current_value
+						.file_name()
+						.ok_or_else(|| anyhow!("{} does not have a filename", current_value.display()))?
+						.into(),
+					"stem" => current_value
+						.file_stem()
+						.ok_or_else(|| anyhow!("{} does not have a filestem", current_value.display()))?
+						.into(),
+					"extension" => current_value
+						.extension()
+						.ok_or_else(|| anyhow!("{} does not have an extension", current_value.display()))?
+						.into(),
+					"to_uppercase" => current_value.to_string_lossy().to_uppercase().into(),
+					"to_lowercase" => current_value.to_string_lossy().to_lowercase().into(),
+					"capitalize" => current_value.to_string_lossy().capitalize().into(),
+					placeholder => bail!("unknown placeholder {}", placeholder),
 				}
-				new = new.replace(&span.as_str(), &*current_value.to_string_lossy());
 			}
-			Ok(new.replace("//", "/"))
-		} else {
-			Ok(self.as_ref().to_string())
+			new = new.replace(&span.as_str(), &*current_value.to_string_lossy());
 		}
+		Ok(new.replace("//", "/"))
 	}
 }
 
@@ -101,10 +119,15 @@ pub mod tests {
 	use std::path::PathBuf;
 
 	use super::*;
+	#[test]
+	fn deserialize_invalid_ph_non_symbol() {
+		let str = "$HOME/{extension.name}";
+		assert!(visit_placeholder_string(str).is_err())
+	}
 
 	#[test]
 	fn deserialize_invalid_ph_extension_name() {
-		let str = "$HOME/{extension.name}";
+		let str = "$HOME/{extension.filename}";
 		assert!(visit_placeholder_string(str).is_err())
 	}
 	#[test]

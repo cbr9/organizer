@@ -24,5 +24,6 @@ pub mod logger;
 pub mod register;
 pub mod simulation;
 pub mod utils;
+mod fsa;
 
 pub const PROJECT_NAME: &str = "alfred";
