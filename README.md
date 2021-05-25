@@ -1,2 +1,2 @@
-![Travis (.org) branch](https://img.shields.io/travis/cbr9/organize/alpha-2.0)
-[![codecov](https://codecov.io/gh/cbr9/organize/branch/alpha-2.0/graph/badge.svg)](https://codecov.io/gh/cbr9/organize)
+![Travis (.org) branch](https://img.shields.io/travis/cbr9/alfred)
+![Codecov](https://img.shields.io/codecov/c/github/cbr9/alfred)
