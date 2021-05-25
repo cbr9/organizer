@@ -7,8 +7,8 @@ os:
   - linux
 
 script:
-  cargo build --verbose &&
-  cargo test --all --verbose
+  cargo test --all --verbose &&
+  cargo build --verbose
 
 branches:
   only:
