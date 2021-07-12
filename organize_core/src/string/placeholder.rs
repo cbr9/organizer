@@ -5,6 +5,7 @@ use crate::{transitions, transition, fsa::{FSA, Transition}, string::Capitalize}
 use lazy_static::lazy_static;
 use regex::Regex;
 use serde::{de::Error, Deserialize, Deserializer};
+use itertools::all;
 
 lazy_static! {
 	static ref POTENTIAL_PH_REGEX: Regex = Regex::new(r"\{\w+(?:\.\w+)*}").unwrap(); // a panic here indicates a compile-time bug
@@ -14,6 +15,7 @@ lazy_static! {
 		0,
 		&[0, 1, 2, 3, 4],
 		transitions![
+			// On <string>, on <int>, go to  <int>
 			("path", 0) => 0,
 			("parent", 0) => 1,
 			("filename", 0) => 2,
@@ -56,17 +58,20 @@ where
 // used inside Visitor impls
 pub fn visit_placeholder_string(val: &str) -> Result<String> {
 	if let Some(matches) = POTENTIAL_PH_REGEX.captures(val) {
-		if matches.iter().all(|capture| {
+		let all_valid = matches.iter().all(|capture| {
 			if let Some(capture) = capture {
 				let pieces = capture.as_str().trim_matches(|pat| pat == '{' || pat == '}').split(".");
 				return PARSER.accepts(pieces)
 			}
 			false
-		}) {
-			return Ok(val.to_string())
+		});
+		return if all_valid {
+			Ok(val.to_string())
+		} else {
+			bail!("invalid placeholder")
 		}
 	}
-	bail!("invalid placeholder")
+	Ok(val.to_string())
 }
 
 pub trait Placeholder {
