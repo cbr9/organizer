@@ -11,6 +11,7 @@ mod new;
 mod run;
 mod stop;
 mod watch;
+mod undo;
 
 #[derive(Clap)]
 #[clap(about, author, version)]
