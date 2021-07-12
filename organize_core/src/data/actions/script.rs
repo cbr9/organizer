@@ -123,7 +123,11 @@ impl Script {
 
 	fn run<T: AsRef<Path>>(&self, path: T) -> anyhow::Result<Output> {
 		let script = self.write(path.as_ref())?;
-		let output = Command::new(&self.exec).arg(&script).stdout(Stdio::piped()).spawn()?.wait_with_output()?;
+		let output = Command::new(&self.exec)
+			.arg(&script)
+			.stdout(Stdio::piped())
+			.spawn()?
+			.wait_with_output()?;
 		Ok(output)
 	}
 }

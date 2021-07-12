@@ -58,17 +58,17 @@ where
 // used inside Visitor impls
 pub fn visit_placeholder_string(val: &str) -> Result<String> {
 	if let Some(matches) = POTENTIAL_PH_REGEX.captures(val) {
-		let all_valid = matches.iter().all(|capture| {
+		let all_placeholders_valid = matches.iter().all(|capture| {
 			if let Some(capture) = capture {
-				let pieces = capture.as_str().trim_matches(|pat| pat == '{' || pat == '}').split(".");
+				let pieces = capture.as_str().trim_matches(|pat| pat == '{' || pat == '}').split('.');
 				return PARSER.accepts(pieces)
 			}
 			false
 		});
-		return if all_valid {
-			Ok(val.to_string())
-		} else {
-			bail!("invalid placeholder")
+
+		return match all_placeholders_valid {
+			true => Ok(val.to_string()),
+			false => bail!("invalid placeholder")
 		}
 	}
 	Ok(val.to_string())

@@ -121,14 +121,17 @@ impl<'a> File<'a> {
 		self.filter_by_options(ancestor, rule, folder) && self.filter_by_filters(rule, folder)
 	}
 
-	pub fn get_matching_rules(&mut self, path_to_rules: &'a PathToRules) -> Vec<&'a (usize, usize)> {
+	pub fn get_matching_rules(&self, path_to_rules: &'a PathToRules) -> Vec<&'a (usize, usize)> {
 		let (ancestor, rules) = path_to_rules.get_key_value(&self.path).unwrap();
 		match self.data.match_rules() {
 			Match::First => rules
 				.iter()
 				.find(|(rule, folder)| self.filter(ancestor, rule, folder))
 				.map_or_else(Vec::new, |rule| vec![rule]),
-			Match::All => rules.iter().filter(|(rule, folder)| self.filter(ancestor, rule, folder)).collect(),
+			Match::All => rules
+				.iter()
+				.filter(|(rule, folder)| self.filter(ancestor, rule, folder))
+				.collect(),
 		}
 	}
 }
@@ -138,7 +141,9 @@ mod tests {
 	use crate::file::File;
 	use crate::{
 		data::{
-			folders::Folder, config::Config, config::Rule,
+			config::Config,
+			config::Rule,
+			folders::Folder,
 			options::{recursive::Recursive, Options},
 			settings::Settings,
 			Data,
@@ -242,7 +247,12 @@ mod tests {
 		let file = File::new(dir.join("depth2.pdf"), DATA.deref(), true);
 		assert!(file.filter_by_recursive(DOWNLOADS.deref(), 0, 0)); // at (0, 0), recursive.depth is Some(2)
 		assert!(!file.filter_by_recursive(DOWNLOADS.deref(), 1, 0)); // at (0, 0), recursive.depth is Some(1)
-		let dir = DOCUMENTS.join("depth1").join("depth2").join("depth3").join("depth4").join("depth5");
+		let dir = DOCUMENTS
+			.join("depth1")
+			.join("depth2")
+			.join("depth3")
+			.join("depth4")
+			.join("depth5");
 		let file = File::new(dir.join("depth6.pdf"), DATA.deref(), true);
 		assert!(!file.filter_by_recursive(DOWNLOADS.deref(), 0, 1)); // at (0, 1), recursive.depth is Some(5)
 		assert!(file.filter_by_recursive(DOWNLOADS.deref(), 1, 1)); // at (1, 1), recursive.depth is Some(0)

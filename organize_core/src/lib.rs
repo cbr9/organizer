@@ -20,10 +20,10 @@ pub(crate) mod string {
 }
 pub mod data;
 pub mod file;
+mod fsa;
 pub mod logger;
 pub mod register;
 pub mod simulation;
 pub mod utils;
-mod fsa;
 
 pub const PROJECT_NAME: &str = "alfred";

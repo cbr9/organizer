@@ -8,7 +8,7 @@ use crate::data::options::r#match::Match;
 use crate::{data::options::apply::wrapper::ApplyWrapper, utils::DefaultOpt};
 
 use crate::data::options::recursive::Recursive;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
 #[derive(Deserialize, Serialize, Debug, Clone, Eq, PartialEq)]

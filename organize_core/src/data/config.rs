@@ -7,12 +7,9 @@ use anyhow::{anyhow, bail, Context, Result};
 use serde::Deserialize;
 
 use crate::{
-	data::{
-		actions::Actions, filters::Filters, folders::Folders,
-		options::Options,
-	},
-	PROJECT_NAME,
+	data::{actions::Actions, filters::Filters, folders::Folders, options::Options},
 	utils::DefaultOpt,
+	PROJECT_NAME,
 };
 
 #[derive(Deserialize, Clone, Debug, PartialEq, Eq)]
@@ -124,12 +121,12 @@ mod tests {
 
 	use anyhow::{anyhow, Result};
 
-	use crate::utils::tests::{AndWait, project};
+	use crate::utils::tests::{project, AndWait};
 
 	use super::*;
 
 	#[test]
-    fn test() -> Result<()> {
+	fn test() -> Result<()> {
 		// these tests are all crammed into one to avoid concurrency issues
 		// where one test interferes with the setup on another
 		create()?;

@@ -42,10 +42,7 @@ impl<'a> PathToRules<'a> {
 mod tests {
 	use super::*;
 	use crate::{
-		data::{
-			folders::Folder, config::Rule,
-			options::Options,
-		},
+		data::{config::Rule, folders::Folder, options::Options},
 		utils::DefaultOpt,
 	};
 	use std::path::Path;

@@ -15,14 +15,14 @@ use std::ops::Sub;
 #[derive(Clap, Debug)]
 pub struct Edit {
 	#[clap(subcommand)]
-    subcommand: Subcommand
+	subcommand: Subcommand,
 }
 
 // DUMMY ENUM REQUIRED TO AVOID A CLAP BUG
 #[derive(Clap, Debug)]
 enum Subcommand {
 	Config,
-	Settings
+	Settings,
 }
 
 impl Cmd for Edit {

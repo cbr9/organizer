@@ -3,23 +3,23 @@ use std::path::PathBuf;
 use anyhow::{anyhow, Result};
 
 use crate::{
-    data::{
-        config::Config,
-        options::{apply::Apply, Options, r#match::Match},
-        settings::Settings,
+	data::{
+		config::Config,
+		options::{apply::Apply, r#match::Match, Options},
+		settings::Settings,
 	},
-    PROJECT_NAME,
-    utils::{DefaultOpt, UnwrapRef},
+	utils::{DefaultOpt, UnwrapRef},
+	PROJECT_NAME,
 };
 
+pub mod actions;
 pub mod config;
+pub mod filters;
+pub mod folders;
 pub mod options;
 pub mod path_to_recursive;
 pub mod path_to_rules;
 pub mod settings;
-pub mod actions;
-pub mod filters;
-pub mod folders;
 
 #[derive(Debug, Clone)]
 pub struct Data {

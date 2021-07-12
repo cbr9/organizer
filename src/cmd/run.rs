@@ -8,7 +8,7 @@ use organize_core::{
 	file::File,
 	logger::Logger,
 	simulation::Simulation,
-	utils::UnwrapRef
+	utils::UnwrapRef,
 };
 use rayon::prelude::*;
 

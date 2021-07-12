@@ -13,10 +13,7 @@ mod regex;
 
 #[cfg(feature = "filter_mime")]
 use crate::data::filters::mime::MimeWrapper;
-use crate::data::{
-	actions::script::Script, filters::regex::Regex,
-	options::apply::Apply,
-};
+use crate::data::{actions::script::Script, filters::regex::Regex, options::apply::Apply};
 
 #[derive(Debug, Clone, Deserialize, Eq, PartialEq)]
 #[serde(rename_all(deserialize = "lowercase"))]

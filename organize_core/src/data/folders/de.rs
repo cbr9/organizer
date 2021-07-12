@@ -42,7 +42,11 @@ impl<'de> Deserialize<'de> for Folder {
 					match key.as_str() {
 						"path" => {
 							path = match path.is_none() {
-								true => Some(Folder::from_str(&map.next_value::<String>()?).map(|f| f.path).map_err(M::Error::custom)?),
+								true => Some(
+									Folder::from_str(&map.next_value::<String>()?)
+										.map(|f| f.path)
+										.map_err(M::Error::custom)?,
+								),
 								false => return Err(M::Error::duplicate_field("path")),
 							}
 						}

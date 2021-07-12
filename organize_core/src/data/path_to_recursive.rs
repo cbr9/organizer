@@ -55,9 +55,11 @@ mod tests {
 	use super::*;
 	use crate::{
 		data::{
-			folders::Folder, Config, config::Rule,
+			config::Rule,
+			folders::Folder,
 			options::{recursive::Recursive, Options},
 			settings::Settings,
+			Config,
 		},
 		utils::DefaultOpt,
 	};
