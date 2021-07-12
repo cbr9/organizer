@@ -3,7 +3,7 @@ use std::{borrow::Cow, path::PathBuf};
 use lazy_static::lazy_static;
 use log::error;
 
-use libalfred::data::config::Config;
+use organize_core::data::config::Config;
 
 use crate::cmd::{App, Cmd};
 use clap::Clap;

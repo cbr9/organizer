@@ -1,6 +1,6 @@
 use clap::Clap;
 
-use libalfred::logger::Logger;
+use organize_core::logger::Logger;
 
 use crate::cmd::{edit::Edit, info::Info, logs::Logs, new::New, run::Run, stop::Stop, watch::Watch};
 

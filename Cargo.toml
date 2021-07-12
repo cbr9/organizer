@@ -1,5 +1,5 @@
 [package]
-name = "alfred"
+name = "organize"
 version = "0.2.0"
 authors = ["KBR9 <cabero96@protonmail.com>"]
 edition = "2018"
@@ -24,7 +24,7 @@ log = "0.4"
 fern = {version = "0.5", features = ["colored"] }
 toml = "0.5.7"
 anyhow = "1.0.34"
-libalfred = { path = "libalfred" }
+organize_core = { path = "organize_core" }
 path-clean = "0.1.0"
 walkdir = "2.3.1"
 dialoguer = { version = "0.8.0", optional = true }
@@ -33,11 +33,11 @@ dirs-next = "2.0.0"
 [features]
 interactive = ["dialoguer"]
 hot-reload = []
-action_trash = ["libalfred/action_trash"]
-filter_mime = ["libalfred/filter_mime"]
+action_trash = ["organize_core/action_trash"]
+filter_mime = ["organize_core/filter_mime"]
 
 [workspace]
-members = ["libalfred"]
+members = ["organize_core"]
 
 [dev-dependencies]
 pretty_assertions = "0.6.1"

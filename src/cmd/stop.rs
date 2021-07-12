@@ -4,7 +4,7 @@ use anyhow::Result;
 use clap::Clap;
 use sysinfo::{ProcessExt, RefreshKind, Signal, System, SystemExt};
 
-use libalfred::{logger::Logger, register::Register};
+use organize_core::{logger::Logger, register::Register};
 
 use crate::{cmd::Cmd, CONFIG_PATH_STR};
 
