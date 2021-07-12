@@ -7,7 +7,7 @@ use std::{
 use anyhow::{Context, Result};
 use clap::Clap;
 
-use libalfred::data::{config::Config, settings::Settings};
+use organize_core::data::{config::Config, settings::Settings};
 
 use crate::cmd::Cmd;
 use std::ops::Sub;

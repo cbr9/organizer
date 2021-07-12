@@ -2,7 +2,7 @@ use crate::{Cmd, CONFIG_PATH_STR};
 use anyhow::Result;
 use clap::Clap;
 use notify::RecursiveMode;
-use libalfred::{
+use organize_core::{
     data::{path_to_recursive::PathToRecursive, path_to_rules::PathToRules, Data},
     file::File,
 };

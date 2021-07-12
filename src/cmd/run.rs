@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use anyhow::Result;
 use clap::Clap;
 
-use libalfred::{
+use organize_core::{
 	data::{path_to_recursive::PathToRecursive, path_to_rules::PathToRules, Data},
 	file::File,
 	logger::Logger,

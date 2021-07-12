@@ -15,7 +15,7 @@ use log::{debug, info};
 use notify::{watcher, DebouncedEvent, RecommendedWatcher, RecursiveMode, Watcher};
 use sysinfo::{ProcessExt, RefreshKind, Signal, System, SystemExt};
 
-use libalfred::{
+use organize_core::{
 	data::{config::Config, path_to_recursive::PathToRecursive, path_to_rules::PathToRules, settings::Settings, Data},
 	file::File,
 	logger::Logger,
@@ -23,7 +23,7 @@ use libalfred::{
 };
 
 use crate::{cmd::run::Run, Cmd, CONFIG_PATH_STR};
-use libalfred::simulation::Simulation;
+use organize_core::simulation::Simulation;
 use std::sync::{Arc, Mutex};
 
 #[derive(Clap, Debug)]

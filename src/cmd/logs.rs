@@ -2,7 +2,7 @@ use anyhow::Result;
 use clap::Clap;
 use log::Level;
 
-use libalfred::logger::Logger;
+use organize_core::logger::Logger;
 
 use crate::Cmd;
 
