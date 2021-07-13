@@ -69,7 +69,7 @@ impl Config {
 	}
 
 	pub fn default_dir() -> Result<PathBuf> {
-		let var = "ALFRED_CONFIG_DIR";
+		let var = "ORGANIZE_CONFIG_DIR";
 		std::env::var_os(var).map_or_else(
 			|| {
 				Ok(dirs_next::config_dir()

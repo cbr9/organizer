@@ -120,7 +120,7 @@ impl Data {
 	}
 
 	pub fn dir() -> Result<PathBuf> {
-		let var = "ALFRED_DATA_DIR";
+		let var = "ORGANIZE_DATA_DIR";
 		std::env::var_os(var).map_or_else(
 			|| {
 				Ok(dirs_next::data_local_dir()

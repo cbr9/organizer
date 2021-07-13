@@ -26,4 +26,4 @@ pub mod register;
 pub mod simulation;
 pub mod utils;
 
-pub const PROJECT_NAME: &str = "alfred";
+pub const PROJECT_NAME: &str = "organize";
