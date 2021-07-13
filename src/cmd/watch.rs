@@ -176,9 +176,7 @@ impl<'a> Watch {
 											for folder in path_to_rules.keys() {
 												watcher.unwatch(folder)?;
 											}
-											if cfg!(feature = "hot-reload") {
-												watcher.unwatch(config_parent)?;
-											}
+											watcher.unwatch(config_parent)?;
 											std::mem::drop(path);
 											std::mem::drop(path_to_rules);
 											std::mem::drop(path_to_recursive);
