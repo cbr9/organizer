@@ -10,10 +10,10 @@ use itertools::all;
 lazy_static! {
 	static ref POTENTIAL_PH_REGEX: Regex = Regex::new(r"\{\w+(?:\.\w+)*}").unwrap(); // a panic here indicates a compile-time bug
 	static ref PARSER: FSA<'static, u8> = FSA::new(
-		&[0, 1, 2, 3, 4],
+		&[0, 1, 2, 3, 4, 5],
 		&["path", "parent", "filename", "stem", "extension", "to_lowercase", "to_uppercase", "capitalize"],
 		0,
-		&[0, 1, 2, 3, 4],
+		&[0, 1, 2, 3, 4, 5],
 		transitions![
 			// On <string>, on <int>, go to  <int>
 			("path", 0) => 0,
@@ -25,8 +25,8 @@ lazy_static! {
 			("to_uppercase", 0) => 3,
 			("capitalize", 0) => 3,
             // --------------------
-			("filename", 1) => 2,
-			("path", 1) => 1,
+			("filename", 1) => 5,
+			// ("path", 1) => 1,
 			("parent", 1) => 1,
 			("to_lowercase", 1) => 3,
 			("to_uppercase", 1) => 3,
@@ -40,7 +40,11 @@ lazy_static! {
 			// --------------------
 			("to_lowercase", 4) => 3,
 			("to_uppercase", 4) => 3,
-			("capitalize", 4) => 3
+			("capitalize", 4) => 3,
+			// --------------------
+			("to_uppercase", 5) => 3,
+			("to_lowercase", 5) => 3,
+			("capitalize", 5) => 3
 		]
 	);
 
@@ -57,20 +61,14 @@ where
 
 // used inside Visitor impls
 pub fn visit_placeholder_string(val: &str) -> Result<String> {
-	if let Some(matches) = POTENTIAL_PH_REGEX.captures(val) {
-		let all_placeholders_valid = matches.iter().all(|capture| {
-			if let Some(capture) = capture {
-				let pieces = capture.as_str().trim_matches(|pat| pat == '{' || pat == '}').split('.');
-				return PARSER.accepts(pieces)
-			}
-			false
-		});
-
-		return match all_placeholders_valid {
-			true => Ok(val.to_string()),
+	POTENTIAL_PH_REGEX.find_iter(val).try_for_each(|capture| {
+		let pieces = capture.as_str().trim_matches(|pat| pat == '{' || pat == '}').split('.');
+		match PARSER.accepts(pieces) {
+			true => Ok(()),
 			false => bail!("invalid placeholder")
 		}
-	}
+	})?;
+
 	Ok(val.to_string())
 }
 
@@ -158,6 +156,11 @@ pub mod tests {
 	#[test]
 	fn deserialize_invalid_ph_parent_stem() {
 		let str = "$HOME/{parent.stem}";
+		assert!(visit_placeholder_string(str).is_err())
+	}
+	#[test]
+	fn deserialize_invalid_ph_parent_filename_stem() {
+		let str = "$HOME/{parent.filename.stem}";
 		assert!(visit_placeholder_string(str).is_err())
 	}
 	#[test]
