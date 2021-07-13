@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use anyhow::{anyhow, Result};
 
@@ -107,8 +107,7 @@ getters! {
 }
 
 impl Data {
-	pub fn new() -> Result<Self> {
-		let path = Config::path()?;
+	pub fn new<T: AsRef<Path>>(path: T) -> Result<Self> {
 		let config = Config::parse(&path)?;
 		Config::set_cwd(path)?;
 		let settings = Settings::new(Settings::path()?)?;

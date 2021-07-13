@@ -28,7 +28,7 @@ impl Cmd for Run {
 	fn run(mut self) -> Result<()> {
 		Logger::setup(self.no_color)?;
 		self.config = self.config.canonicalize()?;
-		let data = Data::new()?;
+		let data = Data::new(&self.config)?;
 		self.start(data)
 	}
 }

@@ -46,7 +46,7 @@ impl Cmd for Watch {
 	fn run(mut self) -> Result<()> {
 		Logger::setup(self.no_color)?;
 		self.config = self.config.canonicalize()?;
-		let data = Data::new()?;
+		let data = Data::new(&self.config)?;
 
 		if self.clean {
 			self.cleanup(&data)?;
@@ -85,7 +85,7 @@ impl<'a> Watch {
 				if let Some(process) = sys.get_process(section.pid) {
 					process.kill(Signal::Term);
 				}
-				self.start(Data::new()?)
+				self.start(Data::new(&self.config)?)
 			}
 			None => self.replace_none(),
 		}
@@ -102,7 +102,7 @@ impl<'a> Watch {
 			.with_prompt("Do you wish to start an instance?")
 			.interact()?;
 		if prompt {
-			return self.start(Data::new()?);
+			return self.start(Data::new(&self.config)?);
 		}
 		Ok(())
 	}
