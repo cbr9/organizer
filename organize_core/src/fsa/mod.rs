@@ -60,13 +60,11 @@ impl<'a, Q: Debug + Eq + Hash + Clone> FSA<'a, Q> {
 		assert!(states.contains(&start_state));
 		assert!(accept_states.iter().all(|state| states.contains(state)) && accept_states.len() <= states.len());
 
-		let state_to_index = HashMap::from_iter(states.into_iter().enumerate().map(|(index, state)| (state.clone(), index)));
-		let symbol_to_index = HashMap::from_iter(
-			symbols
-				.into_iter()
+		let state_to_index = states.iter().enumerate().map(|(index, state)| (state.clone(), index)).collect::<HashMap<_, _>>();
+		let symbol_to_index = symbols
+				.iter()
 				.enumerate()
-				.map(|(index, symbol)| (symbol.to_string(), index)),
-		);
+				.map(|(index, symbol)| (symbol.to_string(), index)).collect::<HashMap<_, _>>();
 		let mut fsa = Self {
 			start_state,
 			accept_states,
@@ -89,7 +87,7 @@ impl<'a, Q: Debug + Eq + Hash + Clone> FSA<'a, Q> {
 	}
 
 	pub fn accepts<P: ToString + Hash + Eq, T: Iterator<Item = P>>(&self, tape: T) -> bool {
-		let index_to_item: HashMap<usize, T::Item, RandomState> = HashMap::from_iter(tape.into_iter().enumerate());
+		let index_to_item: HashMap<usize, T::Item, RandomState> = tape.into_iter().enumerate().collect::<HashMap<_, _>>();
 
 		let length = index_to_item.len();
 		let mut current_input_index = 0;
