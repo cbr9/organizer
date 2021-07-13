@@ -23,8 +23,8 @@ jobs:
   fast_finish: true
   include:
       - before_script:
-          - rm target/debug/deps/alfred-* || true
-          - rm target/debug/deps/libalfred-* || true
+          - rm target/debug/deps/organize-* || true
+          - rm target/debug/deps/organize_core-* || true
           - rustup component add rustfmt-preview
           - rustup component add clippy-preview
         script:
