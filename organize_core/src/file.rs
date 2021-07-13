@@ -27,7 +27,10 @@ impl<'a> File<'a> {
 		let rules = self.get_matching_rules(path_to_rules);
 		for (i, j) in rules {
 			let rule = &self.data.config.rules[*i];
-			match rule.actions.simulate(self.path, self.data.get_apply_actions(*i, *j), simulation) {
+			match rule
+				.actions
+				.simulate(self.path, self.data.get_apply_actions(*i, *j), simulation)
+			{
 				None => break,
 				Some(new_path) => {
 					self.path = new_path;
