@@ -29,6 +29,7 @@ path-clean = "0.1.0"
 walkdir = "2.3.1"
 dialoguer = { version = "0.8.0", optional = true }
 dirs-next = "2.0.0"
+notify-rust = "4.5.2"
 
 [features]
 interactive = ["dialoguer"]

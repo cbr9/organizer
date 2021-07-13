@@ -25,6 +25,7 @@ use organize_core::{
 use crate::{cmd::run::Run, Cmd, CONFIG_PATH_STR};
 use organize_core::simulation::Simulation;
 use std::sync::{Arc, Mutex};
+use notify_rust::Timeout;
 
 #[derive(Clap, Debug)]
 pub struct Watch {
@@ -181,7 +182,12 @@ impl<'a> Watch {
 											std::mem::drop(path_to_rules);
 											std::mem::drop(path_to_recursive);
 											data.config = new_config;
-											info!("reloaded configuration: {}", self.config.display());
+											notify_rust::Notification::new()
+												.summary("organize")
+												.appname("organize")
+												.body(&format!("reloaded configuration: {}", self.config.display()))
+												.timeout(Timeout::Milliseconds(2000))
+												.show()?;
 											break self.start(data);
 										}
 									}
