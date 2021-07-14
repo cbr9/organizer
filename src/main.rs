@@ -10,20 +10,20 @@ use clap::Clap;
 
 lazy_static! {
 	pub static ref CONFIG_PATH: PathBuf = Config::path()
-	.map(|path| {
-		let parent = path.parent().expect("invalid config directory");
-		if !parent.exists() {
-			std::fs::create_dir_all(&parent).expect("could not create config directory");
-		}
-        if !path.exists() {
-			std::fs::File::create(&path).expect("could not create config file");
-		}
-		path
-	})
-	.unwrap_or_else(|e| {
-		error!("{:?}", e);
-		std::process::exit(0)
-	});
+		.map(|path| {
+			let parent = path.parent().expect("invalid config directory");
+			if !parent.exists() {
+				std::fs::create_dir_all(&parent).expect("could not create config directory");
+			}
+			if !path.exists() {
+				std::fs::File::create(&path).expect("could not create config file");
+			}
+			path
+		})
+		.unwrap_or_else(|e| {
+			error!("{:?}", e);
+			std::process::exit(0)
+		});
 	pub static ref CONFIG_PATH_STR: Cow<'static, str> = CONFIG_PATH.to_string_lossy();
 }
 

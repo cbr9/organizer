@@ -21,13 +21,12 @@ pub struct Config {
 
 impl Config {
 	pub fn parse<T: AsRef<Path>>(path: T) -> Result<Config> {
-		fs::read_to_string(&path)
-			.map(|ref content| {
-				if content.is_empty() {
-					bail!("empty configuration")
-				}
-				serde_yaml::from_str(content).with_context(|| format!("could not deserialize {}", path.as_ref().display()))
-			})?
+		fs::read_to_string(&path).map(|ref content| {
+			if content.is_empty() {
+				bail!("empty configuration")
+			}
+			serde_yaml::from_str(content).with_context(|| format!("could not deserialize {}", path.as_ref().display()))
+		})?
 	}
 
 	pub fn set_cwd<T: AsRef<Path>>(path: T) -> Result<PathBuf> {

@@ -11,7 +11,7 @@ use dialoguer::{theme::ColorfulTheme, Confirm};
 use anyhow::Result;
 use clap::Clap;
 use colored::Colorize;
-use log::{debug, info};
+
 use notify::{watcher, DebouncedEvent, RecommendedWatcher, RecursiveMode, Watcher};
 use sysinfo::{ProcessExt, RefreshKind, Signal, System, SystemExt};
 
@@ -23,9 +23,9 @@ use organize_core::{
 };
 
 use crate::{cmd::run::Run, Cmd, CONFIG_PATH_STR};
+use notify_rust::Notification;
 use organize_core::simulation::Simulation;
 use std::sync::{Arc, Mutex};
-use notify_rust::Timeout;
 
 #[derive(Clap, Debug)]
 pub struct Watch {
@@ -157,56 +157,39 @@ impl<'a> Watch {
 	}
 
 	fn start(&'a self, mut data: Data) -> Result<()> {
-		let path_to_rules = PathToRules::new(&data.config);
-		let path_to_recursive = PathToRecursive::new(&data);
-		let (mut watcher, rx) = self.setup(&path_to_recursive)?;
 		let config_parent = self.config.parent().unwrap();
 		let settings_path = Settings::path()?;
 		let simulation = if self.simulate { Some(Simulation::new()?) } else { None };
+
+		let path_to_rules = PathToRules::new(&data.config);
+		let path_to_recursive = PathToRecursive::new(&data);
+		let (_watcher, rx) = self.setup(&path_to_recursive)?;
 
 		loop {
 			if let Ok(event) = rx.recv() {
 				match event {
 					DebouncedEvent::Create(path) => Self::on_create(path, config_parent, &data, &path_to_rules, &simulation),
 					DebouncedEvent::Write(path) => {
-						if cfg!(feature = "hot-reload") {
-							if path == self.config {
-								match Config::parse(&self.config) {
-									Ok(new_config) => {
-										if new_config != data.config {
-											for folder in path_to_rules.keys() {
-												watcher.unwatch(folder)?;
-											}
-											watcher.unwatch(config_parent)?;
-											std::mem::drop(path);
-											std::mem::drop(path_to_rules);
-											std::mem::drop(path_to_recursive);
-											data.config = new_config;
-											notify_rust::Notification::new()
-												.summary("organize")
-												.appname("organize")
-												.body(&format!("reloaded configuration: {}", self.config.display()))
-												.timeout(Timeout::Milliseconds(2000))
-												.show()?;
-											break self.start(data);
-										}
-									}
-									Err(e) => {
-										debug!("could not reload configuration: {}", e);
-									}
-								};
-							} else if path == settings_path {
-								match Settings::new(&settings_path) {
-									Ok(settings) => {
-										if data.settings != settings {
-											info!("successfully reloaded settings");
-											data.settings = settings;
-											break self.start(data);
-										}
-									}
-									Err(e) => {
-										debug!("could not reload settings: {}", e);
-									}
+						if path == self.config {
+							if let Ok(new_config) = Config::parse(&self.config) {
+								if new_config != data.config {
+									data.config = new_config;
+									Notification::new()
+										.summary("organize")
+										.body("organize reloaded successfully")
+										.show()?;
+									break self.start(data);
+								}
+							}
+						} else if path == settings_path {
+							if let Ok(new_settings) = Settings::new(&settings_path) {
+								if data.settings != new_settings {
+									data.settings = new_settings;
+									Notification::new()
+										.summary("organize")
+										.body("organize reloaded successfully")
+										.show()?;
+									break self.start(data);
 								}
 							}
 						}

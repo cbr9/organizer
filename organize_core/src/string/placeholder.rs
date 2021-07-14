@@ -1,15 +1,15 @@
 use anyhow::{anyhow, bail, Context, Result};
 use std::path::Path;
 
-use crate::{transitions, transition, fsa::{FSA, Transition}, string::Capitalize};
+use crate::{transitions, transition, fsa::{Fsa, Transition}, string::Capitalize};
 use lazy_static::lazy_static;
 use regex::Regex;
 use serde::{de::Error, Deserialize, Deserializer};
-use itertools::all;
+
 
 lazy_static! {
 	static ref POTENTIAL_PH_REGEX: Regex = Regex::new(r"\{\w+(?:\.\w+)*}").unwrap(); // a panic here indicates a compile-time bug
-	static ref PARSER: FSA<'static, u8> = FSA::new(
+	static ref PARSER: Fsa<'static, u8> = Fsa::new(
 		&[0, 1, 2, 3, 4, 5],
 		&["path", "parent", "filename", "stem", "extension", "to_lowercase", "to_uppercase", "capitalize"],
 		0,

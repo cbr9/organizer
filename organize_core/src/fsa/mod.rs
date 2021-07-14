@@ -2,10 +2,9 @@ use std::collections::hash_map::RandomState;
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::hash::Hash;
-use std::iter::FromIterator;
 
 #[derive(Debug)]
-pub(in crate) struct FSA<'a, Q> {
+pub(in crate) struct Fsa<'a, Q> {
 	pub accept_states: &'a [Q],
 	pub transition_matrix: Vec<Vec<Option<Q>>>,
 	pub start_state: Q,
@@ -55,16 +54,21 @@ macro_rules! transition {
     }
 }
 
-impl<'a, Q: Debug + Eq + Hash + Clone> FSA<'a, Q> {
+impl<'a, Q: Debug + Eq + Hash + Clone> Fsa<'a, Q> {
 	pub fn new<S: ToString>(states: &'a [Q], symbols: &'a [S], start_state: Q, accept_states: &'a [Q], transitions: Vec<Transition<Q, S>>) -> Self {
 		assert!(states.contains(&start_state));
 		assert!(accept_states.iter().all(|state| states.contains(state)) && accept_states.len() <= states.len());
 
-		let state_to_index = states.iter().enumerate().map(|(index, state)| (state.clone(), index)).collect::<HashMap<_, _>>();
+		let state_to_index = states
+			.iter()
+			.enumerate()
+			.map(|(index, state)| (state.clone(), index))
+			.collect::<HashMap<_, _>>();
 		let symbol_to_index = symbols
-				.iter()
-				.enumerate()
-				.map(|(index, symbol)| (symbol.to_string(), index)).collect::<HashMap<_, _>>();
+			.iter()
+			.enumerate()
+			.map(|(index, symbol)| (symbol.to_string(), index))
+			.collect::<HashMap<_, _>>();
 		let mut fsa = Self {
 			start_state,
 			accept_states,
@@ -113,6 +117,7 @@ impl<'a, Q: Debug + Eq + Hash + Clone> FSA<'a, Q> {
 		}
 	}
 
+	#[cfg(test)]
 	pub fn rejects<P: ToString + Hash + Eq, T: Iterator<Item = P>>(&self, tape: T) -> bool {
 		!self.accepts(tape)
 	}
@@ -130,7 +135,7 @@ mod tests {
 		//   2     ∅   3   ∅
 		//   3     ∅   3   4
 		//   4:    ∅   ∅   ∅
-		let fsa = FSA::new(
+		let fsa = Fsa::new(
 			&[0, 1, 2, 3, 4],
 			&['b', 'a', '!'],
 			0,

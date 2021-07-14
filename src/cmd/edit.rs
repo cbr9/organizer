@@ -10,7 +10,6 @@ use clap::Clap;
 use organize_core::data::{config::Config, settings::Settings};
 
 use crate::cmd::Cmd;
-use std::ops::Sub;
 
 #[derive(Clap, Debug)]
 pub struct Edit {

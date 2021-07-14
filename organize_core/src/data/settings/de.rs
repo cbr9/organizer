@@ -1,5 +1,3 @@
-use crate::data::{options::Options, settings::Settings};
-use serde::{Deserialize, Deserializer};
 //
 // impl<'de> Deserialize<'de> for Settings {
 // 	fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>

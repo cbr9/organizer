@@ -86,7 +86,7 @@ mod tests {
 			startswith: Some("TE".into()),
 			..Default::default()
 		};
-		assert_eq!(filename.matches(path), false)
+		assert!(!filename.matches(path))
 	}
 
 	#[test]
@@ -97,7 +97,7 @@ mod tests {
 			startswith: Some("DF".into()),
 			..Default::default()
 		};
-		assert_eq!(filename.matches(path), false)
+		assert!(!filename.matches(path))
 	}
 
 	#[test]
@@ -108,7 +108,7 @@ mod tests {
 			contains: Some("ES".into()),
 			..Default::default()
 		};
-		assert_eq!(filename.matches(path), false)
+		assert!(!filename.matches(path))
 	}
 	#[test]
 	fn match_containing_case_sensitive() {
