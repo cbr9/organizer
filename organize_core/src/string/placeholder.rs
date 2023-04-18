@@ -1,14 +1,17 @@
 use anyhow::{anyhow, bail, Context, Result};
 use std::path::Path;
 
-use crate::{transitions, transition, fsa::{Fsa, Transition}, string::Capitalize};
+use crate::{
+	fsa::{Fsa, Transition},
+	string::Capitalize,
+	transition, transitions,
+};
 use lazy_static::lazy_static;
 use regex::Regex;
 use serde::{de::Error, Deserialize, Deserializer};
 
-
 lazy_static! {
-	static ref POTENTIAL_PH_REGEX: Regex = Regex::new(r"\{\w+(?:\.\w+)*}").unwrap(); // a panic here indicates a compile-time bug
+	static ref POTENTIAL_PH_REGEX: Regex = Regex::new(r"\{\{\w+(?:\.\w+)*}}").unwrap(); // a panic here indicates a compile-time bug
 	static ref PARSER: Fsa<'static, u8> = Fsa::new(
 		&[0, 1, 2, 3, 4, 5],
 		&["path", "parent", "filename", "stem", "extension", "to_lowercase", "to_uppercase", "capitalize"],
@@ -24,14 +27,14 @@ lazy_static! {
 			("to_lowercase", 0) => 3,
 			("to_uppercase", 0) => 3,
 			("capitalize", 0) => 3,
-            // --------------------
+			// --------------------
 			("filename", 1) => 5,
 			// ("path", 1) => 1,
 			("parent", 1) => 1,
 			("to_lowercase", 1) => 3,
 			("to_uppercase", 1) => 3,
 			("capitalize", 1) => 3,
-            // --------------------
+			// --------------------
 			("stem", 2) => 4,
 			("extension", 2) => 4,
 			("to_lowercase", 2) => 3,
@@ -65,7 +68,7 @@ pub fn visit_placeholder_string(val: &str) -> Result<String> {
 		let pieces = capture.as_str().trim_matches(|pat| pat == '{' || pat == '}').split('.');
 		match PARSER.accepts(pieces) {
 			true => Ok(()),
-			false => bail!("invalid placeholder")
+			false => bail!("invalid placeholder"),
 		}
 	})?;
 
@@ -79,7 +82,7 @@ pub trait Placeholder {
 impl<T: AsRef<str>> Placeholder for T {
 	fn expand_placeholders<P: AsRef<Path>>(self, path: P) -> Result<String> {
 		let str = self.as_ref();
-			// if the first condition is false, the second one won't be evaluated and REGEX won't be initialized
+		// if the first condition is false, the second one won't be evaluated and REGEX won't be initialized
 		let mut new = str.to_string();
 		for span in POTENTIAL_PH_REGEX.find_iter(str) {
 			let placeholders = span.as_str().trim_matches(|x| x == '{' || x == '}').split('.'); // split a placeholder like {path.filename.extension} into [path, filename, extension]

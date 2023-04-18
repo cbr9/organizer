@@ -1,12 +1,17 @@
-use std::{borrow::Cow, path::PathBuf};
+use std::{
+	borrow::Cow,
+	path::PathBuf,
+	sync::{Arc, Mutex},
+};
 
 use lazy_static::lazy_static;
 use log::error;
 
 use organize_core::data::config::Config;
+use rusqlite::Connection;
 
 use crate::cmd::{App, Cmd};
-use clap::Clap;
+use clap::Parser;
 
 lazy_static! {
 	pub static ref CONFIG_PATH: PathBuf = Config::path()
@@ -33,6 +38,5 @@ fn main() {
 	let app: App = App::parse();
 	if let Err(e) = app.run() {
 		error!("{:?}", e);
-		std::process::exit(0)
 	}
 }

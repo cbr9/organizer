@@ -1,3 +1,8 @@
+use std::sync::{Arc, Mutex};
+
+use lazy_static::lazy_static;
+use rusqlite::Connection;
+
 #[macro_use]
 extern crate strum_macros;
 
@@ -22,8 +27,12 @@ pub mod data;
 pub mod file;
 mod fsa;
 pub mod logger;
-pub mod register;
-pub mod simulation;
 pub mod utils;
 
 pub const PROJECT_NAME: &str = "organize";
+
+lazy_static! {
+	pub static ref DB: Arc<Mutex<Connection>> = Arc::new(Mutex::new(
+		Connection::open(dirs_next::data_local_dir().unwrap().join("organize").join("organize.db")).unwrap()
+	));
+}

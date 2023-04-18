@@ -1,8 +1,7 @@
-use clap::Clap;
+use clap::{Parser, Subcommand};
 
-use organize_core::logger::Logger;
-
-use crate::cmd::{edit::Edit, info::Info, logs::Logs, new::New, run::Run, stop::Stop, watch::Watch};
+use crate::cmd::edit::Edit;
+use crate::cmd::run::Run;
 
 mod edit;
 mod info;
@@ -12,16 +11,22 @@ mod run;
 mod stop;
 mod watch;
 
-#[derive(Clap)]
-#[clap(about, author, version)]
-pub enum App {
-	Watch(Watch),
+#[derive(Subcommand)]
+enum Command {
 	Run(Run),
-	Logs(Logs),
-	Stop(Stop),
 	Edit(Edit),
-	New(New),
-	Info(Info),
+	// Watch(Watch),
+	// Logs(Logs),
+	// Stop(Stop),
+	// New(New),
+	// Info(Info),
+}
+
+#[derive(Parser)]
+#[command(about, author, version)]
+pub struct App {
+	#[command(subcommand)]
+	command: Command,
 }
 
 pub trait Cmd {
@@ -30,18 +35,18 @@ pub trait Cmd {
 
 impl Cmd for App {
 	fn run(self) -> anyhow::Result<()> {
-		use App::*;
-		match self {
-			Watch(watch) => watch.run(),
-			Run(run) => run.run(),
-			Stop(stop) => stop.run(),
-			Logs(logs) => {
-				Logger::setup(logs.no_color)?;
-				logs.run()
-			}
-			Edit(config) => config.run(),
-			New(new) => new.run(),
-			Info(info) => info.run(),
+		match self.command {
+			Command::Run(run) => run.run(),
+			Command::Edit(edit) => edit.run(),
+			// Watch(watch) => watch.run(conn),
+			// Run(run) => run.run(conn),
+			// Stop(stop) => stop.run(conn),
+			// Command::Logs(logs) => {
+			// 	Logger::setup(logs.no_color)?;
+			// 	logs.run(conn)
+			// }
+			// Command::New(new) => new.run(conn),
+			// Command::Info(info) => info.run(conn),
 		}
 	}
 }

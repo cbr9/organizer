@@ -1,34 +1,30 @@
 use std::path::PathBuf;
 
 use anyhow::Result;
-use clap::Clap;
+use clap::Parser;
 
 use organize_core::{
-	data::{path_to_recursive::PathToRecursive, path_to_rules::PathToRules, Data},
+	data::{config::Config, path_to_recursive::PathToRecursive, path_to_rules::PathToRules, Data},
 	file::File,
 	logger::Logger,
-	simulation::Simulation,
-	utils::UnwrapRef,
 };
 use rayon::prelude::*;
 
-use crate::{Cmd, CONFIG_PATH_STR};
+use crate::Cmd;
 
-#[derive(Clap, Debug)]
+#[derive(Parser, Debug)]
 pub struct Run {
-	#[clap(long, short = 'c', default_value = & CONFIG_PATH_STR, about = "Config path")]
-	pub(crate) config: PathBuf,
-	#[clap(long, short = 's', about = "Do not change any files, but get output on the hypothetical changes")]
-	pub(crate) simulate: bool,
-	#[clap(long, about = "Do not print colored output")]
+	#[arg(long, short = 'c')]
+	pub(crate) config: Option<PathBuf>,
+	#[arg(long, default_value_t = false)]
 	pub(crate) no_color: bool,
 }
 
 impl Cmd for Run {
 	fn run(mut self) -> Result<()> {
 		Logger::setup(self.no_color)?;
-		self.config = self.config.canonicalize()?;
-		let data = Data::new(&self.config)?;
+		self.config = Some(self.config.unwrap_or_else(|| Config::path().unwrap()).canonicalize()?);
+		let data = Data::new(self.config.clone().unwrap())?;
 		self.start(data)
 	}
 }
@@ -37,7 +33,6 @@ impl<'a> Run {
 	pub(crate) fn start(self, data: Data) -> Result<()> {
 		let path_to_recursive = PathToRecursive::new(&data);
 		let path_to_rules = PathToRules::new(&data.config);
-		let simulation = if self.simulate { Some(Simulation::new()?) } else { None };
 
 		path_to_rules.par_iter().for_each(|(path, _)| {
 			let recursive = path_to_recursive.get(path).unwrap();
@@ -45,11 +40,7 @@ impl<'a> Run {
 			walker.into_iter().filter_map(|e| e.ok()).for_each(|entry| {
 				if entry.path().is_file() {
 					let file = File::new(entry.path(), &data, false);
-					if self.simulate {
-						file.simulate(&path_to_rules, simulation.unwrap_ref());
-					} else {
-						file.act(&path_to_rules);
-					}
+					file.act(&path_to_rules);
 				}
 			});
 		});

@@ -13,15 +13,13 @@ use serde::{de::Error, Deserialize, Deserializer};
 
 use crate::{
 	data::{
-		actions::{Act, ActionType, AsAction, Simulate},
+		actions::{Act, ActionType, AsAction},
 		filters::AsFilter,
 		Config,
 	},
-	simulation::Simulation,
 	string::{deserialize_placeholder_string, Placeholder},
 };
 use anyhow::Result;
-use std::sync::{Arc, Mutex, MutexGuard};
 
 #[derive(Deserialize, Debug, Clone, Default, Eq, PartialEq)]
 pub struct Script {
@@ -41,19 +39,9 @@ impl Act for Script {
 		unimplemented!()
 	}
 }
-impl Simulate for Script {
-	fn simulate<T, P>(&self, _from: T, _to: Option<P>, _simulation: MutexGuard<Simulation>) -> Result<Option<PathBuf>>
-	where
-		Self: Sized,
-		T: AsRef<Path> + Into<PathBuf>,
-		P: AsRef<Path> + Into<PathBuf>,
-	{
-		unimplemented!()
-	}
-}
 
 impl AsAction for Script {
-	fn process<T: Into<PathBuf>>(&self, path: T, _simulation: Option<&Arc<Mutex<Simulation>>>) -> Option<PathBuf> {
+	fn process<T: Into<PathBuf>>(&self, path: T) -> Option<PathBuf> {
 		let path = path.into();
 		self.run(&path)
 			.map(|output| {

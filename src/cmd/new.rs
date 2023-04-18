@@ -1,14 +1,12 @@
 use crate::cmd::{edit::Edit, Cmd};
 use anyhow::Result;
-use clap::Clap;
+use clap::Parser;
 use organize_core::{data::config::Config, logger::Logger};
 use std::path::PathBuf;
 
-#[derive(Clap, Debug)]
+#[derive(Parser, Debug)]
 pub struct New {
-	#[clap(skip)]
-	inner: bool,
-	#[clap(long = "in")]
+	#[arg(long = "in")]
 	folder: Option<PathBuf>,
 }
 

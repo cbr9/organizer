@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Deserialize, Serialize, Debug, Clone, Eq, PartialEq, ToString)]
+#[derive(Deserialize, Serialize, Debug, Clone, Eq, PartialEq, Display)]
 #[strum(serialize_all = "snake_case")]
 #[serde(rename_all(serialize = "lowercase", deserialize = "lowercase"))]
 pub enum Match {

@@ -1,12 +1,8 @@
 use crate::{
 	data::{options::r#match::Match, path_to_rules::PathToRules, Data},
 	path::IsHidden,
-	simulation::Simulation,
 };
-use std::{
-	path::{Path, PathBuf},
-	sync::{Arc, Mutex},
-};
+use std::path::{Path, PathBuf};
 
 pub struct File<'a> {
 	pub path: PathBuf,
@@ -20,22 +16,6 @@ impl<'a> File<'a> {
 			path: path.into(),
 			data,
 			is_watching,
-		}
-	}
-
-	pub fn simulate(mut self, path_to_rules: &'a PathToRules, simulation: &Arc<Mutex<Simulation>>) {
-		let rules = self.get_matching_rules(path_to_rules);
-		for (i, j) in rules {
-			let rule = &self.data.config.rules[*i];
-			match rule
-				.actions
-				.simulate(self.path, self.data.get_apply_actions(*i, *j), simulation)
-			{
-				None => break,
-				Some(new_path) => {
-					self.path = new_path;
-				}
-			}
 		}
 	}
 

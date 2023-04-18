@@ -1,34 +1,33 @@
 use std::{
 	env,
 	path::Path,
-	process::{Command, ExitStatus},
+	process::{self, ExitStatus},
 };
 
 use anyhow::{Context, Result};
-use clap::Clap;
+use clap::{Parser, Subcommand};
 
 use organize_core::data::{config::Config, settings::Settings};
 
 use crate::cmd::Cmd;
 
-#[derive(Clap, Debug)]
+#[derive(Parser, Debug)]
 pub struct Edit {
-	#[clap(subcommand)]
-	subcommand: Subcommand,
+	#[command(subcommand)]
+	command: Command,
 }
 
-// DUMMY ENUM REQUIRED TO AVOID A CLAP BUG
-#[derive(Clap, Debug)]
-enum Subcommand {
+#[derive(Subcommand, Debug)]
+enum Command {
 	Config,
 	Settings,
 }
 
 impl Cmd for Edit {
 	fn run(self) -> Result<()> {
-		match self.subcommand {
-			Subcommand::Config => Self::launch_editor(Config::path()?).map(|_| ()),
-			Subcommand::Settings => Self::launch_editor(Settings::path()?).map(|_| ()),
+		match self.command {
+			Command::Config => Self::launch_editor(Config::path()?).map(|_| ()),
+			Command::Settings => Self::launch_editor(Settings::path()?).map(|_| ()),
 		}
 	}
 }
@@ -36,7 +35,7 @@ impl Cmd for Edit {
 impl Edit {
 	pub(crate) fn launch_editor<T: AsRef<Path>>(path: T) -> Result<ExitStatus> {
 		env::var("EDITOR").map(|editor| {
-			Command::new(&editor)
+			process::Command::new(&editor)
 				.arg(path.as_ref())
 				.spawn()
 				.context(editor)?

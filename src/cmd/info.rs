@@ -1,5 +1,5 @@
 use crate::cmd::Cmd;
-use clap::Clap;
+use clap::Parser;
 use colored::Colorize;
 
 use organize_core::{
@@ -7,13 +7,13 @@ use organize_core::{
 	utils::DefaultOpt,
 };
 
-#[derive(Clap, Debug)]
+#[derive(Parser, Debug)]
 pub struct Info {
-	#[clap(long, short = 'd')]
+	#[arg(long, short = 'd')]
 	defaults: bool,
-	#[clap(long, short = 'p')]
+	#[arg(long, short = 'p')]
 	path: bool,
-	#[clap(long, short = 'a', exclusive = true)]
+	#[arg(long, short = 'a', exclusive = true)]
 	all: bool,
 }
 

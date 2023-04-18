@@ -1,14 +1,14 @@
 use anyhow::Result;
-use clap::Clap;
+use clap::Parser;
 use log::Level;
 
 use organize_core::logger::Logger;
 
 use crate::Cmd;
 
-#[derive(Debug, Clap)]
+#[derive(Debug, Parser)]
 pub struct Logs {
-	#[clap(long, about = "Do not print colored output")]
+	#[arg(long)]
 	pub(crate) no_color: bool,
 }
 
