@@ -1,14 +1,12 @@
 use std::{
 	borrow::Cow,
 	path::PathBuf,
-	sync::{Arc, Mutex},
 };
 
 use lazy_static::lazy_static;
 use log::error;
 
 use organize_core::data::config::Config;
-use rusqlite::Connection;
 
 use crate::cmd::{App, Cmd};
 use clap::Parser;
