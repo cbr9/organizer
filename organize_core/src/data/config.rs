@@ -69,7 +69,7 @@ impl Config {
 				bail!("empty configuration")
 			}
 
-			serde_yaml::from_str(content).with_context(|| format!("could not deserialize {}", path.as_ref().display()))
+			toml::from_str(content).with_context(|| format!("could not deserialize {}", path.as_ref().display()))
 		})?
 	}
 
