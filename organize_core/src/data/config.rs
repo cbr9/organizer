@@ -21,10 +21,11 @@ pub struct Config {
 
 impl Config {
 	pub fn create_in<T: AsRef<Path>>(folder: T) -> Result<PathBuf> {
-		let path = folder.as_ref().join(format!("{}.yml", PROJECT_NAME));
+		let path = folder.as_ref().join(format!("{}.toml", PROJECT_NAME));
 		if path.exists() {
 			bail!("a config file already exists in `{}`", folder.as_ref().display())
 		}
+		// TODO needs an update
 		let output = include_str!("../../../examples/blueprint.yml");
 		std::fs::write(&path, output).with_context(|| format!("error: could not create config file ({})", path.display()))?;
 		Ok(path.canonicalize()?)
@@ -55,7 +56,7 @@ impl Config {
 	}
 
 	pub fn default_path() -> Result<PathBuf> {
-		Self::default_dir().map(|dir| dir.join("config.yml")).map(|path| {
+		Self::default_dir().map(|dir| dir.join("config.toml")).map(|path| {
 			if !path.exists() {
 				std::fs::File::create(&path).expect("Could not create config file...");
 			}
@@ -82,7 +83,7 @@ impl Config {
 				let path = file.ok()?.path();
 				let extension = path.extension().unwrap_or_default();
 				let stem = path.file_stem().unwrap_or_default();
-				if stem == PROJECT_NAME && (extension == "yaml" || extension == "yml") {
+				if stem == PROJECT_NAME && (extension == "toml") {
 					Some(path)
 				} else {
 					None
