@@ -20,22 +20,6 @@ pub struct Config {
 }
 
 impl Config {
-	pub fn create_in<T: AsRef<Path>>(folder: T) -> Result<PathBuf> {
-		let path = folder.as_ref().join(format!("{}.toml", PROJECT_NAME));
-		if path.exists() {
-			bail!("a config file already exists in `{}`", folder.as_ref().display())
-		}
-		// TODO needs an update
-		let output = include_str!("../../../examples/blueprint.yml");
-		std::fs::write(&path, output).with_context(|| format!("error: could not create config file ({})", path.display()))?;
-		Ok(path.canonicalize()?)
-	}
-
-	pub fn create_in_cwd() -> Result<PathBuf> {
-		let dir = std::env::current_dir()?;
-		Self::create_in(dir)
-	}
-
 	pub fn default_dir() -> Result<PathBuf> {
 		let var = "ORGANIZE_CONFIG_DIR";
 		let path = std::env::var_os(var).map_or_else(

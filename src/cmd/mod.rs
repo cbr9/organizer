@@ -4,9 +4,6 @@ use crate::cmd::edit::Edit;
 use crate::cmd::run::Run;
 
 mod edit;
-mod info;
-pub(super) mod logs;
-mod new;
 mod run;
 mod stop;
 mod watch;
@@ -16,10 +13,7 @@ enum Command {
 	Run(Run),
 	Edit(Edit),
 	// Watch(Watch),
-	// Logs(Logs),
 	// Stop(Stop),
-	// New(New),
-	// Info(Info),
 }
 
 #[derive(Parser)]
