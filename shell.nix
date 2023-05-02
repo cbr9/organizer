@@ -2,6 +2,7 @@
 pkgs.mkShell {
   nativeBuildInputs = with pkgs; [
     cargo
+    mdbook
     rustc
     rustup
     gcc

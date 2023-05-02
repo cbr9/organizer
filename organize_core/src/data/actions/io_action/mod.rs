@@ -110,26 +110,9 @@ impl Act for Move {
 	{
 		let to = to.unwrap().into();
 		let from = from.as_ref();
-		let db = DB.clone();
-		let conn = db.lock().unwrap();
-		conn.execute(
-			"CREATE TABLE IF NOT EXISTS move (
-				id INTEGER PRIMARY KEY AUTOINCREMENT,
-				origin VARCHAR(500),
-				dest VARCHAR(500)
-			)",
-			(),
-		)
-		.with_context(|| "Could not create table")
-		.and_then(|_| {
-			conn.execute(
-				"INSERT INTO move (origin, dest) values (?1, ?2)",
-				&[from.to_str().unwrap(), to.to_str().unwrap()],
-			)
-			.with_context(|| "Could not insert entry")
-		})
-		.and_then(|_| std::fs::rename(&from, &to).with_context(|| "Failed to move file"))
-		.map_or(Ok(None), |_| Ok(Some(to)))
+		std::fs::rename(&from, &to)
+			.with_context(|| "Failed to move file")
+			.map_or(Ok(None), |_| Ok(Some(to)))
 	}
 }
 
@@ -141,26 +124,9 @@ impl Act for Copy {
 	{
 		let to = to.unwrap().into();
 		let from = from.as_ref();
-		let db = DB.clone();
-		let conn = db.lock().unwrap();
-		conn.execute(
-			"CREATE TABLE IF NOT EXISTS copy (
-				id INTEGER PRIMARY KEY AUTOINCREMENT,
-				origin VARCHAR(500),
-				dest VARCHAR(500)
-			)",
-			(),
-		)
-		.with_context(|| "Could not create table")
-		.and_then(|_| {
-			conn.execute(
-				"INSERT INTO copy (origin, dest) values (?1, ?2)",
-				&[from.to_str().unwrap(), to.to_str().unwrap()],
-			)
-			.with_context(|| "Could not insert entry")
-		})
-		.and_then(|_| std::fs::copy(&from, &to).with_context(|| "Failed to copy file"))
-		.map_or(Ok(None), |_| Ok(Some(from.into())))
+		std::fs::copy(&from, &to)
+			.with_context(|| "Failed to copy file")
+			.map_or(Ok(None), |e| Ok(Some(from.into())))
 	}
 }
 

@@ -6,7 +6,6 @@ use crate::{
 	data::{
 		config::Config,
 		options::{apply::Apply, r#match::Match, Options},
-		settings::Settings,
 	},
 	utils::{DefaultOpt, UnwrapRef},
 	PROJECT_NAME,
@@ -19,12 +18,11 @@ pub mod folders;
 pub mod options;
 pub mod path_to_recursive;
 pub mod path_to_rules;
-pub mod settings;
+
 
 #[derive(Debug, Clone)]
 pub struct Data {
 	pub(crate) defaults: Options,
-	pub settings: Settings,
 	pub config: Config,
 }
 
@@ -37,9 +35,7 @@ macro_rules! getters {
 				folder.options.$field.as_ref().unwrap_or_else(|| {
 					rule.options.$field.as_ref().unwrap_or_else(|| {
 						self.config.defaults.$field.as_ref().unwrap_or_else(|| {
-							self.settings.defaults.$field.as_ref().unwrap_or_else(|| {
-								self.defaults.$field.unwrap_ref()
-							})
+							self.defaults.$field.unwrap_ref()
 						})
 					})
 				})
@@ -50,9 +46,7 @@ macro_rules! getters {
 		impl Data {
 			$($v fn $name(&self) -> &$typ {
 				self.config.defaults.$field.as_ref().unwrap_or_else(|| {
-					self.settings.defaults.$field.as_ref().unwrap_or_else(|| {
-						self.defaults.$field.unwrap_ref()
-					})
+					self.defaults.$field.unwrap_ref()
 				})
 			})+
 		}
@@ -65,9 +59,7 @@ macro_rules! getters {
 				folder.options.$field.$subfield.as_ref().unwrap_or_else(|| {
 					rule.options.$field.$subfield.as_ref().unwrap_or_else(|| {
 						self.config.defaults.$field.$subfield.as_ref().unwrap_or_else(|| {
-							self.settings.defaults.$field.$subfield.as_ref().unwrap_or_else(|| {
-								self.defaults.$field.$subfield.unwrap_ref()
-							})
+							self.defaults.$field.$subfield.unwrap_ref()
 						})
 					})
 				})
@@ -110,10 +102,8 @@ impl Data {
 	pub fn new<T: AsRef<Path>>(path: T) -> Result<Self> {
 		let config = Config::parse(&path)?;
 		Config::set_cwd(path)?;
-		let settings = Settings::new(Settings::path()?)?;
 		let data = Self {
 			defaults: Options::default_some(),
-			settings,
 			config,
 		};
 		Ok(data)
@@ -121,11 +111,11 @@ impl Data {
 
 	pub fn dir() -> Result<PathBuf> {
 		let var = "ORGANIZE_DATA_DIR";
-		std::env::var_os(var).map_or_else(
-			|| {
-				Ok(dirs_next::data_local_dir()
-					.ok_or_else(|| anyhow!("could not find data directory, please set {} manually", var))?
-					.join(PROJECT_NAME))
+		std::env::var_os(var)
+			.map_or_else(|| {
+				dirs_next::data_local_dir()
+					.ok_or_else(|| anyhow!("could not find data directory, please set {} manually", var))
+					.map(|path| path.join(PROJECT_NAME))
 			},
 			|path| Ok(PathBuf::from(path)),
 		)

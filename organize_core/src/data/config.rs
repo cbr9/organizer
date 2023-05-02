@@ -40,12 +40,7 @@ impl Config {
 	}
 
 	pub fn default_path() -> Result<PathBuf> {
-		Self::default_dir().map(|dir| dir.join("config.toml")).map(|path| {
-			if !path.exists() {
-				std::fs::File::create(&path).expect("Could not create config file...");
-			}
-			path
-		})
+		Self::default_dir().map(|dir| dir.join("config.toml"))
 	}
 
 	pub fn parse<T: AsRef<Path>>(path: T) -> Result<Config> {
@@ -60,18 +55,13 @@ impl Config {
 
 	pub fn path() -> Result<PathBuf> {
 		std::env::current_dir()
-			.context("cannot determine current directory")?
+			.context("Cannot determine current directory")?
 			.read_dir()
-			.context("cannot determine directory content")?
+			.context("Cannot determine directory content")?
 			.find_map(|file| {
 				let path = file.ok()?.path();
-				let extension = path.extension().unwrap_or_default();
-				let stem = path.file_stem().unwrap_or_default();
-				if stem == PROJECT_NAME && (extension == "toml") {
-					Some(path)
-				} else {
-					None
-				}
+				let found = path.file_stem()? == PROJECT_NAME && path.extension()? == "toml";
+				found.then_some(path)
 			})
 			.map_or_else(Self::default_path, Ok)
 	}
