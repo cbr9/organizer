@@ -62,19 +62,22 @@ impl Act for Delete {
 		T: AsRef<Path> + Into<PathBuf>,
 		P: AsRef<Path> + Into<PathBuf>,
 	{
-		std::fs::remove_file(&from)
-			.map(|_| None)
-			.with_context(|| format!("could not delete {}", from.as_ref().display()))
+		if self.0 {
+			std::fs::remove_file(&from)
+				.with_context(|| format!("could not delete {}", from.as_ref().display()))
+				.map(|_| None)
+		} else {
+			Ok(Some(from.into()))
+		}
 	}
 }
 
 impl Trash {
 	fn dir() -> Result<PathBuf> {
 		let dir = dirs_next::data_local_dir().unwrap().join("organize").join(".trash");
-		if !dir.exists() {
-			std::fs::create_dir_all(&dir)?;
-		}
-		Ok(dir)
+		std::fs::create_dir_all(&dir)
+			.with_context(|| format!("Could not create trash directory at {}", &dir.display()))
+			.map(|_| dir)
 	}
 }
 
@@ -84,9 +87,86 @@ impl Act for Trash {
 		T: AsRef<Path> + Into<PathBuf>,
 		P: AsRef<Path> + Into<PathBuf>,
 	{
-		let to = Self::dir()?.join(from.as_ref().file_name().unwrap());
-		std::fs::rename(&from, &to)
-			.with_context(|| format!("could not move ({} -> {})", from.as_ref().display(), to.display()))
-			.map(|_| None)
+		if self.0 {
+			let to = Self::dir()?.join(from.as_ref().file_name().unwrap());
+			let from = from.as_ref();
+			std::fs::copy(&from, &to).with_context(|| format!("Could not copy file ({} -> {})", from.display(), to.display()))?;
+			std::fs::remove_file(&from)
+				.with_context(|| format!("could not move ({} -> {})", from.display(), to.display()))
+				.map(|_| None)
+		} else {
+			Ok(Some(from.into()))
+		}
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+	use tempfile;
+
+	#[test]
+	fn test_delete_true() {
+		let tmp_dir = tempfile::tempdir().expect("Couldn't create temporary directory");
+		let tmp_path = tmp_dir.path().to_owned();
+		let tmp_file = tmp_path.join("delete_me.txt");
+		let action = Delete(true);
+
+		std::fs::write(&tmp_file, "").expect("Could create target file");
+		assert!(tmp_file.exists());
+
+		action
+			.act::<&Path, &Path>(&tmp_file, None)
+			.expect("Could not delete target file");
+		assert!(!tmp_file.exists());
+	}
+
+	#[test]
+	fn test_delete_false() {
+		let tmp_dir = tempfile::tempdir().expect("Couldn't create temporary directory");
+		let tmp_path = tmp_dir.path().to_owned();
+		let tmp_file = tmp_path.join("delete_me.txt");
+		let action = Delete(false);
+
+		std::fs::write(&tmp_file, "").expect("Could create target file");
+		assert!(tmp_file.exists());
+
+		action
+			.act::<&Path, &Path>(&tmp_file, None)
+			.expect("Could not `delete` target file");
+		assert!(tmp_file.exists());
+	}
+
+	#[test]
+	fn test_trash_true() {
+		let tmp_dir = tempfile::tempdir().expect("Couldn't create temporary directory");
+		let tmp_path = tmp_dir.path().to_owned();
+		let tmp_file = tmp_path.join("trash_me.txt");
+		let action = Trash(true);
+
+		std::fs::write(&tmp_file, "").expect("Could create target file");
+		assert!(tmp_file.exists());
+
+		let new_path = action
+			.act::<&Path, &Path>(&tmp_file, None)
+			.expect("Could not delete target file");
+		dbg!(new_path);
+		assert!(!tmp_file.exists());
+	}
+
+	#[test]
+	fn test_trash_false() {
+		let tmp_dir = tempfile::tempdir().expect("Couldn't create temporary directory");
+		let tmp_path = tmp_dir.path().to_owned();
+		let tmp_file = tmp_path.join("trash_me.txt");
+		let action = Trash(false);
+
+		std::fs::write(&tmp_file, "").expect("Could create target file");
+		assert!(tmp_file.exists());
+
+		action
+			.act::<&Path, &Path>(&tmp_file, None)
+			.expect("Could not `delete` target file");
+		assert!(tmp_file.exists());
 	}
 }
