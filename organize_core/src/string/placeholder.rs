@@ -12,48 +12,70 @@ use serde::{de::Error, Deserialize, Deserializer};
 
 lazy_static! {
 	static ref POTENTIAL_PH_REGEX: Regex = Regex::new(r"\{\{\w+(?:\.\w+)*}}").unwrap(); // a panic here indicates a compile-time bug
+	static ref PLACEHOLDER_TO_ALIASES: HashMap<Placeholder, &'static str> =  HashMap::from([
+			(Placeholder::Path, "path"),
+			(Placeholder::Parent, "parent"),
+			(Placeholder::Filename, "filename"),
+			(Placeholder::Extension, "extension"),
+			(Placeholder::Stem, "stem"),
+			(Placeholder::ToUpperCase, "to_uppercase"),
+			(Placeholder::ToLowerCase, "to_lowercase"),
+			(Placeholder::Capitalize, "capitalize"),
+		]);
+
+	static ref PLACEHOLDER_ALIASES: Vec<&'static str> = vec![
+		PLACEHOLDER_TO_ALIASES[&Placeholder::Path],
+		PLACEHOLDER_TO_ALIASES[&Placeholder::Parent],
+		PLACEHOLDER_TO_ALIASES[&Placeholder::Filename],
+		PLACEHOLDER_TO_ALIASES[&Placeholder::Stem],
+		PLACEHOLDER_TO_ALIASES[&Placeholder::Extension],
+		PLACEHOLDER_TO_ALIASES[&Placeholder::ToLowerCase],
+		PLACEHOLDER_TO_ALIASES[&Placeholder::ToUpperCase],
+		PLACEHOLDER_TO_ALIASES[&Placeholder::Capitalize]
+	];
+
 	static ref PARSER: Fsa<'static, u8> = Fsa::new(
 		&[0, 1, 2, 3, 4, 5],
-		&["path", "parent", "filename", "stem", "extension", "to_lowercase", "to_uppercase", "capitalize"],
+		&*PLACEHOLDER_ALIASES,
 		0,
 		&[0, 1, 2, 3, 4, 5],
 		transitions![
 			// On <string>, on <int>, go to  <int>
-			("path", 0) => 0,
-			("parent", 0) => 1,
-			("filename", 0) => 2,
-			("stem", 0) => 4,
-			("extension", 0) => 4,
-			("to_lowercase", 0) => 3,
-			("to_uppercase", 0) => 3,
-			("capitalize", 0) => 3,
+			(PLACEHOLDER_TO_ALIASES[&Placeholder::Path], 0) => 0,
+			(PLACEHOLDER_TO_ALIASES[&Placeholder::Parent], 0) => 1,
+			(PLACEHOLDER_TO_ALIASES[&Placeholder::Filename], 0) => 2,
+			(PLACEHOLDER_TO_ALIASES[&Placeholder::Stem], 0) => 4,
+			(PLACEHOLDER_TO_ALIASES[&Placeholder::Extension], 0) => 4,
+			(PLACEHOLDER_TO_ALIASES[&Placeholder::ToLowerCase], 0) => 3,
+			(PLACEHOLDER_TO_ALIASES[&Placeholder::ToUpperCase], 0) => 3,
+			(PLACEHOLDER_TO_ALIASES[&Placeholder::Capitalize], 0) => 3,
 			// --------------------
-			("filename", 1) => 5,
-			// ("path", 1) => 1,
-			("parent", 1) => 1,
-			("to_lowercase", 1) => 3,
-			("to_uppercase", 1) => 3,
-			("capitalize", 1) => 3,
+			(PLACEHOLDER_TO_ALIASES[&Placeholder::Filename], 1) => 5,
+			(PLACEHOLDER_TO_ALIASES[&Placeholder::Path], 1) => 1,
+			(PLACEHOLDER_TO_ALIASES[&Placeholder::Parent], 1) => 1,
+			(PLACEHOLDER_TO_ALIASES[&Placeholder::ToLowerCase], 1) => 3,
+			(PLACEHOLDER_TO_ALIASES[&Placeholder::ToUpperCase], 1) => 3,
+			(PLACEHOLDER_TO_ALIASES[&Placeholder::Capitalize], 1) => 3,
 			// --------------------
-			("stem", 2) => 4,
-			("extension", 2) => 4,
-			("to_lowercase", 2) => 3,
-			("to_uppercase", 2) => 3,
-			("capitalize", 2) => 3,
+			(PLACEHOLDER_TO_ALIASES[&Placeholder::Stem], 2) => 4,
+			(PLACEHOLDER_TO_ALIASES[&Placeholder::Extension], 2) => 4,
+			(PLACEHOLDER_TO_ALIASES[&Placeholder::ToLowerCase], 2) => 3,
+			(PLACEHOLDER_TO_ALIASES[&Placeholder::ToUpperCase], 2) => 3,
+			(PLACEHOLDER_TO_ALIASES[&Placeholder::Capitalize], 2) => 3,
 			// --------------------
-			("to_lowercase", 4) => 3,
-			("to_uppercase", 4) => 3,
-			("capitalize", 4) => 3,
+			(PLACEHOLDER_TO_ALIASES[&Placeholder::ToLowerCase], 4) => 3,
+			(PLACEHOLDER_TO_ALIASES[&Placeholder::ToUpperCase], 4) => 3,
+			(PLACEHOLDER_TO_ALIASES[&Placeholder::Capitalize], 4) => 3,
 			// --------------------
-			("to_uppercase", 5) => 3,
-			("to_lowercase", 5) => 3,
-			("capitalize", 5) => 3
+			(PLACEHOLDER_TO_ALIASES[&Placeholder::ToUpperCase], 5) => 3,
+			(PLACEHOLDER_TO_ALIASES[&Placeholder::ToLowerCase], 5) => 3,
+			(PLACEHOLDER_TO_ALIASES[&Placeholder::Capitalize], 5) => 3
 		]
 	);
 
 }
 
-// used in #[serde(deserialize_with = "..."] flags
+// used in #[serde(deserialize_with = "...] flags
 pub fn deserialize_placeholder_string<'de, D>(deserializer: D) -> Result<String, D::Error>
 where
 	D: Deserializer<'de>,
@@ -68,7 +90,7 @@ pub fn visit_placeholder_string(val: &str) -> Result<String> {
 		let pieces = capture.as_str().trim_matches(|pat| pat == '{' || pat == '}').split('.');
 		match PARSER.accepts(pieces) {
 			true => Ok(()),
-			false => bail!("invalid placeholder"),
+			false => bail!("Invalid placeholder"),
 		}
 	})?;
 
@@ -79,7 +101,7 @@ pub trait ExpandPlaceholder {
 	fn expand_placeholders<P: AsRef<Path>>(self, path: P) -> Result<OsString>;
 }
 
-#[derive(PartialEq, Eq, Hash)]
+#[derive(PartialEq, Eq, Hash, Copy, Clone)]
 enum Placeholder {
 	Path,
 	Parent,
@@ -94,20 +116,9 @@ enum Placeholder {
 impl FromStr for Placeholder {
 	type Err = anyhow::Error;
 	fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-		let map = HashMap::from([
-			(Self::Path, vec!["path", "abspath"]),
-			(Self::Parent, vec!["parent"]),
-			(Self::Filename, vec!["filename", "name"]),
-			(Self::Extension, vec!["extension", "ext"]),
-			(Self::Stem, vec!["stem", "filestem"]),
-			(Self::ToUpperCase, vec!["upper", "to_upper", "to_uppercase"]),
-			(Self::ToLowerCase, vec!["lower", "to_lower", "to_lowercase"]),
-			(Self::Capitalize, vec!["capitalize", "cap"]),
-		]);
-
-		for (key, aliases) in map.into_iter() {
-			if aliases.contains(&s) {
-				return Ok(key);
+		for (key, alias) in PLACEHOLDER_TO_ALIASES.iter() {
+			if alias == &s {
+				return Ok(*key);
 			}
 		}
 
