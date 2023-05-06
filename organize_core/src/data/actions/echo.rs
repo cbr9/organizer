@@ -8,9 +8,9 @@ use serde::Deserialize;
 
 use crate::{
 	data::actions::{Act, ActionType, AsAction},
-	string::{deserialize_placeholder_string, Placeholder},
+	string::{deserialize_placeholder_string, ExpandPlaceholder},
 };
-use anyhow::{Context, Result};
+use anyhow::Result;
 
 #[derive(Debug, Clone, Deserialize, Default, Eq, PartialEq)]
 pub struct Echo(#[serde(deserialize_with = "deserialize_placeholder_string")] String);
@@ -30,13 +30,10 @@ impl Act for Echo {
 		P: AsRef<Path> + Into<PathBuf>,
 	{
 		let from = from.into();
-		match self
-			.as_str()
-			.expand_placeholders(&from)
-			.with_context(|| format!("could not expand placeholders ({})", self.as_str()))
-		{
+		let expanded = self.as_str().expand_placeholders(&from);
+		match expanded {
 			Ok(str) => {
-				info!("({}) {}", self.ty().to_string(), str);
+				info!("({}) {:#?}", self.ty().to_string(), str);
 				Ok(Some(from))
 			}
 			Err(e) => {

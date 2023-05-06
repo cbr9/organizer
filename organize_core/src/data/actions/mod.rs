@@ -9,7 +9,7 @@ use crate::data::{
 	actions::{
 		delete::Delete,
 		echo::Echo,
-		io_action::{Copy, Hardlink, Move, Rename, Symlink},
+		io_action::{Copy, Hardlink, Move, Symlink},
 		script::Script,
 	},
 	options::apply::Apply,
@@ -28,7 +28,6 @@ pub(crate) mod script;
 pub enum Action {
 	Move(Move),
 	Copy(Copy),
-	Rename(Rename),
 	Hardlink(Hardlink),
 	Symlink(Symlink),
 	Delete(Delete),
@@ -48,7 +47,6 @@ impl Act for Action {
 		match self {
 			Copy(copy) => copy.act(from, to),     // IOAction has three different implementations of AsAction
 			Move(r#move) => r#move.act(from, to), // so they must be called with turbo-fish syntax
-			Rename(rename) => rename.act(from, to),
 			Hardlink(hardlink) => hardlink.act(from, to),
 			Symlink(symlink) => symlink.act(from, to),
 			Delete(delete) => delete.act(from, to),
@@ -65,7 +63,6 @@ impl AsAction for Action {
 		match self {
 			Move(r#move) => r#move.process(path),
 			Copy(copy) => copy.process(path),
-			Rename(rename) => rename.process(path),
 			Hardlink(hardlink) => hardlink.process(path),
 			Symlink(symlink) => symlink.process(path),
 			Delete(delete) => delete.process(path),
@@ -80,7 +77,6 @@ impl AsAction for Action {
 		match self {
 			Copy(copy) => copy.ty(),
 			Move(r#move) => r#move.ty(),
-			Rename(rename) => rename.ty(),
 			Hardlink(hardlink) => hardlink.ty(),
 			Symlink(symlink) => symlink.ty(),
 			Delete(delete) => delete.ty(),
@@ -115,7 +111,6 @@ pub enum ActionType {
 	Delete,
 	Echo,
 	Move,
-	Rename,
 	Hardlink,
 	Symlink,
 	Script,
@@ -127,7 +122,6 @@ impl From<&Action> for ActionType {
 		match action {
 			Action::Move(_) => Self::Move,
 			Action::Copy(_) => Self::Copy,
-			Action::Rename(_) => Self::Rename,
 			Action::Hardlink(_) => Self::Hardlink,
 			Action::Symlink(_) => Self::Symlink,
 			Action::Delete(_) => Self::Delete,

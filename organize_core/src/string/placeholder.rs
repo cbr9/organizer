@@ -1,5 +1,5 @@
 use anyhow::{anyhow, bail, Context, Result};
-use std::path::Path;
+use std::{collections::HashMap, ffi::OsString, path::Path, str::FromStr};
 
 use crate::{
 	fsa::{Fsa, Transition},
@@ -75,48 +75,98 @@ pub fn visit_placeholder_string(val: &str) -> Result<String> {
 	Ok(val.to_string())
 }
 
-pub trait Placeholder {
-	fn expand_placeholders<P: AsRef<Path>>(self, path: P) -> Result<String>;
+pub trait ExpandPlaceholder {
+	fn expand_placeholders<P: AsRef<Path>>(self, path: P) -> Result<OsString>;
 }
 
-impl<T: AsRef<str>> Placeholder for T {
-	fn expand_placeholders<P: AsRef<Path>>(self, path: P) -> Result<String> {
-		let str = self.as_ref();
-		// if the first condition is false, the second one won't be evaluated and REGEX won't be initialized
-		let mut new = str.to_string();
-		for span in POTENTIAL_PH_REGEX.find_iter(str) {
-			let placeholders = span.as_str().trim_matches(|x| x == '{' || x == '}').split('.'); // split a placeholder like {path.filename.extension} into [path, filename, extension]
-			let mut current_value = path.as_ref().to_path_buf();
-			for placeholder in placeholders.into_iter() {
-				current_value = match placeholder {
-					"path" => current_value
-						.canonicalize()
-						.with_context(|| format!("could not retrieve the absolute path of {}", current_value.display()))?,
-					"parent" => current_value
-						.parent()
-						.ok_or_else(|| anyhow!("{} does not have a parent directory", current_value.display()))?
-						.into(),
-					"filename" => current_value
-						.file_name()
-						.ok_or_else(|| anyhow!("{} does not have a filename", current_value.display()))?
-						.into(),
-					"stem" => current_value
-						.file_stem()
-						.ok_or_else(|| anyhow!("{} does not have a filestem", current_value.display()))?
-						.into(),
-					"extension" => current_value
-						.extension()
-						.ok_or_else(|| anyhow!("{} does not have an extension", current_value.display()))?
-						.into(),
-					"to_uppercase" => current_value.to_string_lossy().to_uppercase().into(),
-					"to_lowercase" => current_value.to_string_lossy().to_lowercase().into(),
-					"capitalize" => current_value.to_string_lossy().capitalize().into(),
-					placeholder => bail!("unknown placeholder {}", placeholder),
-				}
+#[derive(PartialEq, Eq, Hash)]
+enum Placeholder {
+	Path,
+	Parent,
+	Filename,
+	Extension,
+	Stem,
+	ToLowerCase,
+	ToUpperCase,
+	Capitalize,
+}
+
+impl FromStr for Placeholder {
+	type Err = anyhow::Error;
+	fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+		let map = HashMap::from([
+			(Self::Path, vec!["path", "abspath"]),
+			(Self::Parent, vec!["parent"]),
+			(Self::Filename, vec!["filename", "name"]),
+			(Self::Extension, vec!["extension", "ext"]),
+			(Self::Stem, vec!["stem", "filestem"]),
+			(Self::ToUpperCase, vec!["upper", "to_upper", "to_uppercase"]),
+			(Self::ToLowerCase, vec!["lower", "to_lower", "to_lowercase"]),
+			(Self::Capitalize, vec!["capitalize", "cap"]),
+		]);
+
+		for (key, aliases) in map.into_iter() {
+			if aliases.contains(&s) {
+				return Ok(key);
 			}
-			new = new.replace(&span.as_str(), &*current_value.to_string_lossy());
 		}
-		Ok(new.replace("//", "/"))
+
+		Err(anyhow!("Unknown placeholder"))
+	}
+}
+
+impl Placeholder {
+	fn expand<P: AsRef<Path>>(self, path: P) -> Result<OsString> {
+		let path = path.as_ref();
+		match self {
+			Self::Path => path
+				.canonicalize()
+				.with_context(|| format!("could not retrieve the absolute path of {}", path.display()))
+				.map(OsString::from),
+			Self::Parent => path
+				.parent()
+				.ok_or_else(|| anyhow!("{} does not have a parent directory", path.display()))
+				.map(OsString::from),
+			Self::Filename => path
+				.file_name()
+				.ok_or_else(|| anyhow!("{} does not have a filename", path.display()))
+				.map(OsString::from),
+			Self::Stem => path
+				.file_stem()
+				.ok_or_else(|| anyhow!("{} does not have a filestem", path.display()))
+				.map(OsString::from),
+			Self::Extension => path
+				.extension()
+				.ok_or_else(|| anyhow!("{} does not have an extension", path.display()))
+				.map(OsString::from),
+			Self::ToLowerCase => Ok(path.to_string_lossy().to_lowercase().into()),
+			Self::ToUpperCase => Ok(path.to_string_lossy().to_uppercase().into()),
+			Self::Capitalize => Ok(path.to_string_lossy().capitalize().into()),
+		}
+	}
+}
+
+impl<T: AsRef<str>> ExpandPlaceholder for T {
+	fn expand_placeholders<P: AsRef<Path>>(self, path: P) -> Result<OsString> {
+		let mut new = self.as_ref().to_string();
+
+		for span in POTENTIAL_PH_REGEX.find_iter(&new.clone()) {
+			let span = span.as_str();
+			let mut current = path.as_ref().to_path_buf().into_os_string();
+			let placeholders: Vec<Placeholder> = span
+				.trim_matches(|x| x == '{' || x == '}')
+				.split('.')
+				.map(Placeholder::from_str)
+				.collect::<Result<Vec<Placeholder>, _>>()?;
+
+			for placeholder in placeholders.into_iter() {
+				current = placeholder.expand(&current)?;
+			}
+
+			new = new.replace(&span, &*current.to_string_lossy());
+		}
+
+		Ok(new.into())
 	}
 }
 
@@ -127,169 +177,170 @@ pub mod tests {
 	use super::*;
 	#[test]
 	fn deserialize_invalid_ph_non_symbol() {
-		let str = "$HOME/{extension.name}";
+		let str = "$HOME/{{extension.name}}";
 		assert!(visit_placeholder_string(str).is_err())
 	}
 
 	#[test]
 	fn deserialize_invalid_ph_extension_name() {
-		let str = "$HOME/{extension.filename}";
+		let str = "$HOME/{{extension.filename}}";
 		assert!(visit_placeholder_string(str).is_err())
 	}
 	#[test]
 	fn deserialize_invalid_ph_extension_stem() {
-		let str = "$HOME/{extension.stem}";
+		let str = "$HOME/{{extension.stem}}";
 		assert!(visit_placeholder_string(str).is_err())
 	}
 	#[test]
 	fn deserialize_invalid_ph_extension_extension() {
-		let str = "$HOME/{extension.extension}";
+		let str = "$HOME/{{extension.extension}}";
 		assert!(visit_placeholder_string(str).is_err())
 	}
 	#[test]
 	fn deserialize_invalid_ph_stem_extension() {
-		let str = "$HOME/{stem.extension}";
+		let str = "$HOME/{{stem.extension}}";
 		assert!(visit_placeholder_string(str).is_err())
 	}
 	#[test]
 	fn deserialize_invalid_ph_stem_stem() {
-		let str = "$HOME/{stem.stem}";
+		let str = "$HOME/{{stem.stem}}";
 		assert!(visit_placeholder_string(str).is_err())
 	}
 	#[test]
 	fn deserialize_invalid_ph_parent_stem() {
-		let str = "$HOME/{parent.stem}";
+		let str = "$HOME/{{parent.stem}}";
 		assert!(visit_placeholder_string(str).is_err())
 	}
 	#[test]
 	fn deserialize_invalid_ph_parent_filename_stem() {
-		let str = "$HOME/{parent.filename.stem}";
+		let str = "$HOME/{{parent.filename.stem}}";
 		assert!(visit_placeholder_string(str).is_err())
 	}
 	#[test]
 	fn deserialize_invalid_ph_parent_extension() {
-		let str = "$HOME/{parent.extension}";
+		let str = "$HOME/{{parent.extension}}";
 		assert!(visit_placeholder_string(str).is_err())
 	}
 	#[test]
 	fn deserialize_valid_ph_extension() {
-		let str = "$HOME/{extension}";
+		let str = "$HOME/{{extension}}";
 		assert!(visit_placeholder_string(str).is_ok())
 	}
 	#[test]
 	fn deserialize_valid_ph_stem() {
-		let str = "$HOME/{stem}";
+		let str = "$HOME/{{stem}}";
 		assert!(visit_placeholder_string(str).is_ok())
 	}
 	#[test]
 	fn deserialize_valid_ph_filename() {
-		let str = "$HOME/{filename}";
+		let str = "$HOME/{{filename}}";
 		assert!(visit_placeholder_string(str).is_ok())
 	}
 	#[test]
 	fn deserialize_valid_ph_path() {
-		let str = "$HOME/{path}";
+		let str = "$HOME/{{path}}";
 		assert!(visit_placeholder_string(str).is_ok())
 	}
 	#[test]
 	fn deserialize_valid_ph_parent() {
-		let str = "$HOME/{parent}";
+		let str = "$HOME/{{parent}}";
 		assert!(visit_placeholder_string(str).is_ok())
 	}
 	#[test]
 	fn deserialize_valid_ph_extension_uppercase() {
-		let str = "$HOME/{extension.to_uppercase}";
+		let str = "$HOME/{{extension.to_uppercase}}";
 		assert!(visit_placeholder_string(str).is_ok())
 	}
 	#[test]
 	fn deserialize_valid_ph_stem_uppercase() {
-		let str = "$HOME/{stem.to_uppercase}";
+		let str = "$HOME/{{stem.to_uppercase}}";
 		assert!(visit_placeholder_string(str).is_ok())
 	}
 	#[test]
 	fn deserialize_valid_ph_filename_uppercase() {
-		let str = "$HOME/{filename.to_uppercase}";
+		let str = "$HOME/{{filename.to_uppercase}}";
 		assert!(visit_placeholder_string(str).is_ok())
 	}
 	#[test]
 	fn deserialize_valid_ph_path_uppercase() {
-		let str = "$HOME/{path.to_uppercase}";
+		let str = "$HOME/{{path.to_uppercase}}";
 		assert!(visit_placeholder_string(str).is_ok())
 	}
 	#[test]
 	fn deserialize_valid_ph_parent_uppercase() {
-		let str = "$HOME/{parent.to_uppercase}";
+		let str = "$HOME/{{parent.to_uppercase}}";
 		assert!(visit_placeholder_string(str).is_ok())
 	}
 	#[test]
 	fn deserialize_valid_ph_filename_extension() {
-		let str = "$HOME/{filename.extension}";
+		let str = "$HOME/{{filename.extension}}";
 		assert!(visit_placeholder_string(str).is_ok())
 	}
 	#[test]
 	fn deserialize_valid_ph_filename_stem() {
-		let str = "$HOME/{filename.stem}";
+		let str = "$HOME/{{filename.stem}}";
 		assert!(visit_placeholder_string(str).is_ok())
 	}
 	#[test]
 	fn deserialize_valid_ph_parent_filename() {
-		let str = "$HOME/{parent.filename}";
+		let str = "$HOME/{{parent.filename}}";
 		assert!(visit_placeholder_string(str).is_ok())
 	}
 	#[test]
 	fn deserialize_valid_ph_parent_parent() {
-		let str = "$HOME/{parent.parent}";
+		let str = "$HOME/{{parent.parent}}";
 		assert!(visit_placeholder_string(str).is_ok())
 	}
 	#[test]
 	fn deserialize_valid_ph_parent_parent_parent() {
-		let str = "$HOME/{parent.parent.parent}";
+		let str = "$HOME/{{parent.parent.parent}}";
 		assert!(visit_placeholder_string(str).is_ok())
 	}
 	#[test]
 	fn deserialize_valid_ph_parent_parent_parent_filename() {
-		let str = "$HOME/{parent.parent.parent.filename}";
+		let str = "$HOME/{{parent.parent.parent.filename}}";
 		assert!(visit_placeholder_string(str).is_ok())
 	}
 	#[test]
 	fn deserialize_valid_ph_path_parent() {
-		let str = "$HOME/{path.parent}";
+		let str = "$HOME/{{path.parent}}";
 		assert!(visit_placeholder_string(str).is_ok())
 	}
 	#[test]
 	fn deserialize_valid_ph_path_filename() {
-		let str = "$HOME/{path.filename}";
+		let str = "$HOME/{{path.filename}}";
 		assert!(visit_placeholder_string(str).is_ok())
 	}
 	#[test]
 	fn deserialize_valid_ph_path_stem() {
-		let str = "$HOME/{path.stem}";
+		let str = "$HOME/{{path.stem}}";
 		assert!(visit_placeholder_string(str).is_ok())
 	}
 	#[test]
 	fn deserialize_valid_ph_path_extension() {
-		let str = "$HOME/{path.extension}";
+		let str = "$HOME/{{path.extension}}";
 		assert!(visit_placeholder_string(str).is_ok())
 	}
+
 	#[test]
 	fn single_placeholder() {
-		let with_ph = "$HOME/Downloads/{parent.filename}";
-		let expected = String::from("$HOME/Downloads/Documents");
+		let with_ph = "$HOME/Downloads/{{parent.filename}}";
 		let path = Path::new("$HOME/Documents/test.pdf");
+		let expected = OsString::from("$HOME/Downloads/Documents");
 		let new_str = with_ph.expand_placeholders(path).unwrap();
 		assert_eq!(new_str, expected)
 	}
 	#[test]
 	fn multiple_placeholders() {
-		let with_ph = "$HOME/{extension}/{parent.filename}";
-		let expected = String::from("$HOME/pdf/Documents");
+		let with_ph = "$HOME/{{extension}}/{{parent.filename}}";
+		let expected = OsString::from("$HOME/pdf/Documents");
 		let path = Path::new("$HOME/Documents/test.pdf");
 		let new_str = with_ph.expand_placeholders(path).unwrap();
 		assert_eq!(new_str, expected)
 	}
 	#[test]
 	fn multiple_placeholders_sentence() {
-		let with_ph = "To run this program, you have to change directory into $HOME/{extension}/{parent.filename}";
+		let with_ph = "To run this program, you have to change directory into $HOME/{{extension}}/{{parent.filename}}";
 		let path = PathBuf::from("$HOME/Documents/test.pdf");
 		let new_str = with_ph.expand_placeholders(&path).unwrap();
 		let expected = "To run this program, you have to change directory into $HOME/pdf/Documents";

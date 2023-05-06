@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
 	data::actions::{Act, ActionType, AsAction},
 	path::{Expand, ResolveConflict},
-	string::Placeholder,
+	string::ExpandPlaceholder,
 	utils::UnwrapRef,
 	// DB,
 };
@@ -32,9 +32,6 @@ struct Inner {
 pub struct Move(Inner);
 
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
-pub struct Rename(Inner);
-
-#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
 pub struct Copy(Inner);
 
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
@@ -48,8 +45,7 @@ macro_rules! as_action {
 		impl AsAction for $id {
 			fn process<T: Into<PathBuf>>(&self, path: T) -> Option<PathBuf> {
 				let path = path.into();
-				let ty = self.ty();
-				let to = self.0.prepare_path(&path, &ty);
+				let to = self.0.prepare_path(&path);
 				if to.is_none() {
 					if self.0.if_exists == ConflictOption::Delete {
 						if let Err(e) = std::fs::remove_file(&path).with_context(|| format!("could not delete {}", path.display())) {
@@ -78,7 +74,7 @@ macro_rules! as_action {
 
 				match self.act(&path, Some(to.unwrap_ref())) {
 					Ok(new_path) => {
-						info!("({}) {} -> {}", ty.to_string(), path.display(), to.unwrap().display());
+						info!("({}) {} -> {}", self.ty().to_string(), path.display(), to.unwrap().display());
 						new_path
 					}
 					Err(e) => {
@@ -97,7 +93,6 @@ macro_rules! as_action {
 }
 
 as_action!(Move);
-as_action!(Rename);
 as_action!(Copy);
 as_action!(Hardlink);
 as_action!(Symlink);
@@ -126,19 +121,7 @@ impl Act for Copy {
 		let from = from.as_ref();
 		std::fs::copy(&from, &to)
 			.with_context(|| "Failed to copy file")
-			.map_or(Ok(None), |e| Ok(Some(from.into())))
-	}
-}
-
-impl Act for Rename {
-	fn act<T, P>(&self, from: T, to: Option<P>) -> Result<Option<PathBuf>>
-	where
-		T: AsRef<Path> + Into<PathBuf>,
-		P: AsRef<Path> + Into<PathBuf>,
-	{
-		std::fs::rename(&from, to.unwrap_ref())
-			.with_context(|| format!("could not rename ({} -> {})", from.as_ref().display(), to.unwrap_ref().as_ref().display()))
-			.map(|_| Some(to.unwrap().into()))
+			.map_or(Ok(None), |_| Ok(Some(from.into())))
 	}
 }
 
@@ -180,12 +163,10 @@ impl Act for Symlink {
 }
 
 impl Inner {
-	fn prepare_path<T>(&self, path: T, kind: &ActionType) -> Option<PathBuf>
+	fn prepare_path<T>(&self, path: T) -> Option<PathBuf>
 	where
 		T: AsRef<Path>,
 	{
-		use ActionType::{Copy, Hardlink, Move, Rename, Symlink};
-
 		let path = path.as_ref();
 		let mut to = match self.to.to_string_lossy().expand_placeholders(path) {
 			Ok(str) => PathBuf::from(str),
@@ -195,22 +176,13 @@ impl Inner {
 			}
 		};
 
-		match kind {
-			Copy | Move | Hardlink | Symlink => {
-				if to.to_string_lossy().ends_with('/') || to.is_dir() {
-					to.push(path.file_name()?)
-				}
-			}
-			Rename => {
-				to = path.with_file_name(to);
-			}
-			_ => unreachable!(),
+		if to.to_string_lossy().ends_with('/') || to.is_dir() {
+			to.push(path.file_name()?)
 		}
 
-		if to.exists() {
-			to.resolve_naming_conflict(&self.if_exists)
-		} else {
-			Some(to)
+		match to.exists() {
+			true => to.resolve_naming_conflict(&self.if_exists),
+			false => Some(to),
 		}
 	}
 }

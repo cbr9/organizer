@@ -1,6 +1,4 @@
 use std::{
-	fs,
-	ops::Deref,
 	path::{Path, PathBuf},
 	process::{Command, Output, Stdio},
 	result,
@@ -10,14 +8,14 @@ use std::{
 use colored::Colorize;
 use log::info;
 use serde::{de::Error, Deserialize, Deserializer};
+use tempfile;
 
 use crate::{
 	data::{
 		actions::{Act, ActionType, AsAction},
 		filters::AsFilter,
-		Config,
 	},
-	string::{deserialize_placeholder_string, Placeholder},
+	string::{deserialize_placeholder_string, ExpandPlaceholder},
 };
 use anyhow::Result;
 
@@ -98,15 +96,13 @@ impl Script {
 	}
 
 	fn write(&self, path: &Path) -> anyhow::Result<PathBuf> {
-		let content = self.content.as_str();
-		let content = content.expand_placeholders(path)?;
-		let dir = Config::default_dir()?.join("scripts");
-		if !dir.exists() {
-			fs::create_dir_all(&dir)?;
+		let script = tempfile::NamedTempFile::new()?;
+		let script_path = script.into_temp_path().to_path_buf();
+		let content = self.content.as_str().expand_placeholders(path)?.into_string();
+		if let Ok(content) = content {
+			std::fs::write(&script_path, content)?;
 		}
-		let script = dir.join("temp_script");
-		fs::write(&script, content.deref())?;
-		Ok(script)
+		Ok(script_path)
 	}
 
 	fn run<T: AsRef<Path>>(&self, path: T) -> anyhow::Result<Output> {
