@@ -4,6 +4,7 @@ pkgs.mkShell {
     cargo
     tokei
     hyperfine
+    sqlite
     mdbook
     rustc
     rustup
