@@ -5,30 +5,18 @@ use std::{
 };
 
 use anyhow::{Context, Result};
-use clap::{Parser, Subcommand};
+use clap::Parser;
 
-use organize_core::data::{config::Config, settings::Settings};
+use organize_core::data::config::Config;
 
 use crate::cmd::Cmd;
 
 #[derive(Parser, Debug)]
-pub struct Edit {
-	#[command(subcommand)]
-	command: Command,
-}
-
-#[derive(Subcommand, Debug)]
-enum Command {
-	Config,
-	Settings,
-}
+pub struct Edit;
 
 impl Cmd for Edit {
 	fn run(self) -> Result<()> {
-		match self.command {
-			Command::Config => Self::launch_editor(Config::path()?).map(|_| ()),
-			Command::Settings => Self::launch_editor(Settings::path()?).map(|_| ()),
-		}
+		Self::launch_editor(Config::path()?).map(|_| ())
 	}
 }
 

@@ -87,7 +87,6 @@ impl Config {
 }
 
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
-// #[serde(deny_unknown_fields)]
 pub struct Rule {
 	pub actions: Actions,
 	pub filters: Filters,

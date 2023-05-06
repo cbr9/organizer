@@ -13,7 +13,7 @@ use crate::{
 	path::{Expand, ResolveConflict},
 	string::Placeholder,
 	utils::UnwrapRef,
-	DB,
+	// DB,
 };
 use anyhow::{Context, Result};
 

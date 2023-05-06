@@ -5,15 +5,12 @@ use crate::cmd::run::Run;
 
 mod edit;
 mod run;
-mod stop;
 mod watch;
 
 #[derive(Subcommand)]
 enum Command {
 	Run(Run),
 	Edit(Edit),
-	// Watch(Watch),
-	// Stop(Stop),
 }
 
 #[derive(Parser)]
@@ -32,15 +29,6 @@ impl Cmd for App {
 		match self.command {
 			Command::Run(run) => run.run(),
 			Command::Edit(edit) => edit.run(),
-			// Watch(watch) => watch.run(conn),
-			// Run(run) => run.run(conn),
-			// Stop(stop) => stop.run(conn),
-			// Command::Logs(logs) => {
-			// 	Logger::setup(logs.no_color)?;
-			// 	logs.run(conn)
-			// }
-			// Command::New(new) => new.run(conn),
-			// Command::Info(info) => info.run(conn),
 		}
 	}
 }

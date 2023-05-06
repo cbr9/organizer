@@ -1,7 +1,4 @@
-use std::{
-	borrow::Cow,
-	path::PathBuf,
-};
+use std::{borrow::Cow, path::PathBuf};
 
 use lazy_static::lazy_static;
 use log::error;
