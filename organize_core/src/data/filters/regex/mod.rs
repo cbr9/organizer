@@ -3,9 +3,10 @@ mod de;
 use std::{ops::Deref, path::Path, str::FromStr};
 
 use crate::data::filters::AsFilter;
+use derive_more::Deref;
 use std::convert::TryFrom;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Deref, Clone)]
 pub struct Regex(pub Vec<regex::Regex>);
 
 impl PartialEq for Regex {
@@ -14,14 +15,6 @@ impl PartialEq for Regex {
 	}
 }
 impl Eq for Regex {}
-
-impl Deref for Regex {
-	type Target = Vec<regex::Regex>;
-
-	fn deref(&self) -> &Self::Target {
-		&self.0
-	}
-}
 
 impl AsFilter for Regex {
 	fn matches<T: AsRef<Path>>(&self, path: T) -> bool {

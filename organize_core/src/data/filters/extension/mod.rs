@@ -1,19 +1,12 @@
 mod de;
 
-use std::{ops::Deref, path::Path};
+use std::path::Path;
 
 use crate::data::filters::AsFilter;
+use derive_more::Deref;
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Deref, Clone, Eq, PartialEq)]
 pub struct Extension(Vec<String>);
-
-impl Deref for Extension {
-	type Target = Vec<String>;
-
-	fn deref(&self) -> &Self::Target {
-		&self.0
-	}
-}
 
 impl AsFilter for Extension {
 	fn matches<T: AsRef<Path>>(&self, path: T) -> bool {

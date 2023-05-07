@@ -1,8 +1,6 @@
-use std::{
-	ops::Deref,
-	path::{Path, PathBuf},
-};
+use std::path::{Path, PathBuf};
 
+use derive_more::Deref;
 use serde::Deserialize;
 
 use crate::data::{
@@ -132,16 +130,8 @@ impl From<&Action> for ActionType {
 	}
 }
 
-#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Default, Deref, Clone, Deserialize, PartialEq, Eq)]
 pub struct Actions(pub Vec<Action>);
-
-impl Deref for Actions {
-	type Target = Vec<Action>;
-
-	fn deref(&self) -> &Self::Target {
-		&self.0
-	}
-}
 
 impl Actions {
 	pub fn act<T: Into<PathBuf>>(&self, path: T, apply: &Apply) -> Option<PathBuf> {

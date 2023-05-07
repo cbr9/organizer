@@ -1,8 +1,6 @@
-use std::{
-	ops::Deref,
-	path::{Path, PathBuf},
-};
+use std::path::{Path, PathBuf};
 
+use derive_more::Deref;
 use log::{error, info};
 use serde::Deserialize;
 
@@ -12,16 +10,8 @@ use crate::{
 };
 use anyhow::Result;
 
-#[derive(Debug, Clone, Deserialize, Default, Eq, PartialEq)]
+#[derive(Debug, Clone, Deserialize, Deref, Default, Eq, PartialEq)]
 pub struct Echo(#[serde(deserialize_with = "deserialize_placeholder_string")] String);
-
-impl Deref for Echo {
-	type Target = String;
-
-	fn deref(&self) -> &Self::Target {
-		&self.0
-	}
-}
 
 impl Act for Echo {
 	fn act<T, P>(&self, from: T, _to: Option<P>) -> Result<Option<PathBuf>>

@@ -1,19 +1,12 @@
 mod de;
 
 use crate::data::filters::AsFilter;
+use derive_more::Deref;
 use mime::FromStrError;
-use std::{convert::TryFrom, ops::Deref, path::Path, str::FromStr};
+use std::{convert::TryFrom, path::Path, str::FromStr};
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, Deref, PartialEq)]
 pub struct Mime(mime::Mime);
-
-impl Deref for Mime {
-	type Target = mime::Mime;
-
-	fn deref(&self) -> &Self::Target {
-		&self.0
-	}
-}
 
 impl FromStr for Mime {
 	type Err = FromStrError;
@@ -23,16 +16,8 @@ impl FromStr for Mime {
 	}
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Deref)]
 pub struct MimeWrapper(Vec<Mime>);
-
-impl Deref for MimeWrapper {
-	type Target = Vec<Mime>;
-
-	fn deref(&self) -> &Self::Target {
-		&self.0
-	}
-}
 
 impl From<Mime> for MimeWrapper {
 	fn from(mime: Mime) -> Self {
@@ -60,8 +45,8 @@ impl AsFilter for MimeWrapper {
 		let guess = mime_guess::from_path(path.as_ref()).first_or_octet_stream();
 		self.iter().any(|mime| match (mime.type_(), mime.subtype()) {
 			(mime::STAR, subtype) => subtype == guess.subtype(),
-			(ty, mime::STAR) => ty == guess.type_(),
-			(ty, subtype) => ty == guess.type_() && subtype == guess.subtype(),
+			(type_, mime::STAR) => type_ == guess.type_(),
+			(type_, subtype) => type_ == guess.type_() && subtype == guess.subtype(),
 		})
 	}
 }

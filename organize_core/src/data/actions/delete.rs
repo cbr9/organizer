@@ -1,27 +1,17 @@
-use std::{
-	ops::Deref,
-	path::{Path, PathBuf},
-};
+use std::path::{Path, PathBuf};
 
 use crate::data::actions::{Act, ActionType, AsAction};
 use anyhow::{Context, Result};
+use derive_more::Deref;
 use log::{error, info};
 use serde::Deserialize;
 use std::str::FromStr;
 
-#[derive(Debug, Clone, Deserialize, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Deref, Deserialize, Default, PartialEq, Eq)]
 pub struct Delete(bool);
 
-#[derive(Debug, Clone, Deserialize, Default, Eq, PartialEq)]
+#[derive(Debug, Clone, Deref, Deserialize, Default, Eq, PartialEq)]
 pub struct Trash(bool);
-
-impl Deref for Delete {
-	type Target = bool;
-
-	fn deref(&self) -> &Self::Target {
-		&self.0
-	}
-}
 
 macro_rules! as_action {
 	($id:ty) => {
@@ -29,7 +19,7 @@ macro_rules! as_action {
 			fn process<T: Into<PathBuf> + AsRef<Path>>(&self, path: T) -> Option<PathBuf> {
 				let path = path.into();
 				let to: Option<T> = None;
-				if self.0 {
+				if **self {
 					match self.act(&path, to) {
 						Ok(new_path) => {
 							info!("({}) {}", self.ty().to_string(), path.display());
@@ -62,7 +52,7 @@ impl Act for Delete {
 		T: AsRef<Path> + Into<PathBuf>,
 		P: AsRef<Path> + Into<PathBuf>,
 	{
-		if self.0 {
+		if **self {
 			std::fs::remove_file(&from)
 				.with_context(|| format!("could not delete {}", from.as_ref().display()))
 				.map(|_| None)
