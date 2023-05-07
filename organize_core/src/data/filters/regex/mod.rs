@@ -1,6 +1,6 @@
 mod de;
 
-use std::{ops::Deref, path::Path, str::FromStr};
+use std::{path::Path, str::FromStr};
 
 use crate::data::filters::AsFilter;
 use derive_more::Deref;
