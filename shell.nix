@@ -5,12 +5,14 @@ pkgs.mkShell {
     tokei
     hyperfine
     sqlite
+    rust-analyzer
     mdbook
     rustc
     rustup
     gcc
-    rust-analyzer
     taplo
+    clippy
     lldb
+    crate2nix
   ];
 }
