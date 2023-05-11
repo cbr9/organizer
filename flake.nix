@@ -9,7 +9,6 @@
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = (import nixpkgs) { inherit system; };
-        lib = pkgs.lib;
         naersk' = pkgs.callPackage naersk { };
 
       in {
@@ -19,7 +18,7 @@
             owner = "cbr9";
             repo = "organizer";
             rev = "59598e3";
-            sha256 = lib.fakeSha256;
+            sha256 = "sha256-5IsQK1XzqHEcNduumpNTSYgylPeAyKVUXxK8/GkyOxQ=";
           };
         };
 
