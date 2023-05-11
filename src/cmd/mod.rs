@@ -1,7 +1,7 @@
 use clap::{Parser, Subcommand};
 
+use self::{run::RunBuilder, watch::WatchBuilder};
 use crate::cmd::edit::Edit;
-use crate::cmd::run::Run;
 
 mod edit;
 mod run;
@@ -9,8 +9,9 @@ mod watch;
 
 #[derive(Subcommand)]
 enum Command {
-	Run(Run),
+	Run(RunBuilder),
 	Edit(Edit),
+	Watch(WatchBuilder),
 }
 
 #[derive(Parser)]
@@ -27,8 +28,9 @@ pub trait Cmd {
 impl Cmd for App {
 	fn run(self) -> anyhow::Result<()> {
 		match self.command {
-			Command::Run(run) => run.run(),
+			Command::Run(run) => run.build()?.run(),
 			Command::Edit(edit) => edit.run(),
+			Command::Watch(watch) => watch.build()?.run(),
 		}
 	}
 }

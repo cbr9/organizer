@@ -8,33 +8,69 @@ use organize_core::{
 	file::File,
 	logger::Logger,
 };
-use rayon::prelude::*;
 
 use crate::Cmd;
 
-#[derive(Parser, Debug)]
-pub struct Run {
+#[derive(Parser, Default)]
+pub struct RunBuilder {
 	#[arg(long, short = 'c')]
-	pub(crate) config: Option<PathBuf>,
-	#[arg(long, default_value_t = false)]
+	config: Option<PathBuf>,
+	#[arg(long)]
+	no_color: Option<bool>,
+}
+
+impl RunBuilder {
+	pub fn config(mut self, config: Option<PathBuf>) -> Result<Self> {
+		self.config = match config {
+			Some(config) => Some(config),
+			None => Some(Config::path()?),
+		};
+		Ok(self)
+	}
+	pub fn no_color(mut self, no_color: Option<bool>) -> Self {
+		self.no_color = Some(no_color.map_or_else(|| false, |v| !v));
+		self
+	}
+	pub fn build(mut self) -> Result<Run> {
+		if self.config.is_none() {
+			self = self.config(None)?;
+		}
+		if self.no_color.is_none() {
+			self = self.no_color(None);
+		}
+		Ok(Run {
+			config: self.config.unwrap(),
+			no_color: self.no_color.unwrap(),
+		})
+	}
+}
+
+pub struct Run {
+	pub(crate) config: PathBuf,
 	pub(crate) no_color: bool,
 }
 
+impl Run {
+	pub fn builder() -> RunBuilder {
+		RunBuilder::default()
+	}
+}
+
 impl Cmd for Run {
-	fn run(mut self) -> Result<()> {
-		Logger::setup(self.no_color)?;
-		self.config = Some(self.config.unwrap_or_else(|| Config::path().unwrap()).canonicalize()?);
-		let data = Data::new(self.config.clone().unwrap())?;
-		self.start(data)
+	fn run(self) -> Result<()> {
+		self.start()
 	}
 }
 
 impl<'a> Run {
-	pub(crate) fn start(self, data: Data) -> Result<()> {
-		let path_to_recursive = PathToRecursive::new(&data);
-		let path_to_rules = PathToRules::new(&data.config);
+	pub(crate) fn start(self) -> Result<()> {
+		Logger::setup(self.no_color)?;
 
-		path_to_rules.par_iter().for_each(|(path, _)| {
+		let data = Data::new(self.config)?;
+		let path_to_recursive = PathToRecursive::new(data.clone());
+		let path_to_rules = PathToRules::new(data.config.clone());
+
+		path_to_rules.iter().for_each(|(path, _)| {
 			let recursive = path_to_recursive.get(path).unwrap();
 			let walker = recursive.to_walker(path);
 			walker.into_iter().filter_map(|e| e.ok()).for_each(|entry| {

@@ -1,195 +1,144 @@
-// use std::{
-// 	path::{Path, PathBuf},
-// 	process,
-// 	sync::mpsc::{channel, Receiver},
-// 	time::Duration,
-// };
+use std::{
+	path::{Path, PathBuf},
+	sync::mpsc::Sender,
+};
 
-// #[cfg(feature = "interactive")]
-// use dialoguer::{theme::ColorfulTheme, Confirm};
+use anyhow::Result;
+use clap::Parser;
+use notify::{Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 
-// use anyhow::Result;
-// use clap::Clap;
-// use colored::Colorize;
+use organize_core::{
+	data::{config::Config, path_to_recursive::PathToRecursive, path_to_rules::PathToRules, Data},
+	file::File,
+};
 
-// use notify::{watcher, DebouncedEvent, RecommendedWatcher, RecursiveMode, Watcher};
-// use sysinfo::{ProcessExt, RefreshKind, Signal, System, SystemExt};
+use crate::{cmd::run::Run, Cmd};
 
-// use organize_core::{
-// 	data::{config::Config, path_to_recursive::PathToRecursive, path_to_rules::PathToRules, settings::Settings, Data},
-// 	file::File,
-// 	logger::Logger,
-// 	register::Register,
-// };
+#[derive(Parser, Debug)]
+pub struct WatchBuilder {
+	#[arg(long, short = 'c')]
+	pub config: Option<PathBuf>,
+	#[arg(long)]
+	clean: Option<bool>,
+	#[arg(long)]
+	pub(crate) no_color: Option<bool>,
+}
 
-// use crate::{cmd::run::Run, Cmd, CONFIG_PATH_STR};
-// use notify_rust::Notification;
-// use std::sync::{Arc, Mutex};
+impl WatchBuilder {
+	pub fn build(mut self) -> Result<Watch> {
+		self.config = match self.config {
+			Some(config) => Some(config),
+			None => Some(Config::path()?),
+		};
+		self.no_color = Some(self.no_color.map_or_else(|| true, |v| !v));
+		self.clean = Some(self.clean.map_or_else(|| true, |v| !v));
 
-// #[derive(Clap, Debug)]
-// pub struct Watch {
-// 	#[clap(long, short = 'c', default_value = & CONFIG_PATH_STR, about = "Config path")]
-// 	pub config: PathBuf,
-// 	#[clap(long, short = 'd', default_value = "2", about = "Seconds to wait before processing an event")]
-// 	delay: u8,
-// 	#[clap(long, short = 'r', about = "Restart the instance running with the specified configuration")]
-// 	replace: bool,
-// 	#[clap(long, about = "Process existing files before processing events")]
-// 	clean: bool,
-// 	#[clap(long, about = "Do not print colored output")]
-// 	pub(crate) no_color: bool,
-// }
+		Ok(Watch {
+			config: unsafe { self.config.unwrap_unchecked() },
+			clean: unsafe { self.clean.unwrap_unchecked() },
+			no_color: unsafe { self.no_color.unwrap_unchecked() },
+		})
+	}
+}
 
-// impl Cmd for Watch {
-// 	fn run(mut self) -> Result<()> {
-// 		Logger::setup(self.no_color)?;
-// 		self.config = self.config.canonicalize()?;
-// 		let data = Data::new(&self.config)?;
+#[derive(Debug)]
+pub struct Watch {
+	pub config: PathBuf,
+	clean: bool,
+	pub(crate) no_color: bool,
+}
 
-// 		if self.clean {
-// 			self.cleanup(&data)?;
-// 		}
+impl Cmd for Watch {
+	fn run(self) -> Result<()> {
+		// Logger::setup(self.no_color)?;
+		if self.clean {
+			self.cleanup()?;
+		}
+		self.start()
+	}
+}
 
-// 		if self.replace {
-// 			return self.replace();
-// 		}
+impl<'a> Watch {
+	fn cleanup(&self) -> Result<()> {
+		let cmd = Run::builder()
+			.config(Some(self.config.clone()))?
+			.no_color(Some(self.no_color))
+			.build()?;
+		cmd.start()
+	}
 
-// 		let mut register = Register::new()?;
+	fn on_create<T: AsRef<Path>>(&self, path: T, data: &Data, path_to_rules: &PathToRules) {
+		let path = path.as_ref();
+		let config_parent = self.config.parent().expect("Couldn't find config path");
+		if let Some(parent) = path.parent() {
+			if parent != config_parent && path.is_file() {
+				let file = File::new(path, &data, true);
+				file.act(&path_to_rules);
+			}
+		}
+	}
 
-// 		if register.iter().any(|section| section.path == self.config) {
-// 			println!("An existing instance is already running with the selected configuration. Add --replace to restart it");
-// 			return Ok(());
-// 		}
-// 		register.push(process::id(), &self.config)?;
-// 		self.start(data)
-// 	}
-// }
+	fn event_handler(
+		&self,
+		res: notify::Result<Event>,
+		data: &mut Data,
+		path_to_rules: &mut PathToRules,
+		path_to_recursive: &mut PathToRecursive,
+		mut watcher: RecommendedWatcher,
+		tx: &Sender<notify::Result<Event>>,
+	) -> RecommendedWatcher {
+		let event = res.unwrap();
+		match event.kind {
+			notify::EventKind::Create(_) => {
+				for p in event.paths {
+					self.on_create::<PathBuf>(p, &data, &path_to_rules);
+				}
+			}
+			EventKind::Modify(_) => {
+				for p in event.paths {
+					if p == self.config {
+						if let Ok(new_config) = Config::parse(&self.config) {
+							if new_config != data.config {
+								data.config = new_config;
+								*path_to_rules = PathToRules::new(data.config.clone());
+								*path_to_recursive = PathToRecursive::new(data.clone());
+								std::mem::drop(watcher);
+								watcher = self.setup(&path_to_recursive, tx);
+								log::info!("Reloaded config");
+							}
+						}
+					}
+				}
+			}
+			_ => {}
+		}
+		watcher
+	}
 
-// impl<'a> Watch {
-// 	fn cleanup(&self, data: &Data) -> Result<()> {
-// 		let cmd = Run {
-// 			config: self.config.clone(),
-// 			simulate: false,
-// 			no_color: self.no_color,
-// 		};
-// 		cmd.start(data.clone())
-// 	}
+	fn setup(&self, path_to_recursive: &PathToRecursive, tx: &Sender<notify::Result<Event>>) -> RecommendedWatcher {
+		let mut watcher = RecommendedWatcher::new(tx.clone(), notify::Config::default()).unwrap();
 
-// 	fn replace(&self) -> Result<()> {
-// 		let register = Register::new()?;
-// 		match register.iter().find(|section| section.path == self.config) {
-// 			Some(section) => {
-// 				let sys = System::new_with_specifics(RefreshKind::with_processes(RefreshKind::new()));
-// 				if let Some(process) = sys.get_process(section.pid) {
-// 					process.kill(Signal::Term);
-// 				}
-// 				self.start(Data::new(&self.config)?)
-// 			}
-// 			None => self.replace_none(),
-// 		}
-// 	}
+		for (folder, recursive) in path_to_recursive.iter() {
+			watcher.watch(folder, recursive.type_()).unwrap();
+		}
 
-// 	#[cfg(feature = "interactive")]
-// 	fn replace_none(&self) -> Result<()> {
-// 		println!(
-// 			"{} {}",
-// 			"No instance was found running with configuration:".bold(),
-// 			self.config.display().to_string().underline()
-// 		);
-// 		let prompt = Confirm::with_theme(&ColorfulTheme::default())
-// 			.with_prompt("Do you wish to start an instance?")
-// 			.interact()?;
-// 		if prompt {
-// 			return self.start(Data::new(&self.config)?);
-// 		}
-// 		Ok(())
-// 	}
+		if let Some(parent) = self.config.parent() {
+			watcher.watch(parent, RecursiveMode::NonRecursive).unwrap();
+		}
+		watcher
+	}
 
-// 	#[cfg(not(feature = "interactive"))]
-// 	fn replace_none(&self) -> Result<()> {
-// 		println!(
-// 			"{} {}",
-// 			"No instance was found running with configuration:".bold(),
-// 			self.config.display().to_string().underline()
-// 		);
-// 		Ok(())
-// 	}
+	fn start(self) -> Result<()> {
+		let mut data = Data::new(self.config.clone()).unwrap();
+		let mut path_to_rules = PathToRules::new(data.config.clone());
+		let mut path_to_recursive = PathToRecursive::new(data.clone());
+		let (tx, rx) = std::sync::mpsc::channel();
+		let mut watcher = self.setup(&path_to_recursive, &tx);
 
-// 	fn setup(&'a self, path_to_recursive: &PathToRecursive) -> Result<(RecommendedWatcher, Receiver<DebouncedEvent>)> {
-// 		let (tx, rx) = channel();
-// 		let mut watcher = watcher(tx, Duration::from_secs(self.delay as u64)).unwrap();
-// 		for (folder, recursive) in path_to_recursive.iter() {
-// 			watcher.watch(
-// 				folder,
-// 				match recursive.is_recursive() {
-// 					true => RecursiveMode::Recursive,
-// 					false => RecursiveMode::NonRecursive,
-// 				},
-// 			)?
-// 		}
-// 		if cfg!(feature = "hot-reload") && self.config.parent().is_some() {
-// 			watcher.watch(self.config.parent().unwrap(), RecursiveMode::NonRecursive)?;
-// 		}
-// 		Ok((watcher, rx))
-// 	}
+		for res in &rx {
+			watcher = self.event_handler(res, &mut data, &mut path_to_rules, &mut path_to_recursive, watcher, &tx);
+		}
 
-// 	fn on_create<T: AsRef<Path>, P: AsRef<Path>>(
-// 		path: T,
-// 		config_parent: P,
-// 		data: &Data,
-// 		path_to_rules: &PathToRules,
-// 		simulation: &Option<Arc<Mutex<Simulation>>>,
-// 	) {
-// 		let path = path.as_ref();
-// 		let config_parent = config_parent.as_ref();
-// 		if let Some(parent) = path.parent() {
-// 			if parent != config_parent && path.is_file() {
-// 				let file = File::new(path, data, true);
-// 				file.act(&path_to_rules);
-// 			}
-// 		}
-// 	}
-
-// 	fn start(&'a self, mut data: Data) -> Result<()> {
-// 		let config_parent = self.config.parent().unwrap();
-// 		let settings_path = Settings::path()?;
-
-// 		let path_to_rules = PathToRules::new(&data.config);
-// 		let path_to_recursive = PathToRecursive::new(&data);
-// 		let (_watcher, rx) = self.setup(&path_to_recursive)?;
-
-// 		loop {
-// 			if let Ok(event) = rx.recv() {
-// 				match event {
-// 					DebouncedEvent::Create(path) => Self::on_create(path, config_parent, &data, &path_to_rules),
-// 					DebouncedEvent::Write(path) => {
-// 						if path == self.config {
-// 							if let Ok(new_config) = Config::parse(&self.config) {
-// 								if new_config != data.config {
-// 									data.config = new_config;
-// 									Notification::new()
-// 										.summary("organize")
-// 										.body("organize reloaded successfully")
-// 										.show()?;
-// 									break self.start(data);
-// 								}
-// 							}
-// 						} else if path == settings_path {
-// 							if let Ok(new_settings) = Settings::new(&settings_path) {
-// 								if data.settings != new_settings {
-// 									data.settings = new_settings;
-// 									Notification::new()
-// 										.summary("organize")
-// 										.body("organize reloaded successfully")
-// 										.show()?;
-// 									break self.start(data);
-// 								}
-// 							}
-// 						}
-// 					}
-// 					_ => {}
-// 				}
-// 			}
-// 		}
-// 	}
-// }
+		Ok(())
+	}
+}

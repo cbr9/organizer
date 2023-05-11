@@ -63,7 +63,7 @@ impl Config {
 				let found = path.file_stem()? == PROJECT_NAME && path.extension()? == "toml";
 				found.then_some(path)
 			})
-			.map_or_else(Self::default_path, Ok)
+			.map_or_else(Self::default_path, |path| path.canonicalize().context("Couldn't find config file"))
 	}
 
 	pub fn set_cwd<T: AsRef<Path>>(path: T) -> Result<PathBuf> {
