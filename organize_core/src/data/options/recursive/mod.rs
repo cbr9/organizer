@@ -27,6 +27,14 @@ impl Recursive {
 		}
 	}
 
+	pub fn as_mode(&self) -> notify::RecursiveMode {
+		if self.is_recursive() {
+			return notify::RecursiveMode::Recursive;
+		} else {
+			return notify::RecursiveMode::NonRecursive;
+		}
+	}
+
 	pub fn is_recursive(&self) -> bool {
 		self.depth.map(|depth| depth == 0 || depth > 1).unwrap_or_default()
 	}

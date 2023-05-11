@@ -5,6 +5,7 @@ use std::{
 	path::{Path, PathBuf},
 };
 
+#[derive(Clone)]
 pub struct PathToRules<'a>(HashMap<&'a PathBuf, Vec<(usize, usize)>>);
 
 impl<'a> PathToRules<'a> {
