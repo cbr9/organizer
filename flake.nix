@@ -9,6 +9,7 @@
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = (import nixpkgs) { inherit system; };
+        lib = pkgs.lib;
         naersk' = pkgs.callPackage naersk { };
 
       in {
@@ -17,8 +18,8 @@
           src = pkgs.fetchFromGitHub {
             owner = "cbr9";
             repo = "organizer";
-            rev = "9ebf448";
-            sha256 = "sha256-mAuTpq/lF/l3gPX7vk7mGge35WJsGNGrGJyYI9Bj4Fw=";
+            rev = "59598e3";
+            sha256 = lib.fakeSha256;
           };
         };
 
