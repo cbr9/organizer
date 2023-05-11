@@ -4,3 +4,4 @@ venv/
 Dockerfile
 .idea/
 /.run
+.direnv/
