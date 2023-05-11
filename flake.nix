@@ -14,6 +14,7 @@
       in {
         # For `nix build` & `nix run`:
         defaultPackage = naersk'.buildPackage {
+          copyBins = true;
           src = pkgs.fetchFromGitHub {
             owner = "cbr9";
             repo = "organizer";
@@ -23,7 +24,8 @@
         };
 
         # For `nix develop` (optional, can be skipped):
-        devShell =
-          pkgs.mkShell { nativeBuildInputs = with pkgs; [ rustc cargo ]; };
+        devShell = pkgs.mkShell {
+          nativeBuildInputs = with pkgs; [ rustc cargo rust-analyzer ];
+        };
       });
 }
