@@ -19,6 +19,12 @@ pub struct Config {
 	pub defaults: Options,
 }
 
+impl Default for Config {
+	fn default() -> Self {
+        unimplemented!()
+    }
+}
+
 impl Config {
 	pub fn default_dir() -> Result<PathBuf> {
 		let var = "ORGANIZE_CONFIG_DIR";
@@ -67,21 +73,23 @@ impl Config {
 	}
 
 	pub fn set_cwd<T: AsRef<Path>>(path: T) -> Result<PathBuf> {
-		if path.as_ref() == Self::default_path()? {
+		let path = path.as_ref();
+		if path == Self::default_path()? {
 			dirs_next::home_dir()
-				.map(|path| -> Result<PathBuf> {
-					std::env::set_current_dir(&path).map_err(anyhow::Error::new)?;
+				.context("could not determine home directory")
+				.and_then(|path| {
+					std::env::set_current_dir(&path).context("Could not change into home directory")?;
 					Ok(path)
 				})
-				.ok_or_else(|| anyhow!("could not determine home directory"))?
+
 		} else {
-			path.as_ref()
-				.parent()
-				.map(|path| -> Result<PathBuf> {
-					std::env::set_current_dir(path).map_err(anyhow::Error::new)?;
-					Ok(path.into())
+			path.parent()
+				.context("could not determine parent directory")
+				.and_then(|path| {
+					std::env::set_current_dir(path)?;
+					Ok(path.to_path_buf())
 				})
-				.ok_or_else(|| anyhow!("could not determine config directory"))?
+				.context("could not determine config directory")
 		}
 	}
 }
