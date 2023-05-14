@@ -36,7 +36,8 @@ pub struct ConfigBuilder {
 impl ConfigBuilder {
 	pub fn parse<T: AsRef<Path>>(path: T) -> Result<Self> {
 		let path = path.as_ref();
-		fs::read_to_string(path).map(|s| toml::from_str(&s).with_context(|| format!("could not deserialize {}", path.display())))?
+		let s = fs::read_to_string(path)?;
+		toml::from_str(&s).context("Could not deserialize config")
 	}
 	pub fn path_to_rules(&self) -> HashMap<PathBuf, Vec<(usize, usize)>> {
 		let mut map = HashMap::with_capacity(self.rules.len()); // there will be at least one folder per rule

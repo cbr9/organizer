@@ -94,11 +94,11 @@ impl Watch {
 								watcher = self.setup(tx);
 								if self.cleanup_after_reload {
 									if let Err(e) = self.cleanup() {
-										log::error!("{}", e);
+										log::error!("{:?}", e);
 									}
 								}
 							}
-							Err(e) => log::error!("{}", e),
+							Err(e) => log::error!("{:?}", e),
 						}
 					}
 				}
