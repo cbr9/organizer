@@ -3,11 +3,7 @@ use std::path::PathBuf;
 use anyhow::Result;
 use clap::Parser;
 
-use organize_core::{
-	data::{config::Config, path_to_recursive::PathToRecursive, path_to_rules::PathToRules, Data},
-	file::File,
-	logger::Logger,
-};
+use organize_core::{config::Config, file::File, logger::Logger};
 
 use crate::Cmd;
 
@@ -39,14 +35,14 @@ impl RunBuilder {
 			self = self.no_color(None);
 		}
 		Ok(Run {
-			config: self.config.unwrap(),
+			config: Config::parse(self.config.unwrap()).unwrap(),
 			no_color: self.no_color.unwrap(),
 		})
 	}
 }
 
 pub struct Run {
-	pub(crate) config: PathBuf,
+	pub(crate) config: Config,
 	pub(crate) no_color: bool,
 }
 
@@ -65,18 +61,13 @@ impl Cmd for Run {
 impl<'a> Run {
 	pub(crate) fn start(self) -> Result<()> {
 		Logger::setup(self.no_color)?;
-
-		let data = Data::new(self.config)?;
-		let path_to_recursive = PathToRecursive::new(data.clone());
-		let path_to_rules = PathToRules::new(data.config.clone());
-
-		path_to_rules.iter().for_each(|(path, _)| {
-			let recursive = path_to_recursive.get(path).unwrap();
+		self.config.path_to_rules.iter().for_each(|(path, _)| {
+			let recursive = self.config.path_to_recursive.get(path).unwrap();
 			let walker = recursive.to_walker(path);
 			walker.into_iter().filter_map(|e| e.ok()).for_each(|entry| {
 				if entry.path().is_file() {
-					let file = File::new(entry.path(), &data, false);
-					file.act(&path_to_rules);
+					let file = File::new(entry.path(), &self.config, false);
+					file.act(&self.config.path_to_rules);
 				}
 			});
 		});

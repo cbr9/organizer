@@ -7,7 +7,7 @@ use std::{
 use anyhow::{Context, Result};
 use clap::Parser;
 
-use organize_core::data::config::Config;
+use organize_core::config::Config;
 
 use crate::cmd::Cmd;
 

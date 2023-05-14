@@ -7,10 +7,7 @@ use anyhow::Result;
 use clap::Parser;
 use notify::{Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 
-use organize_core::{
-	data::{config::Config, path_to_recursive::PathToRecursive, path_to_rules::PathToRules, Data},
-	file::File,
-};
+use organize_core::{config::Config, file::File};
 
 use crate::{cmd::run::Run, Cmd};
 
@@ -34,7 +31,7 @@ impl WatchBuilder {
 		self.clean = Some(self.clean.map_or_else(|| true, |v| !v));
 
 		Ok(Watch {
-			config: unsafe { self.config.unwrap_unchecked() },
+			config: Config::parse(unsafe { self.config.unwrap_unchecked() }).unwrap(),
 			clean: unsafe { self.clean.unwrap_unchecked() },
 			no_color: unsafe { self.no_color.unwrap_unchecked() },
 		})
@@ -43,7 +40,7 @@ impl WatchBuilder {
 
 #[derive(Debug)]
 pub struct Watch {
-	pub config: PathBuf,
+	pub config: Config,
 	clean: bool,
 	pub(crate) no_color: bool,
 }
@@ -61,49 +58,44 @@ impl Cmd for Watch {
 impl<'a> Watch {
 	fn cleanup(&self) -> Result<()> {
 		let cmd = Run::builder()
-			.config(Some(self.config.clone()))?
+			.config(Some(self.config.path.clone()))?
 			.no_color(Some(self.no_color))
 			.build()?;
 		cmd.start()
 	}
 
-	fn on_create<T: AsRef<Path>>(&self, path: T, data: &Data, path_to_rules: &PathToRules) {
+	fn on_create<T: AsRef<Path>>(&self, path: T) {
 		let path = path.as_ref();
-		let config_parent = self.config.parent().expect("Couldn't find config path");
+		let config_parent = self.config.path.parent().expect("Couldn't find config path");
 		if let Some(parent) = path.parent() {
 			if parent != config_parent && path.is_file() {
-				let file = File::new(path, &data, true);
-				file.act(&path_to_rules);
+				let file = File::new(path, &self.config, true);
+				file.act(&self.config.path_to_rules);
 			}
 		}
 	}
 
 	fn event_handler(
-		&self,
+		&mut self,
 		res: notify::Result<Event>,
-		data: &mut Data,
-		path_to_rules: &mut PathToRules,
-		path_to_recursive: &mut PathToRecursive,
 		mut watcher: RecommendedWatcher,
 		tx: &Sender<notify::Result<Event>>,
 	) -> RecommendedWatcher {
 		let event = res.unwrap();
 		match event.kind {
 			notify::EventKind::Create(_) => {
-				for p in event.paths {
-					self.on_create::<PathBuf>(p, &data, &path_to_rules);
+				for path in event.paths {
+					self.on_create::<PathBuf>(path);
 				}
 			}
 			EventKind::Modify(_) => {
 				for p in event.paths {
-					if p == self.config {
-						if let Ok(new_config) = Config::parse(&self.config) {
-							if new_config != data.config {
-								data.config = new_config;
-								*path_to_rules = PathToRules::new(data.config.clone());
-								*path_to_recursive = PathToRecursive::new(data.clone());
+					if p == self.config.path {
+						if let Ok(new_config) = Config::parse(&self.config.path) {
+							if new_config != self.config {
+								self.config = new_config;
 								std::mem::drop(watcher);
-								watcher = self.setup(&path_to_recursive, tx);
+								watcher = self.setup(&tx);
 								log::info!("Reloaded config");
 							}
 						}
@@ -115,28 +107,25 @@ impl<'a> Watch {
 		watcher
 	}
 
-	fn setup(&self, path_to_recursive: &PathToRecursive, tx: &Sender<notify::Result<Event>>) -> RecommendedWatcher {
+	fn setup(&self, tx: &Sender<notify::Result<Event>>) -> RecommendedWatcher {
 		let mut watcher = RecommendedWatcher::new(tx.clone(), notify::Config::default()).unwrap();
 
-		for (folder, recursive) in path_to_recursive.iter() {
+		for (folder, recursive) in self.config.path_to_recursive.iter() {
 			watcher.watch(folder, recursive.type_()).unwrap();
 		}
 
-		if let Some(parent) = self.config.parent() {
+		if let Some(parent) = self.config.path.parent() {
 			watcher.watch(parent, RecursiveMode::NonRecursive).unwrap();
 		}
 		watcher
 	}
 
-	fn start(self) -> Result<()> {
-		let mut data = Data::new(self.config.clone()).unwrap();
-		let mut path_to_rules = PathToRules::new(data.config.clone());
-		let mut path_to_recursive = PathToRecursive::new(data.clone());
+	fn start(mut self) -> Result<()> {
 		let (tx, rx) = std::sync::mpsc::channel();
-		let mut watcher = self.setup(&path_to_recursive, &tx);
+		let mut watcher = self.setup(&tx);
 
 		for res in &rx {
-			watcher = self.event_handler(res, &mut data, &mut path_to_rules, &mut path_to_recursive, watcher, &tx);
+			watcher = self.event_handler(res, watcher, &tx);
 		}
 
 		Ok(())

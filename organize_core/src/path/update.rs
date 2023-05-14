@@ -1,4 +1,4 @@
-use crate::data::actions::io_action::ConflictOption;
+use crate::config::actions::io_action::ConflictOption;
 
 use std::path::PathBuf;
 

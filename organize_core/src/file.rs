@@ -1,29 +1,32 @@
 use crate::{
-	data::{options::r#match::Match, path_to_rules::PathToRules, Data},
+	config::{options::r#match::Match, Config},
 	path::IsHidden,
 };
-use std::path::{Path, PathBuf};
+use std::{
+	collections::HashMap,
+	path::{Path, PathBuf},
+};
 
 pub struct File<'a> {
 	pub path: PathBuf,
-	data: &'a Data,
+	config: &'a Config,
 	is_watching: bool,
 }
 
 impl<'a> File<'a> {
-	pub fn new<T: Into<PathBuf>>(path: T, data: &'a Data, is_watching: bool) -> Self {
+	pub fn new<T: Into<PathBuf>>(path: T, config: &'a Config, is_watching: bool) -> Self {
 		Self {
 			path: path.into(),
-			data,
+			config,
 			is_watching,
 		}
 	}
 
-	pub fn act(mut self, path_to_rules: &'a PathToRules) {
-		let rules = self.get_matching_rules(path_to_rules);
+	pub fn act(mut self, path_to_rules: &'a HashMap<PathBuf, Vec<(usize, usize)>>) {
+		let rules = self.get_matching_rules(&path_to_rules);
 		for (i, j) in rules {
-			let rule = &self.data.config.rules[*i];
-			match rule.actions.act(self.path, self.data.get_apply_actions(*i, *j)) {
+			let rule = &self.config.rules[*i];
+			match rule.actions.act(self.path, self.config.get_apply_actions(*i, *j)) {
 				None => break,
 				Some(new_path) => {
 					self.path = new_path;
@@ -33,7 +36,7 @@ impl<'a> File<'a> {
 	}
 
 	fn filter_by_recursive<T: AsRef<Path>>(&self, ancestor: T, rule: usize, folder: usize) -> bool {
-		let depth = *self.data.get_recursive_depth(rule, folder) as usize;
+		let depth = *self.config.get_recursive_depth(rule, folder) as usize;
 		if depth == 0 {
 			return true;
 		}
@@ -41,7 +44,7 @@ impl<'a> File<'a> {
 	}
 
 	fn filter_by_partial_files(&self, rule: usize, folder: usize) -> bool {
-		if !*self.data.allows_partial_files(rule, folder) {
+		if !*self.config.allows_partial_files(rule, folder) {
 			// if partial files are allowed
 			if let Some(extension) = self.path.extension() {
 				let partial_extensions = &["crdownload", "part"];
@@ -53,22 +56,27 @@ impl<'a> File<'a> {
 	}
 
 	fn filter_by_hidden_files(&self, rule: usize, folder: usize) -> bool {
-		(self.path.is_hidden() && *self.data.allows_hidden_files(rule, folder)) || !self.path.is_hidden()
+		(self.path.is_hidden() && *self.config.allows_hidden_files(rule, folder)) || !self.path.is_hidden()
 	}
 
 	fn filter_by_ignored_dirs(&self, rule: usize, folder: usize) -> bool {
 		let check_ignored = |dir: &PathBuf| -> bool { self.path.parent().map(|parent| dir == parent).unwrap_or_default() };
-		if let Some(ignored_dirs) = &self.data.config.defaults.ignored_dirs {
+		if let Some(ignored_dirs) = &self.config.global_defaults.ignored_dirs {
 			if ignored_dirs.iter().any(check_ignored) {
 				return false;
 			}
 		}
-		if let Some(ignored_dirs) = &self.data.config.rules[rule].options.ignored_dirs {
+		if let Some(ignored_dirs) = &self.config.local_defaults.ignored_dirs {
 			if ignored_dirs.iter().any(check_ignored) {
 				return false;
 			}
 		}
-		if let Some(ignored_dirs) = &self.data.config.rules[rule].folders[folder].options.ignored_dirs {
+		if let Some(ignored_dirs) = &self.config.rules[rule].options.ignored_dirs {
+			if ignored_dirs.iter().any(check_ignored) {
+				return false;
+			}
+		}
+		if let Some(ignored_dirs) = &self.config.rules[rule].folders[folder].options.ignored_dirs {
 			if ignored_dirs.iter().any(check_ignored) {
 				return false;
 			}
@@ -77,7 +85,7 @@ impl<'a> File<'a> {
 	}
 
 	fn filter_by_watch(&self, rule: usize, folder: usize) -> bool {
-		!self.is_watching || *self.data.allows_watching(rule, folder)
+		!self.is_watching || *self.config.allows_watching(rule, folder)
 	}
 
 	fn filter_by_options<T: AsRef<Path>>(&self, ancestor: T, rule: usize, folder: usize) -> bool {
@@ -89,8 +97,8 @@ impl<'a> File<'a> {
 	}
 
 	fn filter_by_filters(&self, rule: usize, folder: usize) -> bool {
-		let apply = self.data.get_apply_filters(rule, folder);
-		let rule = &self.data.config.rules[rule];
+		let apply = self.config.get_apply_filters(rule, folder);
+		let rule = &self.config.rules[rule];
 		rule.filters.r#match(&self.path, apply)
 	}
 
@@ -99,9 +107,14 @@ impl<'a> File<'a> {
 		self.filter_by_options(ancestor, rule, folder) && self.filter_by_filters(rule, folder)
 	}
 
-	pub fn get_matching_rules(&self, path_to_rules: &'a PathToRules) -> Vec<&'a (usize, usize)> {
-		let (ancestor, rules) = path_to_rules.get_key_value(&self.path).unwrap();
-		match self.data.match_rules() {
+	pub fn get_matching_rules(&self, path_to_rules: &'a HashMap<PathBuf, Vec<(usize, usize)>>) -> Vec<&'a (usize, usize)> {
+		let (ancestor, rules) = self
+			.path
+			.ancestors()
+			.find_map(|ancestor| path_to_rules.get_key_value(&ancestor.to_path_buf()))
+			.unwrap();
+		// let (ancestor, rules) = path_to_rules.get_key_value(&self.path).unwrap();
+		match self.config.match_rules() {
 			Match::First => rules
 				.iter()
 				.find(|(rule, folder)| self.filter(ancestor, rule, folder))
@@ -113,4 +126,3 @@ impl<'a> File<'a> {
 		}
 	}
 }
-

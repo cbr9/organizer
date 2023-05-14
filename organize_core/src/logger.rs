@@ -18,7 +18,8 @@ use lazy_static::lazy_static;
 use log::{Level, Record};
 use regex::Regex;
 
-use crate::data::Data;
+use crate::config::Config;
+
 
 lazy_static! {
 	static ref COLORS: ColoredLevelConfig = Logger::colors();
@@ -96,7 +97,7 @@ impl Logger {
 	}
 
 	fn path(level: Level) -> anyhow::Result<PathBuf> {
-		let dir = Data::dir()?.join("logs");
+		let dir = Config::default_dir().join("logs");
 		match level {
 			Level::Error | Level::Warn => Ok(dir.join("errors.log")),
 			Level::Info => Ok(dir.join("output.log")),

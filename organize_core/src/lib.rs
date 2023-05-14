@@ -3,7 +3,6 @@ use std::sync::{Arc, Mutex};
 use lazy_static::lazy_static;
 use rusqlite::Connection;
 
-#[macro_use]
 extern crate strum_macros;
 
 pub(crate) mod path {
@@ -23,7 +22,7 @@ pub(crate) mod string {
 	mod capitalize;
 	mod placeholder;
 }
-pub mod data;
+pub mod config;
 pub mod file;
 mod fsa;
 pub mod logger;
