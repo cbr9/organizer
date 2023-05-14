@@ -95,7 +95,7 @@ impl<'a> Watch {
 							if new_config != self.config {
 								self.config = new_config;
 								std::mem::drop(watcher);
-								watcher = self.setup(&tx);
+								watcher = self.setup(tx);
 								log::info!("Reloaded config");
 							}
 						}
