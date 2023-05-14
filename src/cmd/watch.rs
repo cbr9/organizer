@@ -87,8 +87,8 @@ impl Watch {
 			EventKind::Modify(_) => {
 				for p in event.paths {
 					if p == self.config.path {
-						if let Ok(new_config) = Config::parse(&self.config.path) {
-							if new_config != self.config {
+						match Config::parse(&self.config.path) {
+							Ok(new_config) => {
 								self.config = new_config;
 								log::info!("Reloaded config");
 								watcher = self.setup(tx);
@@ -98,6 +98,7 @@ impl Watch {
 									}
 								}
 							}
+							Err(e) => log::error!("{}", e),
 						}
 					}
 				}
