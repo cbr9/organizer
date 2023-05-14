@@ -1,5 +1,4 @@
 pub mod apply;
-mod de;
 pub(crate) mod r#match;
 pub mod recursive;
 

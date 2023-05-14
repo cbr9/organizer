@@ -1,5 +1,6 @@
 use std::{ops::Deref, path::Path};
 
+use derive_more::Deref;
 use serde::Deserialize;
 
 use extension::Extension;
@@ -39,16 +40,8 @@ impl AsFilter for Filter {
 	}
 }
 
-#[derive(Debug, Clone, Deserialize, Eq, PartialEq)]
+#[derive(Debug, Clone, Deserialize, Deref, Eq, PartialEq)]
 pub struct Filters(pub(crate) Vec<Filter>);
-
-impl Deref for Filters {
-	type Target = Vec<Filter>;
-
-	fn deref(&self) -> &Self::Target {
-		&self.0
-	}
-}
 
 impl Filters {
 	pub fn r#match<T: AsRef<Path>>(&self, path: T, apply: &Apply) -> bool {
