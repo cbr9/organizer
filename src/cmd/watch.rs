@@ -55,7 +55,7 @@ impl Cmd for Watch {
 	}
 }
 
-impl<'a> Watch {
+impl Watch {
 	fn cleanup(&self) -> Result<()> {
 		let cmd = Run::builder()
 			.config(Some(self.config.path.clone()))?

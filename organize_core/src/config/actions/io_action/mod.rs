@@ -105,7 +105,7 @@ impl Act for Move {
 	{
 		let to = to.unwrap().into();
 		let from = from.as_ref();
-		std::fs::rename(&from, &to)
+		std::fs::rename(from, &to)
 			.with_context(|| "Failed to move file")
 			.map_or(Ok(None), |_| Ok(Some(to)))
 	}
@@ -119,7 +119,7 @@ impl Act for Copy {
 	{
 		let to = to.unwrap().into();
 		let from = from.as_ref();
-		std::fs::copy(&from, &to)
+		std::fs::copy(from, to)
 			.with_context(|| "Failed to copy file")
 			.map_or(Ok(None), |_| Ok(Some(from.into())))
 	}

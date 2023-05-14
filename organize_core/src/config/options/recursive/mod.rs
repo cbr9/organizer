@@ -29,9 +29,9 @@ impl Recursive {
 
 	pub fn type_(&self) -> notify::RecursiveMode {
 		if self.is_recursive() {
-			return notify::RecursiveMode::Recursive;
+			notify::RecursiveMode::Recursive
 		} else {
-			return notify::RecursiveMode::NonRecursive;
+			notify::RecursiveMode::NonRecursive
 		}
 	}
 

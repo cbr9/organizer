@@ -189,15 +189,14 @@ getters! {
 impl Config {
 	pub fn default_dir() -> PathBuf {
 		let var = "ORGANIZE_CONFIG_DIR";
-		let path = std::env::var_os(var).map_or_else(
+		std::env::var_os(var).map_or_else(
 			|| {
 				dirs_next::config_dir()
-					.expect(&format!("could not find config directory, please set {} manually", var))
+					.unwrap_or_else(|| panic!("could not find config directory, please set {} manually", var))
 					.join(PROJECT_NAME)
 			},
-			|path| PathBuf::from(path),
-		);
-		path
+			PathBuf::from,
+		)
 	}
 
 	pub fn default_path() -> PathBuf {

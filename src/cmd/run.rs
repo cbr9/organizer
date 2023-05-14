@@ -58,7 +58,7 @@ impl Cmd for Run {
 	}
 }
 
-impl<'a> Run {
+impl Run {
 	pub(crate) fn start(self) -> Result<()> {
 		Logger::setup(self.no_color)?;
 		self.config.path_to_rules.iter().for_each(|(path, _)| {

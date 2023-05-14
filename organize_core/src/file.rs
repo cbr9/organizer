@@ -23,7 +23,7 @@ impl<'a> File<'a> {
 	}
 
 	pub fn act(mut self, path_to_rules: &'a HashMap<PathBuf, Vec<(usize, usize)>>) {
-		let rules = self.get_matching_rules(&path_to_rules);
+		let rules = self.get_matching_rules(path_to_rules);
 		for (i, j) in rules {
 			let rule = &self.config.rules[*i];
 			match rule.actions.act(self.path, self.config.get_apply_actions(*i, *j)) {

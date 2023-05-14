@@ -20,7 +20,6 @@ use regex::Regex;
 
 use crate::config::Config;
 
-
 lazy_static! {
 	static ref COLORS: ColoredLevelConfig = Logger::colors();
 	static ref TIME_FORMAT: &'static str = "[%F][%T]";
@@ -122,7 +121,7 @@ impl Logger {
 				None => return Err(anyhow::Error::msg("could not determine parent directory")),
 				Some(parent) => {
 					if !parent.exists() {
-						std::fs::create_dir_all(&parent)?;
+						std::fs::create_dir_all(parent)?;
 					}
 				}
 			}

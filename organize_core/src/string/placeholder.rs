@@ -36,7 +36,7 @@ lazy_static! {
 
 	static ref PARSER: Fsa<'static, u8> = Fsa::new(
 		&[0, 1, 2, 3, 4, 5],
-		&*PLACEHOLDER_ALIASES,
+		&PLACEHOLDER_ALIASES,
 		0,
 		&[0, 1, 2, 3, 4, 5],
 		transitions![
@@ -160,8 +160,9 @@ impl Placeholder {
 impl<T: AsRef<str>> ExpandPlaceholder for T {
 	fn expand_placeholders<P: AsRef<Path>>(self, path: P) -> Result<OsString> {
 		let mut new = self.as_ref().to_string();
+		let original = new.clone();
 
-		for span in POTENTIAL_PH_REGEX.find_iter(&new.clone()) {
+		for span in POTENTIAL_PH_REGEX.find_iter(&original) {
 			let span = span.as_str();
 			let mut current = path.as_ref().to_path_buf().into_os_string();
 			let placeholders: Vec<Placeholder> = span
@@ -174,7 +175,7 @@ impl<T: AsRef<str>> ExpandPlaceholder for T {
 				current = placeholder.expand(&current)?;
 			}
 
-			new = new.replace(&span, &*current.to_string_lossy());
+			new = new.replace(span, &current.to_string_lossy());
 		}
 
 		Ok(new.into())
