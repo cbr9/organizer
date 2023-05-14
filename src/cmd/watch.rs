@@ -16,9 +16,9 @@ pub struct WatchBuilder {
 	#[arg(long, short = 'c')]
 	pub config: Option<PathBuf>,
 	#[arg(long)]
-	clean: Option<bool>,
+	cleanup: Option<bool>,
 	#[arg(long)]
-	pub(crate) no_color: Option<bool>,
+	cleanup_after_reload: Option<bool>,
 }
 
 impl WatchBuilder {
@@ -27,13 +27,13 @@ impl WatchBuilder {
 			Some(config) => Some(config),
 			None => Some(Config::path()?),
 		};
-		self.no_color = Some(self.no_color.map_or_else(|| true, |v| !v));
-		self.clean = Some(self.clean.map_or_else(|| true, |v| !v));
+		self.cleanup = Some(self.cleanup.map_or_else(|| true, |v| !v));
+		self.cleanup_after_reload = Some(self.cleanup_after_reload.map_or_else(|| true, |v| !v));
 
 		Ok(Watch {
-			config: Config::parse(unsafe { self.config.unwrap_unchecked() }).unwrap(),
-			clean: unsafe { self.clean.unwrap_unchecked() },
-			no_color: unsafe { self.no_color.unwrap_unchecked() },
+			config: Config::parse(unsafe { self.config.unwrap_unchecked() })?,
+			cleanup: unsafe { self.cleanup.unwrap_unchecked() },
+			cleanup_after_reload: unsafe { self.cleanup_after_reload.unwrap_unchecked() },
 		})
 	}
 }
@@ -41,14 +41,13 @@ impl WatchBuilder {
 #[derive(Debug)]
 pub struct Watch {
 	pub config: Config,
-	clean: bool,
-	pub(crate) no_color: bool,
+	cleanup: bool,
+	cleanup_after_reload: bool,
 }
 
 impl Cmd for Watch {
 	fn run(self) -> Result<()> {
-		// Logger::setup(self.no_color)?;
-		if self.clean {
+		if self.cleanup {
 			self.cleanup()?;
 		}
 		self.start()
@@ -57,10 +56,7 @@ impl Cmd for Watch {
 
 impl Watch {
 	fn cleanup(&self) -> Result<()> {
-		let cmd = Run::builder()
-			.config(Some(self.config.path.clone()))?
-			.no_color(Some(self.no_color))
-			.build()?;
+		let cmd = Run { config: self.config.clone() };
 		cmd.start()
 	}
 
@@ -94,9 +90,13 @@ impl Watch {
 						if let Ok(new_config) = Config::parse(&self.config.path) {
 							if new_config != self.config {
 								self.config = new_config;
-								std::mem::drop(watcher);
-								watcher = self.setup(tx);
 								log::info!("Reloaded config");
+								watcher = self.setup(tx);
+								if self.cleanup_after_reload {
+									if let Err(e) = self.cleanup() {
+										log::error!("{}", e);
+									}
+								}
 							}
 						}
 					}

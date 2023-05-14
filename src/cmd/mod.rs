@@ -1,4 +1,5 @@
 use clap::{Parser, Subcommand};
+use organize_core::logger::Logger;
 
 use self::{run::RunBuilder, watch::WatchBuilder};
 use crate::cmd::edit::Edit;
@@ -19,6 +20,9 @@ enum Command {
 pub struct App {
 	#[command(subcommand)]
 	command: Command,
+	/// Do not print colored logs
+	#[arg(long, default_value_t = false)]
+	pub(crate) no_color: bool,
 }
 
 pub trait Cmd {
@@ -27,10 +31,11 @@ pub trait Cmd {
 
 impl Cmd for App {
 	fn run(self) -> anyhow::Result<()> {
+		Logger::setup(self.no_color)?;
 		match self.command {
-			Command::Run(run) => run.build()?.run(),
+			Command::Run(cmd) => cmd.build()?.run(),
+			Command::Watch(cmd) => cmd.build()?.run(),
 			Command::Edit(edit) => edit.run(),
-			Command::Watch(watch) => watch.build()?.run(),
 		}
 	}
 }

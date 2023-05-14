@@ -1,7 +1,6 @@
 use std::path::{Path, PathBuf};
 
 use derive_more::Deref;
-use log::{error, info};
 use serde::Deserialize;
 
 use crate::{
@@ -23,11 +22,11 @@ impl Act for Echo {
 		let expanded = self.as_str().expand_placeholders(&from);
 		match expanded {
 			Ok(str) => {
-				info!("({}) {:#?}", self.ty().to_string(), str);
+				log::info!("({}) {:#?}", self.ty().to_string(), str);
 				Ok(Some(from))
 			}
 			Err(e) => {
-				error!("{:?}", e);
+				log::error!("{:?}", e);
 				Ok(None)
 			}
 		}

@@ -5,7 +5,6 @@ use std::{
 	str::FromStr,
 };
 
-use log::{error, info};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -49,7 +48,7 @@ macro_rules! as_action {
 				if to.is_none() {
 					if self.0.if_exists == ConflictOption::Delete {
 						if let Err(e) = std::fs::remove_file(&path).with_context(|| format!("could not delete {}", path.display())) {
-							error!("{:?}", e);
+							log::error!("{:?}", e);
 						}
 					}
 					return None;
@@ -61,24 +60,24 @@ macro_rules! as_action {
 							if let Err(e) = std::fs::create_dir_all(parent)
 								.with_context(|| format!("could not create parent directory for {}", to.unwrap_ref().display()))
 							{
-								error!("{:?}", e);
+								log::error!("{:?}", e);
 								return None;
 							}
 						}
 					}
 					None => {
-						error!("{} has an invalid parent", to.unwrap().display());
+						log::error!("{} has an invalid parent", to.unwrap().display());
 						return None;
 					}
 				}
 
 				match self.act(&path, Some(to.unwrap_ref())) {
 					Ok(new_path) => {
-						info!("({}) {} -> {}", self.ty().to_string(), path.display(), to.unwrap().display());
+						log::info!("({}) {} -> {}", self.ty().to_string(), path.display(), to.unwrap().display());
 						new_path
 					}
 					Err(e) => {
-						error!("{:?}", e);
+						log::error!("{:?}", e);
 						None
 					}
 				}
@@ -171,7 +170,7 @@ impl Inner {
 		let mut to = match self.to.to_string_lossy().expand_placeholders(path) {
 			Ok(str) => PathBuf::from(str),
 			Err(e) => {
-				error!("{:?}", e);
+				log::error!("{:?}", e);
 				return None;
 			}
 		};

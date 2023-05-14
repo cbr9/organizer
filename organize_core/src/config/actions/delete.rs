@@ -3,7 +3,6 @@ use std::path::{Path, PathBuf};
 use crate::config::actions::{Act, ActionType, AsAction};
 use anyhow::{Context, Result};
 use derive_more::Deref;
-use log::{error, info};
 use serde::Deserialize;
 use std::str::FromStr;
 
@@ -22,11 +21,11 @@ macro_rules! as_action {
 				if **self {
 					match self.act(&path, to) {
 						Ok(new_path) => {
-							info!("({}) {}", self.ty().to_string(), path.display());
+							log::info!("({}) {}", self.ty().to_string(), path.display());
 							new_path
 						}
 						Err(e) => {
-							error!("{:?}", e);
+							log::error!("{:?}", e);
 							None
 						}
 					}
@@ -52,6 +51,7 @@ impl Act for Delete {
 		T: AsRef<Path> + Into<PathBuf>,
 		P: AsRef<Path> + Into<PathBuf>,
 	{
+		println!("te");
 		if **self {
 			std::fs::remove_file(&from)
 				.with_context(|| format!("could not delete {}", from.as_ref().display()))
@@ -137,10 +137,9 @@ mod tests {
 		std::fs::write(&tmp_file, "").expect("Could create target file");
 		assert!(tmp_file.exists());
 
-		let new_path = action
+		action
 			.act::<&Path, &Path>(&tmp_file, None)
 			.expect("Could not delete target file");
-		dbg!(new_path);
 		assert!(!tmp_file.exists());
 	}
 

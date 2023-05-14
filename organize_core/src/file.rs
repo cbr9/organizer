@@ -113,7 +113,7 @@ impl<'a> File<'a> {
 			.ancestors()
 			.find_map(|ancestor| path_to_rules.get_key_value(&ancestor.to_path_buf()))
 			.unwrap();
-		// let (ancestor, rules) = path_to_rules.get_key_value(&self.path).unwrap();
+
 		match self.config.match_rules() {
 			Match::First => rules
 				.iter()
