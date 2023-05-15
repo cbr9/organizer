@@ -10,6 +10,7 @@
       let
         pkgs = (import nixpkgs) { inherit system; };
         naersk' = pkgs.callPackage naersk { };
+        lib = nixpkgs.lib;
       in {
         # For `nix build` & `nix run`:
         defaultPackage = naersk'.buildPackage {
@@ -17,8 +18,8 @@
           src = pkgs.fetchFromGitHub {
             owner = "cbr9";
             repo = "organizer";
-            rev = "38e96c9";
-            sha256 = "sha256-HMz5nnGB2xssk+3SeWOZFYs++Z41y8jJSVIWow5ifaA=";
+            rev = "b9e43f7";
+            sha256 = "sha256-Lqr6/IGePhVMXPLIMAe7dHOokV67eTFpJzk9t2ytxO0=";
           };
         };
 
