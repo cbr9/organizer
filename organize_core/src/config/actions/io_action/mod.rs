@@ -175,7 +175,7 @@ impl Inner {
 			}
 		};
 
-		if to.to_string_lossy().ends_with('/') || to.is_dir() {
+		if to.extension().is_none() || to.is_dir() {
 			to.push(path.file_name()?)
 		}
 
