@@ -19,24 +19,23 @@ use anyhow::{Context, Result};
 use regex::Regex;
 use serde::de::Error;
 
-mod de;
-
-#[derive(Debug, Clone, Eq, PartialEq, Default)]
+#[derive(Deserialize, Debug, Clone, Eq, PartialEq, Default)]
 struct Inner {
 	pub to: PathBuf,
+	#[serde(default)]
 	pub if_exists: ConflictOption,
 }
 
-#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+#[derive(Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct Move(Inner);
 
-#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+#[derive(Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct Copy(Inner);
 
-#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+#[derive(Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct Hardlink(Inner);
 
-#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+#[derive(Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct Symlink(Inner);
 
 macro_rules! as_action {

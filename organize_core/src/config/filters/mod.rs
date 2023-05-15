@@ -15,7 +15,7 @@ use crate::config::filters::mime::MimeWrapper;
 use crate::config::{actions::script::Script, filters::regex::Regex, options::apply::Apply};
 
 #[derive(Debug, Clone, Deserialize, Eq, PartialEq)]
-#[serde(rename_all(deserialize = "lowercase"))]
+#[serde(tag = "type", rename_all(deserialize = "lowercase"))]
 pub enum Filter {
 	Regex(Regex),
 	Filename(Filename),

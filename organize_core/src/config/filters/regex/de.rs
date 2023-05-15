@@ -1,10 +1,11 @@
 use crate::config::filters::regex::Regex;
+use itertools::Itertools;
 use serde::{
-	de,
-	de::{Error, SeqAccess, Visitor},
+	de::MapAccess,
+	de::{Error, Visitor},
 	Deserialize, Deserializer,
 };
-use std::{fmt, fmt::Formatter, str::FromStr};
+use std::{fmt, fmt::Formatter};
 
 impl<'de> Deserialize<'de> for Regex {
 	fn deserialize<D>(deserializer: D) -> Result<Self, <D as Deserializer<'de>>::Error>
@@ -17,27 +18,27 @@ impl<'de> Deserialize<'de> for Regex {
 			type Value = Regex;
 
 			fn expecting(&self, formatter: &mut Formatter) -> fmt::Result {
-				formatter.write_str("string or seq")
+				formatter.write_str("map")
 			}
 
-			fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
+			fn visit_map<M>(self, mut map: M) -> Result<Regex, M::Error>
 			where
-				E: de::Error,
+				M: MapAccess<'de>,
 			{
-				Regex::from_str(value).map_err(E::custom)
-			}
-
-			fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
-			where
-				A: SeqAccess<'de>,
-			{
-				let mut vec = Vec::new();
-				while let Some(val) = seq.next_element::<String>()? {
-					regex::Regex::new(&val).map_err(A::Error::custom).map(|re| {
-						vec.push(re);
-					})?;
+				let mut patterns = Vec::new();
+				while let Some(key) = map.next_key::<String>()? {
+					match key.as_str() {
+						"patterns" => {
+							let value = map.next_value::<Vec<String>>()?;
+							patterns = value
+								.into_iter()
+								.map(|s| regex::Regex::new(&s).map_err(M::Error::custom))
+								.try_collect()?;
+						}
+						key => return Err(M::Error::unknown_field(key, &["patterns"])),
+					}
 				}
-				Ok(Regex(vec))
+				Ok(Regex { patterns })
 			}
 		}
 
@@ -53,7 +54,7 @@ mod tests {
 	#[test]
 	fn deserialize_single() {
 		let re = regex::Regex::new(".*").unwrap();
-		let value = Regex(vec![re]);
+		let value = Regex { patterns: vec![re] };
 		assert_de_tokens(&value, &[Token::Str(".*")])
 	}
 
@@ -61,7 +62,7 @@ mod tests {
 	fn deserialize_mult() {
 		let first = regex::Regex::new(".*").unwrap();
 		let sec = regex::Regex::new(".+").unwrap();
-		let value = Regex(vec![first, sec]);
+		let value = Regex { patterns: vec![first, sec] };
 		assert_de_tokens(&value, &[Token::Seq { len: Some(2) }, Token::Str(".*"), Token::Str(".+"), Token::SeqEnd])
 	}
 }

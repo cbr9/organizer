@@ -23,7 +23,7 @@ pub(crate) mod io_action;
 pub(crate) mod script;
 
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
-#[serde(rename_all(deserialize = "lowercase"))]
+#[serde(tag = "type", rename_all(deserialize = "lowercase"))]
 pub enum Action {
 	Move(Move),
 	Copy(Copy),

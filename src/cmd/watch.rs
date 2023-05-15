@@ -38,7 +38,7 @@ impl WatchBuilder {
 			config: Config::parse(self.config.unwrap())?,
 			cleanup: self.cleanup.unwrap(),
 			cleanup_after_reload: self.cleanup_after_reload.unwrap(),
-			delay: Duration::new(self.delay.unwrap(), 0),
+			delay: Duration::from_secs(self.delay.unwrap()),
 		})
 	}
 }
@@ -56,7 +56,7 @@ impl Cmd for Watch {
 		if self.cleanup {
 			self.cleanup()?;
 		}
-		self.start()
+		Ok(self.start())
 	}
 }
 
@@ -88,7 +88,9 @@ impl Watch {
 				notify::EventKind::Create(_) => {
 					let copy = self.clone();
 					std::thread::spawn(move || {
-						std::thread::sleep(copy.delay);
+						if copy.delay != Duration::from_secs(0) {
+							std::thread::sleep(copy.delay);
+						}
 						for path in event.paths {
 							Self::on_create::<PathBuf>(&copy, path);
 						}
@@ -133,14 +135,12 @@ impl Watch {
 		watcher
 	}
 
-	fn start(mut self) -> Result<()> {
+	fn start(mut self) -> () {
 		let (tx, rx) = std::sync::mpsc::channel();
 		let mut watcher = self.setup(&tx);
 
 		for res in &rx {
 			watcher = self.event_handler(res, watcher, &tx);
 		}
-
-		Ok(())
 	}
 }

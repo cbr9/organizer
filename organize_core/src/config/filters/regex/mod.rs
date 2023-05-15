@@ -7,7 +7,9 @@ use derive_more::Deref;
 use std::convert::TryFrom;
 
 #[derive(Debug, Deref, Clone)]
-pub struct Regex(pub Vec<regex::Regex>);
+pub struct Regex {
+	patterns: Vec<regex::Regex>,
+}
 
 impl PartialEq for Regex {
 	fn eq(&self, other: &Self) -> bool {
@@ -37,7 +39,7 @@ impl TryFrom<Vec<&str>> for Regex {
 			let re = regex::Regex::new(str)?;
 			vec.push(re)
 		}
-		Ok(Self(vec))
+		Ok(Self { patterns: vec })
 	}
 }
 
@@ -46,7 +48,7 @@ impl FromStr for Regex {
 
 	fn from_str(s: &str) -> Result<Self, Self::Err> {
 		match regex::Regex::new(s) {
-			Ok(regex) => Ok(Regex(vec![regex])),
+			Ok(regex) => Ok(Regex { patterns: vec![regex] }),
 			Err(e) => Err(e),
 		}
 	}
