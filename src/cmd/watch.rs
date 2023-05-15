@@ -83,38 +83,40 @@ impl Watch {
 		mut watcher: RecommendedWatcher,
 		tx: &Sender<notify::Result<Event>>,
 	) -> RecommendedWatcher {
-		let event = res.unwrap();
-		match event.kind {
-			notify::EventKind::Create(_) => {
-				let copy = self.clone();
-				std::thread::spawn(move || {
-					std::thread::sleep(copy.delay);
-					for path in event.paths {
-						Self::on_create::<PathBuf>(&copy, path);
-					}
-				});
-			}
-			EventKind::Modify(_) => {
-				for p in event.paths {
-					if p == self.config.path {
-						match Config::parse(&self.config.path) {
-							Ok(new_config) => {
-								self.config = new_config;
-								log::info!("Reloaded config");
-								watcher = self.setup(tx);
-								if self.cleanup_after_reload {
-									if let Err(e) = self.cleanup() {
-										log::error!("{:?}", e);
+		if let Ok(event) = res {
+			match event.kind {
+				notify::EventKind::Create(_) => {
+					let copy = self.clone();
+					std::thread::spawn(move || {
+						std::thread::sleep(copy.delay);
+						for path in event.paths {
+							Self::on_create::<PathBuf>(&copy, path);
+						}
+					});
+				}
+				EventKind::Modify(_) => {
+					for p in event.paths {
+						if p == self.config.path {
+							match Config::parse(&self.config.path) {
+								Ok(new_config) => {
+									self.config = new_config;
+									log::info!("Reloaded config");
+									watcher = self.setup(tx);
+									if self.cleanup_after_reload {
+										if let Err(e) = self.cleanup() {
+											log::error!("{:?}", e);
+										}
 									}
 								}
+								Err(e) => log::error!("{:?}", e),
 							}
-							Err(e) => log::error!("{:?}", e),
 						}
 					}
 				}
+				_ => {}
 			}
-			_ => {}
 		}
+
 		watcher
 	}
 

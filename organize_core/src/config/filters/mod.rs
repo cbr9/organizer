@@ -1,4 +1,4 @@
-use std::{ops::Deref, path::Path};
+use std::path::Path;
 
 use derive_more::Deref;
 use serde::Deserialize;
