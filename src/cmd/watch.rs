@@ -1,6 +1,7 @@
 use std::{
 	path::{Path, PathBuf},
 	sync::mpsc::Sender,
+	time::Duration,
 };
 
 use anyhow::Result;
@@ -19,6 +20,8 @@ pub struct WatchBuilder {
 	cleanup: Option<bool>,
 	#[arg(long)]
 	cleanup_after_reload: Option<bool>,
+	#[arg(long)]
+	delay: Option<u64>,
 }
 
 impl WatchBuilder {
@@ -29,20 +32,23 @@ impl WatchBuilder {
 		};
 		self.cleanup = Some(self.cleanup.map_or_else(|| true, |v| !v));
 		self.cleanup_after_reload = Some(self.cleanup_after_reload.map_or_else(|| true, |v| !v));
+		self.delay = Some(self.delay.unwrap_or(0));
 
 		Ok(Watch {
-			config: Config::parse(unsafe { self.config.unwrap_unchecked() })?,
-			cleanup: unsafe { self.cleanup.unwrap_unchecked() },
-			cleanup_after_reload: unsafe { self.cleanup_after_reload.unwrap_unchecked() },
+			config: Config::parse(self.config.unwrap())?,
+			cleanup: self.cleanup.unwrap(),
+			cleanup_after_reload: self.cleanup_after_reload.unwrap(),
+			delay: Duration::new(self.delay.unwrap(), 0),
 		})
 	}
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Watch {
 	pub config: Config,
 	cleanup: bool,
 	cleanup_after_reload: bool,
+	delay: Duration,
 }
 
 impl Cmd for Watch {
@@ -80,9 +86,13 @@ impl Watch {
 		let event = res.unwrap();
 		match event.kind {
 			notify::EventKind::Create(_) => {
-				for path in event.paths {
-					self.on_create::<PathBuf>(path);
-				}
+				let copy = self.clone();
+				std::thread::spawn(move || {
+					std::thread::sleep(copy.delay);
+					for path in event.paths {
+						Self::on_create::<PathBuf>(&copy, path);
+					}
+				});
 			}
 			EventKind::Modify(_) => {
 				for p in event.paths {
