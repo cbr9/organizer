@@ -35,7 +35,7 @@ impl<'de> Deserialize<'de> for MimeWrapper {
 			where
 				M: MapAccess<'de>,
 			{
-				let mut patterns = Vec::new();
+				let mut types = Vec::new();
 				while let Some(key) = map.next_key::<String>()? {
 					match key.as_str() {
 						"types" => {
