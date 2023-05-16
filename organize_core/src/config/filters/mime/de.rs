@@ -45,6 +45,7 @@ impl<'de> Deserialize<'de> for MimeWrapper {
 					}
 				}
 				Ok(MimeWrapper { patterns })
+			}
 		}
 		deserializer.deserialize_any(WrapperVisitor)
 	}
