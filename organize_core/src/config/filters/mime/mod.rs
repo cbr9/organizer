@@ -17,11 +17,13 @@ impl FromStr for Mime {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Deref)]
-pub struct MimeWrapper(Vec<Mime>);
+pub struct MimeWrapper{
+	types: Vec<Mime>
+}
 
 impl From<Mime> for MimeWrapper {
 	fn from(mime: Mime) -> Self {
-		MimeWrapper(vec![mime])
+		MimeWrapper::new(vec![mime])
 	}
 }
 
@@ -53,7 +55,7 @@ impl AsFilter for MimeWrapper {
 
 impl MimeWrapper {
 	pub fn new(vec: Vec<Mime>) -> Self {
-		Self(vec)
+		Self{types: vec}
 	}
 }
 

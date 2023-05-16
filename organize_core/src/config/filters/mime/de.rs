@@ -24,26 +24,27 @@ impl<'de> Deserialize<'de> for MimeWrapper {
 			type Value = MimeWrapper;
 
 			fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-				formatter.write_str("str or seq")
+				formatter.write_str("str")
 			}
 
-			fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+			fn visit_map<M>(self, mut map: M) -> Result<Regex, M::Error>
 			where
-				E: Error,
+				M: MapAccess<'de>,
 			{
-				Ok(MimeWrapper(vec![Mime::from_str(v).map_err(E::custom)?]))
-			}
-
-			fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
-			where
-				A: SeqAccess<'de>,
-			{
-				let mut vec = Vec::new();
-				while let Some(mime_type) = seq.next_element::<String>()? {
-					vec.push(Mime::from_str(&mime_type).map_err(A::Error::custom)?);
+				let mut patterns = Vec::new();
+				while let Some(key) = map.next_key::<String>()? {
+					match key.as_str() {
+						"types" => {
+							let value = map.next_value::<Vec<String>>()?;
+							patterns = value
+								.into_iter()
+								.map(|s| Mime::from_str(&s).map_err(M::Error::custom))
+								.try_collect()?;
+						}
+						key => return Err(M::Error::unknown_field(key, &["types"])),
+					}
 				}
-				Ok(MimeWrapper(vec))
-			}
+				Ok(MimeWrapper { patterns })
 		}
 		deserializer.deserialize_any(WrapperVisitor)
 	}
