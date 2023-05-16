@@ -40,7 +40,7 @@ impl<'de> Deserialize<'de> for MimeWrapper {
 					match key.as_str() {
 						"types" => {
 							let value = map.next_value::<Vec<String>>()?;
-							patterns = value
+							types = value
 								.into_iter()
 								.map(|s| Mime::from_str(&s).map_err(M::Error::custom))
 								.try_collect()?;
@@ -48,7 +48,7 @@ impl<'de> Deserialize<'de> for MimeWrapper {
 						key => return Err(M::Error::unknown_field(key, &["types"])),
 					}
 				}
-				Ok(MimeWrapper { patterns })
+				Ok(MimeWrapper { types })
 			}
 		}
 		deserializer.deserialize_any(WrapperVisitor)
