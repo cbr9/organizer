@@ -19,7 +19,7 @@
             owner = "cbr9";
             repo = "organizer";
             rev = "64777b8";
-            sha256 = lib.fakeSha256;
+            sha256 = "sha256-VwxeJ834n1X0gpQa0uIL8keyKmE/79JXTA7H/3Itigk=";
           };
         };
 
