@@ -18,8 +18,8 @@
           src = pkgs.fetchFromGitHub {
             owner = "cbr9";
             repo = "organizer";
-            rev = "64777b8";
-            sha256 = "sha256-VwxeJ834n1X0gpQa0uIL8keyKmE/79JXTA7H/3Itigk=";
+            rev = "c25ab3d";
+            sha256 = lib.fakeSha256;
           };
         };
 
