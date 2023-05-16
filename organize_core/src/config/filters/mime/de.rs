@@ -1,8 +1,12 @@
 use crate::config::filters::mime::{Mime, MimeWrapper};
 use serde::{
-	de::{Error, SeqAccess, Visitor},
+	de::MapAccess,
+
+	de::{Error, Visitor},
 	Deserialize, Deserializer,
 };
+use itertools::Itertools;
+
 use std::{fmt, str::FromStr};
 
 impl<'de> Deserialize<'de> for Mime {
@@ -27,7 +31,7 @@ impl<'de> Deserialize<'de> for MimeWrapper {
 				formatter.write_str("str")
 			}
 
-			fn visit_map<M>(self, mut map: M) -> Result<Regex, M::Error>
+			fn visit_map<M>(self, mut map: M) -> Result<MimeWrapper, M::Error>
 			where
 				M: MapAccess<'de>,
 			{
