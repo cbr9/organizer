@@ -5,6 +5,7 @@ use std::{
 	str::FromStr,
 };
 
+use derive_more::Deref;
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -14,28 +15,30 @@ use crate::{
 	utils::UnwrapRef,
 	// DB,
 };
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 
 use regex::Regex;
 use serde::de::Error;
 
 #[derive(Deserialize, Debug, Clone, Eq, PartialEq, Default)]
-struct Inner {
+pub struct Inner {
 	pub to: PathBuf,
 	#[serde(default)]
 	pub if_exists: ConflictOption,
+	#[serde(default)]
+	pub allow_cycles: bool,
 }
 
-#[derive(Deserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Deserialize, Deref, Debug, Clone, PartialEq, Eq)]
 pub struct Move(Inner);
 
-#[derive(Deserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Deserialize, Deref, Debug, Clone, PartialEq, Eq)]
 pub struct Copy(Inner);
 
-#[derive(Deserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Deserialize, Deref, Debug, Clone, PartialEq, Eq)]
 pub struct Hardlink(Inner);
 
-#[derive(Deserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Deserialize, Deref, Debug, Clone, PartialEq, Eq)]
 pub struct Symlink(Inner);
 
 macro_rules! as_action {
@@ -101,8 +104,15 @@ impl Act for Move {
 		T: AsRef<Path> + Into<PathBuf>,
 		P: AsRef<Path> + Into<PathBuf>,
 	{
-		let to = to.unwrap().into();
+		let to = Into::<PathBuf>::into(to.unwrap());
 		let from = from.as_ref();
+		if to.parent().unwrap() == from.parent().unwrap() && !self.allow_cycles {
+			bail!(
+				"Origin {} and target {} paths are inside the same folder, but cycles are not allowed",
+				from.display(),
+				&to.display()
+			)
+		}
 		std::fs::rename(from, &to)
 			.with_context(|| "Failed to move file")
 			.map_or(Ok(None), |_| Ok(Some(to)))
@@ -117,6 +127,15 @@ impl Act for Copy {
 	{
 		let to = to.unwrap().into();
 		let from = from.as_ref();
+		if !self.allow_cycles {
+			if to.parent().unwrap() == from.parent().unwrap() {
+				bail!(
+					"Origin {} and target {} paths are inside the same folder, but cycles are not allowed",
+					from.display(),
+					&to.display()
+				)
+			}
+		}
 		std::fs::copy(from, to)
 			.with_context(|| "Failed to copy file")
 			.map_or(Ok(None), |_| Ok(Some(from.into())))
@@ -129,14 +148,19 @@ impl Act for Hardlink {
 		T: AsRef<Path> + Into<PathBuf>,
 		P: AsRef<Path> + Into<PathBuf>,
 	{
-		std::fs::hard_link(&from, to.unwrap_ref())
-			.with_context(|| {
-				format!(
-					"could not create hardlink ({} -> {})",
-					from.as_ref().display(),
-					to.unwrap_ref().as_ref().display()
+		let to = to.unwrap().into();
+		let from = from.as_ref();
+		if !self.allow_cycles {
+			if to.parent().unwrap() == from.parent().unwrap() {
+				bail!(
+					"Origin {} and target {} paths are inside the same folder, but cycles are not allowed",
+					from.display(),
+					to.display()
 				)
-			})
+			}
+		}
+		std::fs::hard_link(&from, &to)
+			.with_context(|| format!("could not create hardlink ({} -> {})", from.display(), to.display()))
 			.map(|_| Some(from.into()))
 	}
 }
@@ -148,14 +172,19 @@ impl Act for Symlink {
 		T: AsRef<Path> + Into<PathBuf>,
 		P: AsRef<Path> + Into<PathBuf>,
 	{
-		std::os::unix::fs::symlink(&from, to.unwrap_ref())
-			.with_context(|| {
-				format!(
-					"could not create symlink ({} -> {})",
-					from.as_ref().display(),
-					to.unwrap_ref().as_ref().display()
+		let to = to.unwrap().into();
+		let from = from.as_ref();
+		if !self.allow_cycles {
+			if to.parent().unwrap() == from.parent().unwrap() {
+				bail!(
+					"Origin {} and target {} paths are inside the same folder, but cycles are not allowed",
+					from.display(),
+					to.display()
 				)
-			})
+			}
+		}
+		std::os::unix::fs::symlink(from, &to)
+			.with_context(|| format!("could not create symlink ({} -> {})", from.display(), to.display()))
 			.map(|_| Some(from.into()))
 	}
 }
@@ -192,6 +221,7 @@ impl TryFrom<PathBuf> for Inner {
 		let action = Self {
 			to: value.expand_user()?.expand_vars()?,
 			if_exists: Default::default(),
+			allow_cycles: false,
 		};
 		Ok(action)
 	}
