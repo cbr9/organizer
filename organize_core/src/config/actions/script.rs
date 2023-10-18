@@ -43,9 +43,10 @@ impl AsAction for Script {
 		let path = path.into();
 		self.run(&path)
 			.map(|output| {
-				info!("({}) run script on {}", self.exec.bold(), path.display());
 				let output = String::from_utf8_lossy(&output.stdout);
-				output.lines().last().map(|last| PathBuf::from(&last.trim()))
+				let new_path = output.lines().last().map(|last| PathBuf::from(&last.trim())).unwrap();
+				info!("({}) {} -> {}", self.exec.bold(), path.display(), new_path.display());
+				Some(new_path)
 			})
 			.ok()?
 	}
