@@ -80,8 +80,8 @@ impl Act for Trash {
 		if self.0 {
 			let to = Self::dir()?.join(from.as_ref().file_name().unwrap());
 			let from = from.as_ref();
-			std::fs::copy(&from, &to).with_context(|| format!("Could not copy file ({} -> {})", from.display(), to.display()))?;
-			std::fs::remove_file(&from)
+			std::fs::copy(from, &to).with_context(|| format!("Could not copy file ({} -> {})", from.display(), to.display()))?;
+			std::fs::remove_file(from)
 				.with_context(|| format!("could not move ({} -> {})", from.display(), to.display()))
 				.map(|_| None)
 		} else {

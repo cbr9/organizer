@@ -127,14 +127,13 @@ impl Act for Copy {
 	{
 		let to = to.unwrap().into();
 		let from = from.as_ref();
-		if !self.allow_cycles {
-			if to.parent().unwrap() == from.parent().unwrap() {
-				bail!(
-					"Origin {} and target {} paths are inside the same folder, but cycles are not allowed",
-					from.display(),
-					&to.display()
-				)
-			}
+
+		if !self.allow_cycles && to.parent().unwrap() == from.parent().unwrap() {
+			bail!(
+				"Origin {} and target {} paths are inside the same folder, but cycles are not allowed",
+				from.display(),
+				&to.display()
+			)
 		}
 		std::fs::copy(from, to)
 			.with_context(|| "Failed to copy file")

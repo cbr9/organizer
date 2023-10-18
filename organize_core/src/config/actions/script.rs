@@ -34,7 +34,7 @@ impl Act for Script {
 		T: AsRef<Path> + Into<PathBuf>,
 		P: AsRef<Path> + Into<PathBuf>,
 	{
-		unimplemented!()
+		Ok(self.process(_from))
 	}
 }
 
@@ -130,6 +130,6 @@ mod tests {
 			script = Script::new("python3", content);
 			script.run(path).unwrap()
 		});
-		assert!(script.matches(&path))
+		assert!(script.matches(path))
 	}
 }
