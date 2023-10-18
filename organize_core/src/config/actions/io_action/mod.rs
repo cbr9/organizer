@@ -238,12 +238,13 @@ impl FromStr for Inner {
 /// Defines the options available to resolve a naming conflict,
 /// i.e. how the application should proceed when a file exists
 /// but it should move/rename/copy some file to that existing path
-#[derive(Eq, PartialEq, Debug, Clone, Deserialize, Serialize)]
+#[derive(Eq, PartialEq, Default, Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all(serialize = "lowercase", deserialize = "lowercase"))]
 pub enum ConflictOption {
 	Overwrite,
 	Skip,
-	Rename { counter_separator: String },
+	#[default]
+	Rename,
 	Delete,
 }
 
@@ -256,25 +257,8 @@ impl FromStr for ConflictOption {
 			"overwrite" => Self::Overwrite,
 			"skip" => Self::Skip,
 			"rename" => Self::default(),
-			other => {
-				let re = Regex::new("rename with \"(?P<counter_separator>.*)\"").unwrap();
-				let captures = re.captures(other).ok_or_else(|| {
-					Self::Err::unknown_variant(other, &["skip", "delete", "overwrite", "rename", "rename with \"<counter_separator>\""])
-				})?;
-				let counter_separator = captures.name("counter_separator").unwrap();
-				Self::Rename {
-					counter_separator: counter_separator.as_str().into(),
-				}
-			}
+			_ => panic!("Unknown option"),
 		};
 		Ok(variant)
-	}
-}
-
-impl Default for ConflictOption {
-	fn default() -> Self {
-		ConflictOption::Rename {
-			counter_separator: " ".to_string(),
-		}
 	}
 }
