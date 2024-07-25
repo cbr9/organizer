@@ -29,6 +29,7 @@
           clippy
           rust-analyzer
           rustfmt
+          sqlite
         ];
       };
     });
