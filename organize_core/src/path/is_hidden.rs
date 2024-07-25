@@ -18,7 +18,13 @@ mod tests {
 	use super::*;
 	#[test]
 	fn check_hidden() {
-		let path = Path::new(".testfile");
+		let path = Path::new("/home/user/.testfile");
 		assert!(path.is_hidden())
+	}
+
+	#[test]
+	fn not_hidden() {
+		let path = Path::new("/home/user/testfile");
+		assert!(!path.is_hidden())
 	}
 }
