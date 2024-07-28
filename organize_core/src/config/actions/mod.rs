@@ -39,7 +39,7 @@ impl<T: ActionPipeline> ActionRunner for T {
 				if confirmation {
 					return match self.execute(src.clone(), dest.clone()) {
 						Ok(new_path) => {
-							log::info!("{}", self.log_success_msg(src, dest)?);
+							log::info!("{}", self.log_success_msg(src, new_path.clone())?);
 							Ok(new_path)
 						}
 						Err(e) => {
