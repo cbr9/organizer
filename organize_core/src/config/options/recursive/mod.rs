@@ -23,7 +23,10 @@ impl Recursive {
 	pub fn to_walker<T: AsRef<Path>>(&self, path: T) -> WalkDir {
 		match self.depth {
 			None | Some(1) => WalkDir::new(path).min_depth(1),
-			Some(other) => WalkDir::new(path).min_depth(1).max_depth(other as usize),
+			Some(other) => {
+				let max_depth = if other == 0 { 9999 } else { other };
+				WalkDir::new(path).min_depth(1).max_depth(max_depth as usize)
+			}
 		}
 	}
 
