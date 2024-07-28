@@ -5,54 +5,54 @@ use std::{
 	str::FromStr,
 };
 
-use colored::Colorize;
-use log::info;
 use serde::{de::Error, Deserialize, Deserializer};
 use tempfile;
 
 use crate::{
-	config::{
-		actions::{Act, ActionType, AsAction},
-		filters::AsFilter,
-	},
+	config::{actions::ActionType, filters::AsFilter},
 	string::{deserialize_placeholder_string, ExpandPlaceholder},
 };
 use anyhow::Result;
+
+use super::ActionPipeline;
 
 #[derive(Deserialize, Debug, Clone, Default, Eq, PartialEq)]
 pub struct Script {
 	#[serde(deserialize_with = "deserialize_exec")]
 	exec: String,
+	#[serde(default)]
+	args: Vec<String>,
 	#[serde(deserialize_with = "deserialize_placeholder_string")]
 	content: String,
 }
 
-impl Act for Script {
-	fn act<T, P>(&self, _from: T, _to: Option<P>) -> Result<Option<PathBuf>>
-	where
-		Self: Sized,
-		T: AsRef<Path> + Into<PathBuf>,
-		P: AsRef<Path> + Into<PathBuf>,
-	{
-		Ok(self.process(_from))
-	}
-}
+impl ActionPipeline for Script {
+	const TYPE: ActionType = ActionType::Script;
 
-impl AsAction for Script {
-	fn process<T: Into<PathBuf>>(&self, path: T) -> Option<PathBuf> {
-		let path = path.into();
-		self.run(&path)
-			.map(|output| {
-				let output = String::from_utf8_lossy(&output.stdout);
-				let new_path = output.lines().last().map(|last| PathBuf::from(&last.trim())).unwrap();
-				info!("({}) {} -> {}", self.exec.bold(), path.display(), new_path.display());
-				Some(new_path)
-			})
-			.ok()?
+	const REQUIRES_DEST: bool = false;
+
+	fn execute<T: AsRef<Path> + Into<PathBuf> + Clone, P: AsRef<Path> + Into<PathBuf> + Clone>(
+		&self,
+		src: T,
+		_: Option<P>,
+	) -> Result<Option<PathBuf>> {
+		self.run_script(&src).map(|output| {
+			let output = String::from_utf8_lossy(&output.stdout);
+			output.lines().last().map(|last| PathBuf::from(&last.trim()))
+		})
 	}
 
-	fn ty(&self) -> ActionType {
-		ActionType::Script
+	fn log_success_msg<T: AsRef<Path> + Into<PathBuf> + Clone, P: AsRef<Path> + Into<PathBuf> + Clone>(
+		&self,
+		src: T,
+		dest: Option<P>,
+	) -> Result<String> {
+		Ok(format!(
+			"({} SCRIPT) {} -> {}",
+			self.exec.to_uppercase(),
+			src.as_ref().display(),
+			dest.expect("Script did not output a valid path to stdout").as_ref().display()
+		))
 	}
 }
 
@@ -72,14 +72,14 @@ where
 
 impl AsFilter for Script {
 	fn matches<T: AsRef<Path>>(&self, path: T) -> bool {
-		self.run(path)
+		self.run_script(path)
 			.map(|output| {
 				// get the last line in stdout and parse it as a boolean
 				// if it can't be parsed, return false
 				let out = String::from_utf8_lossy(&output.stdout);
 				out.lines().last().map(|last| {
 					let last = last.trim().to_lowercase();
-					bool::from_str(&last).unwrap_or_default()
+					bool::from_str(&last).expect("Filter script did not output a valid boolean to stdout")
 				})
 			})
 			.ok()
@@ -93,6 +93,7 @@ impl Script {
 		Self {
 			exec: exec.into(),
 			content: content.into(),
+			args: vec![],
 		}
 	}
 
@@ -106,9 +107,10 @@ impl Script {
 		Ok(script_path)
 	}
 
-	fn run<T: AsRef<Path>>(&self, path: T) -> anyhow::Result<Output> {
+	fn run_script<T: AsRef<Path>>(&self, path: T) -> anyhow::Result<Output> {
 		let script = self.write(path.as_ref())?;
 		let output = Command::new(&self.exec)
+			.args(self.args.as_slice())
 			.arg(&script)
 			.stdout(Stdio::piped())
 			.spawn()?
@@ -126,10 +128,10 @@ mod tests {
 		let content = "print('huh')\nprint('{path}'.islower())";
 		let mut script = Script::new("python", content);
 		let path = "/home";
-		script.run(path).unwrap_or_else(|_| {
+		script.run_script(path).unwrap_or_else(|_| {
 			// some linux distributions don't have a `python` executable, but a `python3`
 			script = Script::new("python3", content);
-			script.run(path).unwrap()
+			script.run_script(path).unwrap()
 		});
 		assert!(script.matches(path))
 	}

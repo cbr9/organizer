@@ -102,6 +102,23 @@ pub trait ExpandPlaceholder {
 }
 
 #[derive(PartialEq, Eq, Hash, Copy, Clone)]
+enum PathPlaceholder {
+	RelativePath,
+	AbsolutePath,
+	Parent,
+	Filename,
+	Extension,
+	Stem,
+}
+
+#[derive(PartialEq, Eq, Hash, Copy, Clone)]
+enum StringPlaceholder {
+	Lowercase,
+	Uppercase,
+	Capitalize,
+}
+
+#[derive(PartialEq, Eq, Hash, Copy, Clone)]
 enum Placeholder {
 	Path,
 	Parent,
@@ -354,7 +371,7 @@ pub mod tests {
 	fn multiple_placeholders_sentence() {
 		let with_ph = "To run this program, you have to change directory into $HOME/{extension}/{parent.filename}";
 		let path = PathBuf::from("$HOME/Documents/test.pdf");
-		let new_str = with_ph.expand_placeholders(&path).unwrap();
+		let new_str = with_ph.expand_placeholders(path).unwrap();
 		let expected = "To run this program, you have to change directory into $HOME/pdf/Documents";
 		assert_eq!(new_str, expected)
 	}
@@ -362,7 +379,7 @@ pub mod tests {
 	fn no_placeholder() {
 		let tested = "/home/cabero/Documents/test.pdf";
 		let dummy_path = PathBuf::from(tested);
-		let new = tested.expand_placeholders(&dummy_path).unwrap();
+		let new = tested.expand_placeholders(dummy_path).unwrap();
 		assert_eq!(new, tested)
 	}
 }

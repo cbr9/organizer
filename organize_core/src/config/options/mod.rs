@@ -4,10 +4,11 @@ pub mod recursive;
 
 use crate::config::options::r#match::Match;
 
-use crate::{config::options::apply::wrapper::ApplyWrapper, utils::DefaultOpt};
+use crate::utils::DefaultOpt;
 
 use crate::config::options::recursive::Recursive;
 use anyhow::{Context, Result};
+use apply::Apply;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -21,8 +22,7 @@ pub struct Options {
 	pub hidden_files: Option<bool>,
 	pub r#match: Option<Match>,
 	pub partial_files: Option<bool>,
-	#[serde(default = "DefaultOpt::default_none")]
-	pub apply: ApplyWrapper,
+	pub apply: Option<Apply>,
 }
 
 impl Options {
@@ -47,7 +47,7 @@ impl DefaultOpt for Options {
 			hidden_files: None,
 			partial_files: None,
 			r#match: None,
-			apply: DefaultOpt::default_none(),
+			apply: Some(Apply::All),
 		}
 	}
 
@@ -58,7 +58,7 @@ impl DefaultOpt for Options {
 			ignored_dirs: Some(Vec::new()),
 			hidden_files: Some(false),
 			partial_files: Some(false),
-			apply: DefaultOpt::default_some(),
+			apply: Some(Default::default()),
 			r#match: Some(Match::default()),
 		}
 	}

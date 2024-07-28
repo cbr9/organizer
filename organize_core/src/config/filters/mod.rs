@@ -12,7 +12,9 @@ mod mime;
 mod regex;
 
 use crate::config::filters::mime::MimeWrapper;
-use crate::config::{actions::script::Script, filters::regex::Regex, options::apply::Apply};
+use crate::config::{filters::regex::Regex, options::apply::Apply};
+
+use super::actions::script::Script;
 
 #[derive(Debug, Clone, Deserialize, Eq, PartialEq)]
 #[serde(tag = "type", rename_all(deserialize = "lowercase"))]
@@ -48,16 +50,6 @@ impl Filters {
 		match apply {
 			Apply::All => self.iter().all(|filter| filter.matches(&path)),
 			Apply::Any => self.iter().any(|filter| filter.matches(&path)),
-			Apply::AllOf(filters) => self
-				.iter()
-				.enumerate()
-				.filter(|(i, _)| filters.contains(i))
-				.all(|(_, filter)| filter.matches(&path)),
-			Apply::AnyOf(filters) => self
-				.iter()
-				.enumerate()
-				.filter(|(i, _)| filters.contains(i))
-				.any(|(_, filter)| filter.matches(&path)),
 		}
 	}
 }
@@ -65,10 +57,7 @@ impl Filters {
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use crate::config::{
-		filters::{regex::Regex, Filter},
-		options::apply::Apply,
-	};
+	use crate::config::filters::{regex::Regex, Filter};
 	use std::str::FromStr;
 
 	#[test]
@@ -86,44 +75,5 @@ mod tests {
 		let regex = Regex::from_str(".*unsplash.*").unwrap();
 		let filters = Filters(vec![Filter::Regex(regex), Filter::Regex(Regex::from_str(".*\\.jpg").unwrap())]);
 		assert!(filters.r#match("$HOME/Downloads/test.jpg", &Apply::Any))
-	}
-
-	#[test]
-	fn match_any_of() {
-		let regex = Regex::from_str(".*unsplash.*").unwrap();
-		let filters = Filters(vec![
-			Filter::Regex(regex),
-			Filter::Regex(Regex::from_str(".*\\.pdf").unwrap()),
-			Filter::Filename(Filename {
-				case_sensitive: true,
-				startswith: Some("random".into()),
-				..Filename::default()
-			}),
-		]);
-		let path = "$HOME/Downloads/unsplash.jpg";
-		assert!(filters.r#match(&path, &Apply::AnyOf(vec![0, 1])));
-		assert!(!filters.r#match(&path, &Apply::AnyOf(vec![1, 2])));
-		assert!(filters.r#match(&path, &Apply::AnyOf(vec![0, 2])));
-	}
-
-	#[test]
-	fn match_all_of() {
-		let filters = Filters(vec![
-			Filter::Regex(Regex::from_str(".*unsplash.*").unwrap()),
-			Filter::Regex(Regex::from_str(".*\\.pdf").unwrap()),
-			Filter::Filename(Filename {
-				case_sensitive: true,
-				startswith: Some("random".into()),
-				..Filename::default()
-			}),
-			Filter::Regex(Regex::from_str(".*\\.jpg").unwrap()),
-		]);
-		let path = "$HOME/Downloads/unsplash.jpg";
-		assert!(!filters.r#match(&path, &Apply::AllOf(vec![0, 1])));
-		assert!(!filters.r#match(&path, &Apply::AllOf(vec![1, 2])));
-		assert!(!filters.r#match(&path, &Apply::AllOf(vec![1, 3])));
-		assert!(!filters.r#match(&path, &Apply::AllOf(vec![2, 3])));
-		assert!(!filters.r#match(&path, &Apply::AllOf(vec![0, 2])));
-		assert!(filters.r#match(&path, &Apply::AllOf(vec![0, 3])));
 	}
 }

@@ -65,7 +65,7 @@ mod tests {
 			endswith: Some("DF".into()),
 			..Default::default()
 		};
-		assert!(filename.matches(&path))
+		assert!(filename.matches(path))
 	}
 
 	#[test]
@@ -75,7 +75,7 @@ mod tests {
 			contains: Some("ES".into()),
 			..Default::default()
 		};
-		assert!(filename.matches(&path))
+		assert!(filename.matches(path))
 	}
 
 	#[test]

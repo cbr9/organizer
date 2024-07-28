@@ -33,7 +33,7 @@ pub mod tests {
 			extensions: vec!["pdf".into()],
 		};
 		let path = PathBuf::from("$HOME/Downloads/test.pdf");
-		assert!(extension.matches(&path))
+		assert!(extension.matches(path))
 	}
 	#[test]
 	fn multiple_match_pdf() {
@@ -41,7 +41,7 @@ pub mod tests {
 			extensions: vec!["pdf".into(), "doc".into(), "docx".into()],
 		};
 		let path = PathBuf::from("$HOME/Downloads/test.pdf");
-		assert!(extension.matches(&path))
+		assert!(extension.matches(path))
 	}
 
 	#[test]
@@ -50,6 +50,6 @@ pub mod tests {
 			extensions: vec!["pdf".into(), "doc".into(), "docx".into()],
 		};
 		let path = PathBuf::from("$HOME/Downloads/test.jpg");
-		assert!(!extension.matches(&path))
+		assert!(!extension.matches(path))
 	}
 }

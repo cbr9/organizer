@@ -1,24 +1,24 @@
-use anyhow::Context;
+use std::path::{Path, PathBuf};
 
-use crate::config::actions::io_action::ConflictOption;
+use serde::{Deserialize, Serialize};
 
-use std::path::PathBuf;
-
-pub trait ResolveConflict {
-	fn resolve_naming_conflict(self, on_conflict: &ConflictOption) -> Option<PathBuf>;
+/// Defines the options available to resolve a naming conflict,
+/// i.e. how the application should proceed when a file exists
+/// but it should move/rename/copy some file to that existing path
+#[derive(Eq, PartialEq, Default, Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all(serialize = "lowercase", deserialize = "lowercase"))]
+pub enum ConflictOption {
+	Overwrite,
+	Skip,
+	#[default]
+	Rename,
 }
 
-impl<T: Into<PathBuf>> ResolveConflict for T {
-	fn resolve_naming_conflict(self, on_conflict: &ConflictOption) -> Option<PathBuf> {
+impl ConflictOption {
+	pub fn resolve_naming_conflict<T: AsRef<Path>>(&self, target_path: T) -> Option<PathBuf> {
 		use ConflictOption::*;
-		let mut path = self.into();
-		match on_conflict {
-			Delete => {
-				if let Err(e) = std::fs::remove_file(&path).with_context(|| format!("could not delete {}", path.display())) {
-					log::error!("{:?}", e);
-				}
-				None
-			}
+		let mut path = target_path.as_ref().to_path_buf();
+		match self {
 			Skip => None,
 			Overwrite => Some(path.to_path_buf()),
 			Rename => {
@@ -50,23 +50,14 @@ mod tests {
 	#[test]
 	fn skip() {
 		let path = PathBuf::from("/home/user/skipped_file.txt");
-		let new = path.resolve_naming_conflict(&ConflictOption::Skip);
+		let new = ConflictOption::Skip.resolve_naming_conflict(&path);
 		assert_eq!(new, None)
-	}
-
-	#[test]
-	fn delete() {
-		let file = NamedTempFile::new().unwrap();
-		let tmp_path = file.into_temp_path();
-		let new = tmp_path.resolve_naming_conflict(&ConflictOption::Delete);
-		assert_eq!(new, None);
-		assert!(!tmp_path.exists());
 	}
 
 	#[test]
 	fn overwrite() {
 		let path = PathBuf::from("/home/user/skipped_file.txt");
-		let new = path.clone().resolve_naming_conflict(&ConflictOption::Overwrite);
+		let new = ConflictOption::Overwrite.resolve_naming_conflict(&path);
 		assert_eq!(new, Some(path))
 	}
 
@@ -77,7 +68,7 @@ mod tests {
 		let file_name = path.file_stem().unwrap().to_string_lossy();
 		let mut expected = path.clone();
 		expected.set_file_name(format!("{} (1)", file_name));
-		let new = path.clone().resolve_naming_conflict(&ConflictOption::Rename);
+		let new = ConflictOption::Rename.resolve_naming_conflict(&path);
 		assert_eq!(new, Some(expected))
 	}
 
@@ -89,7 +80,7 @@ mod tests {
 		dbg!(file_name.clone());
 		let mut expected = path.clone();
 		expected.set_file_name(format!("{} (1).txt", file_name));
-		let new = path.clone().resolve_naming_conflict(&ConflictOption::Rename);
+		let new = ConflictOption::Rename.resolve_naming_conflict(&path);
 		assert_eq!(new, Some(expected))
 	}
 }

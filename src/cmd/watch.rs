@@ -56,7 +56,8 @@ impl Cmd for Watch {
 		if self.cleanup {
 			self.cleanup()?;
 		}
-		Ok(self.start())
+		self.start();
+		Ok(())
 	}
 }
 

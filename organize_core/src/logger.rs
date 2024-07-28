@@ -127,7 +127,7 @@ impl Logger {
 			}
 			Ok(fern::Dispatch::new()
 				.filter(move |metadata| metadata.level() == level)
-				.format(Self::plain_format) // we don't want ANSI escape codes to be written to the log file
+				.format(Self::colored_format) // we don't want ANSI escape codes to be written to the log file
 				.chain(fern::log_file(path)?))
 		})??;
 

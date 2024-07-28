@@ -4,7 +4,9 @@ use std::{
 	path::{Path, PathBuf},
 };
 
+use actions::Action;
 use anyhow::{Context, Result};
+use options::apply::Apply;
 use serde::Deserialize;
 
 use crate::{
@@ -13,10 +15,9 @@ use crate::{
 };
 
 use self::{
-	actions::Actions,
 	filters::Filters,
 	folders::Folders,
-	options::{apply::Apply, r#match::Match, recursive::Recursive, Options},
+	options::{r#match::Match, recursive::Recursive, Options},
 };
 
 pub mod actions;
@@ -173,17 +174,14 @@ getters! {
 	pub fn allows_hidden_files(&self, rule: usize, folder: usize) -> bool {
 		hidden_files
 	}
+	pub fn get_apply(&self, rule: usize, folder: usize) -> Apply {
+		apply
+	}
 }
 
 getters! {
 	pub fn get_recursive_depth(&self, rule: usize, folder: usize) -> u16 {
 		recursive.depth
-	}
-	pub fn get_apply_actions(&self, rule: usize, folder: usize) -> Apply {
-		apply.actions
-	}
-	pub fn get_apply_filters(&self, rule: usize, folder: usize) -> Apply {
-		apply.filters
 	}
 }
 
@@ -256,7 +254,7 @@ impl Config {
 
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
 pub struct Rule {
-	pub actions: Actions,
+	pub actions: Vec<Action>,
 	pub filters: Filters,
 	pub folders: Folders,
 	#[serde(default = "Options::default_none")]
@@ -266,7 +264,7 @@ pub struct Rule {
 impl Default for Rule {
 	fn default() -> Self {
 		Self {
-			actions: Actions(vec![]),
+			actions: vec![],
 			filters: Filters(vec![]),
 			folders: vec![],
 			options: Options::default_none(),

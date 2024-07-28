@@ -1,5 +1,5 @@
 use crate::{
-	config::{options::r#match::Match, Config},
+	config::{actions::ActionRunner, options::r#match::Match, Config},
 	path::IsHidden,
 };
 use std::{
@@ -26,10 +26,12 @@ impl<'a> File<'a> {
 		let rules = self.get_matching_rules(path_to_rules);
 		for (i, j) in rules {
 			let rule = &self.config.rules[*i];
-			match rule.actions.act(self.path, self.config.get_apply_actions(*i, *j)) {
-				None => break,
-				Some(new_path) => {
-					self.path = new_path;
+			for action in rule.actions.iter() {
+				match action.run(self.path.as_path()).unwrap() {
+					None => break,
+					Some(new_path) => {
+						self.path = new_path;
+					}
 				}
 			}
 		}
@@ -97,7 +99,7 @@ impl<'a> File<'a> {
 	}
 
 	fn filter_by_filters(&self, rule: usize, folder: usize) -> bool {
-		let apply = self.config.get_apply_filters(rule, folder);
+		let apply = self.config.get_apply(rule, folder);
 		let rule = &self.config.rules[rule];
 		rule.filters.r#match(&self.path, apply)
 	}

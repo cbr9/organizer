@@ -73,11 +73,7 @@ impl<'de> Deserialize<'de> for Folder {
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use crate::config::options::{
-		apply::{wrapper::ApplyWrapper, Apply},
-		recursive::Recursive,
-		Options,
-	};
+	use crate::config::options::{apply::Apply, recursive::Recursive, Options};
 
 	use serde::de::{value::Error, Error as ErrorTrait};
 	use serde_test::{assert_de_tokens, assert_de_tokens_error, Token};
@@ -193,7 +189,7 @@ mod tests {
 			hidden_files: None,
 			r#match: None,
 			partial_files: None,
-			apply: ApplyWrapper::from(Apply::All),
+			apply: Some(Apply::All),
 		};
 		assert_de_tokens(
 			&value,

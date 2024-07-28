@@ -8,11 +8,11 @@ extern crate strum_macros;
 pub(crate) mod path {
 	pub(crate) use expand::*;
 	pub(crate) use is_hidden::*;
-	pub(crate) use update::*;
+	pub(crate) use prepare::*;
 
 	mod expand;
 	mod is_hidden;
-	mod update;
+	mod prepare;
 }
 
 pub(crate) mod string {
