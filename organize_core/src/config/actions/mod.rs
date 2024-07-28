@@ -88,11 +88,11 @@ pub trait ActionPipeline {
 		match Self::TYPE {
 			Copy | Move | Hardlink | Symlink => Ok(format!(
 				"({}) {} -> {}",
-				Self::TYPE,
+				Self::TYPE.to_string().to_uppercase(),
 				src.as_ref().display(),
 				dest.expect("dest should not be none").as_ref().display()
 			)),
-			Delete | Trash => Ok(format!("({}) {}", Self::TYPE, src.as_ref().display())),
+			Delete | Trash => Ok(format!("({}) {}", Self::TYPE.to_string().to_uppercase(), src.as_ref().display())),
 			_ => unimplemented!(),
 		}
 	}
