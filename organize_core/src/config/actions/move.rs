@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 use dialoguer::Confirm;
 use serde::Deserialize;
 
@@ -44,8 +44,12 @@ impl ActionPipeline for Move {
 		src: T,
 		dest: Option<P>,
 	) -> Result<Option<PathBuf>> {
-		std::fs::rename(src, dest.as_ref().expect("Destination path should not be none"))
-			.with_context(|| "Failed to move file")
-			.map_or(Ok(None), |_| Ok(dest.map(|s| s.into())))
+		let dest: PathBuf = dest.unwrap().into();
+		println!("{} {}", src.as_ref().display(), dest.display());
+		let res = std::fs::rename(src, dest.clone());
+		match res {
+			Ok(_) => Ok(Some(dest)),
+			Err(e) => bail!(e),
+		}
 	}
 }

@@ -19,6 +19,7 @@ pub fn prepare_target_path(on_conflict: &ConflictOption, src: &Path, dest: &Path
 		if filename.is_none() {
 			return Ok(None);
 		}
+		std::fs::create_dir_all(&to)?;
 		to.push(filename.unwrap());
 	}
 
