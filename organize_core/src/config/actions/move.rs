@@ -45,11 +45,12 @@ impl ActionPipeline for Move {
 		dest: Option<P>,
 	) -> Result<Option<PathBuf>> {
 		let dest: PathBuf = dest.unwrap().into();
-		println!("{} {}", src.as_ref().display(), dest.display());
-		let res = std::fs::rename(src, dest.clone());
+		let res = std::fs::rename(src.clone(), dest.clone())
+			.with_context(|| format!("Could not move {} -> {}", src.clone().as_ref().display(), dest.display()));
+
 		match res {
 			Ok(_) => Ok(Some(dest)),
-			Err(e) => bail!(e),
+			Err(e) => Err(e),
 		}
 	}
 }
