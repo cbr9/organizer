@@ -10,7 +10,7 @@ use serde::Deserialize;
 use strum_macros::{Display, EnumString};
 use symlink::Symlink;
 
-use crate::config::actions::delete::Trash;
+use crate::config::actions::trash::Trash;
 
 use anyhow::Result;
 
@@ -22,6 +22,7 @@ pub(crate) mod hardlink;
 pub(crate) mod r#move;
 pub(crate) mod script;
 pub(crate) mod symlink;
+pub(crate) mod trash;
 
 pub trait ActionRunner {
 	fn run<T: AsRef<Path> + Into<PathBuf> + Clone>(&self, src: T) -> Result<Option<PathBuf>>;
