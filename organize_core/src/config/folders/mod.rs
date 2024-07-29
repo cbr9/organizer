@@ -6,9 +6,10 @@ use crate::{config::options::Options, path::Expand, utils::DefaultOpt};
 use std::convert::TryFrom;
 
 #[derive(Deserialize, Debug, PartialEq, Eq, Clone)]
+#[serde(deny_unknown_fields)]
 pub struct Folder {
 	pub path: PathBuf,
-	#[serde(default)]
+	#[serde(flatten, default)]
 	pub options: Options,
 	#[serde(default)]
 	pub interactive: bool,
