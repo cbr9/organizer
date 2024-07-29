@@ -24,7 +24,13 @@ impl Recursive {
 		match self.depth {
 			None | Some(1) => WalkDir::new(path).min_depth(1),
 			Some(other) => {
-				let max_depth = if other == 0 { 9999 } else { other };
+				let max_depth = if path.as_ref() == dirs_next::home_dir().unwrap() {
+					1
+				} else if other == 0 {
+					9999
+				} else {
+					other
+				};
 				WalkDir::new(path).min_depth(1).max_depth(max_depth as usize)
 			}
 		}
