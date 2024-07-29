@@ -254,6 +254,8 @@ impl Config {
 
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
 pub struct Rule {
+	pub name: Option<String>,
+	pub tags: Vec<String>,
 	pub actions: Vec<Action>,
 	pub filters: Filters,
 	pub folders: Folders,
@@ -264,6 +266,8 @@ pub struct Rule {
 impl Default for Rule {
 	fn default() -> Self {
 		Self {
+			name: None,
+			tags: vec![],
 			actions: vec![],
 			filters: Filters(vec![]),
 			folders: vec![],
