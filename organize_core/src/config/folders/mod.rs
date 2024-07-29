@@ -1,14 +1,17 @@
-mod de;
+use std::path::PathBuf;
 
-use std::{path::PathBuf, str::FromStr};
+use serde::Deserialize;
 
 use crate::{config::options::Options, path::Expand, utils::DefaultOpt};
 use std::convert::TryFrom;
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Deserialize, Debug, PartialEq, Eq, Clone)]
 pub struct Folder {
 	pub path: PathBuf,
+	#[serde(default)]
 	pub options: Options,
+	#[serde(default)]
+	pub interactive: bool,
 }
 
 impl TryFrom<PathBuf> for Folder {
@@ -21,17 +24,9 @@ impl TryFrom<PathBuf> for Folder {
 			.map(|path| Self {
 				path,
 				options: DefaultOpt::default_none(),
+				interactive: false,
 			})
 			.map_err(anyhow::Error::new)
-	}
-}
-
-impl FromStr for Folder {
-	type Err = anyhow::Error;
-
-	fn from_str(s: &str) -> Result<Self, Self::Err> {
-		let path = PathBuf::from(s);
-		Self::try_from(path)
 	}
 }
 
