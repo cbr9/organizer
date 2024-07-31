@@ -8,3 +8,4 @@ TODO:
   - [ ] math?
   - [ ] script 
 - [ ] integrate external templating library
+- [ ] file content filter
