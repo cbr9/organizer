@@ -9,3 +9,4 @@ TODO:
   - [ ] script 
 - [ ] integrate external templating library
 - [ ] file content filter
+- [ ] compressed file extraction action
