@@ -3,4 +3,8 @@
 
 TODO:
 - [ ] implement custom variables
+  - [ ] regex based (using named capture groups)
+  - [ ] simple (string)
+  - [ ] math?
+  - [ ] script 
 - [ ] integrate external templating library
