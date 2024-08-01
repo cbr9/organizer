@@ -1,4 +1,7 @@
-use std::path::{Path, PathBuf};
+use std::{
+	collections::HashMap,
+	path::{Path, PathBuf},
+};
 
 use anyhow::{bail, Result};
 use tera::{Context, Tera};
@@ -14,17 +17,28 @@ pub fn get_context<T: AsRef<Path>>(path: T) -> Context {
 	context.insert("filename", &path.file_name().unwrap().to_string_lossy());
 	context.insert("extension", &path.extension().unwrap().to_string_lossy());
 	let hash = sha256::try_digest(&path).unwrap();
-	let mime = mime_guess::from_path(&path).first_or_octet_stream().to_string();
+	let mime = mime_guess::from_path(path).first_or_octet_stream().to_string();
 	context.insert("hash", &hash);
 	context.insert("mime", &mime);
+
+	let mut environment = HashMap::new();
+	let mut variables = HashMap::new();
+	for (key, value) in std::env::vars() {
+		variables.insert(key, value);
+	}
+	environment.insert("env", variables);
+
+	let new_context = Context::from_serialize(environment).unwrap();
+
+	context.extend(new_context);
 	context
 }
 
 pub fn prepare_target_path(on_conflict: &ConflictOption, src: &Path, dest: &Path) -> Result<Option<PathBuf>> {
 	// if there are any placeholders in the destination, expand them
 
-	let context = get_context(&src);
-	let mut to = match Tera::one_off(&dest.to_string_lossy(), &context, true) {
+	let context = get_context(src);
+	let mut to = match Tera::one_off(&dest.to_string_lossy(), &context, false) {
 		Ok(str) => PathBuf::from(str),
 		Err(e) => {
 			log::error!("{:?}", e);
