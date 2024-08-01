@@ -51,8 +51,6 @@ impl Cmd for Run {
 
 impl Run {
 	pub(crate) fn start(self) -> Result<()> {
-		let mut processed_files = vec![];
-
 		for rule in self.config.rules.iter() {
 			for folder in rule.folders.iter() {
 				let location = folder.path.as_path();
@@ -76,7 +74,6 @@ impl Run {
 								Some(path) => entry = path,
 								None => continue 'entries,
 							}
-							processed_files.push(&entry);
 						}
 					}
 				}
