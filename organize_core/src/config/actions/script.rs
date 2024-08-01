@@ -1,11 +1,10 @@
 use std::{
 	path::{Path, PathBuf},
 	process::{Command, Output, Stdio},
-	result,
 	str::FromStr,
 };
 
-use serde::{de::Error, Deserialize, Deserializer};
+use serde::Deserialize;
 use tempfile;
 use tera::Tera;
 
@@ -85,8 +84,8 @@ impl Script {
 	fn write(&self, path: &Path) -> anyhow::Result<PathBuf> {
 		let script = tempfile::NamedTempFile::new()?;
 		let script_path = script.into_temp_path().to_path_buf();
-		let context = get_context(&path);
-		let content = Tera::one_off(&self.content, &context, true);
+		let context = get_context(path);
+		let content = Tera::one_off(&self.content, &context, false);
 		if let Ok(content) = content {
 			std::fs::write(&script_path, content)?;
 		}
@@ -111,7 +110,7 @@ mod tests {
 
 	#[test]
 	fn test_script_filter() {
-		let content = "print('huh')\nprint('{path}'.islower())";
+		let content = "print('huh')\nprint('{{path}}'.islower())";
 		let mut script = Script::new("python", content);
 		let path = "/home";
 		script.run_script(path).unwrap_or_else(|_| {
