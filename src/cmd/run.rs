@@ -6,41 +6,12 @@ use clap::Parser;
 use organize_core::config::{actions::ActionRunner, filters::AsFilter, Config};
 use tera::{Context, Tera};
 
-use crate::Cmd;
+use crate::{Cmd, CONFIG};
 
 #[derive(Parser, Default)]
-pub struct RunBuilder {
+pub struct Run {
 	#[arg(long, short = 'c')]
 	config: Option<PathBuf>,
-}
-
-impl RunBuilder {
-	pub fn config(mut self, config: Option<PathBuf>) -> Result<Self> {
-		self.config = match config {
-			Some(config) => Some(config),
-			None => Some(Config::path()?),
-		};
-		Ok(self)
-	}
-	pub fn build(mut self) -> Result<Run> {
-		if self.config.is_none() {
-			self = self.config(None)?;
-		}
-		Ok(Run {
-			config: Config::parse(self.config.unwrap()).unwrap(),
-		})
-	}
-}
-
-pub struct Run {
-	pub(crate) config: Config,
-}
-
-impl Run {
-	#[allow(dead_code)]
-	pub fn builder() -> RunBuilder {
-		RunBuilder::default()
-	}
 }
 
 impl Cmd for Run {
@@ -51,16 +22,15 @@ impl Cmd for Run {
 
 impl Run {
 	pub(crate) fn start(self) -> Result<()> {
-		for rule in self.config.rules.iter() {
+		let config = CONFIG.get_or_init(|| match self.config {
+			Some(ref path) => Config::parse(path).unwrap(),
+			None => Config::parse(Config::path().unwrap()).unwrap(),
+		});
+
+		for rule in config.rules.iter() {
 			for folder in rule.folders.iter() {
 				let location = folder.path.as_path();
-				let walker = self
-					.config
-					.path_to_recursive
-					.get(location)
-					.unwrap()
-					.to_walker(location)
-					.max_depth(1);
+				let walker = config.path_to_recursive.get(location).unwrap().to_walker(location).max_depth(1);
 				'entries: for entry in walker.into_iter() {
 					let Ok(entry) = entry else { continue };
 					let mut entry = entry.into_path();

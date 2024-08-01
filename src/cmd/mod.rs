@@ -1,15 +1,15 @@
 use clap::{Parser, Subcommand};
 use organize_core::logger::Logger;
 
-use self::run::RunBuilder;
 use crate::cmd::edit::Edit;
+use crate::cmd::run::Run;
 
 mod edit;
 mod run;
 
 #[derive(Subcommand)]
 enum Command {
-	Run(RunBuilder),
+	Run(Run),
 	Edit(Edit),
 }
 
@@ -31,7 +31,7 @@ impl Cmd for App {
 	fn run(self) -> anyhow::Result<()> {
 		Logger::setup(self.no_color)?;
 		match self.command {
-			Command::Run(cmd) => cmd.build()?.run(),
+			Command::Run(cmd) => cmd.run(),
 			Command::Edit(edit) => edit.run(),
 		}
 	}

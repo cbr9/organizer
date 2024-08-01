@@ -15,7 +15,6 @@ dialoguer = { version = "0.10.4" }
 serde_yaml = "0.9.21"
 colored = "2.0.0"
 sysinfo = "0.28.4"
-lazy_static = "1.4.0"
 rayon = "1.7"
 trash = "4.1.1"
 log = "0.4"
