@@ -27,23 +27,9 @@ where
 {
 	// Deserialize as a Vec<String>
 	let str: String = String::deserialize(deserializer)?;
-	Folder::try_from(str).map(|o| o.path).map_err(serde::de::Error::custom)
-}
-
-impl TryFrom<String> for Folder {
-	type Error = anyhow::Error;
-
-	fn try_from(str: String) -> Result<Self, Self::Error> {
-		let context = get_env_context();
-		let tera = Tera::one_off(&str, &context, false).map_err(anyhow::Error::new)?;
-		let path = PathBuf::from(tera).expand_user()?;
-
-		Ok(Self {
-			path,
-			options: DefaultOpt::default_none(),
-			interactive: false,
-		})
-	}
+	let context = get_env_context();
+	let tera = Tera::one_off(&str, &context, false).map_err(serde::de::Error::custom)?;
+	PathBuf::from(tera).expand_user().map_err(serde::de::Error::custom)
 }
 
 pub type Folders = Vec<Folder>;
