@@ -1,14 +1,25 @@
-mod de;
-
 use std::{path::Path, str::FromStr};
 
 use crate::config::filters::AsFilter;
 use derive_more::Deref;
+use serde::{Deserialize, Deserializer};
 use std::convert::TryFrom;
 
-#[derive(Debug, Deref, Clone)]
+#[derive(Deserialize, Debug, Deref, Clone)]
 pub struct Regex {
+	#[serde(deserialize_with = "deserialize_patterns")]
 	patterns: Vec<regex::Regex>,
+}
+
+fn deserialize_patterns<'de, D>(deserializer: D) -> Result<Vec<regex::Regex>, D::Error>
+where
+	D: Deserializer<'de>,
+{
+	// Deserialize as a Vec<String>
+	let patterns_str: Vec<String> = Vec::deserialize(deserializer)?;
+	Regex::try_from(patterns_str)
+		.map(|o| o.patterns)
+		.map_err(serde::de::Error::custom)
 }
 
 impl PartialEq for Regex {
@@ -30,13 +41,13 @@ impl AsFilter for Regex {
 	}
 }
 
-impl TryFrom<Vec<&str>> for Regex {
+impl<T: ToString> TryFrom<Vec<T>> for Regex {
 	type Error = regex::Error;
 
-	fn try_from(value: Vec<&str>) -> Result<Self, Self::Error> {
+	fn try_from(value: Vec<T>) -> Result<Self, Self::Error> {
 		let mut vec = Vec::with_capacity(value.len());
 		for str in value {
-			let re = regex::Regex::new(str)?;
+			let re = regex::Regex::new(&str.to_string())?;
 			vec.push(re)
 		}
 		Ok(Self { patterns: vec })

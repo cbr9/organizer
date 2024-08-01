@@ -1,9 +1,10 @@
-use std::path::PathBuf;
+use std::{collections::HashMap, iter::FromIterator, path::PathBuf};
 
 use anyhow::Result;
 use clap::Parser;
 
-use organize_core::{config::Config, file::File};
+use organize_core::config::{actions::ActionRunner, filters::AsFilter, Config};
+use tera::{Context, Tera};
 
 use crate::Cmd;
 
@@ -50,16 +51,40 @@ impl Cmd for Run {
 
 impl Run {
 	pub(crate) fn start(self) -> Result<()> {
-		self.config.path_to_rules.iter().for_each(|(path, _)| {
-			let recursive = self.config.path_to_recursive.get(path).unwrap();
-			let walker = recursive.to_walker(path);
-			walker.into_iter().filter_map(|e| e.ok()).for_each(|entry| {
-				if entry.path().is_file() {
-					let file = File::new(entry.path(), &self.config, false);
-					file.act(&self.config.path_to_rules);
+		for rule in self.config.rules.iter() {
+			for folder in rule.folders.iter() {
+				let location = folder.path.as_path();
+				let walker = self
+					.config
+					.path_to_recursive
+					.get(location)
+					.unwrap()
+					.to_walker(location)
+					.max_depth(1);
+				'entries: for entry in walker.into_iter() {
+					let Ok(entry) = entry else { continue };
+					let mut entry = entry.into_path();
+
+					if entry.is_file() {
+						for filter in rule.filters.iter() {
+							if !filter.matches(&entry) {
+								continue 'entries;
+							}
+						}
+						for action in rule.actions.iter() {
+							let res = match action.run(&entry) {
+								Ok(path) => path,
+								Err(_) => None,
+							};
+							match res {
+								Some(path) => entry = path,
+								None => continue 'entries,
+							}
+						}
+					}
 				}
-			});
-		});
+			}
+		}
 		Ok(())
 	}
 }

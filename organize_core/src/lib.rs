@@ -15,16 +15,8 @@ pub(crate) mod path {
 	mod prepare;
 }
 
-pub(crate) mod string {
-	pub(crate) use capitalize::*;
-	pub(crate) use placeholder::*;
-
-	mod capitalize;
-	mod placeholder;
-}
 pub mod config;
 pub mod file;
-mod fsa;
 pub mod logger;
 pub mod utils;
 

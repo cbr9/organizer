@@ -2,8 +2,9 @@ use std::path::{Path, PathBuf};
 
 use derive_more::Deref;
 use serde::Deserialize;
+use tera::Tera;
 
-use crate::{config::actions::ActionType, string::ExpandPlaceholder};
+use crate::{config::actions::ActionType, path::get_context};
 use anyhow::Result;
 
 use super::ActionPipeline;
@@ -30,7 +31,8 @@ impl ActionPipeline for Echo {
 		src: T,
 		_: Option<P>,
 	) -> Result<String> {
-		let expanded = self.message.as_str().expand_placeholders(src)?;
-		Ok(format!("(ECHO) {}", expanded.to_string_lossy()))
+		let context = get_context(&src);
+		let message = Tera::one_off(&self.message, &context, false)?;
+		Ok(format!("(ECHO) {}", message))
 	}
 }

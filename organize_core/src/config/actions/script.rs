@@ -1,16 +1,16 @@
 use std::{
 	path::{Path, PathBuf},
 	process::{Command, Output, Stdio},
-	result,
 	str::FromStr,
 };
 
-use serde::{de::Error, Deserialize, Deserializer};
+use serde::Deserialize;
 use tempfile;
+use tera::Tera;
 
 use crate::{
 	config::{actions::ActionType, filters::AsFilter},
-	string::{deserialize_placeholder_string, ExpandPlaceholder},
+	path::get_context,
 };
 use anyhow::Result;
 
@@ -18,11 +18,9 @@ use super::ActionPipeline;
 
 #[derive(Deserialize, Debug, Clone, Default, Eq, PartialEq)]
 pub struct Script {
-	#[serde(deserialize_with = "deserialize_exec")]
 	exec: String,
 	#[serde(default)]
 	args: Vec<String>,
-	#[serde(deserialize_with = "deserialize_placeholder_string")]
 	content: String,
 }
 
@@ -56,20 +54,6 @@ impl ActionPipeline for Script {
 	}
 }
 
-fn deserialize_exec<'de, D>(deserializer: D) -> result::Result<String, D::Error>
-where
-	D: Deserializer<'de>,
-{
-	let str = String::deserialize(deserializer)?;
-	std::process::Command::new(&str)
-		.spawn()
-		.map(|mut child| {
-			child.kill().ok();
-			str
-		})
-		.map_err(D::Error::custom)
-}
-
 impl AsFilter for Script {
 	fn matches<T: AsRef<Path>>(&self, path: T) -> bool {
 		self.run_script(path)
@@ -100,7 +84,8 @@ impl Script {
 	fn write(&self, path: &Path) -> anyhow::Result<PathBuf> {
 		let script = tempfile::NamedTempFile::new()?;
 		let script_path = script.into_temp_path().to_path_buf();
-		let content = self.content.as_str().expand_placeholders(path)?.into_string();
+		let context = get_context(path);
+		let content = Tera::one_off(&self.content, &context, false);
 		if let Ok(content) = content {
 			std::fs::write(&script_path, content)?;
 		}
@@ -125,7 +110,7 @@ mod tests {
 
 	#[test]
 	fn test_script_filter() {
-		let content = "print('huh')\nprint('{path}'.islower())";
+		let content = "print('huh')\nprint('{{path}}'.islower())";
 		let mut script = Script::new("python", content);
 		let path = "/home";
 		script.run_script(path).unwrap_or_else(|_| {

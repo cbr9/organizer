@@ -260,6 +260,7 @@ impl Config {
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
 pub struct Rule {
 	pub name: Option<String>,
+	#[serde(default)]
 	pub tags: Vec<String>,
 	pub actions: Vec<Action>,
 	pub filters: Filters,
