@@ -1,10 +1,10 @@
-pub mod recursive;
+pub mod max_depth;
 
 use crate::path::IsHidden;
 
 use crate::utils::DefaultOpt;
 
-use crate::config::options::recursive::Recursive;
+use crate::config::options::max_depth::MaxDepth;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use walkdir::DirEntry;
@@ -14,7 +14,7 @@ use super::{folders::Folder, Config, Rule};
 #[derive(Deserialize, Serialize, Debug, Clone, Eq, PartialEq)]
 pub struct FolderOptions {
 	/// defines whether or not subdirectories must be scanned
-	pub recursive: Option<Recursive>,
+	pub max_depth: Option<MaxDepth>,
 	pub ignored_dirs: Option<Vec<PathBuf>>,
 	pub hidden_files: Option<bool>,
 	pub partial_files: Option<bool>,
@@ -45,8 +45,8 @@ getters! {
 	pub fn hidden_files() -> bool {
 		hidden_files
 	}
-	pub fn recursive() -> Recursive {
-		recursive
+	pub fn max_depth() -> MaxDepth {
+		max_depth
 	}
 }
 
@@ -91,7 +91,7 @@ impl Default for FolderOptions {
 impl DefaultOpt for FolderOptions {
 	fn default_none() -> Self {
 		Self {
-			recursive: None,
+			max_depth: None,
 			ignored_dirs: None,
 			hidden_files: None,
 			partial_files: None,
@@ -100,7 +100,7 @@ impl DefaultOpt for FolderOptions {
 
 	fn default_some() -> Self {
 		Self {
-			recursive: Some(Recursive::default()),
+			max_depth: Some(MaxDepth::default()),
 			ignored_dirs: Some(vec![]),
 			hidden_files: Some(false),
 			partial_files: Some(false),

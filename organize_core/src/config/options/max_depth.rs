@@ -4,9 +4,9 @@ use walkdir::WalkDir;
 
 #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
 #[serde(transparent)]
-pub struct Recursive(pub u64);
+pub struct MaxDepth(pub u64);
 
-impl Recursive {
+impl MaxDepth {
 	pub fn to_walker<T: AsRef<Path>>(&self, path: T) -> WalkDir {
 		let max_depth = if path.as_ref() == dirs_next::home_dir().unwrap() {
 			1
@@ -28,9 +28,9 @@ impl Recursive {
 	}
 }
 
-impl Default for Recursive {
+impl Default for MaxDepth {
 	fn default() -> Self {
-		Recursive(1)
+		MaxDepth(1)
 	}
 }
 
@@ -41,8 +41,8 @@ mod tests {
 
 	#[test]
 	fn is_recursive() {
-		assert!(Recursive(1).type_() == notify::RecursiveMode::NonRecursive);
-		assert!(Recursive(0).type_() == notify::RecursiveMode::Recursive);
-		assert!(Recursive(2).type_() == notify::RecursiveMode::Recursive);
+		assert!(MaxDepth(1).type_() == notify::RecursiveMode::NonRecursive);
+		assert!(MaxDepth(0).type_() == notify::RecursiveMode::Recursive);
+		assert!(MaxDepth(2).type_() == notify::RecursiveMode::Recursive);
 	}
 }

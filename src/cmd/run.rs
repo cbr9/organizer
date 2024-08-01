@@ -26,7 +26,7 @@ impl Cmd for Run {
 		for rule in config.rules.iter() {
 			for folder in rule.folders.iter() {
 				let location = folder.path.as_path();
-				let walker = FolderOptions::recursive(config, rule, folder)
+				let walker = FolderOptions::max_depth(config, rule, folder)
 					.to_walker(location)
 					.sort_by_file_name();
 
