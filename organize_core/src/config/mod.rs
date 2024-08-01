@@ -40,6 +40,7 @@ impl ConfigBuilder {
 		let s = fs::read_to_string(path)?;
 		toml::from_str(&s).context("Could not deserialize config")
 	}
+
 	pub fn path_to_rules(&self) -> HashMap<PathBuf, Vec<(usize, usize)>> {
 		let mut map = HashMap::with_capacity(self.rules.len()); // there will be at least one folder per rule
 		self.rules.iter().enumerate().for_each(|(i, rule)| {
@@ -221,9 +222,13 @@ impl Config {
 			.read_dir()
 			.context("Cannot determine directory content")?
 			.find_map(|file| {
-				let path = file.ok()?.path();
-				let found = path.file_stem()? == PROJECT_NAME && path.extension()? == "toml";
-				found.then_some(path)
+				let mut path = file.ok()?.path();
+				if path.is_dir() && path.file_stem()?.to_string_lossy().ends_with(PROJECT_NAME) {
+					return Some(path.join("config.toml"));
+				} else if path.file_stem()?.to_string_lossy().ends_with(PROJECT_NAME) && path.extension()? == "toml" {
+					return Some(path);
+				}
+				None
 			})
 			.map_or_else(
 				|| Ok(Self::default_path()),
