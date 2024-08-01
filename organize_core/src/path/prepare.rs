@@ -12,13 +12,22 @@ pub fn get_context<T: AsRef<Path>>(path: T) -> Context {
 	let mut context = tera::Context::new();
 	let path = path.as_ref();
 	context.insert("path", &path.to_string_lossy());
-	context.insert("parent", &path.parent().unwrap().to_string_lossy());
-	context.insert("stem", &path.file_stem().unwrap().to_string_lossy());
-	context.insert("filename", &path.file_name().unwrap().to_string_lossy());
-	context.insert("extension", &path.extension().unwrap().to_string_lossy());
-	let hash = sha256::try_digest(&path).unwrap();
+	if let Some(parent) = path.parent() {
+		context.insert("parent", &parent.to_string_lossy());
+	}
+	if let Some(stem) = path.file_stem() {
+		context.insert("stem", &stem.to_string_lossy());
+	}
+	if let Some(name) = path.file_name() {
+		context.insert("filename", &name.to_string_lossy());
+	}
+	if let Some(extension) = path.extension() {
+		context.insert("extension", &extension.to_string_lossy());
+	}
+	if let Ok(hash) = sha256::try_digest(&path) {
+		context.insert("hash", &hash);
+	}
 	let mime = mime_guess::from_path(path).first_or_octet_stream().to_string();
-	context.insert("hash", &hash);
 	context.insert("mime", &mime);
 
 	let mut environment = HashMap::new();
