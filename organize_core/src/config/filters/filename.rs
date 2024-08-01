@@ -55,7 +55,7 @@ mod tests {
 			startswith: Some("TE".into()),
 			..Default::default()
 		};
-		assert!(filename.matches(&path))
+		assert!(filename.matches(path))
 	}
 
 	#[test]

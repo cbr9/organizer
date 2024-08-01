@@ -12,7 +12,7 @@ use crate::{
 	config::{actions::ActionType, filters::AsFilter},
 	path::get_context,
 };
-use anyhow::Result;
+use anyhow::{bail, Result};
 
 use super::ActionPipeline;
 
@@ -33,7 +33,11 @@ impl ActionPipeline for Script {
 		&self,
 		src: T,
 		_: Option<P>,
+		simulated: bool,
 	) -> Result<Option<PathBuf>> {
+		if simulated {
+			bail!("Cannot run scripted actions during a dry run")
+		}
 		self.run_script(&src).map(|output| {
 			let output = String::from_utf8_lossy(&output.stdout);
 			output.lines().last().map(|last| PathBuf::from(&last.trim()))
@@ -44,6 +48,7 @@ impl ActionPipeline for Script {
 		&self,
 		src: T,
 		dest: Option<P>,
+		_: bool,
 	) -> Result<String> {
 		Ok(format!(
 			"({} SCRIPT) {} -> {}",

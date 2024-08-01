@@ -6,7 +6,8 @@ use crate::utils::DefaultOpt;
 
 use crate::config::options::recursive::Recursive;
 use serde::{Deserialize, Serialize};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
+use walkdir::DirEntry;
 
 use super::{folders::Folder, Config, Rule};
 
@@ -50,29 +51,32 @@ getters! {
 }
 
 impl FolderOptions {
-	pub fn allows(config: &Config, rule: &Rule, folder: &Folder, path: &Path) -> bool {
+	pub fn allows_entry(config: &Config, rule: &Rule, folder: &Folder, entry: &DirEntry) -> bool {
 		let mut allowed = true;
+		let path = entry.path();
 
 		// filter by partial_files option
-		let allows_partial_files = Self::partial_files(config, rule, folder);
-		if !allows_partial_files {
-			if let Some(extension) = path.extension() {
-				let partial_extensions = &["crdownload", "part"];
-				let extension = extension.to_string_lossy();
-				allowed = allowed && !partial_extensions.contains(&&*extension);
+		if path.is_file() {
+			let allows_partial_files = Self::partial_files(config, rule, folder);
+			if !allows_partial_files && path.is_file() {
+				if let Some(extension) = path.extension() {
+					let partial_extensions = &["crdownload", "part", "download"];
+					let extension = extension.to_string_lossy();
+					allowed = allowed && !partial_extensions.contains(&&*extension);
+				}
 			}
+
+			// filter by hidden_files option
+			let allows_hidden_files = Self::hidden_files(config, rule, folder);
+			allowed = allowed && ((path.is_hidden() && allows_hidden_files) || !path.is_hidden());
 		}
 
-		// filter by hidden_files option
-		let allows_hidden_files = Self::hidden_files(config, rule, folder);
-		allowed = allowed && ((path.is_hidden() && allows_hidden_files) || !path.is_hidden());
-
-		// filter by ignored_dirs option
-		let ignored_dirs = Self::ignored_dirs(config, rule, folder);
-		let in_ignored_dir = !ignored_dirs
-			.iter()
-			.any(|dir: &PathBuf| -> bool { path.parent().map(|parent| dir == parent).unwrap_or_default() });
-		allowed = allowed && in_ignored_dir;
+		if path.is_dir() {
+			// filter by ignored_dirs option
+			let ignored_dirs = Self::ignored_dirs(config, rule, folder);
+			let is_ignored_dir = !ignored_dirs.iter().any(|dir| path == dir);
+			allowed = allowed && is_ignored_dir;
+		}
 
 		allowed
 	}

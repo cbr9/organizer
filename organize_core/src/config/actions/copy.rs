@@ -57,15 +57,16 @@ impl ActionPipeline for Copy {
 		&self,
 		src: T,
 		dest: Option<P>,
+		simulated: bool,
 	) -> Result<Option<PathBuf>> {
-		std::fs::copy(src.as_ref(), dest.clone().unwrap().into())
-			.with_context(|| "Failed to copy file")
-			.map_or(Ok(None), |_| {
-				if self.continue_with == ContinueWith::Copy {
-					Ok(Some(dest.unwrap().into()))
-				} else {
-					Ok(Some(src.into()))
-				}
-			})
+		if !simulated {
+			std::fs::copy(src.as_ref(), dest.clone().unwrap().into()).with_context(|| "Failed to copy file")?;
+		}
+
+		if self.continue_with == ContinueWith::Copy {
+			Ok(Some(dest.unwrap().into()))
+		} else {
+			Ok(Some(src.into()))
+		}
 	}
 }

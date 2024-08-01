@@ -11,16 +11,12 @@ use crate::{Cmd, CONFIG};
 pub struct Run {
 	#[arg(long, short = 'c')]
 	config: Option<PathBuf>,
+	#[arg(long)]
+	dry_run: bool,
 }
 
 impl Cmd for Run {
 	fn run(self) -> Result<()> {
-		self.start()
-	}
-}
-
-impl Run {
-	pub(crate) fn start(self) -> Result<()> {
 		let config = CONFIG.get_or_init(|| match self.config {
 			Some(ref path) => Config::new(path).expect("Could not parse config"),
 			None => Config::new(Config::path().unwrap()).expect("Could not parse config"),
@@ -29,14 +25,21 @@ impl Run {
 		for rule in config.rules.iter() {
 			for folder in rule.folders.iter() {
 				let location = folder.path.as_path();
-				let walker = FolderOptions::recursive(config, rule, folder).to_walker(location);
-				for entry in walker.into_iter() {
+				let walker = FolderOptions::recursive(config, rule, folder)
+					.to_walker(location)
+					.sort_by_file_name();
+
+				let entries = walker
+					.into_iter()
+					.filter_entry(|e| FolderOptions::allows_entry(config, rule, folder, e));
+
+				for entry in entries {
 					let Ok(entry) = entry else { continue };
 					let mut entry = entry.into_path();
 
 					if entry.is_file() && rule.filters.matches(&entry) {
 						'actions: for action in rule.actions.iter() {
-							match action.run(&entry)? {
+							match action.run(&entry, self.dry_run)? {
 								Some(path) => entry = path,
 								None => break 'actions,
 							};

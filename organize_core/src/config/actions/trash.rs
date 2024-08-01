@@ -14,8 +14,6 @@ fn enabled() -> bool {
 #[derive(Debug, Clone, Deserialize, Default, Eq, PartialEq)]
 pub struct Trash {
 	#[serde(default = "enabled")]
-	enable: bool,
-	#[serde(default)]
 	pub confirm: bool,
 }
 
@@ -36,20 +34,19 @@ impl ActionPipeline for Trash {
 		&self,
 		src: T,
 		_: Option<P>,
+		simulated: bool,
 	) -> Result<Option<PathBuf>> {
-		if self.enable {
+		if !simulated {
 			let to = Self::dir()?.join(src.as_ref().file_name().unwrap());
 			let from = src.as_ref();
 			std::fs::copy(from, &to).with_context(|| format!("Could not copy file ({} -> {})", from.display(), to.display()))?;
-			std::fs::remove_file(from)
-				.with_context(|| format!("could not move ({} -> {})", from.display(), to.display()))
-				.map(|_| None)
-		} else {
-			Ok(Some(src.into()))
+			std::fs::remove_file(from).with_context(|| format!("could not move ({} -> {})", from.display(), to.display()))?;
 		}
+		Ok(None)
 	}
+
 	fn confirm<T: AsRef<Path> + Into<PathBuf> + Clone, P: AsRef<Path> + Into<PathBuf> + Clone>(&self, src: T, _: Option<P>) -> Result<bool> {
-		if self.confirm && self.enable {
+		if self.confirm {
 			Confirm::new()
 				.with_prompt(format!("Send {} to trash?", src.as_ref().display()))
 				.interact()
@@ -70,16 +67,13 @@ mod tests {
 		let tmp_dir = tempfile::tempdir().expect("Couldn't create temporary directory");
 		let tmp_path = tmp_dir.path().to_owned();
 		let tmp_file = tmp_path.join("trash_me.txt");
-		let action = Trash {
-			enable: true,
-			confirm: false,
-		};
+		let action = Trash { confirm: false };
 
 		std::fs::write(&tmp_file, "").expect("Could create target file");
 		assert!(tmp_file.exists());
 
 		action
-			.execute::<&Path, &Path>(&tmp_file, None)
+			.execute::<&Path, &Path>(&tmp_file, None, false)
 			.expect("Could not trash target file");
 		assert!(!tmp_file.exists());
 	}
@@ -89,16 +83,13 @@ mod tests {
 		let tmp_dir = tempfile::tempdir().expect("Couldn't create temporary directory");
 		let tmp_path = tmp_dir.path().to_owned();
 		let tmp_file = tmp_path.join("trash_me.txt");
-		let action = Trash {
-			enable: false,
-			confirm: false,
-		};
+		let action = Trash { confirm: false };
 
 		std::fs::write(&tmp_file, "").expect("Could create target file");
 		assert!(tmp_file.exists());
 
 		action
-			.execute::<&Path, &Path>(&tmp_file, None)
+			.execute::<&Path, &Path>(&tmp_file, None, false)
 			.expect("Could not trash target file");
 		assert!(tmp_file.exists());
 	}

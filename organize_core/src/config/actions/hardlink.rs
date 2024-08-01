@@ -58,15 +58,21 @@ impl ActionPipeline for Hardlink {
 		&self,
 		src: T,
 		dest: Option<P>,
+		simulated: bool,
 	) -> Result<Option<PathBuf>> {
-		std::fs::hard_link(src.as_ref(), dest.as_ref().expect("dest should not be None"))
-			.with_context(|| {
+		if !simulated {
+			std::fs::hard_link(src.as_ref(), dest.as_ref().expect("dest should not be None")).with_context(|| {
 				format!(
 					"could not create hardlink ({} -> {})",
 					src.as_ref().display(),
-					dest.expect("dest should not be none").as_ref().display()
+					dest.clone().expect("dest should not be none").as_ref().display()
 				)
-			})
-			.map(|_| Some(src.into()))
+			})?;
+		}
+		if self.continue_with == ContinueWith::Link {
+			Ok(Some(dest.unwrap().into()))
+		} else {
+			Ok(Some(src.into()))
+		}
 	}
 }

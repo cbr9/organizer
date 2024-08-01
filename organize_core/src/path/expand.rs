@@ -1,7 +1,4 @@
-use std::{
-	ffi::{OsStr},
-	path::{PathBuf},
-};
+use std::{ffi::OsStr, path::PathBuf};
 
 pub trait Expand {
 	fn expand_user(self) -> PathBuf
@@ -26,7 +23,6 @@ impl<T: Into<PathBuf>> Expand for T {
 
 #[cfg(test)]
 mod tests {
-	use std::env;
 
 	use super::*;
 

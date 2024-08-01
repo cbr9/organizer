@@ -53,19 +53,20 @@ impl ActionPipeline for Symlink {
 		}
 	}
 
+	#[cfg(target_family = "unix")]
 	fn execute<T: AsRef<Path> + Into<PathBuf> + Clone, P: AsRef<Path> + Into<PathBuf> + Clone>(
 		&self,
 		src: T,
 		dest: Option<P>,
+		simulated: bool,
 	) -> Result<Option<PathBuf>> {
-		std::fs::copy(src.as_ref(), dest.as_ref().unwrap())
-			.with_context(|| "Failed to copy file")
-			.map_or(Ok(None), |_| {
-				if self.continue_with == ContinueWith::Link {
-					Ok(Some(dest.unwrap().into()))
-				} else {
-					Ok(Some(src.into()))
-				}
-			})
+		if !simulated {
+			std::os::unix::fs::symlink(src.as_ref(), dest.as_ref().unwrap()).with_context(|| "Failed to symlink file")?;
+		}
+		if self.continue_with == ContinueWith::Link {
+			Ok(Some(dest.unwrap().into()))
+		} else {
+			Ok(Some(src.into()))
+		}
 	}
 }

@@ -62,7 +62,7 @@ mod tests {
 		let types = Mime::try_from(vec!["image/*", "audio/*"]).unwrap();
 		let img = "test.jpg";
 		let audio = "test.ogg";
-		assert!(types.matches(&img));
-		assert!(types.matches(&audio));
+		assert!(types.matches(img));
+		assert!(types.matches(audio));
 	}
 }

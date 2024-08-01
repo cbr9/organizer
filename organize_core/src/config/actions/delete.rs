@@ -14,8 +14,6 @@ fn enabled() -> bool {
 #[derive(Debug, Clone, Deserialize, Default, PartialEq, Eq)]
 pub struct Delete {
 	#[serde(default = "enabled")]
-	enable: bool,
-	#[serde(default = "enabled")]
 	pub confirm: bool,
 }
 
@@ -27,18 +25,16 @@ impl ActionPipeline for Delete {
 		&self,
 		src: T,
 		_: Option<P>,
+		simulated: bool,
 	) -> Result<Option<PathBuf>> {
-		if self.enable {
-			std::fs::remove_file(&src)
-				.with_context(|| format!("could not delete {}", src.as_ref().display()))
-				.map(|_| None)
-		} else {
-			Ok(Some(src.into()))
+		if !simulated {
+			std::fs::remove_file(&src).with_context(|| format!("could not delete {}", src.as_ref().display()))?;
 		}
+		Ok(None)
 	}
 
 	fn confirm<T: AsRef<Path> + Into<PathBuf> + Clone, P: AsRef<Path> + Into<PathBuf> + Clone>(&self, src: T, _: Option<P>) -> Result<bool> {
-		if self.confirm && self.enable {
+		if self.confirm {
 			Confirm::new()
 				.with_prompt(format!("Permanently delete {}?", src.as_ref().display()))
 				.interact()
@@ -59,16 +55,13 @@ mod tests {
 		let tmp_dir = tempfile::tempdir().expect("Couldn't create temporary directory");
 		let tmp_path = tmp_dir.path().to_owned();
 		let tmp_file = tmp_path.join("delete_me.txt");
-		let action = Delete {
-			enable: true,
-			confirm: false,
-		};
+		let action = Delete { confirm: false };
 
 		std::fs::write(&tmp_file, "").expect("Could create target file");
 		assert!(tmp_file.exists());
 
 		action
-			.execute::<&Path, &Path>(&tmp_file, None)
+			.execute::<&Path, &Path>(&tmp_file, None, false)
 			.expect("Could not delete target file");
 		assert!(!tmp_file.exists());
 	}
@@ -78,16 +71,13 @@ mod tests {
 		let tmp_dir = tempfile::tempdir().expect("Couldn't create temporary directory");
 		let tmp_path = tmp_dir.path().to_owned();
 		let tmp_file = tmp_path.join("delete_me.txt");
-		let action = Delete {
-			enable: false,
-			confirm: false,
-		};
+		let action = Delete { confirm: false };
 
 		std::fs::write(&tmp_file, "").expect("Could create target file");
 		assert!(tmp_file.exists());
 
 		action
-			.execute::<&Path, &Path>(&tmp_file, None)
+			.execute::<&Path, &Path>(&tmp_file, None, false)
 			.expect("Could not delete target file");
 		assert!(tmp_file.exists());
 	}

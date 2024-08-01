@@ -25,12 +25,12 @@ pub(crate) mod symlink;
 pub(crate) mod trash;
 
 pub trait ActionRunner {
-	fn run<T: AsRef<Path> + Into<PathBuf> + Clone>(&self, src: T) -> Result<Option<PathBuf>>;
+	fn run<T: AsRef<Path> + Into<PathBuf> + Clone>(&self, src: T, simulated: bool) -> Result<Option<PathBuf>>;
 }
 
 impl<T: ActionPipeline> ActionRunner for T {
 	#[allow(clippy::nonminimal_bool)]
-	fn run<P: AsRef<Path> + Into<PathBuf> + Clone>(&self, src: P) -> Result<Option<PathBuf>> {
+	fn run<P: AsRef<Path> + Into<PathBuf> + Clone>(&self, src: P, simulated: bool) -> Result<Option<PathBuf>> {
 		let dest = self.get_target_path(src.clone());
 		if let Ok(dest) = dest {
 			if (Self::REQUIRES_DEST && dest.is_some()) || !Self::REQUIRES_DEST {
@@ -38,9 +38,9 @@ impl<T: ActionPipeline> ActionRunner for T {
 				let src = src.into();
 
 				if confirmation {
-					return match self.execute(src.clone(), dest.clone()) {
+					return match self.execute(src.clone(), dest.clone(), simulated) {
 						Ok(new_path) => {
-							log::info!("{}", self.log_success_msg(src, new_path.clone())?);
+							log::info!("{}", self.log_success_msg(src, new_path.clone(), simulated)?);
 							Ok(new_path)
 						}
 						Err(e) => {
@@ -56,17 +56,17 @@ impl<T: ActionPipeline> ActionRunner for T {
 }
 
 impl ActionRunner for Action {
-	fn run<T: AsRef<Path> + Into<PathBuf> + Clone>(&self, src: T) -> Result<Option<PathBuf>> {
+	fn run<T: AsRef<Path> + Into<PathBuf> + Clone>(&self, src: T, simulated: bool) -> Result<Option<PathBuf>> {
 		use Action::*;
 		match self {
-			Copy(copy) => copy.run(src),
-			Move(r#move) => r#move.run(src),
-			Hardlink(hardlink) => hardlink.run(src),
-			Symlink(symlink) => symlink.run(src),
-			Delete(delete) => delete.run(src),
-			Echo(echo) => echo.run(src),
-			Trash(trash) => trash.run(src),
-			Script(script) => script.run(src),
+			Copy(copy) => copy.run(src, simulated),
+			Move(r#move) => r#move.run(src, simulated),
+			Hardlink(hardlink) => hardlink.run(src, simulated),
+			Symlink(symlink) => symlink.run(src, simulated),
+			Delete(delete) => delete.run(src, simulated),
+			Echo(echo) => echo.run(src, simulated),
+			Trash(trash) => trash.run(src, simulated),
+			Script(script) => script.run(src, simulated),
 		}
 	}
 }
@@ -78,22 +78,29 @@ pub trait ActionPipeline {
 		&self,
 		src: T,
 		dest: Option<P>,
+		simulated: bool,
 	) -> Result<Option<PathBuf>>;
 
 	fn log_success_msg<T: AsRef<Path> + Into<PathBuf> + Clone, P: AsRef<Path> + Into<PathBuf> + Clone>(
 		&self,
 		src: T,
 		dest: Option<P>,
+		simulated: bool,
 	) -> Result<String> {
 		use ActionType::*;
+		let hint = if !simulated {
+			Self::TYPE.to_string().to_uppercase()
+		} else {
+			format!("SIMULATED {}", Self::TYPE.to_string().to_uppercase())
+		};
 		match Self::TYPE {
 			Copy | Move | Hardlink | Symlink => Ok(format!(
 				"({}) {} -> {}",
-				Self::TYPE.to_string().to_uppercase(),
+				hint,
 				src.as_ref().display(),
 				dest.expect("dest should not be none").as_ref().display()
 			)),
-			Delete | Trash => Ok(format!("({}) {}", Self::TYPE.to_string().to_uppercase(), src.as_ref().display())),
+			Delete | Trash => Ok(format!("({}) {}", hint, src.as_ref().display())),
 			_ => unimplemented!(),
 		}
 	}

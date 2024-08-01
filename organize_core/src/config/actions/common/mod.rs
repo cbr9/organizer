@@ -50,7 +50,7 @@ mod tests {
 	#[test]
 	fn skip() {
 		let path = PathBuf::from("/home/user/skipped_file.txt");
-		let new = ConflictOption::Skip.resolve_naming_conflict(&path);
+		let new = ConflictOption::Skip.resolve_naming_conflict(path);
 		assert_eq!(new, None)
 	}
 

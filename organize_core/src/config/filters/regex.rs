@@ -76,20 +76,20 @@ mod tests {
 	fn match_single() {
 		let regex = Regex::from_str(r".*unsplash.*").unwrap();
 		let path = "$HOME/Pictures/test_unsplash_img.jpg";
-		assert!(regex.matches(&path))
+		assert!(regex.matches(path))
 	}
 
 	#[test]
 	fn match_multiple() {
 		let regex = Regex::try_from(vec![r".*unsplash.*", r"\w"]).unwrap();
 		let path = "$HOME/Pictures/test_unsplash_img.jpg";
-		assert!(regex.matches(&path))
+		assert!(regex.matches(path))
 	}
 
 	#[test]
 	fn no_match_multiple() {
 		let regex = Regex::try_from(vec![r".*unsplash.*", r"\d"]).unwrap();
 		let path = "$HOME/Documents/deep_learning.pdf";
-		assert!(!regex.matches(&path))
+		assert!(!regex.matches(path))
 	}
 }

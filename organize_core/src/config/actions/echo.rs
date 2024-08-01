@@ -22,6 +22,7 @@ impl ActionPipeline for Echo {
 		&self,
 		src: T,
 		_: Option<P>,
+		_: bool,
 	) -> Result<Option<PathBuf>> {
 		Ok(Some(src.into()))
 	}
@@ -30,9 +31,11 @@ impl ActionPipeline for Echo {
 		&self,
 		src: T,
 		_: Option<P>,
+		simulated: bool,
 	) -> Result<String> {
 		let context = get_context(&src);
 		let message = Tera::one_off(&self.message, &context, false)?;
-		Ok(format!("(ECHO) {}", message))
+		let hint = if simulated { "ECHO" } else { "SIMULATED ECHO" };
+		Ok(format!("({}) {}", hint, message))
 	}
 }
