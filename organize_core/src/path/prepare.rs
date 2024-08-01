@@ -8,6 +8,16 @@ use tera::{Context, Tera};
 
 use crate::config::actions::common::ConflictOption;
 
+pub fn get_env_context() -> Context {
+	let mut environment = HashMap::new();
+	let mut variables = HashMap::new();
+	for (key, value) in std::env::vars() {
+		variables.insert(key, value);
+	}
+	environment.insert("env", variables);
+	Context::from_serialize(environment).unwrap()
+}
+
 pub fn get_context<T: AsRef<Path>>(path: T) -> Context {
 	let mut context = tera::Context::new();
 	let path = path.as_ref();
@@ -30,16 +40,7 @@ pub fn get_context<T: AsRef<Path>>(path: T) -> Context {
 	let mime = mime_guess::from_path(path).first_or_octet_stream().to_string();
 	context.insert("mime", &mime);
 
-	let mut environment = HashMap::new();
-	let mut variables = HashMap::new();
-	for (key, value) in std::env::vars() {
-		variables.insert(key, value);
-	}
-	environment.insert("env", variables);
-
-	let new_context = Context::from_serialize(environment).unwrap();
-
-	context.extend(new_context);
+	context.extend(get_env_context());
 	context
 }
 
