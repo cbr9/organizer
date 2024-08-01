@@ -2,6 +2,7 @@ use std::path::PathBuf;
 
 use anyhow::Result;
 use clap::Parser;
+use rayon::prelude::*;
 
 use organize_core::config::{actions::ActionRunner, filters::AsFilter, options::FolderOptions, Config};
 
@@ -29,23 +30,30 @@ impl Cmd for Run {
 					.to_walker(location)
 					.sort_by_file_name();
 
-				let entries = walker
+				let mut entries = walker
 					.into_iter()
-					.filter_entry(|e| FolderOptions::allows_entry(config, rule, folder, e));
+					.filter_entry(|e| FolderOptions::allows_entry(config, rule, folder, e))
+					.filter_map(|e| e.ok())
+					.map(|e| e.into_path())
+					.collect::<Vec<_>>();
 
-				for entry in entries {
-					let Ok(entry) = entry else { continue };
-					let mut entry = entry.into_path();
-
+				entries.par_iter_mut().for_each(|entry| {
 					if entry.is_file() && rule.filters.matches(&entry) {
 						'actions: for action in rule.actions.iter() {
-							match action.run(&entry, self.dry_run)? {
-								Some(path) => entry = path,
+							let new_path = match action.run(&entry, self.dry_run) {
+								Ok(path) => path,
+								Err(e) => {
+									log::error!("{}", e);
+									None
+								}
+							};
+							match new_path {
+								Some(path) => *entry = path,
 								None => break 'actions,
 							};
 						}
 					}
-				}
+				})
 			}
 		}
 		Ok(())
