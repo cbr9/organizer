@@ -7,6 +7,6 @@ TODO:
   - [ ] simple (string)
   - [ ] math?
   - [ ] script 
-- [ ] integrate external templating library
+- [x] integrate external templating library
 - [ ] file content filter
 - [ ] compressed file extraction action
