@@ -11,7 +11,6 @@ pub(crate) mod path {
 }
 
 pub mod config;
-pub mod file;
 pub mod logger;
 pub mod utils;
 

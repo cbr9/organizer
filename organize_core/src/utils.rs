@@ -27,26 +27,6 @@ where
 	}
 }
 
-pub trait UnwrapRef<T> {
-	fn unwrap_ref(&self) -> &T;
-}
-
-pub trait UnwrapMut<T> {
-	fn unwrap_mut(&mut self) -> &mut T;
-}
-
-impl<T> UnwrapRef<T> for Option<T> {
-	fn unwrap_ref(&self) -> &T {
-		self.as_ref().unwrap()
-	}
-}
-
-impl<T> UnwrapMut<T> for Option<T> {
-	fn unwrap_mut(&mut self) -> &mut T {
-		self.as_mut().unwrap()
-	}
-}
-
 pub trait Contains<T> {
 	fn contains(&self, value: T) -> bool;
 }

@@ -1,9 +1,9 @@
-use std::{path::PathBuf};
+use std::path::PathBuf;
 
 use anyhow::Result;
 use clap::Parser;
 
-use organize_core::config::{actions::ActionRunner, filters::AsFilter, Config};
+use organize_core::config::{actions::ActionRunner, filters::AsFilter, options::FolderOptions, Config};
 
 use crate::{Cmd, CONFIG};
 
@@ -22,33 +22,24 @@ impl Cmd for Run {
 impl Run {
 	pub(crate) fn start(self) -> Result<()> {
 		let config = CONFIG.get_or_init(|| match self.config {
-			Some(ref path) => Config::parse(path).expect("Could not parse config"),
-			None => Config::parse(Config::path().unwrap()).expect("Could not parse config"),
+			Some(ref path) => Config::new(path).expect("Could not parse config"),
+			None => Config::new(Config::path().unwrap()).expect("Could not parse config"),
 		});
 
 		for rule in config.rules.iter() {
 			for folder in rule.folders.iter() {
 				let location = folder.path.as_path();
-				let walker = config.path_to_recursive.get(location).unwrap().to_walker(location).max_depth(1);
-				'entries: for entry in walker.into_iter() {
+				let walker = FolderOptions::recursive(config, rule, folder).to_walker(location);
+				for entry in walker.into_iter() {
 					let Ok(entry) = entry else { continue };
 					let mut entry = entry.into_path();
 
-					if entry.is_file() {
-						for filter in rule.filters.iter() {
-							if !filter.matches(&entry) {
-								continue 'entries;
-							}
-						}
-						for action in rule.actions.iter() {
-							let res = match action.run(&entry) {
-								Ok(path) => path,
-								Err(_) => None,
-							};
-							match res {
+					if entry.is_file() && rule.filters.matches(&entry) {
+						'actions: for action in rule.actions.iter() {
+							match action.run(&entry)? {
 								Some(path) => entry = path,
-								None => continue 'entries,
-							}
+								None => break 'actions,
+							};
 						}
 					}
 				}

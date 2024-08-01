@@ -11,10 +11,7 @@ mod filename;
 mod mime;
 mod regex;
 
-use crate::config::{
-	filters::{mime::Mime, regex::Regex},
-	options::apply::Apply,
-};
+use crate::config::filters::{mime::Mime, regex::Regex};
 
 use super::actions::script::Script;
 
@@ -47,12 +44,9 @@ impl AsFilter for Filter {
 #[derive(Debug, Clone, Deserialize, Deref, Eq, PartialEq)]
 pub struct Filters(pub(crate) Vec<Filter>);
 
-impl Filters {
-	pub fn r#match<T: AsRef<Path>>(&self, path: T, apply: &Apply) -> bool {
-		match apply {
-			Apply::All => self.iter().all(|filter| filter.matches(&path)),
-			Apply::Any => self.iter().any(|filter| filter.matches(&path)),
-		}
+impl AsFilter for Filters {
+	fn matches<T: AsRef<Path>>(&self, path: T) -> bool {
+		self.iter().all(|filter| filter.matches(&path))
 	}
 }
 
@@ -68,14 +62,14 @@ mod tests {
 			Filter::Regex(Regex::from_str(".*unsplash.*").unwrap()),
 			Filter::Regex(Regex::from_str(".*\\.jpg").unwrap()),
 		]);
-		assert!(filters.r#match("$HOME/Downloads/unsplash_image.jpg", &Apply::All));
-		assert!(!filters.r#match("$HOME/Downloads/unsplash_doc.pdf", &Apply::All));
+		assert!(filters.matches("$HOME/Downloads/unsplash_image.jpg"));
+		assert!(!filters.matches("$HOME/Downloads/unsplash_doc.pdf"));
 	}
 
 	#[test]
 	fn match_any() {
 		let regex = Regex::from_str(".*unsplash.*").unwrap();
 		let filters = Filters(vec![Filter::Regex(regex), Filter::Regex(Regex::from_str(".*\\.jpg").unwrap())]);
-		assert!(filters.r#match("$HOME/Downloads/test.jpg", &Apply::Any))
+		assert!(filters.matches("$HOME/Downloads/test.jpg"))
 	}
 }

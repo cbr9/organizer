@@ -4,7 +4,7 @@ use serde::{Deserialize, Deserializer};
 use tera::Tera;
 
 use crate::{
-	config::options::Options,
+	config::options::FolderOptions,
 	path::{get_env_context, Expand},
 };
 
@@ -13,8 +13,8 @@ use crate::{
 pub struct Folder {
 	#[serde(deserialize_with = "deserialize_template_folder")]
 	pub path: PathBuf,
-	#[serde(flatten, default = "Options::default_none")]
-	pub options: Options,
+	#[serde(flatten, default = "FolderOptions::default_none")]
+	pub options: FolderOptions,
 	#[serde(default)]
 	pub interactive: bool,
 }
