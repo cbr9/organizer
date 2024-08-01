@@ -54,7 +54,13 @@ impl Run {
 		for rule in self.config.rules.iter() {
 			for folder in rule.folders.iter() {
 				let location = folder.path.as_path();
-				let walker = self.config.path_to_recursive.get(location).unwrap().to_walker(location);
+				let walker = self
+					.config
+					.path_to_recursive
+					.get(location)
+					.unwrap()
+					.to_walker(location)
+					.max_depth(1);
 				'entries: for entry in walker.into_iter() {
 					let Ok(entry) = entry else { continue };
 					let mut entry = entry.into_path();
