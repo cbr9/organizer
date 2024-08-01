@@ -219,7 +219,7 @@ impl Config {
 			.read_dir()
 			.context("Cannot determine directory content")?
 			.find_map(|file| {
-				let mut path = file.ok()?.path();
+				let path = file.ok()?.path();
 				if path.is_dir() && path.file_stem()?.to_string_lossy().ends_with(PROJECT_NAME) {
 					return Some(path.join("config.toml"));
 				} else if path.file_stem()?.to_string_lossy().ends_with(PROJECT_NAME) && path.extension()? == "toml" {

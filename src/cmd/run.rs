@@ -1,10 +1,9 @@
-use std::{collections::HashMap, iter::FromIterator, path::PathBuf};
+use std::{path::PathBuf};
 
 use anyhow::Result;
 use clap::Parser;
 
 use organize_core::config::{actions::ActionRunner, filters::AsFilter, Config};
-use tera::{Context, Tera};
 
 use crate::{Cmd, CONFIG};
 
@@ -23,8 +22,8 @@ impl Cmd for Run {
 impl Run {
 	pub(crate) fn start(self) -> Result<()> {
 		let config = CONFIG.get_or_init(|| match self.config {
-			Some(ref path) => Config::parse(path).unwrap(),
-			None => Config::parse(Config::path().unwrap()).unwrap(),
+			Some(ref path) => Config::parse(path).expect("Could not parse config"),
+			None => Config::parse(Config::path().unwrap()).expect("Could not parse config"),
 		});
 
 		for rule in config.rules.iter() {

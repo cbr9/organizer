@@ -29,12 +29,3 @@ impl AsRef<Self> for Apply {
 		self
 	}
 }
-
-impl ToString for Apply {
-	fn to_string(&self) -> String {
-		match self {
-			Apply::All => "all".into(),
-			Apply::Any => "any".into(),
-		}
-	}
-}

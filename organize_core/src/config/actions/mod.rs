@@ -29,6 +29,7 @@ pub trait ActionRunner {
 }
 
 impl<T: ActionPipeline> ActionRunner for T {
+	#[allow(clippy::nonminimal_bool)]
 	fn run<P: AsRef<Path> + Into<PathBuf> + Clone>(&self, src: P) -> Result<Option<PathBuf>> {
 		let dest = self.get_target_path(src.clone());
 		if let Ok(dest) = dest {

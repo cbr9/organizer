@@ -1,7 +1,7 @@
 [package]
 name = "organize"
-version = "0.2.0"
-authors = ["KBR9 <cabero96@protonmail.com>"]
+version = "0.3.0"
+authors = ["KBR9 <cabero96@gmail.com>"]
 edition = "2018"
 description = "file butler for the poweruser"
 repository = "https://github.com/cbr9/organize"

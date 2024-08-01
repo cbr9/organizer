@@ -1,7 +1,6 @@
 use std::{path::Path, str::FromStr};
 
 use crate::config::filters::AsFilter;
-use derive_more::Deref;
 use serde::{Deserialize, Deserializer};
 use std::convert::TryFrom;
 

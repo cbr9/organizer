@@ -1,5 +1,4 @@
 use crate::config::filters::AsFilter;
-use derive_more::Deref;
 use mime::FromStrError;
 use serde::{Deserialize, Deserializer};
 use std::{convert::TryFrom, path::Path, str::FromStr};

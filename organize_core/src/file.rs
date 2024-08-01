@@ -1,5 +1,5 @@
 use crate::{
-	config::{actions::ActionRunner, options::r#match::Match, Config},
+	config::{options::r#match::Match, Config},
 	path::IsHidden,
 };
 use std::{
@@ -15,21 +15,6 @@ pub struct File<'a> {
 impl<'a> File<'a> {
 	pub fn new<T: Into<PathBuf>>(path: T, config: &'a Config) -> Self {
 		Self { path: path.into(), config }
-	}
-
-	pub fn act(mut self, path_to_rules: &'a HashMap<PathBuf, Vec<(usize, usize)>>) {
-		let rules = self.get_matching_rules(path_to_rules);
-		for (i, j) in rules {
-			let rule = &self.config.rules[*i];
-			for action in rule.actions.iter() {
-				match action.run(self.path.as_path()).unwrap() {
-					None => break,
-					Some(new_path) => {
-						self.path = new_path;
-					}
-				}
-			}
-		}
 	}
 
 	fn filter_by_recursive<T: AsRef<Path>>(&self, ancestor: T, rule: usize, folder: usize) -> bool {

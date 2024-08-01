@@ -1,7 +1,7 @@
 [package]
 name = "organize_core"
-version = "0.1.0"
-authors = ["KBR9 <cabero96@protonmail.com>"]
+version = "0.3.0"
+authors = ["KBR9 <cabero96@gmail.com>"]
 edition = "2018"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -38,6 +38,7 @@ derive-new = "0.5.9"
 config-rs = "0.1.3"
 tera = "1.20.0"
 sha256 = "1.5.0"
+lazy_static = "1.5.0"
 
 [dev-dependencies]
 pretty_assertions = "1.3.0"

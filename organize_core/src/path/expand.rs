@@ -1,9 +1,6 @@
-use anyhow::{anyhow, Context, Result};
 use std::{
-	env,
-	ffi::{OsStr, OsString},
-	iter::FromIterator,
-	path::{Path, PathBuf},
+	ffi::{OsStr},
+	path::{PathBuf},
 };
 
 pub trait Expand {

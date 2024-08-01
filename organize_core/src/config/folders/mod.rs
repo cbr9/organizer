@@ -1,15 +1,12 @@
 use std::path::PathBuf;
 
-use anyhow::Context;
 use serde::{Deserialize, Deserializer};
 use tera::Tera;
 
 use crate::{
 	config::options::Options,
-	path::{get_context, get_env_context, Expand},
-	utils::DefaultOpt,
+	path::{get_env_context, Expand},
 };
-use std::convert::TryFrom;
 
 #[derive(Deserialize, Debug, PartialEq, Eq, Clone)]
 #[serde(deny_unknown_fields)]
