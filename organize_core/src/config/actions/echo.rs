@@ -32,7 +32,7 @@ impl ActionPipeline for Echo {
 		_: Option<P>,
 	) -> Result<String> {
 		let context = get_context(&src);
-		let message = Tera::one_off(&self.message, &context, true)?;
+		let message = Tera::one_off(&self.message, &context, false)?;
 		Ok(format!("(ECHO) {}", message))
 	}
 }
