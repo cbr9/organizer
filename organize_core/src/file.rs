@@ -10,16 +10,11 @@ use std::{
 pub struct File<'a> {
 	pub path: PathBuf,
 	config: &'a Config,
-	is_watching: bool,
 }
 
 impl<'a> File<'a> {
-	pub fn new<T: Into<PathBuf>>(path: T, config: &'a Config, is_watching: bool) -> Self {
-		Self {
-			path: path.into(),
-			config,
-			is_watching,
-		}
+	pub fn new<T: Into<PathBuf>>(path: T, config: &'a Config) -> Self {
+		Self { path: path.into(), config }
 	}
 
 	pub fn act(mut self, path_to_rules: &'a HashMap<PathBuf, Vec<(usize, usize)>>) {
@@ -86,16 +81,11 @@ impl<'a> File<'a> {
 		true
 	}
 
-	fn filter_by_watch(&self, rule: usize, folder: usize) -> bool {
-		!self.is_watching || *self.config.allows_watching(rule, folder)
-	}
-
 	fn filter_by_options<T: AsRef<Path>>(&self, ancestor: T, rule: usize, folder: usize) -> bool {
 		self.filter_by_recursive(ancestor, rule, folder)
 			&& self.filter_by_hidden_files(rule, folder)
 			&& self.filter_by_ignored_dirs(rule, folder)
 			&& self.filter_by_partial_files(rule, folder)
-			&& self.filter_by_watch(rule, folder)
 	}
 
 	fn filter_by_filters(&self, rule: usize, folder: usize) -> bool {

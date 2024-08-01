@@ -10,14 +10,15 @@ use crate::config::options::recursive::Recursive;
 use anyhow::{Context, Result};
 use apply::Apply;
 use serde::{Deserialize, Serialize};
-use std::fs;
-use std::path::{Path, PathBuf};
+use std::{
+	fs,
+	path::{Path, PathBuf},
+};
 
 #[derive(Deserialize, Serialize, Debug, Clone, Eq, PartialEq)]
 pub struct Options {
 	/// defines whether or not subdirectories must be scanned
 	pub recursive: Recursive,
-	pub watch: Option<bool>,
 	pub ignored_dirs: Option<Vec<PathBuf>>,
 	pub hidden_files: Option<bool>,
 	pub r#match: Option<Match>,
@@ -42,7 +43,6 @@ impl DefaultOpt for Options {
 	fn default_none() -> Self {
 		Self {
 			recursive: DefaultOpt::default_none(),
-			watch: None,
 			ignored_dirs: None,
 			hidden_files: None,
 			partial_files: None,
@@ -54,7 +54,6 @@ impl DefaultOpt for Options {
 	fn default_some() -> Self {
 		Self {
 			recursive: DefaultOpt::default_some(),
-			watch: Some(true),
 			ignored_dirs: Some(Vec::new()),
 			hidden_files: Some(false),
 			partial_files: Some(false),

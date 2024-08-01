@@ -166,9 +166,6 @@ getters! {
 }
 
 getters! {
-	pub fn allows_watching(&self, rule: usize, folder: usize) -> bool {
-		watch
-	}
 	pub fn allows_partial_files(&self, rule: usize, folder: usize) -> bool {
 		partial_files
 	}
