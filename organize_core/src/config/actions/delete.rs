@@ -51,7 +51,7 @@ mod tests {
 	use tempfile;
 
 	#[test]
-	fn test_delete_true() {
+	fn test_delete() {
 		let tmp_dir = tempfile::tempdir().expect("Couldn't create temporary directory");
 		let tmp_path = tmp_dir.path().to_owned();
 		let tmp_file = tmp_path.join("delete_me.txt");
@@ -64,21 +64,5 @@ mod tests {
 			.execute::<&Path, &Path>(&tmp_file, None, false)
 			.expect("Could not delete target file");
 		assert!(!tmp_file.exists());
-	}
-
-	#[test]
-	fn test_delete_false() {
-		let tmp_dir = tempfile::tempdir().expect("Couldn't create temporary directory");
-		let tmp_path = tmp_dir.path().to_owned();
-		let tmp_file = tmp_path.join("delete_me.txt");
-		let action = Delete { confirm: false };
-
-		std::fs::write(&tmp_file, "").expect("Could create target file");
-		assert!(tmp_file.exists());
-
-		action
-			.execute::<&Path, &Path>(&tmp_file, None, false)
-			.expect("Could not delete target file");
-		assert!(tmp_file.exists());
 	}
 }

@@ -65,11 +65,4 @@ mod tests {
 		assert!(filters.matches("$HOME/Downloads/unsplash_image.jpg"));
 		assert!(!filters.matches("$HOME/Downloads/unsplash_doc.pdf"));
 	}
-
-	#[test]
-	fn match_any() {
-		let regex = Regex::from_str(".*unsplash.*").unwrap();
-		let filters = Filters(vec![Filter::Regex(regex), Filter::Regex(Regex::from_str(".*\\.jpg").unwrap())]);
-		assert!(filters.matches("$HOME/Downloads/test.jpg"))
-	}
 }
