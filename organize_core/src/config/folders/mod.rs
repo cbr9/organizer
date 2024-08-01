@@ -15,7 +15,7 @@ use std::convert::TryFrom;
 pub struct Folder {
 	#[serde(deserialize_with = "deserialize_template_folder")]
 	pub path: PathBuf,
-	#[serde(flatten, default)]
+	#[serde(flatten, default = "Options::default_none")]
 	pub options: Options,
 	#[serde(default)]
 	pub interactive: bool,
