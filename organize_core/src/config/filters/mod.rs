@@ -11,8 +11,10 @@ mod filename;
 mod mime;
 mod regex;
 
-use crate::config::filters::mime::MimeWrapper;
-use crate::config::{filters::regex::Regex, options::apply::Apply};
+use crate::config::{
+	filters::{mime::Mime, regex::Regex},
+	options::apply::Apply,
+};
 
 use super::actions::script::Script;
 
@@ -23,7 +25,7 @@ pub enum Filter {
 	Filename(Filename),
 	Extension(Extension),
 	Script(Script),
-	Mime(MimeWrapper),
+	Mime(Mime),
 }
 
 pub trait AsFilter {

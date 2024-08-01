@@ -5,7 +5,7 @@ use derive_more::Deref;
 use serde::{Deserialize, Deserializer};
 use std::convert::TryFrom;
 
-#[derive(Deserialize, Debug, Deref, Clone)]
+#[derive(Deserialize, Debug, Clone)]
 pub struct Regex {
 	#[serde(deserialize_with = "deserialize_patterns")]
 	patterns: Vec<regex::Regex>,
@@ -24,7 +24,10 @@ where
 
 impl PartialEq for Regex {
 	fn eq(&self, other: &Self) -> bool {
-		self.iter().zip(other.iter()).all(|(lhs, rhs)| lhs.as_str() == rhs.as_str())
+		self.patterns
+			.iter()
+			.zip(other.patterns.iter())
+			.all(|(lhs, rhs)| lhs.as_str() == rhs.as_str())
 	}
 }
 impl Eq for Regex {}
@@ -35,7 +38,7 @@ impl AsFilter for Regex {
 			None => false,
 			Some(filename) => {
 				let filename = filename.to_string_lossy();
-				self.iter().any(|re| re.is_match(&filename))
+				self.patterns.iter().any(|re| re.is_match(&filename))
 			}
 		}
 	}
