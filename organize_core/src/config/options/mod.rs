@@ -57,7 +57,7 @@ impl FolderOptions {
 		// filter by partial_files option
 		if path.is_file() {
 			let allows_partial_files = Self::partial_files(config, rule, folder);
-			if !allows_partial_files && path.is_file() {
+			if allows_partial_files && path.is_file() {
 				if let Some(extension) = path.extension() {
 					let partial_extensions = &["crdownload", "part", "download"];
 					let extension = extension.to_string_lossy();
@@ -67,13 +67,14 @@ impl FolderOptions {
 
 			// filter by hidden_files option
 			let allows_hidden_files = Self::hidden_files(config, rule, folder);
-			allowed = allowed && ((path.is_hidden() && allows_hidden_files) || !path.is_hidden());
+			let is_hidden = path.is_hidden();
+			allowed = allowed && ((is_hidden && allows_hidden_files) || !is_hidden);
 		}
 
 		if path.is_dir() {
 			// filter by ignored_dirs option
 			let ignored_dirs = Self::ignored_dirs(config, rule, folder);
-			let is_ignored_dir = !ignored_dirs.iter().any(|dir| path == dir);
+			let is_ignored_dir = ignored_dirs.iter().any(|dir| path == dir);
 			allowed = allowed && is_ignored_dir;
 		}
 
