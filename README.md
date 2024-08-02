@@ -10,3 +10,4 @@ TODO:
 - [x] integrate external templating library
 - [ ] file content filter
 - [ ] compressed file extraction action
+- [x] refactor 
