@@ -15,8 +15,8 @@ pub struct Echo {
 }
 
 impl ActionPipeline for Echo {
-	const TYPE: ActionType = ActionType::Echo;
 	const REQUIRES_DEST: bool = false;
+	const TYPE: ActionType = ActionType::Echo;
 
 	fn execute<T: AsRef<Path> + Into<PathBuf> + Clone, P: AsRef<Path> + Into<PathBuf> + Clone>(
 		&self,
@@ -35,7 +35,7 @@ impl ActionPipeline for Echo {
 	) -> Result<String> {
 		let context = get_context(&src);
 		let message = Tera::one_off(&self.message, &context, false)?;
-		let hint = if simulated { "ECHO" } else { "SIMULATED ECHO" };
+		let hint = if !simulated { "ECHO" } else { "SIMULATED ECHO" };
 		Ok(format!("({}) {}", hint, message))
 	}
 }
