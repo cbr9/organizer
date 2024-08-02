@@ -13,35 +13,43 @@ use crate::{Cmd, CONFIG};
 pub struct Run {
 	#[arg(long, short = 'c')]
 	config: Option<PathBuf>,
-	#[arg(long, short = 't')]
+	#[arg(long, conflicts_with = "name", help = "A comma-separated list of tags used to select the rules to be run")]
 	tags: Option<String>,
-	#[arg(long)]
+	#[arg(long, conflicts_with = "name", help = "A comma-separated list of tags used to filter out rules")]
 	skip_tags: Option<String>,
+	#[arg(long, help = "Select specific rules to be run by their IDs")]
+	rules: Option<String>,
 	#[arg(long)]
 	dry_run: bool,
 }
 
 impl Run {
 	fn filter_rules(&self, rule: &Rule) -> bool {
-		let chosen_tags = self.tags.clone().unwrap_or_default();
-		let skipped_tags = self.skip_tags.clone().unwrap_or_default();
-		let chosen_tags: HashSet<&str> = chosen_tags.split(',').collect();
-		let skipped_tags: HashSet<&str> = skipped_tags.split(',').collect();
-		rule.tags.iter().all(|tag| {
-			if tag == "always" {
-				return !skipped_tags.contains(tag.as_str());
-			}
+		if let Some(ids) = self.rules.as_ref() {
+			let ids: Vec<String> = ids.split(',').map(|s| s.to_string()).collect();
+			return rule.id.as_ref().is_some_and(|id| ids.contains(id));
+		} else if self.tags.is_some() || self.skip_tags.is_some() {
+			let chosen_tags = self.tags.clone().unwrap_or_default();
+			let skipped_tags = self.skip_tags.clone().unwrap_or_default();
+			let chosen_tags: HashSet<&str> = chosen_tags.split(',').collect();
+			let skipped_tags: HashSet<&str> = skipped_tags.split(',').collect();
+			return rule.tags.iter().all(|tag| {
+				if tag == "always" {
+					return !skipped_tags.contains(tag.as_str());
+				}
 
-			if tag == "never" {
-				return chosen_tags.contains(tag.as_str());
-			}
+				if tag == "never" {
+					return chosen_tags.contains(tag.as_str());
+				}
 
-			chosen_tags
-				.difference(&skipped_tags)
-				.map(|s| s.to_string())
-				.collect::<HashSet<String>>()
-				.contains(tag)
-		})
+				return chosen_tags
+					.difference(&skipped_tags)
+					.map(|s| s.to_string())
+					.collect::<HashSet<String>>()
+					.contains(tag);
+			});
+		}
+		true
 	}
 }
 

@@ -8,7 +8,7 @@ use super::{actions::Action, filters::Filters, folders::Folders, options::Folder
 
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
 pub struct Rule {
-	pub name: Option<String>,
+	pub id: Option<String>,
 	#[serde(default)]
 	pub tags: HashSet<String>,
 	pub actions: Vec<Action>,
@@ -21,7 +21,7 @@ pub struct Rule {
 impl Default for Rule {
 	fn default() -> Self {
 		Self {
-			name: None,
+			id: None,
 			tags: HashSet::new(),
 			actions: vec![],
 			filters: Filters(vec![]),
