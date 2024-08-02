@@ -33,7 +33,7 @@ impl Run {
 			let skipped_tags = self.skip_tags.clone().unwrap_or_default();
 			let chosen_tags: HashSet<&str> = chosen_tags.split(',').collect();
 			let skipped_tags: HashSet<&str> = skipped_tags.split(',').collect();
-			return rule.tags.iter().all(|tag| {
+			return rule.tags.iter().any(|tag| {
 				if tag == "always" {
 					return !skipped_tags.contains(tag.as_str());
 				}
