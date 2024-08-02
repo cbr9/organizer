@@ -1,7 +1,7 @@
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
-use dialoguer::Confirm;
+use dialoguer::{theme::ColorfulTheme, Confirm};
 use serde::Deserialize;
 
 use crate::path::prepare_target_path;
@@ -41,7 +41,7 @@ impl ActionPipeline for Symlink {
 
 	fn confirm<T: AsRef<Path> + Into<PathBuf> + Clone, P: AsRef<Path> + Into<PathBuf> + Clone>(&self, src: T, dest: Option<P>) -> Result<bool> {
 		if self.confirm {
-			Confirm::new()
+			Confirm::with_theme(&ColorfulTheme::default())
 				.with_prompt(format!(
 					"Symlink {} to {}?",
 					src.as_ref().display(),
