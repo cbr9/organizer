@@ -34,6 +34,7 @@ impl Default for ContinueWith {
 impl ActionPipeline for Symlink {
 	const REQUIRES_DEST: bool = true;
 	const TYPE: ActionType = ActionType::Symlink;
+
 	fn get_target_path<T: AsRef<Path> + Into<PathBuf> + Clone>(&self, src: T) -> Result<Option<PathBuf>> {
 		prepare_target_path(&self.on_conflict, src.as_ref(), self.to.as_path())
 	}
@@ -53,20 +54,32 @@ impl ActionPipeline for Symlink {
 		}
 	}
 
-	#[cfg(target_family = "unix")]
 	fn execute<T: AsRef<Path> + Into<PathBuf> + Clone, P: AsRef<Path> + Into<PathBuf> + Clone>(
 		&self,
 		src: T,
 		dest: Option<P>,
 		simulated: bool,
 	) -> Result<Option<PathBuf>> {
+		let dest = dest.unwrap();
 		if !simulated {
-			std::os::unix::fs::symlink(src.as_ref(), dest.as_ref().unwrap()).with_context(|| "Failed to symlink file")?;
+			Self::atomic(&src, &dest).with_context(|| "Failed to symlink file")?;
 		}
 		if self.continue_with == ContinueWith::Link {
-			Ok(Some(dest.unwrap().into()))
+			Ok(Some(dest.into()))
 		} else {
 			Ok(Some(src.into()))
 		}
+	}
+}
+
+impl Symlink {
+	#[cfg(target_family = "unix")]
+	fn atomic<T: AsRef<Path>, P: AsRef<Path>>(src: T, dest: P) -> std::io::Result<()> {
+		std::os::unix::fs::symlink(src.as_ref(), dest.as_ref())
+	}
+
+	#[cfg(target_family = "windows")]
+	fn atomic<T: AsRef<Path>, P: AsRef<Path>>(src: T, dest: P) -> std::io::Result<()> {
+		std::os::windows::fs::symlink_file(src.as_ref(), dest.as_ref())
 	}
 }
