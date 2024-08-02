@@ -1,12 +1,14 @@
 use std::{
 	collections::HashMap,
-	path::{Path, PathBuf},
+	path::{Path, PathBuf, MAIN_SEPARATOR},
 };
 
 use anyhow::{bail, Result};
 use tera::{Context, Tera};
 
 use crate::config::actions::common::ConflictOption;
+
+use super::Expand;
 
 pub fn get_env_context() -> Context {
 	let mut environment = HashMap::new();
@@ -19,7 +21,7 @@ pub fn get_env_context() -> Context {
 }
 
 pub fn get_context<T: AsRef<Path>>(path: T) -> Context {
-	let mut context = tera::Context::new();
+	let mut context = Context::new();
 	let path = path.as_ref();
 	context.insert("path", &path.to_string_lossy());
 	if let Some(parent) = path.parent() {
@@ -49,14 +51,14 @@ pub fn prepare_target_path(on_conflict: &ConflictOption, src: &Path, dest: &Path
 
 	let context = get_context(src);
 	let mut to = match Tera::one_off(&dest.to_string_lossy(), &context, false) {
-		Ok(str) => PathBuf::from(str),
+		Ok(str) => PathBuf::from(str).expand_user(),
 		Err(e) => {
 			log::error!("{:?}", e);
 			bail!("something went wrong");
 		}
 	};
 
-	if to.extension().is_none() || to.is_dir() || to.to_string_lossy().ends_with('/') {
+	if to.extension().is_none() || to.is_dir() || to.to_string_lossy().ends_with(MAIN_SEPARATOR) {
 		let filename = src.file_name();
 		if filename.is_none() {
 			return Ok(None);

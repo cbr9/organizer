@@ -1,19 +1,19 @@
-use config::Config as LayeredConfig;
-use config::File;
+use config::{Config as LayeredConfig, File};
+use rule::Rule;
 use std::path::{Path, PathBuf};
 
-use actions::Action;
 use anyhow::{Context, Result};
 use serde::Deserialize;
 
 use crate::{utils::DefaultOpt, PROJECT_NAME};
 
-use self::{filters::Filters, folders::Folders, options::FolderOptions};
+use self::options::FolderOptions;
 
 pub mod actions;
 pub mod filters;
 pub mod folders;
 pub mod options;
+pub mod rule;
 
 #[derive(Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Config {
@@ -88,31 +88,6 @@ impl Config {
 					Ok(path.to_path_buf())
 				})
 				.context("could not determine config directory")
-		}
-	}
-}
-
-#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
-pub struct Rule {
-	pub name: Option<String>,
-	#[serde(default)]
-	pub tags: Vec<String>,
-	pub actions: Vec<Action>,
-	pub filters: Filters,
-	pub folders: Folders,
-	#[serde(default = "FolderOptions::default_none")]
-	pub options: FolderOptions,
-}
-
-impl Default for Rule {
-	fn default() -> Self {
-		Self {
-			name: None,
-			tags: vec![],
-			actions: vec![],
-			filters: Filters(vec![]),
-			folders: vec![],
-			options: FolderOptions::default_none(),
 		}
 	}
 }
