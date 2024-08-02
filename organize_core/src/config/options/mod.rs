@@ -6,8 +6,7 @@ use crate::utils::DefaultOpt;
 
 use crate::config::options::max_depth::MaxDepth;
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
-use walkdir::DirEntry;
+use std::path::{Path, PathBuf};
 
 use super::{folders::Folder, Config, Rule};
 
@@ -51,9 +50,9 @@ getters! {
 }
 
 impl FolderOptions {
-	pub fn allows_entry(config: &Config, rule: &Rule, folder: &Folder, entry: &DirEntry) -> bool {
+	pub fn allows_entry<T: AsRef<Path>>(config: &Config, rule: &Rule, folder: &Folder, path: T) -> bool {
 		let mut allowed = true;
-		let path = entry.path();
+		let path = path.as_ref();
 
 		// filter by partial_files option
 		if path.is_file() {

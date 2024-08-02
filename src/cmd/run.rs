@@ -32,26 +32,27 @@ impl Cmd for Run {
 
 				let mut entries = walker
 					.into_iter()
-					.filter_entry(|e| FolderOptions::allows_entry(config, rule, folder, e))
+					.filter_entry(|e| {
+						let path = e.path();
+						path.is_file() && FolderOptions::allows_entry(config, rule, folder, path) && rule.filters.matches(path)
+					})
 					.filter_map(|e| e.ok())
 					.map(|e| e.into_path())
 					.collect::<Vec<_>>();
 
 				entries.par_iter_mut().for_each(|entry| {
-					if entry.is_file() && rule.filters.matches(&entry) {
-						'actions: for action in rule.actions.iter() {
-							let new_path = match action.run(&entry, self.dry_run) {
-								Ok(path) => path,
-								Err(e) => {
-									log::error!("{}", e);
-									None
-								}
-							};
-							match new_path {
-								Some(path) => *entry = path,
-								None => break 'actions,
-							};
-						}
+					for action in rule.actions.iter() {
+						let new_path = match action.run(&entry, self.dry_run) {
+							Ok(path) => path,
+							Err(e) => {
+								log::error!("{}", e);
+								None
+							}
+						};
+						match new_path {
+							Some(path) => *entry = path,
+							None => break,
+						};
 					}
 				})
 			}
