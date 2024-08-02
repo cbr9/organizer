@@ -27,10 +27,7 @@ where
 	let str: String = String::deserialize(deserializer)?;
 	let context = get_env_context();
 	let tera = Tera::one_off(&str, &context, false).map_err(serde::de::Error::custom)?;
-	PathBuf::from(tera)
-		.canonicalize()
-		.map(|path| path.expand_user())
-		.map_err(|e| serde::de::Error::custom(e.to_string()))
+	Ok(PathBuf::from(tera).expand_user())
 }
 
 pub type Folders = Vec<Folder>;
