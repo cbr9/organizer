@@ -686,6 +686,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "dialoguer"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "658bce805d770f407bc62102fca7c2c64ceef2fbcb2b8bd19d2765ce093980de"
+dependencies = [
+ "console",
+ "shell-words",
+ "tempfile",
+ "thiserror",
+ "zeroize",
+]
+
+[[package]]
 name = "diff"
 version = "0.1.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1473,7 +1486,7 @@ dependencies = [
  "colored 2.1.0",
  "crossbeam-channel",
  "derive_more",
- "dialoguer",
+ "dialoguer 0.11.0",
  "dirs-next",
  "fern",
  "log",
@@ -1508,7 +1521,7 @@ dependencies = [
  "crossbeam-channel",
  "derive-new",
  "derive_more",
- "dialoguer",
+ "dialoguer 0.10.4",
  "dirs-next",
  "fern",
  "itertools",
