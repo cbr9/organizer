@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use serde::Deserialize;
 
 use crate::utils::DefaultOpt;
@@ -8,7 +10,7 @@ use super::{actions::Action, filters::Filters, folders::Folders, options::Folder
 pub struct Rule {
 	pub name: Option<String>,
 	#[serde(default)]
-	pub tags: Vec<String>,
+	pub tags: HashSet<String>,
 	pub actions: Vec<Action>,
 	pub filters: Filters,
 	pub folders: Folders,
@@ -20,7 +22,7 @@ impl Default for Rule {
 	fn default() -> Self {
 		Self {
 			name: None,
-			tags: vec![],
+			tags: HashSet::new(),
 			actions: vec![],
 			filters: Filters(vec![]),
 			folders: vec![],
