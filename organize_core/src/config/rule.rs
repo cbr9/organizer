@@ -11,6 +11,8 @@ pub struct Rule {
 	pub id: Option<String>,
 	#[serde(default)]
 	pub tags: HashSet<String>,
+	#[serde(default)]
+	pub r#continue: bool,
 	pub actions: Vec<Action>,
 	pub filters: Filters,
 	pub folders: Folders,
@@ -23,6 +25,7 @@ impl Default for Rule {
 		Self {
 			id: None,
 			tags: HashSet::new(),
+			r#continue: false,
 			actions: vec![],
 			filters: Filters(vec![]),
 			folders: vec![],

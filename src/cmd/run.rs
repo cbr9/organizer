@@ -1,4 +1,4 @@
-use std::{iter::FromIterator, path::PathBuf};
+use std::{collections::HashMap, iter::FromIterator, path::PathBuf};
 
 use anyhow::Result;
 use clap::{Parser, ValueHint};
@@ -13,9 +13,9 @@ use crate::{Cmd, CONFIG};
 pub struct Run {
 	#[arg(long, short = 'c', value_hint = ValueHint::FilePath)]
 	config: Option<PathBuf>,
-	#[arg(long, conflicts_with = "name", help = "A comma-separated list of tags used to select the rules to be run", value_hint = ValueHint::Other, value_parser = parse_comma_separated_values)]
+	#[arg(long, conflicts_with = "rules", help = "A comma-separated list of tags used to select the rules to be run", value_hint = ValueHint::Other, value_parser = parse_comma_separated_values)]
 	tags: Option<Vec<String>>,
-	#[arg(long, conflicts_with = "name", help = "A comma-separated list of tags used to filter out rules", value_hint = ValueHint::Other, value_parser = parse_comma_separated_values)]
+	#[arg(long, conflicts_with = "rules", help = "A comma-separated list of tags used to filter out rules", value_hint = ValueHint::Other, value_parser = parse_comma_separated_values)]
 	skip_tags: Option<Vec<String>>,
 	#[arg(long, help = "Select specific rules to be run by their IDs", value_hint = ValueHint::Other, value_parser = parse_comma_separated_values)]
 	rules: Option<Vec<String>>,
@@ -36,10 +36,10 @@ fn parse_comma_separated_values(s: &str) -> Result<Vec<String>, String> {
 }
 
 impl Run {
-	fn choose_tags(prompt: &str, all_tags: &Vec<String>) -> Option<Vec<String>> {
+	fn choose_tags(prompt: &str, all_tags: &[String]) -> Option<Vec<String>> {
 		let tags = MultiSelect::with_theme(&ColorfulTheme::default())
 			.with_prompt(prompt)
-			.items(&all_tags)
+			.items(all_tags)
 			.interact_opt()
 			.unwrap()
 			.unwrap_or_default();
@@ -55,10 +55,10 @@ impl Run {
 		);
 	}
 
-	fn choose_ids(all_ids: &Vec<String>) -> Option<Vec<String>> {
+	fn choose_ids(all_ids: &[String]) -> Option<Vec<String>> {
 		let ids = MultiSelect::with_theme(&ColorfulTheme::default())
 			.with_prompt("Choose rules")
-			.items(&all_ids)
+			.items(all_ids)
 			.interact_opt()
 			.unwrap()
 			.unwrap_or_default();
@@ -74,7 +74,7 @@ impl Run {
 		);
 	}
 
-	fn choose_filters(&mut self, all_tags: &Vec<String>, all_ids: &Vec<String>) {
+	fn choose_filters(&mut self, all_tags: &[String], all_ids: &[String]) {
 		self.interactive_filter = false;
 		let modes = &["Select tags", "Skip tags", "ID"];
 		let mode = Select::with_theme(&ColorfulTheme::default())
@@ -106,7 +106,7 @@ impl Run {
 				}
 				self.rules = Self::choose_ids(all_ids);
 			}
-			_ => return,
+			_ => (),
 		}
 	}
 
@@ -146,17 +146,20 @@ impl Cmd for Run {
 			None => Config::new(Config::path().unwrap()).expect("Could not parse config"),
 		});
 
+		let mut processed_files: HashMap<PathBuf, &Rule> = HashMap::new();
 		let all_tags: Vec<String> = config.rules.iter().flat_map(|rule| &rule.tags).cloned().collect();
 		let all_ids: Vec<String> = config.rules.iter().filter_map(|rule| rule.id.clone()).collect();
-		let dry_run = self.dry_run.clone();
-		let filtered_rules = config.rules.iter().filter(|rule| self.filter_rules(rule, &all_tags, &all_ids));
+		let filtered_rules: Vec<Rule> = config
+			.rules
+			.iter()
+			.filter(|rule| self.filter_rules(rule, &all_tags, &all_ids))
+			.cloned()
+			.collect();
 
-		for rule in filtered_rules {
+		for rule in filtered_rules.iter() {
 			for folder in rule.folders.iter() {
 				let location = folder.path.as_path();
-				let walker = FolderOptions::max_depth(config, rule, folder)
-					.to_walker(location)
-					.sort_by_file_name();
+				let walker = FolderOptions::max_depth(config, rule, folder).to_walker(location);
 
 				let mut entries = walker
 					.into_iter()
@@ -168,21 +171,25 @@ impl Cmd for Run {
 					.map(|e| e.into_path())
 					.collect::<Vec<_>>();
 
-				entries.iter_mut().for_each(|entry| {
-					for action in rule.actions.iter() {
-						let new_path = match action.run(&entry, dry_run) {
-							Ok(path) => path,
-							Err(e) => {
-								log::error!("{}", e);
-								None
-							}
-						};
-						match new_path {
-							Some(path) => *entry = path,
-							None => break,
+				dbg!(&entries);
+
+				for entry in entries.iter_mut() {
+					if let Some(last_rule) = processed_files.get(entry) {
+						if !last_rule.r#continue {
+							continue;
+						}
+					}
+					'actions: for action in rule.actions.iter() {
+						*entry = match action.run(&entry, self.dry_run)? {
+							Some(path) => path,
+							None => break 'actions,
 						};
 					}
-				})
+					processed_files
+						.entry(entry.clone())
+						.and_modify(|value| *value = rule)
+						.or_insert(rule);
+				}
 			}
 		}
 		Ok(())

@@ -2,7 +2,7 @@ use config::{Config as LayeredConfig, File};
 use rule::Rule;
 use std::path::{Path, PathBuf};
 
-use anyhow::{Context, Result};
+use anyhow::{Context as ErrorContext, Result};
 use serde::Deserialize;
 
 use crate::{utils::DefaultOpt, PROJECT_NAME};
@@ -22,6 +22,11 @@ pub struct Config {
 	pub path: PathBuf,
 	#[serde(rename = "defaults", default = "FolderOptions::default_none")]
 	pub defaults: FolderOptions,
+}
+
+pub struct Context {
+	pub current_rule: usize,
+	pub current_folder: usize,
 }
 
 impl Config {
