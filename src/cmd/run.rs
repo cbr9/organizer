@@ -13,11 +13,11 @@ use crate::{Cmd, CONFIG};
 pub struct Run {
 	#[arg(long, short = 'c', value_hint = ValueHint::FilePath)]
 	config: Option<PathBuf>,
-	#[arg(long, conflicts_with = "rules", help = "A comma-separated list of tags used to select the rules to be run", value_hint = ValueHint::Other, value_parser = parse_comma_separated_values)]
+	#[arg(long, conflicts_with = "rules", help = "A comma-separated list of tags used to select the rules to be run", value_parser = parse_comma_separated_values)]
 	tags: Option<Vec<String>>,
-	#[arg(long, conflicts_with = "rules", help = "A comma-separated list of tags used to filter out rules", value_hint = ValueHint::Other, value_parser = parse_comma_separated_values)]
+	#[arg(long, conflicts_with = "rules", help = "A comma-separated list of tags used to filter out rules", value_parser = parse_comma_separated_values)]
 	skip_tags: Option<Vec<String>>,
-	#[arg(long, help = "Select specific rules to be run by their IDs", value_hint = ValueHint::Other, value_parser = parse_comma_separated_values)]
+	#[arg(long, help = "Select specific rules to be run by their IDs", value_parser = parse_comma_separated_values)]
 	rules: Option<Vec<String>>,
 	#[arg(long, short = 'i', conflicts_with_all = ["rules", "tags", "skip_tags"], help = "Filter out rules in an interactive way")]
 	interactive_filter: bool,
@@ -36,42 +36,21 @@ fn parse_comma_separated_values(s: &str) -> Result<Vec<String>, String> {
 }
 
 impl Run {
-	fn choose_tags(prompt: &str, all_tags: &[String]) -> Option<Vec<String>> {
-		let tags = MultiSelect::with_theme(&ColorfulTheme::default())
+	fn choose(prompt: &str, items: &[String]) -> Vec<String> {
+		let choice = MultiSelect::with_theme(&ColorfulTheme::default())
 			.with_prompt(prompt)
-			.items(all_tags)
+			.items(items)
 			.interact_opt()
 			.unwrap()
 			.unwrap_or_default();
 
-		return Some(
-			all_tags
-				.iter()
-				.enumerate()
-				.filter(|(i, _)| tags.contains(i))
-				.map(|(_, tag)| tag)
-				.cloned()
-				.collect(),
-		);
-	}
-
-	fn choose_ids(all_ids: &[String]) -> Option<Vec<String>> {
-		let ids = MultiSelect::with_theme(&ColorfulTheme::default())
-			.with_prompt("Choose rules")
-			.items(all_ids)
-			.interact_opt()
-			.unwrap()
-			.unwrap_or_default();
-
-		return Some(
-			all_ids
-				.iter()
-				.enumerate()
-				.filter(|(i, _)| ids.contains(i))
-				.map(|(_, tag)| tag)
-				.cloned()
-				.collect(),
-		);
+		return items
+			.iter()
+			.enumerate()
+			.filter(|(i, _)| choice.contains(i))
+			.map(|(_, tag)| tag)
+			.cloned()
+			.collect();
 	}
 
 	fn choose_filters(&mut self, all_tags: &[String], all_ids: &[String]) {
@@ -90,21 +69,21 @@ impl Run {
 					println!("There are no rules with an associated tag");
 					return;
 				}
-				self.tags = Self::choose_tags("Tags", all_tags)
+				self.tags = Some(Self::choose("Tags", all_tags))
 			}
 			1 => {
 				if all_tags.is_empty() {
 					println!("There are no rules with an associated tag");
 					return;
 				}
-				self.skip_tags = Self::choose_tags("Skip Tags", all_tags)
+				self.skip_tags = Some(Self::choose("Skip Tags", all_tags))
 			}
 			2 => {
 				if all_ids.is_empty() {
 					println!("There are no rules with an associated ID");
 					return;
 				}
-				self.rules = Self::choose_ids(all_ids);
+				self.rules = Some(Self::choose("IDs", all_ids));
 			}
 			_ => (),
 		}
@@ -170,8 +149,6 @@ impl Cmd for Run {
 					.filter_map(|e| e.ok())
 					.map(|e| e.into_path())
 					.collect::<Vec<_>>();
-
-				dbg!(&entries);
 
 				for entry in entries.iter_mut() {
 					if let Some(last_rule) = processed_files.get(entry) {
