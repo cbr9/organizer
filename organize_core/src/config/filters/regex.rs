@@ -5,6 +5,7 @@ use serde::{Deserialize, Deserializer};
 use std::convert::TryFrom;
 
 #[derive(Deserialize, Debug, Clone)]
+#[serde(deny_unknown_fields)]
 pub struct Regex {
 	#[serde(deserialize_with = "deserialize_patterns")]
 	patterns: Vec<regex::Regex>,

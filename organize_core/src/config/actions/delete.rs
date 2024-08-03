@@ -12,6 +12,7 @@ fn enabled() -> bool {
 }
 
 #[derive(Debug, Clone, Deserialize, Default, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct Delete {
 	#[serde(default = "enabled")]
 	pub confirm: bool,

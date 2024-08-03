@@ -4,6 +4,7 @@ use crate::config::filters::AsFilter;
 use serde::Deserialize;
 
 #[derive(Eq, PartialEq, Deserialize, Debug, Clone, Default)]
+#[serde(deny_unknown_fields)]
 pub struct Filename {
 	pub startswith: Option<String>,
 	pub endswith: Option<String>,

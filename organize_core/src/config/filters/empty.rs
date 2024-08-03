@@ -3,6 +3,7 @@ use serde::Deserialize;
 use super::AsFilter;
 
 #[derive(Eq, PartialEq, Deserialize, Debug, Clone, Default)]
+#[serde(deny_unknown_fields)]
 pub struct Empty;
 
 impl AsFilter for Empty {

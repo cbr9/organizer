@@ -11,6 +11,7 @@ use std::path::{Path, PathBuf};
 use super::{folders::Folder, Config, Rule};
 
 #[derive(Deserialize, Serialize, Debug, Clone, Eq, PartialEq)]
+#[serde(deny_unknown_fields)]
 pub struct FolderOptions {
 	/// defines whether or not subdirectories must be scanned
 	pub max_depth: Option<MaxDepth>,

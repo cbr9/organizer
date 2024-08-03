@@ -17,6 +17,7 @@ use anyhow::{bail, Result};
 use super::ActionPipeline;
 
 #[derive(Deserialize, Debug, Clone, Default, Eq, PartialEq)]
+#[serde(deny_unknown_fields)]
 pub struct Script {
 	exec: String,
 	#[serde(default)]

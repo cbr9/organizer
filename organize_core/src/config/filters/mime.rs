@@ -14,6 +14,7 @@ impl FromStr for Mime {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Mime {
 	#[serde(deserialize_with = "deserialize_mimetypes")]
 	types: Vec<mime::Mime>,

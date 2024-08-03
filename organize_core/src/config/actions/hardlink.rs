@@ -9,6 +9,7 @@ use crate::path::prepare_target_path;
 use super::{common::ConflictOption, ActionPipeline, ActionType};
 
 #[derive(Deserialize, Debug, Clone, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct Hardlink {
 	to: PathBuf,
 	#[serde(default)]

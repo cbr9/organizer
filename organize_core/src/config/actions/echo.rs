@@ -10,6 +10,7 @@ use anyhow::Result;
 use super::ActionPipeline;
 
 #[derive(Debug, Clone, Deserialize, Deref, Default, Eq, PartialEq)]
+#[serde(deny_unknown_fields)]
 pub struct Echo {
 	message: String,
 }
