@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 
+use path_clean::PathClean;
 use serde::{Deserialize, Deserializer};
 use tera::Tera;
 
@@ -27,7 +28,7 @@ where
 	let str: String = String::deserialize(deserializer)?;
 	let context = get_env_context();
 	let tera = Tera::one_off(&str, &context, false).map_err(serde::de::Error::custom)?;
-	Ok(PathBuf::from(tera).expand_user())
+	Ok(PathBuf::from(tera).expand_user().clean())
 }
 
 pub type Folders = Vec<Folder>;

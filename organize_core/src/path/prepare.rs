@@ -1,3 +1,4 @@
+use path_clean::PathClean;
 use std::{
 	collections::HashMap,
 	path::{Path, PathBuf, MAIN_SEPARATOR},
@@ -51,7 +52,7 @@ pub fn prepare_target_path(on_conflict: &ConflictOption, src: &Path, dest: &Path
 
 	let context = get_context(src);
 	let mut to = match Tera::one_off(&dest.to_string_lossy(), &context, false) {
-		Ok(str) => PathBuf::from(str).expand_user(),
+		Ok(str) => PathBuf::from(str).expand_user().clean(),
 		Err(e) => {
 			log::error!("{:?}", e);
 			bail!("something went wrong");
