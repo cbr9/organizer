@@ -9,12 +9,10 @@ repository = "https://github.com/cbr9/organize"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-notify = "5.1.0"
 crossbeam-channel = "0.5.8"
 regex = "1.7.3"
 clap = { version = "4.2.2", features = ["derive"] }
 serde = { version = "1.0.160", features = ["derive"] }
-serde_yaml = "0.9.21"
 chrono = "0.4.24"
 colored = "2.0.0"
 tempfile = "3"
