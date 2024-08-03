@@ -6,7 +6,7 @@ use crate::utils::DefaultOpt;
 
 use super::{actions::Action, filters::Filters, folders::Folders, options::FolderOptions};
 
-#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Deserialize, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct Rule {
 	pub id: Option<String>,

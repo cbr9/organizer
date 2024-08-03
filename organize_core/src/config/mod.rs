@@ -15,7 +15,7 @@ pub mod folders;
 pub mod options;
 pub mod rule;
 
-#[derive(Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Deserialize, Clone, Debug, PartialEq)]
 pub struct Config {
 	pub rules: Vec<Rule>,
 	#[serde(skip)]

@@ -9,7 +9,7 @@ use crate::{
 	path::{get_env_context, Expand},
 };
 
-#[derive(Deserialize, Debug, PartialEq, Eq, Clone)]
+#[derive(Deserialize, Debug, PartialEq, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct Folder {
 	#[serde(deserialize_with = "deserialize_template_folder")]

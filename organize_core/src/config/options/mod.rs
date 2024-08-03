@@ -5,15 +5,14 @@ use crate::path::IsHidden;
 use crate::utils::DefaultOpt;
 
 use crate::config::options::max_depth::MaxDepth;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize};
 use std::path::{Path, PathBuf};
 
 use super::{folders::Folder, Config, Rule};
 
-#[derive(Deserialize, Serialize, Debug, Clone, Eq, PartialEq)]
+#[derive(Deserialize, Debug, Clone, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct FolderOptions {
-	/// defines whether or not subdirectories must be scanned
 	pub max_depth: Option<MaxDepth>,
 	pub ignored_dirs: Option<Vec<PathBuf>>,
 	pub hidden_files: Option<bool>,
