@@ -51,20 +51,17 @@ getters! {
 
 impl FolderOptions {
 	pub fn allows_entry<T: AsRef<Path>>(config: &Config, rule: &Rule, folder: &Folder, path: T) -> bool {
-		let mut allowed = true;
 		let path = path.as_ref();
 
 		// filter by partial_files option
 		if path.is_file() {
 			let allows_partial_files = Self::partial_files(config, rule, folder);
-			if allows_partial_files {
-				if let Some(extension) = path.extension() {
-					let partial_extensions = &["crdownload", "part", "download"];
-					let extension = extension.to_string_lossy();
-					let is_partial = partial_extensions.contains(&&*extension);
-					if is_partial && !allows_partial_files {
-						return false;
-					}
+			if let Some(extension) = path.extension() {
+				let partial_extensions = &["crdownload", "part", "download"];
+				let extension = extension.to_string_lossy();
+				let is_partial = partial_extensions.contains(&&*extension);
+				if is_partial && !allows_partial_files {
+					return false;
 				}
 			}
 
