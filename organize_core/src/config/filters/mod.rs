@@ -1,12 +1,14 @@
 use std::path::Path;
 
 use derive_more::Deref;
+use empty::Empty;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use serde::Deserialize;
 
 use extension::Extension;
 use filename::Filename;
 
+mod empty;
 mod extension;
 mod filename;
 mod mime;
@@ -20,6 +22,7 @@ use super::actions::script::Script;
 #[serde(tag = "type", rename_all(deserialize = "lowercase"))]
 pub enum Filter {
 	Regex(Regex),
+	Empty(Empty),
 	Filename(Filename),
 	Extension(Extension),
 	Script(Script),
@@ -40,6 +43,7 @@ impl AsFilter for Filter {
 			Filter::Extension(extension) => extension.matches(path),
 			Filter::Script(script) => script.matches(path),
 			Filter::Mime(mime) => mime.matches(path),
+			Filter::Empty(empty) => empty.matches(path),
 			Filter::Group { filters } => filters.par_iter().any(|f| f.matches(path)),
 		}
 	}
