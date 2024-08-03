@@ -34,6 +34,9 @@ impl<T: ActionPipeline> ActionRunner for T {
 		let dest = self.get_target_path(src.clone());
 		if let Ok(dest) = dest {
 			if (Self::REQUIRES_DEST && dest.is_some()) || !Self::REQUIRES_DEST {
+				if Self::REQUIRES_DEST && dest.is_some() && src.as_ref() == dest.as_ref().unwrap() {
+					return Ok(dest);
+				}
 				let confirmation = self.confirm(src.clone(), dest.clone())?;
 				let src = src.into();
 
