@@ -4,11 +4,10 @@ use filters::{Extension, Filename, Mime, Parent, Stem};
 use lazy_static::lazy_static;
 use tera::{Context, Tera};
 
-use crate::path::get_env_context;
 pub mod filters;
 
 lazy_static! {
-	pub static ref CONTEXT: Mutex<Context> = Mutex::new(get_env_context());
+	pub static ref CONTEXT: Mutex<Context> = Mutex::new(Context::new());
 	pub static ref TERA: Mutex<Tera> = {
 		let mut tera = Tera::default();
 		tera.register_filter("parent", Parent);
