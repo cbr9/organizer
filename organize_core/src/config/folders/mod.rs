@@ -2,12 +2,11 @@ use std::path::PathBuf;
 
 use anyhow::Result;
 use path_clean::PathClean;
-use serde::{Deserialize, Deserializer};
-use tera::Tera;
+use serde::Deserialize;
 
 use crate::{
 	config::options::FolderOptions,
-	path::{get_env_context, Expand},
+	path::Expand,
 	templates::{CONTEXT, TERA},
 };
 

@@ -12,7 +12,7 @@ impl<T: Into<PathBuf>> Expand for T {
 		let mut components = path.components();
 		if let Some(component) = components.next() {
 			if component.as_os_str() == OsStr::new("~") {
-				let mut path = dirs_next::home_dir().expect("could not find home directory");
+				let mut path = dirs::home_dir().expect("could not find home directory");
 				path.extend(components);
 				return path;
 			}
@@ -28,14 +28,14 @@ mod tests {
 
 	#[test]
 	fn invalid_tilde() {
-		let original = dirs_next::home_dir().unwrap().join("Documents~");
+		let original = dirs::home_dir().unwrap().join("Documents~");
 		assert_eq!(original.clone().expand_user(), original)
 	}
 
 	#[test]
 	fn user_tilde() {
 		let original = "~/Documents";
-		let expected = dirs_next::home_dir().unwrap().join("Documents");
+		let expected = dirs::home_dir().unwrap().join("Documents");
 		assert_eq!(original.expand_user(), expected)
 	}
 }

@@ -5,7 +5,6 @@ use std::{
 
 use derive_more::Deref;
 use serde::Deserialize;
-use tera::{Context, Tera};
 
 use crate::{
 	config::actions::ActionType,
@@ -36,7 +35,7 @@ impl ActionPipeline for Echo {
 
 	fn log_success_msg<T: AsRef<Path> + Into<PathBuf> + Clone, P: AsRef<Path> + Into<PathBuf> + Clone>(
 		&self,
-		src: T,
+		_: T,
 		_: Option<P>,
 		simulated: bool,
 	) -> Result<String> {

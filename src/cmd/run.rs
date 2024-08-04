@@ -2,25 +2,10 @@ use std::{collections::HashMap, iter::FromIterator, path::PathBuf};
 
 use anyhow::Result;
 use clap::{Parser, ValueHint};
-use colored::control;
 use dialoguer::{theme::ColorfulTheme, MultiSelect, Select};
 use std::collections::HashSet;
-use tera::{Context, Tera};
 
-use organize_core::{
-	config::{
-		actions::ActionRunner,
-		filters::AsFilter,
-		options::FolderOptions,
-		rule::{AsVariable, Rule},
-		Config,
-	},
-	path::get_env_context,
-	templates::{
-		filters::{Parent, Stem},
-		CONTEXT,
-	},
-};
+use organize_core::config::{actions::ActionRunner, filters::AsFilter, options::FolderOptions, rule::Rule, Config};
 
 use crate::{Cmd, CONFIG};
 

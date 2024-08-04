@@ -14,6 +14,7 @@ pub mod filters;
 pub mod folders;
 pub mod options;
 pub mod rule;
+pub mod variables;
 
 #[derive(Deserialize, Clone, Debug, PartialEq)]
 pub struct Config {
@@ -24,17 +25,12 @@ pub struct Config {
 	pub defaults: FolderOptions,
 }
 
-pub struct Context {
-	pub current_rule: usize,
-	pub current_folder: usize,
-}
-
 impl Config {
 	pub fn default_dir() -> PathBuf {
-		let var = "ORGANIZE_CONFIG";
-		std::env::var_os(var).map_or_else(
+		let var = format!("{}_CONFIG", PROJECT_NAME.to_uppercase());
+		std::env::var_os(&var).map_or_else(
 			|| {
-				dirs_next::config_dir()
+				dirs::config_dir()
 					.unwrap_or_else(|| panic!("could not find config directory, please set {} manually", var))
 					.join(PROJECT_NAME)
 			},
@@ -79,12 +75,10 @@ impl Config {
 	pub fn set_cwd<T: AsRef<Path>>(path: T) -> Result<PathBuf> {
 		let path = path.as_ref();
 		if path == Self::default_path() {
-			dirs_next::home_dir()
-				.context("could not determine home directory")
-				.and_then(|path| {
-					std::env::set_current_dir(&path).context("Could not change into home directory")?;
-					Ok(path)
-				})
+			dirs::home_dir().context("could not determine home directory").and_then(|path| {
+				std::env::set_current_dir(&path).context("Could not change into home directory")?;
+				Ok(path)
+			})
 		} else {
 			path.parent()
 				.context("could not determine parent directory")

@@ -14,7 +14,7 @@ use crate::{config::actions::trash::Trash, templates::CONTEXT};
 
 use anyhow::Result;
 
-use super::rule::{AsVariable, Variable};
+use super::variables::{AsVariable, Variable};
 
 pub(crate) mod common;
 pub(crate) mod copy;

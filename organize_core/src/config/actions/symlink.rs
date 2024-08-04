@@ -3,7 +3,6 @@ use std::path::{Path, PathBuf};
 use anyhow::{Context as ErrorContext, Result};
 use dialoguer::{theme::ColorfulTheme, Confirm};
 use serde::Deserialize;
-use tera::{Context, Tera};
 
 use crate::path::prepare_target_path;
 

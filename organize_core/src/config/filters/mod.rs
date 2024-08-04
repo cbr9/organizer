@@ -8,17 +8,17 @@ use serde::Deserialize;
 use extension::Extension;
 use filename::Filename;
 
-mod empty;
-mod extension;
-mod filename;
-mod mime;
-mod regex;
+pub mod empty;
+pub mod extension;
+pub mod filename;
+pub mod mime;
+pub mod regex;
 
 use crate::config::filters::{mime::Mime, regex::Regex};
 
 use super::actions::script::Script;
 
-#[derive(Debug, Clone, Deserialize, Eq, PartialEq)]
+#[derive(Debug, Clone, Deserialize, PartialEq)]
 #[serde(tag = "type", rename_all(deserialize = "lowercase"))]
 pub enum Filter {
 	Regex(Regex),
@@ -49,7 +49,7 @@ impl AsFilter for Filter {
 	}
 }
 
-#[derive(Debug, Clone, Deserialize, Deref, Eq, PartialEq)]
+#[derive(Debug, Clone, Deserialize, Deref, PartialEq)]
 pub struct Filters(pub(crate) Vec<Filter>);
 
 impl AsFilter for Filters {
@@ -63,13 +63,13 @@ impl AsFilter for Filters {
 mod tests {
 	use super::*;
 	use crate::config::filters::{regex::Regex, Filter};
-	use std::str::FromStr;
+	use std::convert::TryFrom;
 
 	#[test]
 	fn match_all() {
 		let filters = Filters(vec![
-			Filter::Regex(Regex::from_str(".*unsplash.*").unwrap()),
-			Filter::Regex(Regex::from_str(".*\\.jpg").unwrap()),
+			Filter::Regex(Regex::try_from(vec![".*unsplash.*"]).unwrap()),
+			Filter::Regex(Regex::try_from(vec![".*\\.jpg"]).unwrap()),
 		]);
 		assert!(filters.matches("$HOME/Downloads/unsplash_image.jpg"));
 		assert!(!filters.matches("$HOME/Downloads/unsplash_doc.pdf"));

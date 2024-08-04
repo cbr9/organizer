@@ -1,36 +1,41 @@
-use std::{path::Path, str::FromStr};
+use derive_more::Deref;
 
 use crate::config::filters::AsFilter;
 use serde::{Deserialize, Deserializer};
-use std::convert::TryFrom;
+use std::{convert::TryFrom, path::Path};
 
-#[derive(Deserialize, Debug, Clone)]
+#[derive(PartialEq, Deserialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct Regex {
-	#[serde(deserialize_with = "deserialize_patterns")]
-	patterns: Vec<regex::Regex>,
+	patterns: Vec<RegularExpression>,
 }
 
-fn deserialize_patterns<'de, D>(deserializer: D) -> Result<Vec<regex::Regex>, D::Error>
-where
-	D: Deserializer<'de>,
-{
-	// Deserialize as a Vec<String>
-	let patterns_str: Vec<String> = Vec::deserialize(deserializer)?;
-	Regex::try_from(patterns_str)
-		.map(|o| o.patterns)
-		.map_err(serde::de::Error::custom)
-}
+#[derive(Debug, Deref, Clone)]
+pub struct RegularExpression(regex::Regex);
 
-impl PartialEq for Regex {
-	fn eq(&self, other: &Self) -> bool {
-		self.patterns
-			.iter()
-			.zip(other.patterns.iter())
-			.all(|(lhs, rhs)| lhs.as_str() == rhs.as_str())
+impl<'de> Deserialize<'de> for RegularExpression {
+	fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+	where
+		D: Deserializer<'de>,
+	{
+		// Deserialize as a string first
+		let pattern_str: String = String::deserialize(deserializer)?;
+		// Attempt to compile the regular expression
+		regex::Regex::new(&pattern_str).map(Self).map_err(serde::de::Error::custom)
 	}
 }
-impl Eq for Regex {}
+impl PartialEq for RegularExpression {
+	fn eq(&self, other: &Self) -> bool {
+		self.0.as_str() == other.0.as_str()
+	}
+}
+impl TryFrom<String> for RegularExpression {
+	type Error = regex::Error;
+
+	fn try_from(value: String) -> Result<Self, Self::Error> {
+		regex::Regex::new(value.as_str()).map(Self)
+	}
+}
 
 impl AsFilter for Regex {
 	fn matches<T: AsRef<Path>>(&self, path: T) -> bool {
@@ -50,21 +55,10 @@ impl<T: ToString> TryFrom<Vec<T>> for Regex {
 	fn try_from(value: Vec<T>) -> Result<Self, Self::Error> {
 		let mut vec = Vec::with_capacity(value.len());
 		for str in value {
-			let re = regex::Regex::new(&str.to_string())?;
+			let re = RegularExpression::try_from(str.to_string())?;
 			vec.push(re)
 		}
 		Ok(Self { patterns: vec })
-	}
-}
-
-impl FromStr for Regex {
-	type Err = regex::Error;
-
-	fn from_str(s: &str) -> Result<Self, Self::Err> {
-		match regex::Regex::new(s) {
-			Ok(regex) => Ok(Regex { patterns: vec![regex] }),
-			Err(e) => Err(e),
-		}
 	}
 }
 
@@ -75,7 +69,7 @@ mod tests {
 
 	#[test]
 	fn match_single() {
-		let regex = Regex::from_str(r".*unsplash.*").unwrap();
+		let regex = Regex::try_from(vec![r".*unsplash.*"]).unwrap();
 		let path = "$HOME/Pictures/test_unsplash_img.jpg";
 		assert!(regex.matches(path))
 	}

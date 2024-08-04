@@ -1,16 +1,6 @@
-use anyhow::anyhow;
-use path_clean::PathClean;
 use serde::Deserialize;
-use std::{
-	collections::HashMap,
-	path::{Path, PathBuf},
-	str::FromStr,
-};
-use tera::{to_value, try_get_value, Function, Result, Value};
-
-use crate::{config::actions::common::ConflictOption, path::prepare_target_path};
-
-use super::{CONTEXT, TERA};
+use std::{collections::HashMap, path::PathBuf};
+use tera::{to_value, Result, Value};
 
 pub struct Parent;
 

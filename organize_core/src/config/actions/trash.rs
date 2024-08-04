@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use crate::config::actions::ActionType;
+use crate::{config::actions::ActionType, PROJECT_NAME};
 use anyhow::{Context, Result};
 use dialoguer::{theme::ColorfulTheme, Confirm};
 use serde::Deserialize;
@@ -20,7 +20,7 @@ pub struct Trash {
 
 impl Trash {
 	fn dir() -> Result<PathBuf> {
-		let dir = dirs_next::data_local_dir().unwrap().join("organize").join(".trash");
+		let dir = dirs::data_local_dir().unwrap().join(PROJECT_NAME).join(".trash");
 		std::fs::create_dir_all(&dir)
 			.with_context(|| format!("Could not create trash directory at {}", &dir.display()))
 			.map(|_| dir)

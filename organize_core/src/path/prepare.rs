@@ -6,7 +6,7 @@ use std::{
 };
 
 use anyhow::{bail, Result};
-use tera::{Context, Tera};
+use tera::{Context};
 
 use crate::{
 	config::actions::common::ConflictOption,

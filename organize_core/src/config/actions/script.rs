@@ -7,7 +7,6 @@ use std::{
 
 use serde::Deserialize;
 use tempfile;
-use tera::{Context, Tera};
 
 use crate::{
 	config::{actions::ActionType, filters::AsFilter},
@@ -33,14 +32,14 @@ impl ActionPipeline for Script {
 
 	fn execute<T: AsRef<Path> + Into<PathBuf> + Clone, P: AsRef<Path> + Into<PathBuf> + Clone>(
 		&self,
-		src: T,
+		_: T,
 		_: Option<P>,
 		simulated: bool,
 	) -> Result<Option<PathBuf>> {
 		if simulated {
 			bail!("Cannot run scripted actions during a dry run")
 		}
-		self.run_script(&src).map(|output| {
+		self.run_script().map(|output| {
 			let output = String::from_utf8_lossy(&output.stdout);
 			output.lines().last().map(|last| PathBuf::from(&last.trim()))
 		})
@@ -62,8 +61,8 @@ impl ActionPipeline for Script {
 }
 
 impl AsFilter for Script {
-	fn matches<T: AsRef<Path>>(&self, path: T) -> bool {
-		self.run_script(path)
+	fn matches<T: AsRef<Path>>(&self, _: T) -> bool {
+		self.run_script()
 			.map(|output| {
 				// get the last line in stdout and parse it as a boolean
 				// if it can't be parsed, return false
@@ -99,7 +98,7 @@ impl Script {
 		Ok(script_path)
 	}
 
-	fn run_script<T: AsRef<Path>>(&self, path: T) -> anyhow::Result<Output> {
+	fn run_script(&self) -> anyhow::Result<Output> {
 		let script = self.write()?;
 		let output = Command::new(&self.exec)
 			.args(self.args.as_slice())
@@ -121,10 +120,10 @@ mod tests {
 		CONTEXT.lock().unwrap().insert("path", path);
 		let content = "print('huh')\nprint('{{path}}'.islower())";
 		let mut script = Script::new("python", content);
-		script.run_script(path).unwrap_or_else(|_| {
+		script.run_script().unwrap_or_else(|_| {
 			// some linux distributions don't have a `python` executable, but a `python3`
 			script = Script::new("python3", content);
-			script.run_script(path).unwrap()
+			script.run_script().unwrap()
 		});
 		assert!(script.matches(path))
 	}
