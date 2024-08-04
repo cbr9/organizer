@@ -1,10 +1,16 @@
-use std::path::{Path, PathBuf};
+use std::{
+	ops::DerefMut,
+	path::{Path, PathBuf},
+};
 
 use derive_more::Deref;
 use serde::Deserialize;
-use tera::Tera;
+use tera::{Context, Tera};
 
-use crate::{config::actions::ActionType, path::get_context};
+use crate::{
+	config::actions::ActionType,
+	templates::{CONTEXT, TERA},
+};
 use anyhow::Result;
 
 use super::ActionPipeline;
@@ -34,8 +40,8 @@ impl ActionPipeline for Echo {
 		_: Option<P>,
 		simulated: bool,
 	) -> Result<String> {
-		let context = get_context(&src);
-		let message = Tera::one_off(&self.message, &context, false)?;
+		let mut context = CONTEXT.lock().unwrap();
+		let message = TERA.lock().unwrap().render_str(&self.message, context.deref_mut())?;
 		let hint = if !simulated { "ECHO" } else { "SIMULATED ECHO" };
 		Ok(format!("({}) {}", hint, message))
 	}

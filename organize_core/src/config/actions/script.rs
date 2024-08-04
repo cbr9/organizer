@@ -1,4 +1,5 @@
 use std::{
+	borrow::BorrowMut,
 	path::{Path, PathBuf},
 	process::{Command, Output, Stdio},
 	str::FromStr,
@@ -6,11 +7,11 @@ use std::{
 
 use serde::Deserialize;
 use tempfile;
-use tera::Tera;
+use tera::{Context, Tera};
 
 use crate::{
 	config::{actions::ActionType, filters::AsFilter},
-	path::get_context,
+	templates::{CONTEXT, TERA},
 };
 use anyhow::{bail, Result};
 
@@ -87,11 +88,11 @@ impl Script {
 		}
 	}
 
-	fn write(&self, path: &Path) -> anyhow::Result<PathBuf> {
+	fn write(&self) -> anyhow::Result<PathBuf> {
+		let mut context = CONTEXT.lock().unwrap();
 		let script = tempfile::NamedTempFile::new()?;
 		let script_path = script.into_temp_path().to_path_buf();
-		let context = get_context(path);
-		let content = Tera::one_off(&self.content, &context, false);
+		let content = TERA.lock().unwrap().render_str(&self.content, context.borrow_mut());
 		if let Ok(content) = content {
 			std::fs::write(&script_path, content)?;
 		}
@@ -99,7 +100,7 @@ impl Script {
 	}
 
 	fn run_script<T: AsRef<Path>>(&self, path: T) -> anyhow::Result<Output> {
-		let script = self.write(path.as_ref())?;
+		let script = self.write()?;
 		let output = Command::new(&self.exec)
 			.args(self.args.as_slice())
 			.arg(&script)
@@ -116,9 +117,10 @@ mod tests {
 
 	#[test]
 	fn test_script_filter() {
+		let path = "/home";
+		CONTEXT.lock().unwrap().insert("path", path);
 		let content = "print('huh')\nprint('{{path}}'.islower())";
 		let mut script = Script::new("python", content);
-		let path = "/home";
 		script.run_script(path).unwrap_or_else(|_| {
 			// some linux distributions don't have a `python` executable, but a `python3`
 			script = Script::new("python3", content);

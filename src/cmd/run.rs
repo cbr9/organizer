@@ -2,10 +2,25 @@ use std::{collections::HashMap, iter::FromIterator, path::PathBuf};
 
 use anyhow::Result;
 use clap::{Parser, ValueHint};
+use colored::control;
 use dialoguer::{theme::ColorfulTheme, MultiSelect, Select};
 use std::collections::HashSet;
+use tera::{Context, Tera};
 
-use organize_core::config::{actions::ActionRunner, filters::AsFilter, options::FolderOptions, rule::Rule, Config};
+use organize_core::{
+	config::{
+		actions::ActionRunner,
+		filters::AsFilter,
+		options::FolderOptions,
+		rule::{AsVariable, Rule},
+		Config,
+	},
+	path::get_env_context,
+	templates::{
+		filters::{Parent, Stem},
+		CONTEXT,
+	},
+};
 
 use crate::{Cmd, CONFIG};
 
@@ -137,7 +152,7 @@ impl Cmd for Run {
 
 		for rule in filtered_rules.iter() {
 			for folder in rule.folders.iter() {
-				let location = folder.path.as_path();
+				let location = folder.path()?;
 				let walker = FolderOptions::max_depth(config, rule, folder).to_walker(location);
 
 				let mut entries = walker
@@ -157,7 +172,7 @@ impl Cmd for Run {
 						}
 					}
 					'actions: for action in rule.actions.iter() {
-						*entry = match action.run(&entry, self.dry_run)? {
+						*entry = match action.run(&entry, self.dry_run, &rule.variables)? {
 							Some(path) => path,
 							None => break 'actions,
 						};

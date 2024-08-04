@@ -1489,6 +1489,7 @@ dependencies = [
  "dialoguer 0.11.0",
  "dirs-next",
  "fern",
+ "lazy_static",
  "log",
  "notify-rust",
  "once_cell",

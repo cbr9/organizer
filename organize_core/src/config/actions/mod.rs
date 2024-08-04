@@ -10,9 +10,11 @@ use serde::Deserialize;
 use strum_macros::{Display, EnumString};
 use symlink::Symlink;
 
-use crate::config::actions::trash::Trash;
+use crate::{config::actions::trash::Trash, templates::CONTEXT};
 
 use anyhow::Result;
+
+use super::rule::{AsVariable, Variable};
 
 pub(crate) mod common;
 pub(crate) mod copy;
@@ -25,12 +27,16 @@ pub(crate) mod symlink;
 pub(crate) mod trash;
 
 pub trait ActionRunner {
-	fn run<T: AsRef<Path> + Into<PathBuf> + Clone>(&self, src: T, simulated: bool) -> Result<Option<PathBuf>>;
+	fn run<T: AsRef<Path> + Into<PathBuf> + Clone>(&self, src: T, simulated: bool, variables: &[Variable]) -> Result<Option<PathBuf>>;
 }
 
 impl<T: ActionPipeline> ActionRunner for T {
 	#[allow(clippy::nonminimal_bool)]
-	fn run<P: AsRef<Path> + Into<PathBuf> + Clone>(&self, src: P, simulated: bool) -> Result<Option<PathBuf>> {
+	fn run<P: AsRef<Path> + Into<PathBuf> + Clone>(&self, src: P, simulated: bool, variables: &[Variable]) -> Result<Option<PathBuf>> {
+		CONTEXT.lock().unwrap().insert("path", &src.as_ref().to_string_lossy());
+		for variable in variables.iter() {
+			variable.register();
+		}
 		let dest = self.get_target_path(src.clone());
 		if let Ok(dest) = dest {
 			if (Self::REQUIRES_DEST && dest.is_some()) || !Self::REQUIRES_DEST {
@@ -59,17 +65,17 @@ impl<T: ActionPipeline> ActionRunner for T {
 }
 
 impl ActionRunner for Action {
-	fn run<T: AsRef<Path> + Into<PathBuf> + Clone>(&self, src: T, simulated: bool) -> Result<Option<PathBuf>> {
+	fn run<T: AsRef<Path> + Into<PathBuf> + Clone>(&self, src: T, simulated: bool, variables: &[Variable]) -> Result<Option<PathBuf>> {
 		use Action::*;
 		match self {
-			Copy(copy) => copy.run(src, simulated),
-			Move(r#move) => r#move.run(src, simulated),
-			Hardlink(hardlink) => hardlink.run(src, simulated),
-			Symlink(symlink) => symlink.run(src, simulated),
-			Delete(delete) => delete.run(src, simulated),
-			Echo(echo) => echo.run(src, simulated),
-			Trash(trash) => trash.run(src, simulated),
-			Script(script) => script.run(src, simulated),
+			Copy(copy) => copy.run(src, simulated, variables),
+			Move(r#move) => r#move.run(src, simulated, variables),
+			Hardlink(hardlink) => hardlink.run(src, simulated, variables),
+			Symlink(symlink) => symlink.run(src, simulated, variables),
+			Delete(delete) => delete.run(src, simulated, variables),
+			Echo(echo) => echo.run(src, simulated, variables),
+			Trash(trash) => trash.run(src, simulated, variables),
+			Script(script) => script.run(src, simulated, variables),
 		}
 	}
 }

@@ -77,7 +77,6 @@ mod tests {
 		let file = Builder::new().suffix(".txt").tempfile().unwrap();
 		let path = file.path().to_path_buf();
 		let file_name = path.file_stem().unwrap().to_string_lossy();
-		dbg!(file_name.clone());
 		let mut expected = path.clone();
 		expected.set_file_name(format!("{} (1).txt", file_name));
 		let new = ConflictOption::Rename.resolve_naming_conflict(&path);

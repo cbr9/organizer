@@ -1,13 +1,17 @@
 use path_clean::PathClean;
 use std::{
 	collections::HashMap,
+	ops::DerefMut,
 	path::{Path, PathBuf, MAIN_SEPARATOR},
 };
 
 use anyhow::{bail, Result};
 use tera::{Context, Tera};
 
-use crate::config::actions::common::ConflictOption;
+use crate::{
+	config::actions::common::ConflictOption,
+	templates::{CONTEXT, TERA},
+};
 
 use super::Expand;
 
@@ -21,37 +25,11 @@ pub fn get_env_context() -> Context {
 	Context::from_serialize(environment).unwrap()
 }
 
-pub fn get_context<T: AsRef<Path>>(path: T) -> Context {
-	let mut context = Context::new();
-	let path = path.as_ref();
-	context.insert("path", &path.to_string_lossy());
-	if let Some(parent) = path.parent() {
-		context.insert("parent", &parent.to_string_lossy());
-	}
-	if let Some(stem) = path.file_stem() {
-		context.insert("stem", &stem.to_string_lossy());
-	}
-	if let Some(name) = path.file_name() {
-		context.insert("filename", &name.to_string_lossy());
-	}
-	if let Some(extension) = path.extension() {
-		context.insert("extension", &extension.to_string_lossy());
-	}
-	if let Ok(hash) = sha256::try_digest(&path) {
-		context.insert("hash", &hash);
-	}
-	let mime = mime_guess::from_path(path).first_or_octet_stream().to_string();
-	context.insert("mime", &mime);
-
-	context.extend(get_env_context());
-	context
-}
-
 pub fn prepare_target_path(on_conflict: &ConflictOption, src: &Path, dest: &Path) -> Result<Option<PathBuf>> {
 	// if there are any placeholders in the destination, expand them
 
-	let context = get_context(src);
-	let mut to = match Tera::one_off(&dest.to_string_lossy(), &context, false) {
+	let mut ctx = CONTEXT.lock().unwrap();
+	let mut to = match TERA.lock().unwrap().render_str(&dest.to_string_lossy(), ctx.deref_mut()) {
 		Ok(str) => PathBuf::from(str).expand_user().clean(),
 		Err(e) => {
 			log::error!("{:?}", e);
