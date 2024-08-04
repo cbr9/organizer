@@ -5,7 +5,6 @@ TODO:
 - [ ] implement custom variables
   - [x] regex based (using named capture groups)
   - [x] simple (string)
-  - [ ] math?
   - [ ] script 
 - [x] integrate external templating library
 - [ ] file content filter
