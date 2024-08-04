@@ -13,7 +13,7 @@ use super::{common::ConflictOption, ActionPipeline, ActionType};
 pub struct Symlink {
 	to: PathBuf,
 	#[serde(default)]
-	on_conflict: ConflictOption,
+	if_exists: ConflictOption,
 	#[serde(default)]
 	confirm: bool,
 	#[serde(default)]
@@ -37,7 +37,7 @@ impl ActionPipeline for Symlink {
 	const TYPE: ActionType = ActionType::Symlink;
 
 	fn get_target_path<T: AsRef<Path> + Into<PathBuf> + Clone>(&self, src: T) -> Result<Option<PathBuf>> {
-		prepare_target_path(&self.on_conflict, src.as_ref(), self.to.as_path())
+		prepare_target_path(&self.if_exists, src.as_ref(), self.to.as_path(), true)
 	}
 
 	fn confirm<T: AsRef<Path> + Into<PathBuf> + Clone, P: AsRef<Path> + Into<PathBuf> + Clone>(&self, src: T, dest: Option<P>) -> Result<bool> {

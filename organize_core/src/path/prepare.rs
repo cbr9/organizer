@@ -13,7 +13,7 @@ use crate::{
 
 use super::Expand;
 
-pub fn prepare_target_path(on_conflict: &ConflictOption, src: &Path, dest: &Path) -> Result<Option<PathBuf>> {
+pub fn prepare_target_path(if_exists: &ConflictOption, src: &Path, dest: &Path, with_extension: bool) -> Result<Option<PathBuf>> {
 	// if there are any placeholders in the destination, expand them
 
 	let mut ctx = CONTEXT.lock().unwrap();
@@ -31,13 +31,17 @@ pub fn prepare_target_path(on_conflict: &ConflictOption, src: &Path, dest: &Path
 			return Ok(None);
 		}
 		std::fs::create_dir_all(&to)?;
-		to.push(filename.unwrap());
+		if with_extension {
+			to.push(filename.unwrap());
+		} else {
+			to.push(src.file_stem().unwrap())
+		}
 	} else {
 		std::fs::create_dir_all(to.parent().unwrap())?;
 	}
 
 	match dest.exists() {
-		true => Ok(on_conflict.resolve_naming_conflict(&to)),
+		true => Ok(if_exists.resolve_naming_conflict(&to)),
 		false => Ok(Some(to)),
 	}
 }

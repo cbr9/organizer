@@ -5,7 +5,10 @@ use clap::{Parser, ValueHint};
 use dialoguer::{theme::ColorfulTheme, MultiSelect, Select};
 use std::collections::HashSet;
 
-use organize_core::config::{actions::ActionRunner, filters::AsFilter, options::FolderOptions, rule::Rule, Config};
+use organize_core::{
+	config::{actions::ActionRunner, filters::AsFilter, options::FolderOptions, rule::Rule, variables::AsVariable, Config},
+	templates::CONTEXT,
+};
 
 use crate::{Cmd, CONFIG};
 
@@ -146,7 +149,7 @@ impl Cmd for Run {
 						let path = e.path();
 						path.is_file() && FolderOptions::allows_entry(config, rule, folder, path) && rule.filters.matches(path)
 					})
-					.filter_map(|e| e.ok())
+					.flatten()
 					.map(|e| e.into_path())
 					.collect::<Vec<_>>();
 
@@ -157,7 +160,11 @@ impl Cmd for Run {
 						}
 					}
 					'actions: for action in rule.actions.iter() {
-						*entry = match action.run(&entry, self.dry_run, &rule.variables)? {
+						CONTEXT.lock().unwrap().insert("path", &entry.to_string_lossy());
+						for var in rule.variables.iter() {
+							var.register();
+						}
+						*entry = match action.run(&entry, self.dry_run)? {
 							Some(path) => path,
 							None => break 'actions,
 						};
