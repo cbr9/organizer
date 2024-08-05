@@ -147,7 +147,7 @@ impl Cmd for Run {
 					.into_iter()
 					.filter_entry(|e| {
 						let path = e.path();
-						path.is_file() && FolderOptions::allows_entry(config, rule, folder, path) && rule.filters.matches(path)
+						FolderOptions::allows_entry(config, rule, folder, path) && rule.filters.matches(path)
 					})
 					.flatten()
 					.map(|e| e.into_path())
