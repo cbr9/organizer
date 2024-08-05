@@ -12,11 +12,15 @@ pub struct Extension {
 
 impl AsFilter for Extension {
 	fn matches<T: AsRef<Path>>(&self, path: T) -> bool {
-		path.as_ref()
-			.extension()
-			.and_then(|ext| ext.to_str())
-			.map(|s| self.extensions.contains(&s.to_string()))
-			.unwrap_or(false)
+		let path = path.as_ref();
+		if path.is_file() {
+			return path
+				.extension()
+				.and_then(|ext| ext.to_str())
+				.map(|s| self.extensions.contains(&s.to_string()))
+				.unwrap_or(false);
+		}
+		true
 	}
 }
 
