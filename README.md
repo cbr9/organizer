@@ -10,3 +10,4 @@ TODO:
 - [ ] file content filter
 - [x] compressed file extraction action
 - [x] refactor 
+- [ ] TESTS!!
