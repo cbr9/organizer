@@ -1,8 +1,5 @@
-use std::path::Path;
-
 use derive_more::Deref;
 use empty::Empty;
-use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use serde::Deserialize;
 
 use extension::Extension;
@@ -14,7 +11,10 @@ pub mod filename;
 pub mod mime;
 pub mod regex;
 
-use crate::config::filters::{mime::Mime, regex::Regex};
+use crate::{
+	config::filters::{mime::Mime, regex::Regex},
+	resource::Resource,
+};
 
 use super::actions::script::Script;
 
@@ -31,20 +31,19 @@ pub enum Filter {
 }
 
 pub trait AsFilter {
-	fn matches<T: AsRef<Path>>(&self, path: T) -> bool;
+	fn matches(&self, res: &mut Resource) -> bool;
 }
 
 impl AsFilter for Filter {
-	fn matches<T: AsRef<Path>>(&self, path: T) -> bool {
-		let path = path.as_ref();
+	fn matches(&self, res: &mut Resource) -> bool {
 		match self {
-			Filter::Regex(regex) => regex.matches(path),
-			Filter::Filename(filename) => filename.matches(path),
-			Filter::Extension(extension) => extension.matches(path),
-			Filter::Script(script) => script.matches(path),
-			Filter::Mime(mime) => mime.matches(path),
-			Filter::Empty(empty) => empty.matches(path),
-			Filter::Group { filters } => filters.par_iter().any(|f| f.matches(path)),
+			Filter::Regex(regex) => regex.matches(res),
+			Filter::Filename(filename) => filename.matches(res),
+			Filter::Extension(extension) => extension.matches(res),
+			Filter::Script(script) => script.matches(res),
+			Filter::Mime(mime) => mime.matches(res),
+			Filter::Empty(empty) => empty.matches(res),
+			Filter::Group { filters } => filters.iter().any(|f| f.matches(res)),
 		}
 	}
 }
@@ -53,9 +52,8 @@ impl AsFilter for Filter {
 pub struct Filters(pub(crate) Vec<Filter>);
 
 impl AsFilter for Filters {
-	fn matches<T: AsRef<Path>>(&self, path: T) -> bool {
-		let path = path.as_ref();
-		self.par_iter().all(|filter| filter.matches(path))
+	fn matches(&self, res: &mut Resource) -> bool {
+		self.iter().all(|filter| filter.matches(res))
 	}
 }
 
@@ -63,7 +61,7 @@ impl AsFilter for Filters {
 mod tests {
 	use super::*;
 	use crate::config::filters::{regex::Regex, Filter};
-	use std::convert::TryFrom;
+	use std::{convert::TryFrom, str::FromStr};
 
 	#[test]
 	fn match_all() {
@@ -71,7 +69,7 @@ mod tests {
 			Filter::Regex(Regex::try_from(vec![".*unsplash.*"]).unwrap()),
 			Filter::Regex(Regex::try_from(vec![".*\\.jpg"]).unwrap()),
 		]);
-		assert!(filters.matches("$HOME/Downloads/unsplash_image.jpg"));
-		assert!(!filters.matches("$HOME/Downloads/unsplash_doc.pdf"));
+		assert!(filters.matches(&mut Resource::from_str("$HOME/Downloads/unsplash_image.jpg").unwrap()));
+		assert!(!filters.matches(&mut Resource::from_str("$HOME/Downloads/unsplash_doc.pdf").unwrap()));
 	}
 }

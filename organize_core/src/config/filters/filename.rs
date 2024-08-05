@@ -1,6 +1,5 @@
-use std::path::Path;
 
-use crate::config::filters::AsFilter;
+use crate::{config::filters::AsFilter, resource::Resource};
 use serde::Deserialize;
 
 #[derive(Eq, PartialEq, Deserialize, Debug, Clone, Default)]
@@ -14,7 +13,8 @@ pub struct Filename {
 }
 
 impl AsFilter for Filename {
-	fn matches<T: AsRef<Path>>(&self, path: T) -> bool {
+	fn matches(&self, res: &mut Resource) -> bool {
+		let path = res.path();
 		let mut filename = path.as_ref().file_name().unwrap().to_str().unwrap().to_string();
 		let mut filter = self.clone();
 		if !self.case_sensitive {
@@ -45,80 +45,80 @@ impl AsFilter for Filename {
 
 #[cfg(test)]
 mod tests {
-	use std::path::PathBuf;
+	use std::{path::PathBuf, str::FromStr};
 
 	use super::*;
 
 	#[test]
 	fn match_beginning_case_insensitive() {
-		let path = PathBuf::from("$HOME/Downloads/test.pdf");
+		let mut path = Resource::from_str("$HOME/Downloads/test.pdf").unwrap();
 		let filename = Filename {
 			startswith: Some("TE".into()),
 			..Default::default()
 		};
-		assert!(filename.matches(path))
+		assert!(filename.matches(&mut path))
 	}
 
 	#[test]
 	fn match_ending_case_insensitive() {
-		let path = PathBuf::from("$HOME/Downloads/test.pdf");
+		let mut path = Resource::from_str("$HOME/Downloads/test.pdf").unwrap();
 		let filename = Filename {
 			endswith: Some("DF".into()),
 			..Default::default()
 		};
-		assert!(filename.matches(path))
+		assert!(filename.matches(&mut path))
 	}
 
 	#[test]
 	fn match_containing_case_insensitive() {
-		let path = PathBuf::from("$HOME/Downloads/test.pdf");
+		let mut path = Resource::from_str("$HOME/Downloads/test.pdf").unwrap();
 		let filename = Filename {
 			contains: Some("ES".into()),
 			..Default::default()
 		};
-		assert!(filename.matches(path))
+		assert!(filename.matches(&mut path))
 	}
 
 	#[test]
 	fn no_match_beginning_case_sensitive() {
-		let path = PathBuf::from("$HOME/Downloads/test.pdf");
+		let mut path = Resource::from_str("$HOME/Downloads/test.pdf").unwrap();
 		let filename = Filename {
 			case_sensitive: true,
 			startswith: Some("TE".into()),
 			..Default::default()
 		};
-		assert!(!filename.matches(path))
+		assert!(!filename.matches(&mut path))
 	}
 
 	#[test]
 	fn no_match_ending_case_sensitive() {
-		let path = PathBuf::from("$HOME/Downloads/test.pdf");
+		let mut path = Resource::from_str("$HOME/Downloads/test.pdf").unwrap();
 		let filename = Filename {
 			case_sensitive: true,
 			startswith: Some("DF".into()),
 			..Default::default()
 		};
-		assert!(!filename.matches(path))
+		assert!(!filename.matches(&mut path))
 	}
 
 	#[test]
 	fn no_match_containing_case_sensitive() {
-		let path = PathBuf::from("$HOME/Downloads/test.pdf");
+		let mut path = Resource::from_str("$HOME/Downloads/test.pdf").unwrap();
 		let filename = Filename {
 			case_sensitive: true,
 			contains: Some("ES".into()),
 			..Default::default()
 		};
-		assert!(!filename.matches(path))
+		assert!(!filename.matches(&mut path))
 	}
 	#[test]
 	fn match_containing_case_sensitive() {
-		let path = PathBuf::from("$HOME/Downloads/tESt.pdf");
+		let mut path = Resource::from_str("$HOME/Downloads/tESt.pdf").unwrap();
 		let filename = Filename {
 			case_sensitive: true,
 			contains: Some("ES".into()),
 			..Default::default()
 		};
-		assert!(filename.matches(path))
+		assert!(filename.matches(&mut path))
 	}
 }

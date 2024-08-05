@@ -1,8 +1,10 @@
 use std::path::{Path, PathBuf};
 
-use crate::config::actions::ActionType;
+use crate::{
+	config::{actions::ActionType, SIMULATION},
+	resource::Resource,
+};
 use anyhow::{Context, Result};
-use dialoguer::{theme::ColorfulTheme, Confirm};
 use serde::Deserialize;
 
 use super::ActionPipeline;
@@ -22,27 +24,11 @@ impl ActionPipeline for Delete {
 	const REQUIRES_DEST: bool = false;
 	const TYPE: ActionType = ActionType::Delete;
 
-	fn execute<T: AsRef<Path> + Into<PathBuf> + Clone, P: AsRef<Path> + Into<PathBuf> + Clone>(
-		&self,
-		src: T,
-		_: Option<P>,
-		simulated: bool,
-	) -> Result<Option<PathBuf>> {
-		if !simulated {
-			std::fs::remove_file(&src).with_context(|| format!("could not delete {}", src.as_ref().display()))?;
+	fn execute<T: AsRef<Path>>(&self, src: &mut Resource, _: Option<T>) -> Result<Option<PathBuf>> {
+		if !*SIMULATION {
+			std::fs::remove_file(src.path().as_ref()).with_context(|| format!("could not delete {}", src.path().as_ref().display()))?;
 		}
 		Ok(None)
-	}
-
-	fn confirm<T: AsRef<Path> + Into<PathBuf> + Clone, P: AsRef<Path> + Into<PathBuf> + Clone>(&self, src: T, _: Option<P>) -> Result<bool> {
-		if self.confirm {
-			Confirm::with_theme(&ColorfulTheme::default())
-				.with_prompt(format!("Permanently delete {}?", src.as_ref().display()))
-				.interact()
-				.context("Could not interact")
-		} else {
-			Ok(true)
-		}
 	}
 }
 
@@ -56,13 +42,14 @@ mod tests {
 		let tmp_dir = tempfile::tempdir().expect("Couldn't create temporary directory");
 		let tmp_path = tmp_dir.path().to_owned();
 		let tmp_file = tmp_path.join("delete_me.txt");
+		let mut resource = Resource::new(&tmp_file, &[]);
 		let action = Delete { confirm: false };
 
-		std::fs::write(&tmp_file, "").expect("Could create target file");
+		std::fs::write(&tmp_file, "").expect("Could not create target file");
 		assert!(tmp_file.exists());
 
 		action
-			.execute::<&Path, &Path>(&tmp_file, None, false)
+			.execute::<&Path>(&mut resource, None)
 			.expect("Could not delete target file");
 		assert!(!tmp_file.exists());
 	}

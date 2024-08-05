@@ -1,13 +1,19 @@
-use std::{collections::HashMap, iter::FromIterator, path::PathBuf};
+use std::{
+	collections::HashMap,
+	iter::FromIterator,
+	path::PathBuf,
+	sync::{Arc, Mutex},
+};
 
 use anyhow::Result;
 use clap::{Parser, ValueHint};
 use dialoguer::{theme::ColorfulTheme, MultiSelect, Select};
+use rayon::iter::{IntoParallelRefMutIterator, ParallelIterator};
 use std::collections::HashSet;
-use walkdir::DirEntry;
 
 use organize_core::{
-	config::{actions::ActionRunner, filters::AsFilter, options::FolderOptions, rule::Rule, variables::AsVariable, Config},
+	config::{actions::ActionRunner, filters::AsFilter, options::FolderOptions, rule::Rule, Config, SIMULATION},
+	resource::Resource,
 	templates::CONTEXT,
 };
 
@@ -129,7 +135,9 @@ impl Cmd for Run {
 			None => Config::new(Config::path().unwrap()).expect("Could not parse config"),
 		});
 
-		let mut processed_files: HashMap<PathBuf, &Rule> = HashMap::new();
+		SIMULATION.set(self.dry_run).unwrap();
+
+		let mut processed_files: Arc<Mutex<HashMap<PathBuf, &Rule>>> = Arc::new(Mutex::new(HashMap::new()));
 		let all_tags: Vec<String> = config.rules.iter().flat_map(|rule| &rule.tags).cloned().collect();
 		let all_ids: Vec<String> = config.rules.iter().filter_map(|rule| rule.id.clone()).collect();
 		let filtered_rules: Vec<Rule> = config
@@ -140,38 +148,43 @@ impl Cmd for Run {
 			.collect();
 
 		for rule in filtered_rules.iter() {
+			processed_files.lock().unwrap().retain(|key, _| key.exists());
 			for folder in rule.folders.iter() {
 				let location = folder.path()?;
+				CONTEXT.lock().unwrap().insert("root", &location.to_string_lossy());
 				let walker = FolderOptions::max_depth(config, rule, folder).to_walker(location);
 
 				let mut entries = walker
 					.into_iter()
 					.flatten()
-					.filter(|e| FolderOptions::allows_entry(config, rule, folder, e.path()) && rule.filters.matches(e.path()))
-					.map(|e| e.into_path())
+					.filter(|e| FolderOptions::allows_entry(config, rule, folder, e.path()))
+					.map(|e| Resource::new(e.path(), &rule.variables))
+					.filter(|e| {
+						let mut e = e.clone();
+						rule.filters.matches(&mut e)
+					})
 					.collect::<Vec<_>>();
 
-				for entry in entries.iter_mut() {
-					if let Some(last_rule) = processed_files.get(entry) {
+				entries.par_iter_mut().for_each(|entry| {
+					if let Some(last_rule) = processed_files.lock().unwrap().get(entry.path().as_ref()) {
 						if !last_rule.r#continue {
-							continue;
+							return;
 						}
 					}
 					'actions: for action in rule.actions.iter() {
-						CONTEXT.lock().unwrap().insert("path", &entry.to_string_lossy());
-						for var in rule.variables.iter() {
-							var.register();
-						}
-						*entry = match action.run(&entry, self.dry_run)? {
-							Some(path) => path,
+						match action.run(entry).unwrap() {
+							Some(path) => entry.set_path(path),
 							None => break 'actions,
 						};
 					}
+
 					processed_files
-						.entry(entry.clone())
+						.lock()
+						.unwrap()
+						.entry(entry.path().as_ref().to_path_buf())
 						.and_modify(|value| *value = rule)
 						.or_insert(rule);
-				}
+				})
 			}
 		}
 		Ok(())

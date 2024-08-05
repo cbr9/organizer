@@ -1,7 +1,7 @@
-use crate::config::filters::AsFilter;
+use crate::{config::filters::AsFilter, resource::Resource};
 use mime::FromStrError;
 use serde::{Deserialize, Deserializer};
-use std::{convert::TryFrom, path::Path, str::FromStr};
+use std::{convert::TryFrom, str::FromStr};
 
 impl FromStr for Mime {
 	type Err = FromStrError;
@@ -45,8 +45,8 @@ impl<T: ToString> TryFrom<Vec<T>> for Mime {
 }
 
 impl AsFilter for Mime {
-	fn matches<T: AsRef<Path>>(&self, path: T) -> bool {
-		let guess = mime_guess::from_path(path.as_ref()).first_or_octet_stream();
+	fn matches(&self, res: &mut Resource) -> bool {
+		let guess = mime_guess::from_path(res.path().as_ref()).first_or_octet_stream();
 		self.types.iter().any(|mime| match (mime.type_(), mime.subtype()) {
 			(mime::STAR, subtype) => subtype == guess.subtype(),
 			(type_, mime::STAR) => type_ == guess.type_(),
@@ -61,9 +61,9 @@ mod tests {
 	#[test]
 	fn test_match() {
 		let types = Mime::try_from(vec!["image/*", "audio/*"]).unwrap();
-		let img = "test.jpg";
-		let audio = "test.ogg";
-		assert!(types.matches(img));
-		assert!(types.matches(audio));
+		let mut img = Resource::from_str("test.jpg").unwrap();
+		let mut audio = Resource::from_str("test.ogg").unwrap();
+		assert!(types.matches(&mut img));
+		assert!(types.matches(&mut audio));
 	}
 }

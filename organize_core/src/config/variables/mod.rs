@@ -1,12 +1,13 @@
 use regex::RegexVariable;
 use serde::Deserialize;
 use simple::SimpleVariable;
+use tera::Context;
 
 pub mod regex;
 pub mod simple;
 
 pub trait AsVariable {
-	fn register(&self);
+	fn register(&self, context: &mut Context);
 }
 
 #[derive(Deserialize, Clone, Debug, PartialEq)]
@@ -17,10 +18,10 @@ pub enum Variable {
 }
 
 impl AsVariable for Variable {
-	fn register(&self) {
+	fn register(&self, context: &mut Context) {
 		match self {
-			Variable::Simple(s) => s.register(),
-			Variable::Regex(r) => r.register(),
+			Variable::Simple(s) => s.register(context),
+			Variable::Regex(r) => r.register(context),
 		}
 	}
 }

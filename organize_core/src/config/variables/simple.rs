@@ -1,8 +1,8 @@
-use std::borrow::BorrowMut;
 
 use serde::Deserialize;
+use tera::Context;
 
-use crate::templates::{CONTEXT, TERA};
+use crate::templates::TERA;
 
 use super::AsVariable;
 
@@ -12,9 +12,8 @@ pub struct SimpleVariable {
 	value: String,
 }
 impl AsVariable for SimpleVariable {
-	fn register(&self) {
-		let mut ctx = CONTEXT.lock().unwrap();
-		let value = TERA.lock().unwrap().render_str(&self.value, ctx.borrow_mut()).unwrap();
-		ctx.insert(&self.name, &value);
+	fn register(&self, context: &mut Context) {
+		let value = TERA.lock().unwrap().render_str(&self.value, context).unwrap();
+		context.insert(&self.name, &value);
 	}
 }

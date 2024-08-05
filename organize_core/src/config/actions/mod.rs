@@ -11,7 +11,10 @@ use serde::Deserialize;
 use strum_macros::{Display, EnumString};
 use symlink::Symlink;
 
-use crate::config::actions::trash::Trash;
+use crate::{
+	config::{actions::trash::Trash, SIMULATION},
+	resource::Resource,
+};
 
 use anyhow::Result;
 
@@ -27,33 +30,33 @@ pub(crate) mod symlink;
 pub(crate) mod trash;
 
 pub trait ActionRunner {
-	fn run<T: AsRef<Path> + Into<PathBuf> + Clone>(&self, src: T, simulated: bool) -> Result<Option<PathBuf>>;
+	fn run(&self, src: &mut Resource) -> Result<Option<PathBuf>>;
 }
 
 impl<T: ActionPipeline> ActionRunner for T {
 	#[allow(clippy::nonminimal_bool)]
-	fn run<P: AsRef<Path> + Into<PathBuf> + Clone>(&self, src: P, simulated: bool) -> Result<Option<PathBuf>> {
-		let dest = self.get_target_path(src.clone());
+	fn run(&self, src: &mut Resource) -> Result<Option<PathBuf>> {
+		let dest = self.get_target_path(src);
 		if let Ok(dest) = dest {
 			if (Self::REQUIRES_DEST && dest.is_some()) || !Self::REQUIRES_DEST {
-				if Self::REQUIRES_DEST && dest.is_some() && src.as_ref() == dest.as_ref().unwrap() {
+				if Self::REQUIRES_DEST && dest.is_some() && src.path().as_ref() == dest.as_ref().unwrap() {
 					return Ok(dest);
 				}
-				let confirmation = self.confirm(src.clone(), dest.clone())?;
-				let src = src.into();
 
-				if confirmation {
-					return match self.execute(src.clone(), dest.clone(), simulated) {
-						Ok(new_path) => {
-							log::info!("{}", self.log_success_msg(src, new_path.clone(), simulated)?);
-							Ok(new_path)
-						}
-						Err(e) => {
-							log::error!("{:?}", e);
-							Err(e)
-						}
-					};
+				if !*SIMULATION && dest.is_some() {
+					let dest = dest.clone().unwrap();
+					std::fs::create_dir_all(dest.parent().unwrap())?;
 				}
+				return match self.execute(src, dest.clone()) {
+					Ok(new_path) => {
+						log::info!("{}", self.log_success_msg(src, new_path.clone())?);
+						Ok(new_path)
+					}
+					Err(e) => {
+						log::error!("{:?}", e);
+						Err(e)
+					}
+				};
 			}
 		}
 		Ok(None)
@@ -61,18 +64,18 @@ impl<T: ActionPipeline> ActionRunner for T {
 }
 
 impl ActionRunner for Action {
-	fn run<T: AsRef<Path> + Into<PathBuf> + Clone>(&self, src: T, simulated: bool) -> Result<Option<PathBuf>> {
+	fn run(&self, src: &mut Resource) -> Result<Option<PathBuf>> {
 		use Action::*;
 		match self {
-			Copy(copy) => copy.run(src, simulated),
-			Move(r#move) => r#move.run(src, simulated),
-			Hardlink(hardlink) => hardlink.run(src, simulated),
-			Symlink(symlink) => symlink.run(src, simulated),
-			Delete(delete) => delete.run(src, simulated),
-			Echo(echo) => echo.run(src, simulated),
-			Trash(trash) => trash.run(src, simulated),
-			Script(script) => script.run(src, simulated),
-			Extract(extract) => extract.run(src, simulated),
+			Copy(copy) => copy.run(src),
+			Move(r#move) => r#move.run(src),
+			Hardlink(hardlink) => hardlink.run(src),
+			Symlink(symlink) => symlink.run(src),
+			Delete(delete) => delete.run(src),
+			Echo(echo) => echo.run(src),
+			Trash(trash) => trash.run(src),
+			Script(script) => script.run(src),
+			Extract(extract) => extract.run(src),
 		}
 	}
 }
@@ -80,21 +83,12 @@ impl ActionRunner for Action {
 pub trait ActionPipeline {
 	const TYPE: ActionType;
 	const REQUIRES_DEST: bool;
-	fn execute<T: AsRef<Path> + Into<PathBuf> + Clone, P: AsRef<Path> + Into<PathBuf> + Clone>(
-		&self,
-		src: T,
-		dest: Option<P>,
-		simulated: bool,
-	) -> Result<Option<PathBuf>>;
 
-	fn log_success_msg<T: AsRef<Path> + Into<PathBuf> + Clone, P: AsRef<Path> + Into<PathBuf> + Clone>(
-		&self,
-		src: T,
-		dest: Option<P>,
-		simulated: bool,
-	) -> Result<String> {
+	fn execute<T: AsRef<Path>>(&self, src: &mut Resource, dest: Option<T>) -> Result<Option<PathBuf>>;
+
+	fn log_success_msg<T: AsRef<Path>>(&self, src: &mut Resource, dest: Option<T>) -> Result<String> {
 		use ActionType::*;
-		let hint = if !simulated {
+		let hint = if !*SIMULATION {
 			Self::TYPE.to_string().to_uppercase()
 		} else {
 			format!("SIMULATED {}", Self::TYPE.to_string().to_uppercase())
@@ -103,21 +97,16 @@ pub trait ActionPipeline {
 			Copy | Move | Hardlink | Symlink | Extract => Ok(format!(
 				"({}) {} -> {}",
 				hint,
-				src.as_ref().display(),
+				src.path().display(),
 				dest.expect("dest should not be none").as_ref().display()
 			)),
-			Delete | Trash => Ok(format!("({}) {}", hint, src.as_ref().display())),
+			Delete | Trash => Ok(format!("({}) {}", hint, src.path().display())),
 			_ => unimplemented!(),
 		}
 	}
 
 	// required only for some actions
-	fn confirm<T: AsRef<Path> + Into<PathBuf> + Clone, P: AsRef<Path> + Into<PathBuf> + Clone>(&self, _: T, _: Option<P>) -> Result<bool> {
-		Ok(true)
-	}
-
-	// required only for some actions
-	fn get_target_path<T: AsRef<Path> + Into<PathBuf> + Clone>(&self, _: T) -> Result<Option<PathBuf>> {
+	fn get_target_path(&self, _: &mut Resource) -> Result<Option<PathBuf>> {
 		if Self::REQUIRES_DEST {
 			unimplemented!()
 		}

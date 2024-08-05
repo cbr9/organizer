@@ -1,6 +1,5 @@
-use std::path::Path;
 
-use crate::config::filters::AsFilter;
+use crate::{config::filters::AsFilter, resource::Resource};
 use derive_more::Deref;
 use serde::Deserialize;
 
@@ -11,8 +10,8 @@ pub struct Extension {
 }
 
 impl AsFilter for Extension {
-	fn matches<T: AsRef<Path>>(&self, path: T) -> bool {
-		let path = path.as_ref();
+	fn matches(&self, res: &mut Resource) -> bool {
+		let path = res.path();
 		if path.is_file() {
 			return path
 				.extension()
@@ -27,26 +26,26 @@ impl AsFilter for Extension {
 #[cfg(test)]
 pub mod tests {
 
-	use std::path::PathBuf;
+	use std::{path::PathBuf, str::FromStr};
 
 	use super::Extension;
-	use crate::config::filters::AsFilter;
+	use crate::{config::filters::AsFilter, resource::Resource};
 
 	#[test]
 	fn single_match_pdf() {
 		let extension = Extension {
 			extensions: vec!["pdf".into()],
 		};
-		let path = PathBuf::from("$HOME/Downloads/test.pdf");
-		assert!(extension.matches(path))
+		let mut path = Resource::from_str("$HOME/Downloads/test.pdf").unwrap();
+		assert!(extension.matches(&mut path))
 	}
 	#[test]
 	fn multiple_match_pdf() {
 		let extension = Extension {
 			extensions: vec!["pdf".into(), "doc".into(), "docx".into()],
 		};
-		let path = PathBuf::from("$HOME/Downloads/test.pdf");
-		assert!(extension.matches(path))
+		let mut path = Resource::from_str("$HOME/Downloads/test.pdf").unwrap();
+		assert!(extension.matches(&mut path))
 	}
 
 	#[test]
@@ -54,7 +53,7 @@ pub mod tests {
 		let extension = Extension {
 			extensions: vec!["pdf".into(), "doc".into(), "docx".into()],
 		};
-		let path = PathBuf::from("$HOME/Downloads/test.jpg");
-		assert!(!extension.matches(path))
+		let mut path = Resource::from_str("$HOME/Downloads/test.jpg").unwrap();
+		assert!(!extension.matches(&mut path))
 	}
 }

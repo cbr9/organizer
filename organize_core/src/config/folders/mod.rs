@@ -3,12 +3,9 @@ use std::path::PathBuf;
 use anyhow::Result;
 use path_clean::PathClean;
 use serde::Deserialize;
+use tera::Context;
 
-use crate::{
-	config::options::FolderOptions,
-	path::Expand,
-	templates::{CONTEXT, TERA},
-};
+use crate::{config::options::FolderOptions, path::Expand, templates::TERA};
 
 #[derive(Deserialize, Debug, PartialEq, Clone)]
 #[serde(deny_unknown_fields)]
@@ -22,14 +19,13 @@ pub struct Folder {
 
 impl Folder {
 	pub fn path(&self) -> Result<PathBuf> {
-		let mut ctx = CONTEXT.lock().unwrap();
+		let context = Context::new();
 		let path = TERA
 			.lock()
 			.unwrap()
-			.render_str(&self.path.to_string_lossy(), &ctx)
+			.render_str(&self.path.to_string_lossy(), &context)
 			.map(PathBuf::from)
 			.map(|p| p.expand_user().clean())?;
-		ctx.insert("root", &path.to_string_lossy());
 		Ok(path)
 	}
 }

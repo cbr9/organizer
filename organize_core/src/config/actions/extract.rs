@@ -5,7 +5,7 @@ use std::{
 	path::{Path, PathBuf},
 };
 
-use crate::path::prepare_target_path;
+use crate::{config::SIMULATION, path::prepare_target_path, resource::Resource};
 
 use super::{common::ConflictOption, ActionPipeline, ActionType};
 
@@ -24,8 +24,8 @@ impl ActionPipeline for Extract {
 
 	const REQUIRES_DEST: bool = true;
 
-	fn get_target_path<T: AsRef<std::path::Path> + Into<PathBuf> + Clone>(&self, src: T) -> anyhow::Result<Option<PathBuf>> {
-		let file = File::open(src.as_ref())?;
+	fn get_target_path(&self, src: &mut Resource) -> anyhow::Result<Option<PathBuf>> {
+		let file = File::open(src.path().as_ref())?;
 		let archive = zip::ZipArchive::new(file)?;
 		let mut common_prefix = None;
 
@@ -42,21 +42,16 @@ impl ActionPipeline for Extract {
 
 		let common_prefix = match common_prefix {
 			Some(p) => p.to_path_buf(),
-			None => src.as_ref().with_extension(""),
+			None => src.path().as_ref().with_extension(""),
 		};
 
-		prepare_target_path(&self.if_exists, src.as_ref(), &self.to.join(common_prefix), false)
+		prepare_target_path(&self.if_exists, src, &self.to.join(common_prefix), false)
 	}
 
-	fn execute<T: AsRef<std::path::Path> + Into<std::path::PathBuf> + Clone, P: AsRef<std::path::Path> + Into<std::path::PathBuf> + Clone>(
-		&self,
-		src: T,
-		dest: Option<P>,
-		simulated: bool,
-	) -> anyhow::Result<Option<std::path::PathBuf>> {
+	fn execute<T: AsRef<Path>>(&self, src: &mut Resource, dest: Option<T>) -> anyhow::Result<Option<std::path::PathBuf>> {
 		let dest = dest.unwrap().as_ref().to_path_buf();
-		if !simulated {
-			let file = File::open(src.as_ref())?;
+		if !*SIMULATION {
+			let file = File::open(src.path().as_ref())?;
 			let mut archive = zip::ZipArchive::new(file)?;
 			archive.extract(&dest)?;
 

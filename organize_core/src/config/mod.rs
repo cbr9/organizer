@@ -1,6 +1,10 @@
 use config::{Config as LayeredConfig, File};
+use once_cell::sync::OnceCell;
 use rule::Rule;
-use std::path::{Path, PathBuf};
+use std::{
+	ops::Deref,
+	path::{Path, PathBuf},
+};
 
 use anyhow::{Context as ErrorContext, Result};
 use serde::Deserialize;
@@ -15,6 +19,27 @@ pub mod folders;
 pub mod options;
 pub mod rule;
 pub mod variables;
+
+pub static SIMULATION: Simulation = Simulation(OnceCell::new());
+
+pub struct Simulation(OnceCell<bool>);
+
+impl Simulation {
+	pub fn set(&self, value: bool) -> Result<(), bool> {
+		match self.0.try_insert(value) {
+			Ok(_) => Ok(()),
+			Err((_, value)) => Err(value),
+		}
+	}
+}
+
+impl Deref for Simulation {
+	type Target = bool;
+
+	fn deref(&self) -> &Self::Target {
+		self.0.get().unwrap()
+	}
+}
 
 #[derive(Deserialize, Clone, Debug, PartialEq)]
 pub struct Config {

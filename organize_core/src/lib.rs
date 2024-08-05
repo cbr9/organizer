@@ -12,6 +12,7 @@ pub mod path {
 
 pub mod config;
 pub mod logger;
+pub mod resource;
 pub mod templates;
 pub mod utils;
 

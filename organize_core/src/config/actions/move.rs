@@ -1,10 +1,9 @@
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context as ErrorContext, Result};
-use dialoguer::{theme::ColorfulTheme, Confirm};
 use serde::Deserialize;
 
-use crate::path::prepare_target_path;
+use crate::{config::SIMULATION, path::prepare_target_path, resource::Resource};
 
 use super::{common::ConflictOption, ActionPipeline, ActionType};
 
@@ -22,37 +21,17 @@ impl ActionPipeline for Move {
 	const REQUIRES_DEST: bool = true;
 	const TYPE: ActionType = ActionType::Move;
 
-	fn get_target_path<T: AsRef<Path> + Into<PathBuf> + Clone>(&self, src: T) -> Result<Option<PathBuf>> {
-		prepare_target_path(&self.if_exists, src.as_ref(), self.to.as_path(), true)
+	fn get_target_path(&self, src: &mut Resource) -> Result<Option<PathBuf>> {
+		prepare_target_path(&self.if_exists, src, self.to.as_path(), true)
 	}
 
-	fn confirm<T: AsRef<Path> + Into<PathBuf> + Clone, P: AsRef<Path> + Into<PathBuf> + Clone>(&self, src: T, dest: Option<P>) -> Result<bool> {
-		if self.confirm {
-			Confirm::with_theme(&ColorfulTheme::default())
-				.with_prompt(format!(
-					"Move {} to {}?",
-					src.as_ref().display(),
-					dest.expect("dest should not be None").as_ref().display()
-				))
-				.interact()
-				.context("Could not interact")
-		} else {
-			Ok(true)
-		}
-	}
-
-	fn execute<T: AsRef<Path> + Into<PathBuf> + Clone, P: AsRef<Path> + Into<PathBuf> + Clone>(
-		&self,
-		src: T,
-		dest: Option<P>,
-		simulated: bool,
-	) -> Result<Option<PathBuf>> {
-		let dest: PathBuf = dest.unwrap().into();
-		if !simulated {
-			std::fs::rename(src.clone(), dest.clone())
-				.with_context(|| format!("Could not move {} -> {}", src.clone().as_ref().display(), dest.display()))?;
+	fn execute<T: AsRef<Path>>(&self, src: &mut Resource, dest: Option<T>) -> Result<Option<PathBuf>> {
+		let dest = dest.unwrap();
+		if !*SIMULATION {
+			std::fs::rename(src.path().as_ref(), dest.as_ref())
+				.with_context(|| format!("Could not move {} -> {}", src.path().as_ref().display(), dest.as_ref().display()))?;
 		}
 
-		Ok(Some(dest))
+		Ok(Some(dest.as_ref().to_path_buf()))
 	}
 }

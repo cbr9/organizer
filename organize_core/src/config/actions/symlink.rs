@@ -1,10 +1,9 @@
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context as ErrorContext, Result};
-use dialoguer::{theme::ColorfulTheme, Confirm};
 use serde::Deserialize;
 
-use crate::path::prepare_target_path;
+use crate::{config::SIMULATION, path::prepare_target_path, resource::Resource};
 
 use super::{common::ConflictOption, ActionPipeline, ActionType};
 
@@ -36,39 +35,19 @@ impl ActionPipeline for Symlink {
 	const REQUIRES_DEST: bool = true;
 	const TYPE: ActionType = ActionType::Symlink;
 
-	fn get_target_path<T: AsRef<Path> + Into<PathBuf> + Clone>(&self, src: T) -> Result<Option<PathBuf>> {
-		prepare_target_path(&self.if_exists, src.as_ref(), self.to.as_path(), true)
+	fn get_target_path(&self, src: &mut Resource) -> Result<Option<PathBuf>> {
+		prepare_target_path(&self.if_exists, src, self.to.as_path(), true)
 	}
 
-	fn confirm<T: AsRef<Path> + Into<PathBuf> + Clone, P: AsRef<Path> + Into<PathBuf> + Clone>(&self, src: T, dest: Option<P>) -> Result<bool> {
-		if self.confirm {
-			Confirm::with_theme(&ColorfulTheme::default())
-				.with_prompt(format!(
-					"Symlink {} to {}?",
-					src.as_ref().display(),
-					dest.expect("dest should not be None").as_ref().display()
-				))
-				.interact()
-				.context("Could not interact")
-		} else {
-			Ok(true)
-		}
-	}
-
-	fn execute<T: AsRef<Path> + Into<PathBuf> + Clone, P: AsRef<Path> + Into<PathBuf> + Clone>(
-		&self,
-		src: T,
-		dest: Option<P>,
-		simulated: bool,
-	) -> Result<Option<PathBuf>> {
+	fn execute<T: AsRef<Path>>(&self, src: &mut Resource, dest: Option<T>) -> Result<Option<PathBuf>> {
 		let dest = dest.unwrap();
-		if !simulated {
-			Self::atomic(&src, &dest).with_context(|| "Failed to symlink file")?;
+		if !*SIMULATION {
+			Self::atomic(src.path().as_ref(), &dest).with_context(|| "Failed to symlink file")?;
 		}
 		if self.continue_with == ContinueWith::Link {
-			Ok(Some(dest.into()))
+			Ok(Some(dest.as_ref().to_path_buf()))
 		} else {
-			Ok(Some(src.into()))
+			Ok(Some(src.path().into_owned()))
 		}
 	}
 }
