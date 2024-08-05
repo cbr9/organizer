@@ -11,4 +11,6 @@ TODO:
 - [x] compressed file extraction action
 - [x] refactor
 - [ ] refactor logger so all logs are put into one file. debug logs should not be written to stout unless a --verbose option is provided. each run should have its own log file in a folder named with the time the program was run
+- [ ] restructure confirm prompts
+- [ ] make resources an arc mutex
 - [ ] TESTS!!
