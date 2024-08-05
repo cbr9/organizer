@@ -8,5 +8,5 @@ TODO:
   - [ ] script 
 - [x] integrate external templating library
 - [ ] file content filter
-- [ ] compressed file extraction action
+- [x] compressed file extraction action
 - [x] refactor 
