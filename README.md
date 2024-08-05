@@ -9,5 +9,6 @@ TODO:
 - [x] integrate external templating library
 - [ ] file content filter
 - [x] compressed file extraction action
-- [x] refactor 
+- [x] refactor
+- [ ] debug option adding debug logs
 - [ ] TESTS!!
