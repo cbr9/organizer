@@ -19,7 +19,7 @@ impl ConflictOption {
 		use ConflictOption::*;
 		let mut path = target_path.as_ref().to_path_buf();
 		match self {
-			Skip => None,
+			Skip => (!path.exists()).then_some(path),
 			Overwrite => Some(path.to_path_buf()),
 			Rename => {
 				let counter_separator = " ";
