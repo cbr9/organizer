@@ -40,8 +40,5 @@ pub fn prepare_target_path(if_exists: &ConflictOption, src: &Path, dest: &Path, 
 		std::fs::create_dir_all(to.parent().unwrap())?;
 	}
 
-	match dest.exists() {
-		true => Ok(if_exists.resolve_naming_conflict(&to)),
-		false => Ok(Some(to)),
-	}
+	Ok(if_exists.resolve_naming_conflict(&to))
 }

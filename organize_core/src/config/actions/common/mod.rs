@@ -18,9 +18,12 @@ impl ConflictOption {
 	pub fn resolve_naming_conflict<T: AsRef<Path>>(&self, target_path: T) -> Option<PathBuf> {
 		use ConflictOption::*;
 		let mut path = target_path.as_ref().to_path_buf();
+		if !path.exists() {
+			return Some(path);
+		}
 		match self {
-			Skip => (!path.exists()).then_some(path),
-			Overwrite => Some(path.to_path_buf()),
+			Skip => None,
+			Overwrite => Some(path),
 			Rename => {
 				let counter_separator = " ";
 				let extension = path.extension().unwrap_or_default().to_string_lossy().to_string();
