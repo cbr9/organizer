@@ -146,9 +146,8 @@ impl Cmd for Run {
 
 				let mut entries = walker
 					.into_iter()
-					.filter_entry(|e: &DirEntry| rule.filters.matches(e.path()))
 					.flatten()
-					.filter(|e| FolderOptions::allows_entry(config, rule, folder, e.path()))
+					.filter(|e| FolderOptions::allows_entry(config, rule, folder, e.path()) && rule.filters.matches(e.path()))
 					.map(|e| e.into_path())
 					.collect::<Vec<_>>();
 
