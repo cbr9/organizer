@@ -5,7 +5,7 @@ use crate::path::IsHidden;
 use crate::utils::DefaultOpt;
 
 use crate::config::options::max_depth::MaxDepth;
-use serde::{Deserialize};
+use serde::Deserialize;
 use std::path::{Path, PathBuf};
 
 use super::{folders::Folder, Config, Rule};
@@ -17,6 +17,14 @@ pub struct FolderOptions {
 	pub ignored_dirs: Option<Vec<PathBuf>>,
 	pub hidden_files: Option<bool>,
 	pub partial_files: Option<bool>,
+	pub targets: Option<Targets>,
+}
+
+#[derive(Debug, Default, Clone, Deserialize, PartialEq)]
+pub enum Targets {
+	#[default]
+	File,
+	Dir,
 }
 
 macro_rules! getters {
@@ -47,12 +55,21 @@ getters! {
 	pub fn max_depth() -> MaxDepth {
 		max_depth
 	}
+	pub fn targets() -> Targets {
+		targets
+	}
 }
 
 impl FolderOptions {
 	pub fn allows_entry<T: AsRef<Path>>(config: &Config, rule: &Rule, folder: &Folder, path: T) -> bool {
 		let path = path.as_ref();
 
+		if path.is_file() && Self::targets(config, rule, folder) == Targets::Dir {
+			return false;
+		}
+		if path.is_dir() && Self::targets(config, rule, folder) == Targets::File {
+			return false;
+		}
 		// filter by partial_files option
 		if path.is_file() {
 			let allows_partial_files = Self::partial_files(config, rule, folder);
@@ -99,6 +116,7 @@ impl DefaultOpt for FolderOptions {
 			ignored_dirs: None,
 			hidden_files: None,
 			partial_files: None,
+			targets: None,
 		}
 	}
 
@@ -108,6 +126,7 @@ impl DefaultOpt for FolderOptions {
 			ignored_dirs: Some(vec![]),
 			hidden_files: Some(false),
 			partial_files: Some(false),
+			targets: Some(Targets::default()),
 		}
 	}
 }

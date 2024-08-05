@@ -4,6 +4,7 @@ use anyhow::Result;
 use clap::{Parser, ValueHint};
 use dialoguer::{theme::ColorfulTheme, MultiSelect, Select};
 use std::collections::HashSet;
+use walkdir::DirEntry;
 
 use organize_core::{
 	config::{actions::ActionRunner, filters::AsFilter, options::FolderOptions, rule::Rule, variables::AsVariable, Config},
@@ -145,11 +146,9 @@ impl Cmd for Run {
 
 				let mut entries = walker
 					.into_iter()
-					.filter_entry(|e| {
-						let path = e.path();
-						FolderOptions::allows_entry(config, rule, folder, path) && rule.filters.matches(path)
-					})
+					.filter_entry(|e: &DirEntry| rule.filters.matches(e.path()))
 					.flatten()
+					.filter(|e| FolderOptions::allows_entry(config, rule, folder, e.path()))
 					.map(|e| e.into_path())
 					.collect::<Vec<_>>();
 
