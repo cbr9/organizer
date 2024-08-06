@@ -149,7 +149,7 @@ impl Cmd for Run {
 			processed_files.lock().unwrap().retain(|key, _| key.exists());
 			for folder in rule.folders.iter() {
 				let location = folder.path()?;
-				let walker = Options::max_depth(config, rule, folder).to_walker(&location);
+				let walker = Options::walker(config, rule, folder)?;
 
 				let mut entries = walker
 					.into_iter()

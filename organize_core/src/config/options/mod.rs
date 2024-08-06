@@ -1,19 +1,19 @@
-pub mod max_depth;
-
 use crate::path::IsHidden;
+use anyhow::{Context, Result};
 
 use crate::utils::DefaultOpt;
 
-use crate::config::options::max_depth::MaxDepth;
 use serde::Deserialize;
 use std::path::{Path, PathBuf};
+use walkdir::WalkDir;
 
 use super::{folders::Folder, Config, Rule};
 
 #[derive(Deserialize, Debug, Clone, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct Options {
-	pub max_depth: Option<MaxDepth>,
+	pub max_depth: Option<usize>,
+	pub min_depth: Option<usize>,
 	pub exclude: Option<Vec<PathBuf>>,
 	pub hidden_files: Option<bool>,
 	pub partial_files: Option<bool>,
@@ -52,8 +52,11 @@ getters! {
 	pub fn hidden_files() -> bool {
 		hidden_files
 	}
-	pub fn max_depth() -> MaxDepth {
+	pub fn max_depth() -> usize {
 		max_depth
+	}
+	pub fn min_depth() -> usize {
+		min_depth
 	}
 	pub fn targets() -> Targets {
 		targets
@@ -61,6 +64,14 @@ getters! {
 }
 
 impl Options {
+	pub fn walker(config: &Config, rule: &Rule, folder: &Folder) -> Result<WalkDir> {
+		let path = &folder.path()?;
+		let home = &dirs::home_dir().context("unable to find home directory")?;
+		let max_depth = if path == home { 1 } else { Self::max_depth(config, rule, folder) };
+		let min_depth = if path == home { 1 } else { Self::min_depth(config, rule, folder) };
+		Ok(WalkDir::new(path).min_depth(min_depth).max_depth(max_depth))
+	}
+
 	pub fn prefilter<T: AsRef<Path>>(config: &Config, rule: &Rule, folder: &Folder, path: T) -> bool {
 		let mut excluded = Self::excluded(config, rule, folder);
 		if excluded.is_empty() {
@@ -124,12 +135,14 @@ impl DefaultOpt for Options {
 			hidden_files: None,
 			partial_files: None,
 			targets: None,
+			min_depth: None,
 		}
 	}
 
 	fn default_some() -> Self {
 		Self {
-			max_depth: Some(MaxDepth::default()),
+			max_depth: Some(1),
+			min_depth: Some(1),
 			exclude: Some(vec![]),
 			hidden_files: Some(false),
 			partial_files: Some(false),
