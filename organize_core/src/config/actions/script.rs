@@ -104,14 +104,14 @@ mod tests {
 
 	#[test]
 	fn test_script_filter() {
-		let mut src = Resource::new("/home", "/", &[]);
+		let src = Resource::new("/home", "/", &[]);
 		let content = "print('huh')\nprint('{{path}}'.islower())";
 		let mut script = Script::new("python", content);
-		script.run_script(&mut src).unwrap_or_else(|_| {
+		script.run_script(&src).unwrap_or_else(|_| {
 			// some linux distributions don't have a `python` executable, but a `python3`
 			script = Script::new("python3", content);
-			script.run_script(&mut src).unwrap()
+			script.run_script(&src).unwrap()
 		});
-		assert!(script.matches(&mut src))
+		assert!(script.matches(&src))
 	}
 }

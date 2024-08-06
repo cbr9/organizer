@@ -156,10 +156,7 @@ impl Cmd for Run {
 					.filter_entry(|e| Options::prefilter(config, rule, folder, e.path()))
 					.flatten()
 					.map(|e| Resource::new(e.path(), &location, &rule.variables))
-					.filter(|e| {
-						let mut e = e.clone();
-						rule.filters.matches(&mut e)
-					})
+					.filter(|e| rule.filters.matches(e))
 					.filter(|e| Options::postfilter(config, rule, folder, &e.path))
 					.collect::<Vec<_>>();
 

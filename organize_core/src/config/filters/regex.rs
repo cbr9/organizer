@@ -1,8 +1,6 @@
-use derive_more::Deref;
-
 use crate::{config::filters::AsFilter, resource::Resource};
 use serde::{Deserialize, Deserializer};
-use std::convert::TryFrom;
+use std::{convert::TryFrom, ops::Deref};
 
 #[derive(PartialEq, Deserialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -10,9 +8,19 @@ pub struct Regex {
 	patterns: Vec<RegularExpression>,
 }
 
-#[derive(Debug, Deref, Clone)]
-pub struct RegularExpression(regex::Regex);
+#[derive(Debug, Clone)]
+pub struct RegularExpression {
+	pattern: regex::Regex,
+	negate: bool,
+}
 
+impl Deref for RegularExpression {
+	type Target = regex::Regex;
+
+	fn deref(&self) -> &Self::Target {
+		&self.pattern
+	}
+}
 impl<'de> Deserialize<'de> for RegularExpression {
 	fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
 	where
@@ -20,20 +28,30 @@ impl<'de> Deserialize<'de> for RegularExpression {
 	{
 		// Deserialize as a string first
 		let pattern_str: String = String::deserialize(deserializer)?;
-		// Attempt to compile the regular expression
-		regex::Regex::new(&pattern_str).map(Self).map_err(serde::de::Error::custom)
+		Self::try_from(pattern_str).map_err(serde::de::Error::custom)
 	}
 }
 impl PartialEq for RegularExpression {
 	fn eq(&self, other: &Self) -> bool {
-		self.0.as_str() == other.0.as_str()
+		self.pattern.as_str() == other.pattern.as_str()
 	}
 }
 impl TryFrom<String> for RegularExpression {
 	type Error = regex::Error;
 
-	fn try_from(value: String) -> Result<Self, Self::Error> {
-		regex::Regex::new(value.as_str()).map(Self)
+	fn try_from(mut value: String) -> Result<Self, Self::Error> {
+		let mut negate = false;
+		if value.starts_with('!') {
+			negate = true;
+			value = value.replacen('!', "", 1);
+		}
+
+		if value.starts_with("\\!") {
+			value = value.replacen('\\', "", 1);
+		}
+
+		let pattern = regex::Regex::new(&value)?;
+		Ok(Self { pattern, negate })
 	}
 }
 
@@ -43,7 +61,13 @@ impl AsFilter for Regex {
 			None => false,
 			Some(filename) => {
 				let filename = filename.to_string_lossy();
-				self.patterns.iter().any(|re| re.is_match(&filename))
+				self.patterns.iter().any(|re| {
+					let mut matches = re.is_match(&filename);
+					if re.negate {
+						matches = !matches;
+					}
+					matches
+				})
 			}
 		}
 	}
@@ -72,21 +96,21 @@ mod tests {
 	#[test]
 	fn match_single() {
 		let regex = Regex::try_from(vec![r".*unsplash.*"]).unwrap();
-		let mut path = Resource::from_str("$HOME/Pictures/test_unsplash_img.jpg").unwrap();
-		assert!(regex.matches(&mut path))
+		let path = Resource::from_str("$HOME/Pictures/test_unsplash_img.jpg").unwrap();
+		assert!(regex.matches(&path))
 	}
 
 	#[test]
 	fn match_multiple() {
 		let regex = Regex::try_from(vec![r".*unsplash.*", r"\w"]).unwrap();
-		let mut path = Resource::from_str("$HOME/Pictures/test_unsplash_img.jpg").unwrap();
-		assert!(regex.matches(&mut path))
+		let path = Resource::from_str("$HOME/Pictures/test_unsplash_img.jpg").unwrap();
+		assert!(regex.matches(&path))
 	}
 
 	#[test]
 	fn no_match_multiple() {
 		let regex = Regex::try_from(vec![r".*unsplash.*", r"\d"]).unwrap();
-		let mut path = Resource::from_str("$HOME/Documents/deep_learning.pdf").unwrap();
-		assert!(!regex.matches(&mut path))
+		let path = Resource::from_str("$HOME/Documents/deep_learning.pdf").unwrap();
+		assert!(!regex.matches(&path))
 	}
 }

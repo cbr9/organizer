@@ -39,14 +39,14 @@ mod tests {
 		let tmp_dir = tempfile::tempdir().expect("Couldn't create temporary directory");
 		let tmp_path = tmp_dir.path().to_owned();
 		let tmp_file = tmp_path.join("delete_me.txt");
-		let mut resource = Resource::new(&tmp_file, tmp_dir.path(), &[]);
+		let resource = Resource::new(&tmp_file, tmp_dir.path(), &[]);
 		let action = Delete { confirm: false };
 
 		std::fs::write(&tmp_file, "").expect("Could not create target file");
 		assert!(tmp_file.exists());
 
 		action
-			.execute::<&Path>(&mut resource, None, false)
+			.execute::<&Path>(&resource, None, false)
 			.expect("Could not delete target file");
 		assert!(!tmp_file.exists());
 	}
