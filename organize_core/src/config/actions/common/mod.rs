@@ -51,14 +51,27 @@ mod tests {
 	use tempfile::{Builder, NamedTempFile};
 
 	#[test]
-	fn skip() {
-		let path = PathBuf::from("/home/user/skipped_file.txt");
-		let new = ConflictOption::Skip.resolve_naming_conflict(path);
+	fn skip_exists() {
+		let file = NamedTempFile::new().unwrap();
+		let new = ConflictOption::Skip.resolve_naming_conflict(file.path());
 		assert_eq!(new, None)
+	}
+	#[test]
+	fn skip_not_exists() {
+		let path = PathBuf::from("/home/user/skipped_file.txt");
+		let new = ConflictOption::Skip.resolve_naming_conflict(&path);
+		assert_eq!(new, Some(path))
 	}
 
 	#[test]
-	fn overwrite() {
+	fn overwrite_exists() {
+		let file = NamedTempFile::new().unwrap();
+		let path = file.path();
+		let new = ConflictOption::Overwrite.resolve_naming_conflict(&path);
+		assert_eq!(new, Some(path.to_path_buf()))
+	}
+	#[test]
+	fn overwrite_not_exists() {
 		let path = PathBuf::from("/home/user/skipped_file.txt");
 		let new = ConflictOption::Overwrite.resolve_naming_conflict(&path);
 		assert_eq!(new, Some(path))
