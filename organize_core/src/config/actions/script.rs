@@ -30,7 +30,7 @@ impl ActionPipeline for Script {
 	const TYPE: ActionType = ActionType::Script;
 
 	fn execute<T: AsRef<Path>>(&self, src: &Resource, _: Option<T>, dry_run: bool) -> Result<Option<PathBuf>> {
-		if !dry_run {
+		if dry_run {
 			bail!("Cannot run scripted actions during a dry run")
 		}
 		self.run_script(src).map(|output| {

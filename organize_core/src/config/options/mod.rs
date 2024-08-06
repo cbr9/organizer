@@ -12,8 +12,8 @@ use super::{folders::Folder, Config, Rule};
 #[derive(Deserialize, Debug, Clone, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct Options {
-	pub max_depth: Option<usize>,
-	pub min_depth: Option<usize>,
+	pub max_depth: Option<f64>,
+	pub min_depth: Option<f64>,
 	pub exclude: Option<Vec<PathBuf>>,
 	pub hidden_files: Option<bool>,
 	pub partial_files: Option<bool>,
@@ -52,10 +52,10 @@ getters! {
 	pub fn hidden_files() -> bool {
 		hidden_files
 	}
-	pub fn max_depth() -> usize {
+	pub fn max_depth() -> f64 {
 		max_depth
 	}
-	pub fn min_depth() -> usize {
+	pub fn min_depth() -> f64 {
 		min_depth
 	}
 	pub fn targets() -> Targets {
@@ -67,9 +67,9 @@ impl Options {
 	pub fn walker(config: &Config, rule: &Rule, folder: &Folder) -> Result<WalkDir> {
 		let path = &folder.path()?;
 		let home = &dirs::home_dir().context("unable to find home directory")?;
-		let max_depth = if path == home { 1 } else { Self::max_depth(config, rule, folder) };
-		let min_depth = if path == home { 1 } else { Self::min_depth(config, rule, folder) };
-		Ok(WalkDir::new(path).min_depth(min_depth).max_depth(max_depth))
+		let max_depth = if path == home { 1.0 } else { Self::max_depth(config, rule, folder) };
+		let min_depth = if path == home { 1.0 } else { Self::min_depth(config, rule, folder) };
+		Ok(WalkDir::new(path).min_depth(min_depth as usize).max_depth(max_depth as usize))
 	}
 
 	pub fn prefilter<T: AsRef<Path>>(config: &Config, rule: &Rule, folder: &Folder, path: T) -> bool {
@@ -141,8 +141,8 @@ impl DefaultOpt for Options {
 
 	fn default_some() -> Self {
 		Self {
-			max_depth: Some(1),
-			min_depth: Some(1),
+			max_depth: Some(1.0),
+			min_depth: Some(1.0),
 			exclude: Some(vec![]),
 			hidden_files: Some(false),
 			partial_files: Some(false),
