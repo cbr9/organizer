@@ -153,13 +153,14 @@ impl Cmd for Run {
 
 				let mut entries = walker
 					.into_iter()
+					.filter_entry(|e| Options::prefilter(config, rule, folder, e.path()))
 					.flatten()
-					.filter(|e| Options::allows_entry(config, rule, folder, e.path()))
 					.map(|e| Resource::new(e.path(), &location, &rule.variables))
 					.filter(|e| {
 						let mut e = e.clone();
 						rule.filters.matches(&mut e)
 					})
+					.filter(|e| Options::postfilter(config, rule, folder, &e.path))
 					.collect::<Vec<_>>();
 
 				entries.par_iter_mut().for_each(|entry| {

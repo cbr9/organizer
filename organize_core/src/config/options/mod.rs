@@ -61,7 +61,23 @@ getters! {
 }
 
 impl Options {
-	pub fn allows_entry<T: AsRef<Path>>(config: &Config, rule: &Rule, folder: &Folder, path: T) -> bool {
+	pub fn prefilter<T: AsRef<Path>>(config: &Config, rule: &Rule, folder: &Folder, path: T) -> bool {
+		let mut excluded = Self::excluded(config, rule, folder);
+		if excluded.is_empty() {
+			return true;
+		}
+
+		excluded.sort_by_key(|path| path.components().count());
+
+		!excluded.iter().any(|dir| {
+			if dir.file_name().is_none() || path.as_ref().file_name().is_none() {
+				return false;
+			}
+			path.as_ref() == dir || path.as_ref().file_name().unwrap() == dir.file_name().unwrap()
+		})
+	}
+
+	pub fn postfilter<T: AsRef<Path>>(config: &Config, rule: &Rule, folder: &Folder, path: T) -> bool {
 		let path = path.as_ref();
 
 		if path.is_file() && Self::targets(config, rule, folder) == Targets::Dir {
@@ -89,22 +105,6 @@ impl Options {
 				return false;
 			}
 		}
-
-		// filter by ignored_dirs option
-		let excluded = Self::excluded(config, rule, folder);
-		if !excluded.is_empty() {
-			let is_ignored = path.ancestors().any(|anc| {
-				excluded.iter().any(|dir| {
-					if dir.file_name().is_none() || anc.file_name().is_none() {
-						return false;
-					}
-					anc == dir || anc.file_name().unwrap() == dir.file_name().unwrap()
-				})
-			});
-			if is_ignored {
-				return false;
-			}
-		};
 
 		true
 	}
