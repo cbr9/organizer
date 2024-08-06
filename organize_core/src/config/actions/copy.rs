@@ -35,11 +35,11 @@ impl ActionPipeline for Copy {
 	const REQUIRES_DEST: bool = true;
 	const TYPE: ActionType = ActionType::Copy;
 
-	fn get_target_path(&self, src: &mut Resource) -> Result<Option<PathBuf>> {
+	fn get_target_path(&self, src: &Resource) -> Result<Option<PathBuf>> {
 		prepare_target_path(&self.if_exists, src, self.to.as_path(), true)
 	}
 
-	fn execute<T: AsRef<Path>>(&self, src: &mut Resource, dest: Option<T>) -> Result<Option<PathBuf>> {
+	fn execute<T: AsRef<Path>>(&self, src: &Resource, dest: Option<T>) -> Result<Option<PathBuf>> {
 		let dest = dest.unwrap();
 		if !*SIMULATION {
 			std::fs::copy(src.path().as_ref(), &dest).with_context(|| "Failed to copy file")?;

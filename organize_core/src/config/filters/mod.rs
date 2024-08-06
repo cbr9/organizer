@@ -1,5 +1,6 @@
 use derive_more::Deref;
 use empty::Empty;
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use serde::Deserialize;
 
 use extension::Extension;
@@ -31,11 +32,11 @@ pub enum Filter {
 }
 
 pub trait AsFilter {
-	fn matches(&self, res: &mut Resource) -> bool;
+	fn matches(&self, res: &Resource) -> bool;
 }
 
 impl AsFilter for Filter {
-	fn matches(&self, res: &mut Resource) -> bool {
+	fn matches(&self, res: &Resource) -> bool {
 		match self {
 			Filter::Regex(regex) => regex.matches(res),
 			Filter::Filename(filename) => filename.matches(res),
@@ -43,7 +44,7 @@ impl AsFilter for Filter {
 			Filter::Script(script) => script.matches(res),
 			Filter::Mime(mime) => mime.matches(res),
 			Filter::Empty(empty) => empty.matches(res),
-			Filter::Group { filters } => filters.iter().any(|f| f.matches(res)),
+			Filter::Group { filters } => filters.par_iter().any(|f| f.matches(res)),
 		}
 	}
 }
@@ -52,8 +53,8 @@ impl AsFilter for Filter {
 pub struct Filters(pub(crate) Vec<Filter>);
 
 impl AsFilter for Filters {
-	fn matches(&self, res: &mut Resource) -> bool {
-		self.iter().all(|filter| filter.matches(res))
+	fn matches(&self, res: &Resource) -> bool {
+		self.par_iter().all(|filter| filter.matches(res))
 	}
 }
 
@@ -69,7 +70,7 @@ mod tests {
 			Filter::Regex(Regex::try_from(vec![".*unsplash.*"]).unwrap()),
 			Filter::Regex(Regex::try_from(vec![".*\\.jpg"]).unwrap()),
 		]);
-		assert!(filters.matches(&mut Resource::from_str("$HOME/Downloads/unsplash_image.jpg").unwrap()));
-		assert!(!filters.matches(&mut Resource::from_str("$HOME/Downloads/unsplash_doc.pdf").unwrap()));
+		assert!(filters.matches(&Resource::from_str("$HOME/Downloads/unsplash_image.jpg").unwrap()));
+		assert!(!filters.matches(&Resource::from_str("$HOME/Downloads/unsplash_doc.pdf").unwrap()));
 	}
 }

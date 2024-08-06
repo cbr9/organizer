@@ -34,7 +34,7 @@ impl ActionPipeline for Trash {
 	const REQUIRES_DEST: bool = false;
 	const TYPE: ActionType = ActionType::Trash;
 
-	fn execute<T: AsRef<Path>>(&self, src: &mut Resource, _: Option<T>) -> Result<Option<PathBuf>> {
+	fn execute<T: AsRef<Path>>(&self, src: &Resource, _: Option<T>) -> Result<Option<PathBuf>> {
 		if !*SIMULATION {
 			let to = Self::dir()?.join(src.path().as_ref().file_name().unwrap());
 			let from = src.path();

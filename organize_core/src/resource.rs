@@ -52,8 +52,7 @@ impl<'a> Resource<'a> {
 		}
 	}
 
-	pub fn context(&mut self) -> Context {
-		self.refresh();
+	pub fn context(&self) -> Context {
 		let mut combined_context = Context::new();
 		let global = CONTEXT.lock().unwrap().deref().clone();
 		combined_context.extend(global);
@@ -61,8 +60,7 @@ impl<'a> Resource<'a> {
 		combined_context
 	}
 
-	pub fn path(&mut self) -> Cow<PathBuf> {
-		self.refresh();
+	pub fn path(&self) -> Cow<PathBuf> {
 		Cow::Borrowed(&self.path)
 	}
 

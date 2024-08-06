@@ -24,7 +24,7 @@ impl ActionPipeline for Extract {
 
 	const REQUIRES_DEST: bool = true;
 
-	fn get_target_path(&self, src: &mut Resource) -> anyhow::Result<Option<PathBuf>> {
+	fn get_target_path(&self, src: &Resource) -> anyhow::Result<Option<PathBuf>> {
 		let file = File::open(src.path().as_ref())?;
 		let archive = zip::ZipArchive::new(file)?;
 		let mut common_prefix = None;
@@ -48,7 +48,7 @@ impl ActionPipeline for Extract {
 		prepare_target_path(&self.if_exists, src, &self.to.join(common_prefix), false)
 	}
 
-	fn execute<T: AsRef<Path>>(&self, src: &mut Resource, dest: Option<T>) -> anyhow::Result<Option<std::path::PathBuf>> {
+	fn execute<T: AsRef<Path>>(&self, src: &Resource, dest: Option<T>) -> anyhow::Result<Option<std::path::PathBuf>> {
 		let dest = dest.unwrap().as_ref().to_path_buf();
 		if !*SIMULATION {
 			let file = File::open(src.path().as_ref())?;

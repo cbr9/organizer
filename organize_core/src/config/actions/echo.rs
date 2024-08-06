@@ -24,11 +24,11 @@ impl ActionPipeline for Echo {
 	const REQUIRES_DEST: bool = false;
 	const TYPE: ActionType = ActionType::Echo;
 
-	fn execute<T: AsRef<Path>>(&self, src: &mut Resource, _: Option<T>) -> Result<Option<PathBuf>> {
+	fn execute<T: AsRef<Path>>(&self, src: &Resource, _: Option<T>) -> Result<Option<PathBuf>> {
 		Ok(Some(src.path().into_owned()))
 	}
 
-	fn log_success_msg<T: AsRef<Path>>(&self, src: &mut Resource, _: Option<T>) -> Result<String> {
+	fn log_success_msg<T: AsRef<Path>>(&self, src: &Resource, _: Option<T>) -> Result<String> {
 		let message = TERA.lock().unwrap().render_str(&self.message, &src.context())?;
 		let hint = if !*SIMULATION { "ECHO" } else { "SIMULATED ECHO" };
 		Ok(format!("({}) {}", hint, message))

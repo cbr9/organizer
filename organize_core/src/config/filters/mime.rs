@@ -45,7 +45,7 @@ impl<T: ToString> TryFrom<Vec<T>> for Mime {
 }
 
 impl AsFilter for Mime {
-	fn matches(&self, res: &mut Resource) -> bool {
+	fn matches(&self, res: &Resource) -> bool {
 		let guess = mime_guess::from_path(res.path().as_ref()).first_or_octet_stream();
 		self.types.iter().any(|mime| match (mime.type_(), mime.subtype()) {
 			(mime::STAR, subtype) => subtype == guess.subtype(),

@@ -1,15 +1,13 @@
 use path_clean::PathClean;
-use std::{
-	path::{Path, PathBuf, MAIN_SEPARATOR},
-};
+use std::path::{Path, PathBuf, MAIN_SEPARATOR};
 
-use anyhow::{bail, Context, Result};
+use anyhow::{bail, Result};
 
 use crate::{config::actions::common::ConflictOption, resource::Resource, templates::TERA};
 
 use super::Expand;
 
-pub fn prepare_target_path(if_exists: &ConflictOption, src: &mut Resource, dest: &Path, with_extension: bool) -> Result<Option<PathBuf>> {
+pub fn prepare_target_path(if_exists: &ConflictOption, src: &Resource, dest: &Path, with_extension: bool) -> Result<Option<PathBuf>> {
 	// if there are any placeholders in the destination, expand them
 
 	let path = src.path().into_owned();

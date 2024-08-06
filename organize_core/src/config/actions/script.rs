@@ -30,7 +30,7 @@ impl ActionPipeline for Script {
 
 	const REQUIRES_DEST: bool = false;
 
-	fn execute<T: AsRef<Path>>(&self, src: &mut Resource, _: Option<T>) -> Result<Option<PathBuf>> {
+	fn execute<T: AsRef<Path>>(&self, src: &Resource, _: Option<T>) -> Result<Option<PathBuf>> {
 		if !*SIMULATION {
 			bail!("Cannot run scripted actions during a dry run")
 		}
@@ -40,7 +40,7 @@ impl ActionPipeline for Script {
 		})
 	}
 
-	fn log_success_msg<T: AsRef<Path>>(&self, src: &mut Resource, dest: Option<T>) -> Result<String> {
+	fn log_success_msg<T: AsRef<Path>>(&self, src: &Resource, dest: Option<T>) -> Result<String> {
 		Ok(format!(
 			"({} SCRIPT) {} -> {}",
 			self.exec.to_uppercase(),
@@ -51,7 +51,7 @@ impl ActionPipeline for Script {
 }
 
 impl AsFilter for Script {
-	fn matches(&self, res: &mut Resource) -> bool {
+	fn matches(&self, res: &Resource) -> bool {
 		self.run_script(res)
 			.map(|output| {
 				// get the last line in stdout and parse it as a boolean
@@ -77,7 +77,7 @@ impl Script {
 		}
 	}
 
-	fn write(&self, src: &mut Resource) -> anyhow::Result<PathBuf> {
+	fn write(&self, src: &Resource) -> anyhow::Result<PathBuf> {
 		let script = tempfile::NamedTempFile::new()?;
 		let script_path = script.into_temp_path().to_path_buf();
 		let content = TERA.lock().unwrap().render_str(&self.content, &src.context());
@@ -87,7 +87,7 @@ impl Script {
 		Ok(script_path)
 	}
 
-	fn run_script(&self, src: &mut Resource) -> anyhow::Result<Output> {
+	fn run_script(&self, src: &Resource) -> anyhow::Result<Output> {
 		let script = self.write(src)?;
 		let output = Command::new(&self.exec)
 			.args(self.args.as_slice())

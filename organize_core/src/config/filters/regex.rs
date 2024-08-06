@@ -38,7 +38,7 @@ impl TryFrom<String> for RegularExpression {
 }
 
 impl AsFilter for Regex {
-	fn matches(&self, res: &mut Resource) -> bool {
+	fn matches(&self, res: &Resource) -> bool {
 		match res.path().as_ref().file_name() {
 			None => false,
 			Some(filename) => {

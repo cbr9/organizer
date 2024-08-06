@@ -1,4 +1,3 @@
-
 use crate::{config::filters::AsFilter, resource::Resource};
 use derive_more::Deref;
 use serde::Deserialize;
@@ -10,7 +9,7 @@ pub struct Extension {
 }
 
 impl AsFilter for Extension {
-	fn matches(&self, res: &mut Resource) -> bool {
+	fn matches(&self, res: &Resource) -> bool {
 		let path = res.path();
 		if path.is_file() {
 			return path
@@ -26,7 +25,7 @@ impl AsFilter for Extension {
 #[cfg(test)]
 pub mod tests {
 
-	use std::{path::PathBuf, str::FromStr};
+	use std::str::FromStr;
 
 	use super::Extension;
 	use crate::{config::filters::AsFilter, resource::Resource};

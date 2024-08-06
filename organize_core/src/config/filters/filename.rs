@@ -1,4 +1,3 @@
-
 use crate::{config::filters::AsFilter, resource::Resource};
 use serde::Deserialize;
 
@@ -13,7 +12,7 @@ pub struct Filename {
 }
 
 impl AsFilter for Filename {
-	fn matches(&self, res: &mut Resource) -> bool {
+	fn matches(&self, res: &Resource) -> bool {
 		let path = res.path();
 		let mut filename = path.as_ref().file_name().unwrap().to_str().unwrap().to_string();
 		let mut filter = self.clone();
@@ -45,7 +44,7 @@ impl AsFilter for Filename {
 
 #[cfg(test)]
 mod tests {
-	use std::{path::PathBuf, str::FromStr};
+	use std::str::FromStr;
 
 	use super::*;
 

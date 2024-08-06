@@ -30,12 +30,12 @@ pub(crate) mod symlink;
 pub(crate) mod trash;
 
 pub trait ActionRunner {
-	fn run(&self, src: &mut Resource) -> Result<Option<PathBuf>>;
+	fn run(&self, src: &Resource) -> Result<Option<PathBuf>>;
 }
 
 impl<T: ActionPipeline> ActionRunner for T {
 	#[allow(clippy::nonminimal_bool)]
-	fn run(&self, src: &mut Resource) -> Result<Option<PathBuf>> {
+	fn run(&self, src: &Resource) -> Result<Option<PathBuf>> {
 		let dest = self.get_target_path(src);
 		if let Ok(dest) = dest {
 			if (Self::REQUIRES_DEST && dest.is_some()) || !Self::REQUIRES_DEST {
@@ -64,7 +64,7 @@ impl<T: ActionPipeline> ActionRunner for T {
 }
 
 impl ActionRunner for Action {
-	fn run(&self, src: &mut Resource) -> Result<Option<PathBuf>> {
+	fn run(&self, src: &Resource) -> Result<Option<PathBuf>> {
 		use Action::*;
 		match self {
 			Copy(copy) => copy.run(src),
@@ -84,9 +84,9 @@ pub trait ActionPipeline {
 	const TYPE: ActionType;
 	const REQUIRES_DEST: bool;
 
-	fn execute<T: AsRef<Path>>(&self, src: &mut Resource, dest: Option<T>) -> Result<Option<PathBuf>>;
+	fn execute<T: AsRef<Path>>(&self, src: &Resource, dest: Option<T>) -> Result<Option<PathBuf>>;
 
-	fn log_success_msg<T: AsRef<Path>>(&self, src: &mut Resource, dest: Option<T>) -> Result<String> {
+	fn log_success_msg<T: AsRef<Path>>(&self, src: &Resource, dest: Option<T>) -> Result<String> {
 		use ActionType::*;
 		let hint = if !*SIMULATION {
 			Self::TYPE.to_string().to_uppercase()
@@ -106,7 +106,7 @@ pub trait ActionPipeline {
 	}
 
 	// required only for some actions
-	fn get_target_path(&self, _: &mut Resource) -> Result<Option<PathBuf>> {
+	fn get_target_path(&self, _: &Resource) -> Result<Option<PathBuf>> {
 		if Self::REQUIRES_DEST {
 			unimplemented!()
 		}

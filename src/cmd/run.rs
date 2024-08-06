@@ -137,7 +137,7 @@ impl Cmd for Run {
 
 		SIMULATION.set(self.dry_run).unwrap();
 
-		let mut processed_files: Arc<Mutex<HashMap<PathBuf, &Rule>>> = Arc::new(Mutex::new(HashMap::new()));
+		let processed_files: Arc<Mutex<HashMap<PathBuf, &Rule>>> = Arc::new(Mutex::new(HashMap::new()));
 		let all_tags: Vec<String> = config.rules.iter().flat_map(|rule| &rule.tags).cloned().collect();
 		let all_ids: Vec<String> = config.rules.iter().filter_map(|rule| rule.id.clone()).collect();
 		let filtered_rules: Vec<Rule> = config

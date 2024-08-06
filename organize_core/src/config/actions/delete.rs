@@ -24,7 +24,7 @@ impl ActionPipeline for Delete {
 	const REQUIRES_DEST: bool = false;
 	const TYPE: ActionType = ActionType::Delete;
 
-	fn execute<T: AsRef<Path>>(&self, src: &mut Resource, _: Option<T>) -> Result<Option<PathBuf>> {
+	fn execute<T: AsRef<Path>>(&self, src: &Resource, _: Option<T>) -> Result<Option<PathBuf>> {
 		if !*SIMULATION {
 			std::fs::remove_file(src.path().as_ref()).with_context(|| format!("could not delete {}", src.path().as_ref().display()))?;
 		}
