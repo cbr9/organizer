@@ -48,18 +48,16 @@ mod tests {
 
 	#[test]
 	fn test_trash() {
-		let tmp_dir = tempfile::tempdir().expect("Couldn't create temporary directory");
-		let tmp_path = tmp_dir.path().to_owned();
-		let tmp_file = tmp_path.join("trash_me.txt");
-		let resource = Resource::new(&tmp_file, tmp_dir, &[]);
+		let tmp_file = tempfile::NamedTempFile::new().unwrap();
+		let path = tmp_file.path();
+		let resource = Resource::new(path, path.parent().unwrap(), &[]);
 		let action = Trash { confirm: false };
 
-		std::fs::write(&tmp_file, "").expect("Could create target file");
-		assert!(tmp_file.exists());
+		assert!(path.exists());
 
 		action
 			.execute::<&Path>(&resource, None, false)
 			.expect("Could not trash target file");
-		assert!(!tmp_file.exists());
+		assert!(!path.exists());
 	}
 }
