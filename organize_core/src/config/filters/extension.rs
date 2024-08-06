@@ -10,7 +10,7 @@ pub struct Extension {
 
 impl AsFilter for Extension {
 	fn matches(&self, res: &Resource) -> bool {
-		let path = res.path();
+		let path = &res.path;
 		if path.is_file() {
 			return path
 				.extension()

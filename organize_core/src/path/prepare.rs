@@ -10,8 +10,8 @@ use super::Expand;
 pub fn prepare_target_path(if_exists: &ConflictOption, src: &Resource, dest: &Path, with_extension: bool) -> Result<Option<PathBuf>> {
 	// if there are any placeholders in the destination, expand them
 
-	let path = src.path().into_owned();
-	let mut to = match TERA.lock().unwrap().render_str(&dest.to_string_lossy(), &src.context()) {
+	let path = &src.path;
+	let mut to = match TERA.lock().unwrap().render_str(&dest.to_string_lossy(), &src.context) {
 		Ok(str) => PathBuf::from(str).expand_user().clean(),
 		Err(e) => {
 			log::error!("{:?}", e);

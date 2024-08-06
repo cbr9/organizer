@@ -1,15 +1,9 @@
-use std::{
-	path::{Path, PathBuf},
-};
+use std::path::{Path, PathBuf};
 
 use derive_more::Deref;
 use serde::Deserialize;
 
-use crate::{
-	config::{actions::ActionType, SIMULATION},
-	resource::Resource,
-	templates::TERA,
-};
+use crate::{config::actions::ActionType, resource::Resource, templates::TERA};
 use anyhow::Result;
 
 use super::ActionPipeline;
@@ -24,13 +18,13 @@ impl ActionPipeline for Echo {
 	const REQUIRES_DEST: bool = false;
 	const TYPE: ActionType = ActionType::Echo;
 
-	fn execute<T: AsRef<Path>>(&self, src: &Resource, _: Option<T>) -> Result<Option<PathBuf>> {
-		Ok(Some(src.path().into_owned()))
+	fn execute<T: AsRef<Path>>(&self, src: &Resource, _: Option<T>, _: bool) -> Result<Option<PathBuf>> {
+		Ok(Some(src.path.clone()))
 	}
 
-	fn log_success_msg<T: AsRef<Path>>(&self, src: &Resource, _: Option<T>) -> Result<String> {
-		let message = TERA.lock().unwrap().render_str(&self.message, &src.context())?;
-		let hint = if !*SIMULATION { "ECHO" } else { "SIMULATED ECHO" };
+	fn log_success_msg<T: AsRef<Path>>(&self, src: &Resource, _: Option<&T>, dry_run: bool) -> Result<String> {
+		let message = TERA.lock().unwrap().render_str(&self.message, &src.context)?;
+		let hint = if !dry_run { "ECHO" } else { "SIMULATED ECHO" };
 		Ok(format!("({}) {}", hint, message))
 	}
 }

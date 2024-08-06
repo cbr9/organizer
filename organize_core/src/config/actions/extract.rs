@@ -5,7 +5,7 @@ use std::{
 	path::{Path, PathBuf},
 };
 
-use crate::{config::SIMULATION, path::prepare_target_path, resource::Resource};
+use crate::{path::prepare_target_path, resource::Resource};
 
 use super::{common::ConflictOption, ActionPipeline, ActionType};
 
@@ -20,12 +20,11 @@ pub struct Extract {
 }
 
 impl ActionPipeline for Extract {
+	const REQUIRES_DEST: bool = true;
 	const TYPE: super::ActionType = ActionType::Extract;
 
-	const REQUIRES_DEST: bool = true;
-
 	fn get_target_path(&self, src: &Resource) -> anyhow::Result<Option<PathBuf>> {
-		let file = File::open(src.path().as_ref())?;
+		let file = File::open(&src.path)?;
 		let archive = zip::ZipArchive::new(file)?;
 		let mut common_prefix = None;
 
@@ -42,16 +41,16 @@ impl ActionPipeline for Extract {
 
 		let common_prefix = match common_prefix {
 			Some(p) => p.to_path_buf(),
-			None => src.path().as_ref().with_extension(""),
+			None => src.path.with_extension(""),
 		};
 
 		prepare_target_path(&self.if_exists, src, &self.to.join(common_prefix), false)
 	}
 
-	fn execute<T: AsRef<Path>>(&self, src: &Resource, dest: Option<T>) -> anyhow::Result<Option<std::path::PathBuf>> {
+	fn execute<T: AsRef<Path>>(&self, src: &Resource, dest: Option<T>, dry_run: bool) -> anyhow::Result<Option<std::path::PathBuf>> {
 		let dest = dest.unwrap().as_ref().to_path_buf();
-		if !*SIMULATION {
-			let file = File::open(src.path().as_ref())?;
+		if !dry_run {
+			let file = File::open(&src.path)?;
 			let mut archive = zip::ZipArchive::new(file)?;
 			archive.extract(&dest)?;
 

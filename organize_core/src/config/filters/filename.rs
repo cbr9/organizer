@@ -1,6 +1,8 @@
 use crate::{config::filters::AsFilter, resource::Resource};
 use serde::Deserialize;
 
+// TODO: refactor
+
 #[derive(Eq, PartialEq, Deserialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
 pub struct Filename {
@@ -13,8 +15,8 @@ pub struct Filename {
 
 impl AsFilter for Filename {
 	fn matches(&self, res: &Resource) -> bool {
-		let path = res.path();
-		let mut filename = path.as_ref().file_name().unwrap().to_str().unwrap().to_string();
+		let path = &res.path;
+		let mut filename = path.file_name().unwrap().to_str().unwrap().to_string();
 		let mut filter = self.clone();
 		if !self.case_sensitive {
 			filename = filename.to_lowercase();

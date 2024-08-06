@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use anyhow::{Context as ErrorContext, Result};
 use serde::Deserialize;
 
-use crate::{config::SIMULATION, path::prepare_target_path, resource::Resource};
+use crate::{path::prepare_target_path, resource::Resource};
 
 use super::{common::ConflictOption, ActionPipeline, ActionType};
 
@@ -39,15 +39,15 @@ impl ActionPipeline for Symlink {
 		prepare_target_path(&self.if_exists, src, self.to.as_path(), true)
 	}
 
-	fn execute<T: AsRef<Path>>(&self, src: &Resource, dest: Option<T>) -> Result<Option<PathBuf>> {
+	fn execute<T: AsRef<Path>>(&self, src: &Resource, dest: Option<T>, dry_run: bool) -> Result<Option<PathBuf>> {
 		let dest = dest.unwrap();
-		if !*SIMULATION {
-			Self::atomic(src.path().as_ref(), &dest).with_context(|| "Failed to symlink file")?;
+		if !dry_run {
+			Self::atomic(&src.path, &dest).with_context(|| "Failed to symlink file")?;
 		}
 		if self.continue_with == ContinueWith::Link {
 			Ok(Some(dest.as_ref().to_path_buf()))
 		} else {
-			Ok(Some(src.path().into_owned()))
+			Ok(Some(src.path.clone()))
 		}
 	}
 }

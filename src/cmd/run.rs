@@ -8,13 +8,13 @@ use std::{
 use anyhow::Result;
 use clap::{Parser, ValueHint};
 use dialoguer::{theme::ColorfulTheme, MultiSelect, Select};
+use log::error;
 use rayon::iter::{IntoParallelRefMutIterator, ParallelIterator};
 use std::collections::HashSet;
 
 use organize_core::{
-	config::{actions::ActionRunner, filters::AsFilter, options::Options, rule::Rule, Config, SIMULATION},
+	config::{actions::ActionRunner, filters::AsFilter, options::Options, rule::Rule, Config},
 	resource::Resource,
-	templates::CONTEXT,
 };
 
 use crate::{Cmd, CONFIG};
@@ -135,8 +135,6 @@ impl Cmd for Run {
 			None => Config::new(Config::path().unwrap()).expect("Could not parse config"),
 		});
 
-		SIMULATION.set(self.dry_run).unwrap();
-
 		let processed_files: Arc<Mutex<HashMap<PathBuf, &Rule>>> = Arc::new(Mutex::new(HashMap::new()));
 		let all_tags: Vec<String> = config.rules.iter().flat_map(|rule| &rule.tags).cloned().collect();
 		let all_ids: Vec<String> = config.rules.iter().filter_map(|rule| rule.id.clone()).collect();
@@ -151,14 +149,13 @@ impl Cmd for Run {
 			processed_files.lock().unwrap().retain(|key, _| key.exists());
 			for folder in rule.folders.iter() {
 				let location = folder.path()?;
-				CONTEXT.lock().unwrap().insert("root", &location.to_string_lossy());
-				let walker = Options::max_depth(config, rule, folder).to_walker(location);
+				let walker = Options::max_depth(config, rule, folder).to_walker(&location);
 
 				let mut entries = walker
 					.into_iter()
 					.flatten()
 					.filter(|e| Options::allows_entry(config, rule, folder, e.path()))
-					.map(|e| Resource::new(e.path(), &rule.variables))
+					.map(|e| Resource::new(e.path(), &location, &rule.variables))
 					.filter(|e| {
 						let mut e = e.clone();
 						rule.filters.matches(&mut e)
@@ -166,13 +163,22 @@ impl Cmd for Run {
 					.collect::<Vec<_>>();
 
 				entries.par_iter_mut().for_each(|entry| {
-					if let Some(last_rule) = processed_files.lock().unwrap().get(entry.path().as_ref()) {
+					if let Some(last_rule) = processed_files.lock().unwrap().get(&entry.path) {
 						if !last_rule.r#continue {
 							return;
 						}
 					}
+
 					'actions: for action in rule.actions.iter() {
-						match action.run(entry).unwrap() {
+						let path = match action.run(entry, self.dry_run) {
+							Ok(path) => path,
+							Err(e) => {
+								error!("{}", e);
+								None
+							}
+						};
+
+						match path {
 							Some(path) => entry.set_path(path),
 							None => break 'actions,
 						};
@@ -181,7 +187,7 @@ impl Cmd for Run {
 					processed_files
 						.lock()
 						.unwrap()
-						.entry(entry.path().as_ref().to_path_buf())
+						.entry(entry.path.clone())
 						.and_modify(|value| *value = rule)
 						.or_insert(rule);
 				})

@@ -1,23 +1,18 @@
 use std::{
-	borrow::Cow,
 	convert::Infallible,
-	ops::Deref,
 	path::{Path, PathBuf},
 	str::FromStr,
 };
 
 use tera::Context;
 
-use crate::{
-	config::variables::{AsVariable, Variable},
-	templates::CONTEXT,
-};
+use crate::config::variables::{AsVariable, Variable};
 
 #[derive(Clone)]
 pub struct Resource<'a> {
-	context: Context,
+	pub context: Context,
 	variables: &'a [Variable],
-	path: PathBuf,
+	pub path: PathBuf,
 }
 
 impl<'a> FromStr for Resource<'a> {
@@ -33,8 +28,9 @@ impl<'a> FromStr for Resource<'a> {
 }
 
 impl<'a> Resource<'a> {
-	pub fn new<T: AsRef<Path>>(path: T, variables: &'a [Variable]) -> Self {
-		let context = Context::new();
+	pub fn new<T: AsRef<Path>, P: AsRef<Path>>(path: T, root: P, variables: &'a [Variable]) -> Self {
+		let mut context = Context::new();
+		context.insert("root", &root.as_ref().to_string_lossy());
 		let mut resource = Self {
 			path: path.as_ref().to_path_buf(),
 			variables,
@@ -50,18 +46,6 @@ impl<'a> Resource<'a> {
 		for var in self.variables {
 			var.register(&mut self.context)
 		}
-	}
-
-	pub fn context(&self) -> Context {
-		let mut combined_context = Context::new();
-		let global = CONTEXT.lock().unwrap().deref().clone();
-		combined_context.extend(global);
-		combined_context.extend(self.context.clone());
-		combined_context
-	}
-
-	pub fn path(&self) -> Cow<PathBuf> {
-		Cow::Borrowed(&self.path)
 	}
 
 	pub fn set_path<T: AsRef<Path>>(&mut self, path: T) {

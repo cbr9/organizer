@@ -8,7 +8,7 @@ use serde::Deserialize;
 use tempfile;
 
 use crate::{
-	config::{actions::ActionType, filters::AsFilter, SIMULATION},
+	config::{actions::ActionType, filters::AsFilter},
 	resource::Resource,
 	templates::TERA,
 };
@@ -26,12 +26,11 @@ pub struct Script {
 }
 
 impl ActionPipeline for Script {
+	const REQUIRES_DEST: bool = false;
 	const TYPE: ActionType = ActionType::Script;
 
-	const REQUIRES_DEST: bool = false;
-
-	fn execute<T: AsRef<Path>>(&self, src: &Resource, _: Option<T>) -> Result<Option<PathBuf>> {
-		if !*SIMULATION {
+	fn execute<T: AsRef<Path>>(&self, src: &Resource, _: Option<T>, dry_run: bool) -> Result<Option<PathBuf>> {
+		if !dry_run {
 			bail!("Cannot run scripted actions during a dry run")
 		}
 		self.run_script(src).map(|output| {
@@ -40,11 +39,11 @@ impl ActionPipeline for Script {
 		})
 	}
 
-	fn log_success_msg<T: AsRef<Path>>(&self, src: &Resource, dest: Option<T>) -> Result<String> {
+	fn log_success_msg<T: AsRef<Path>>(&self, src: &Resource, dest: Option<&T>, _: bool) -> Result<String> {
 		Ok(format!(
 			"({} SCRIPT) {} -> {}",
 			self.exec.to_uppercase(),
-			src.path().as_ref().display(),
+			src.path.display(),
 			dest.expect("Script did not output a valid path to stdout").as_ref().display()
 		))
 	}
@@ -80,7 +79,7 @@ impl Script {
 	fn write(&self, src: &Resource) -> anyhow::Result<PathBuf> {
 		let script = tempfile::NamedTempFile::new()?;
 		let script_path = script.into_temp_path().to_path_buf();
-		let content = TERA.lock().unwrap().render_str(&self.content, &src.context());
+		let content = TERA.lock().unwrap().render_str(&self.content, &src.context);
 		if let Ok(content) = content {
 			std::fs::write(&script_path, content)?;
 		}
@@ -105,7 +104,7 @@ mod tests {
 
 	#[test]
 	fn test_script_filter() {
-		let mut src = Resource::new(PathBuf::from_str("/home").unwrap(), &[]);
+		let mut src = Resource::new("/home", "/", &[]);
 		let content = "print('huh')\nprint('{{path}}'.islower())";
 		let mut script = Script::new("python", content);
 		script.run_script(&mut src).unwrap_or_else(|_| {

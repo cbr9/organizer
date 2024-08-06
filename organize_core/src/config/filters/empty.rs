@@ -10,9 +10,9 @@ pub struct Empty;
 
 impl AsFilter for Empty {
 	fn matches(&self, res: &Resource) -> bool {
-		let path = res.path();
+		let path = &res.path;
 		if path.is_file() {
-			std::fs::metadata(path.as_ref()).map(|md| md.len() == 0).unwrap_or(false)
+			std::fs::metadata(path).map(|md| md.len() == 0).unwrap_or(false)
 		} else {
 			path.read_dir().map(|mut i| i.next().is_none()).unwrap_or(false)
 		}

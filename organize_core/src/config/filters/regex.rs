@@ -2,7 +2,7 @@ use derive_more::Deref;
 
 use crate::{config::filters::AsFilter, resource::Resource};
 use serde::{Deserialize, Deserializer};
-use std::{convert::TryFrom};
+use std::convert::TryFrom;
 
 #[derive(PartialEq, Deserialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -39,7 +39,7 @@ impl TryFrom<String> for RegularExpression {
 
 impl AsFilter for Regex {
 	fn matches(&self, res: &Resource) -> bool {
-		match res.path().as_ref().file_name() {
+		match res.path.file_name() {
 			None => false,
 			Some(filename) => {
 				let filename = filename.to_string_lossy();

@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use anyhow::{Context as ErrorContext, Result};
 use serde::Deserialize;
 
-use crate::{config::SIMULATION, path::prepare_target_path, resource::Resource};
+use crate::{path::prepare_target_path, resource::Resource};
 
 use super::{common::ConflictOption, ActionPipeline, ActionType};
 
@@ -25,11 +25,11 @@ impl ActionPipeline for Move {
 		prepare_target_path(&self.if_exists, src, self.to.as_path(), true)
 	}
 
-	fn execute<T: AsRef<Path>>(&self, src: &Resource, dest: Option<T>) -> Result<Option<PathBuf>> {
+	fn execute<T: AsRef<Path>>(&self, src: &Resource, dest: Option<T>, dry_run: bool) -> Result<Option<PathBuf>> {
 		let dest = dest.unwrap();
-		if !*SIMULATION {
-			std::fs::rename(src.path().as_ref(), dest.as_ref())
-				.with_context(|| format!("Could not move {} -> {}", src.path().as_ref().display(), dest.as_ref().display()))?;
+		if !dry_run {
+			std::fs::rename(&src.path, dest.as_ref())
+				.with_context(|| format!("Could not move {} -> {}", src.path.display(), dest.as_ref().display()))?;
 		}
 
 		Ok(Some(dest.as_ref().to_path_buf()))
