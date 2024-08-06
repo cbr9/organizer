@@ -20,7 +20,7 @@ use crate::{
 use super::actions::script::Script;
 
 #[derive(Debug, Clone, Deserialize, PartialEq)]
-#[serde(tag = "type", rename_all(deserialize = "lowercase"))]
+#[serde(tag = "type", rename_all = "snake_case")]
 pub enum Filter {
 	Regex(Regex),
 	Empty(Empty),
@@ -28,9 +28,6 @@ pub enum Filter {
 	Extension(Extension),
 	Script(Script),
 	Mime(Mime),
-	Group {
-		filters: Vec<Filter>,
-	},
 	#[serde(rename = "!regex")]
 	NotRegex(Regex),
 	#[serde(rename = "!empty")]
@@ -43,8 +40,13 @@ pub enum Filter {
 	NotScript(Script),
 	#[serde(rename = "!mime")]
 	NotMime(Mime),
-	#[serde(rename = "!group")]
-	NotGroup {
+	AnyOf {
+		filters: Vec<Filter>,
+	},
+	AllOf {
+		filters: Vec<Filter>,
+	},
+	NoneOf {
 		filters: Vec<Filter>,
 	},
 }
@@ -56,20 +58,21 @@ pub trait AsFilter {
 impl AsFilter for Filter {
 	fn matches(&self, res: &Resource) -> bool {
 		match self {
-			Filter::Regex(regex) => regex.matches(res),
-			Filter::Filename(filename) => filename.matches(res),
-			Filter::Extension(extension) => extension.matches(res),
-			Filter::Script(script) => script.matches(res),
-			Filter::Mime(mime) => mime.matches(res),
+			Filter::AllOf { filters } => filters.par_iter().all(|f| f.matches(res)),
+			Filter::AnyOf { filters } => filters.par_iter().any(|f| f.matches(res)),
+			Filter::NoneOf { filters } => filters.par_iter().all(|f| !f.matches(res)),
 			Filter::Empty(empty) => empty.matches(res),
-			Filter::Group { filters } => filters.par_iter().any(|f| f.matches(res)),
-			Filter::NotRegex(f) => !f.matches(res),
+			Filter::Extension(extension) => extension.matches(res),
+			Filter::Filename(filename) => filename.matches(res),
+			Filter::Mime(mime) => mime.matches(res),
+			Filter::Regex(regex) => regex.matches(res),
+			Filter::Script(script) => script.matches(res),
 			Filter::NotEmpty(f) => !f.matches(res),
-			Filter::NotFilename(f) => !f.matches(res),
 			Filter::NotExtension(f) => !f.matches(res),
-			Filter::NotScript(f) => !f.matches(res),
+			Filter::NotFilename(f) => !f.matches(res),
 			Filter::NotMime(f) => !f.matches(res),
-			Filter::NotGroup { filters } => !filters.par_iter().any(|f| f.matches(res)),
+			Filter::NotRegex(f) => !f.matches(res),
+			Filter::NotScript(f) => !f.matches(res),
 		}
 	}
 }
