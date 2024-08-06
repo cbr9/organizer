@@ -12,9 +12,9 @@ use super::{folders::Folder, Config, Rule};
 
 #[derive(Deserialize, Debug, Clone, PartialEq)]
 #[serde(deny_unknown_fields)]
-pub struct FolderOptions {
+pub struct Options {
 	pub max_depth: Option<MaxDepth>,
-	pub ignored_dirs: Option<Vec<PathBuf>>,
+	pub exclude: Option<Vec<PathBuf>>,
 	pub hidden_files: Option<bool>,
 	pub partial_files: Option<bool>,
 	pub targets: Option<Targets>,
@@ -29,7 +29,7 @@ pub enum Targets {
 
 macro_rules! getters {
 	($($v:vis fn $name:ident() -> $typ:ty {$field:tt})+) => {
-		impl FolderOptions {
+		impl Options {
 			$($v fn $name(config: &Config, rule: &Rule, folder: &Folder) -> $typ {
 				folder.options.$field.as_ref()
 					.or(rule.options.$field.as_ref())
@@ -43,8 +43,8 @@ macro_rules! getters {
 }
 
 getters! {
-	pub fn ignored_dirs() -> Vec<PathBuf> {
-		ignored_dirs
+	pub fn excluded() -> Vec<PathBuf> {
+		exclude
 	}
 	pub fn partial_files() -> bool {
 		partial_files
@@ -60,7 +60,7 @@ getters! {
 	}
 }
 
-impl FolderOptions {
+impl Options {
 	pub fn allows_entry<T: AsRef<Path>>(config: &Config, rule: &Rule, folder: &Folder, path: T) -> bool {
 		let path = path.as_ref();
 
@@ -90,30 +90,37 @@ impl FolderOptions {
 			}
 		}
 
-		if path.is_dir() {
-			// filter by ignored_dirs option
-			let ignored_dirs = Self::ignored_dirs(config, rule, folder);
-			let is_ignored_dir = ignored_dirs.iter().any(|dir| path == dir);
-			if is_ignored_dir {
+		// filter by ignored_dirs option
+		let excluded = Self::excluded(config, rule, folder);
+		if !excluded.is_empty() {
+			let is_ignored = path.ancestors().any(|anc| {
+				excluded.iter().any(|dir| {
+					if dir.file_name().is_none() || anc.file_name().is_none() {
+						return false;
+					}
+					anc == dir || anc.file_name().unwrap() == dir.file_name().unwrap()
+				})
+			});
+			if is_ignored {
 				return false;
 			}
-		}
+		};
 
 		true
 	}
 }
 
-impl Default for FolderOptions {
+impl Default for Options {
 	fn default() -> Self {
 		Self::default_some()
 	}
 }
 
-impl DefaultOpt for FolderOptions {
+impl DefaultOpt for Options {
 	fn default_none() -> Self {
 		Self {
 			max_depth: None,
-			ignored_dirs: None,
+			exclude: None,
 			hidden_files: None,
 			partial_files: None,
 			targets: None,
@@ -123,7 +130,7 @@ impl DefaultOpt for FolderOptions {
 	fn default_some() -> Self {
 		Self {
 			max_depth: Some(MaxDepth::default()),
-			ignored_dirs: Some(vec![]),
+			exclude: Some(vec![]),
 			hidden_files: Some(false),
 			partial_files: Some(false),
 			targets: Some(Targets::default()),

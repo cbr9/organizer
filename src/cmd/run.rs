@@ -12,7 +12,7 @@ use rayon::iter::{IntoParallelRefMutIterator, ParallelIterator};
 use std::collections::HashSet;
 
 use organize_core::{
-	config::{actions::ActionRunner, filters::AsFilter, options::FolderOptions, rule::Rule, Config, SIMULATION},
+	config::{actions::ActionRunner, filters::AsFilter, options::Options, rule::Rule, Config, SIMULATION},
 	resource::Resource,
 	templates::CONTEXT,
 };
@@ -152,12 +152,12 @@ impl Cmd for Run {
 			for folder in rule.folders.iter() {
 				let location = folder.path()?;
 				CONTEXT.lock().unwrap().insert("root", &location.to_string_lossy());
-				let walker = FolderOptions::max_depth(config, rule, folder).to_walker(location);
+				let walker = Options::max_depth(config, rule, folder).to_walker(location);
 
 				let mut entries = walker
 					.into_iter()
 					.flatten()
-					.filter(|e| FolderOptions::allows_entry(config, rule, folder, e.path()))
+					.filter(|e| Options::allows_entry(config, rule, folder, e.path()))
 					.map(|e| Resource::new(e.path(), &rule.variables))
 					.filter(|e| {
 						let mut e = e.clone();

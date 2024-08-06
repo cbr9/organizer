@@ -11,7 +11,7 @@ use serde::Deserialize;
 
 use crate::{utils::DefaultOpt, PROJECT_NAME};
 
-use self::options::FolderOptions;
+use self::options::Options;
 
 pub mod actions;
 pub mod filters;
@@ -46,8 +46,8 @@ pub struct Config {
 	pub rules: Vec<Rule>,
 	#[serde(skip)]
 	pub path: PathBuf,
-	#[serde(rename = "defaults", default = "FolderOptions::default_none")]
-	pub defaults: FolderOptions,
+	#[serde(rename = "defaults", default = "Options::default_none")]
+	pub defaults: Options,
 }
 
 impl Config {
