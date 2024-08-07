@@ -5,6 +5,7 @@ use serde::Deserialize;
 #[derive(Debug, Deserialize, Deref, Clone, Eq, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct Extension {
+	#[serde(default)]
 	extensions: Vec<String>,
 }
 
