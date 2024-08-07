@@ -1,6 +1,7 @@
-use crate::{config::filters::AsFilter, resource::Resource};
+use crate::{config::filters::AsFilter, resource::Resource, templates::TERA};
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use serde::{Deserialize, Deserializer};
-use std::{convert::TryFrom, ops::Deref};
+use std::{convert::TryFrom, ops::Deref, str::FromStr};
 
 #[derive(PartialEq, Deserialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -8,10 +9,17 @@ pub struct Regex {
 	patterns: Vec<RegularExpression>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct RegularExpression {
-	pattern: regex::Regex,
-	negate: bool,
+	#[serde(deserialize_with = "deserialize_regex")]
+	pub pattern: regex::Regex,
+	#[serde(default)]
+	pub negate: bool,
+	pub input: String,
+}
+
+fn default_input() -> String {
+	"{{path | filename}}".into()
 }
 
 impl Deref for RegularExpression {
@@ -21,16 +29,16 @@ impl Deref for RegularExpression {
 		&self.pattern
 	}
 }
-impl<'de> Deserialize<'de> for RegularExpression {
-	fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-	where
-		D: Deserializer<'de>,
-	{
-		// Deserialize as a string first
-		let pattern_str: String = String::deserialize(deserializer)?;
-		Self::try_from(pattern_str).map_err(serde::de::Error::custom)
-	}
+
+fn deserialize_regex<'de, D>(deserializer: D) -> Result<regex::Regex, D::Error>
+where
+	D: Deserializer<'de>,
+{
+	// Deserialize as a Vec<String>
+	let patterns_str: String = String::deserialize(deserializer)?;
+	regex::Regex::from_str(patterns_str.as_str()).map_err(serde::de::Error::custom)
 }
+
 impl PartialEq for RegularExpression {
 	fn eq(&self, other: &Self) -> bool {
 		self.pattern.as_str() == other.pattern.as_str()
@@ -39,37 +47,30 @@ impl PartialEq for RegularExpression {
 impl TryFrom<String> for RegularExpression {
 	type Error = regex::Error;
 
-	fn try_from(mut value: String) -> Result<Self, Self::Error> {
-		let mut negate = false;
-		if value.starts_with('!') {
-			negate = true;
-			value = value.replacen('!', "", 1);
-		}
-
-		if value.starts_with("\\!") {
-			value = value.replacen('\\', "", 1);
-		}
-
+	fn try_from(value: String) -> Result<Self, Self::Error> {
 		let pattern = regex::Regex::new(&value)?;
-		Ok(Self { pattern, negate })
+		Ok(Self {
+			pattern,
+			negate: false,
+			input: default_input(),
+		})
+	}
+}
+
+impl AsFilter for RegularExpression {
+	fn matches(&self, res: &Resource) -> bool {
+		let input = TERA.lock().unwrap().render_str(&self.input, &res.context).unwrap();
+		let mut matches = self.pattern.is_match(&input);
+		if self.negate {
+			matches = !matches;
+		}
+		matches
 	}
 }
 
 impl AsFilter for Regex {
 	fn matches(&self, res: &Resource) -> bool {
-		match res.path.file_name() {
-			None => false,
-			Some(filename) => {
-				let filename = filename.to_string_lossy();
-				self.patterns.iter().any(|re| {
-					let mut matches = re.is_match(&filename);
-					if re.negate {
-						matches = !matches;
-					}
-					matches
-				})
-			}
-		}
+		self.patterns.par_iter().any(|f| f.matches(res))
 	}
 }
 

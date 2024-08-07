@@ -1,7 +1,8 @@
-use regex::RegexVariable;
 use serde::Deserialize;
 use simple::SimpleVariable;
 use tera::Context;
+
+use super::filters::regex::RegularExpression;
 
 pub mod regex;
 pub mod simple;
@@ -14,7 +15,7 @@ pub trait AsVariable {
 #[serde(tag = "type", rename_all(deserialize = "lowercase"))]
 pub enum Variable {
 	Simple(SimpleVariable),
-	Regex(RegexVariable),
+	Regex(RegularExpression),
 }
 
 impl AsVariable for Variable {
