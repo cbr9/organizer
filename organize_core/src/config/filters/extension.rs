@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use crate::{config::filters::AsFilter, resource::Resource};
 use derive_more::Deref;
 use serde::Deserialize;
@@ -5,24 +7,30 @@ use serde::Deserialize;
 #[derive(Debug, Deserialize, Deref, Clone, Eq, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct Extension {
+	#[serde(default)]
 	extensions: Vec<String>,
 }
 
 impl AsFilter for Extension {
 	fn matches(&self, res: &Resource) -> bool {
-		let extension = res.path.extension().unwrap_or_default().to_string_lossy().to_string();
+		let extension = res.path.extension().unwrap_or_default().to_string_lossy();
 		if extension.is_empty() {
 			return false;
 		}
 
+		if self.extensions.is_empty() {
+			return true;
+		}
+
 		self.extensions.iter().any(|e| {
 			let mut negate = false;
-			let mut parsed = e.clone();
+			let mut parsed = Cow::from(e);
 
 			if parsed.starts_with('!') {
 				negate = true;
-				parsed = parsed.replacen('!', "", 1);
+				parsed = Cow::Owned(parsed.to_mut().replacen('!', "", 1));
 			}
+
 			let mut matches = parsed == extension;
 			if negate {
 				matches = !matches

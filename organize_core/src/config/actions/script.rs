@@ -14,7 +14,7 @@ use crate::{
 };
 use anyhow::{bail, Result};
 
-use super::ActionPipeline;
+use super::AsAction;
 
 #[derive(Deserialize, Debug, Clone, Default, Eq, PartialEq)]
 #[serde(deny_unknown_fields)]
@@ -25,7 +25,7 @@ pub struct Script {
 	content: String,
 }
 
-impl ActionPipeline for Script {
+impl AsAction for Script {
 	const REQUIRES_DEST: bool = false;
 	const TYPE: ActionType = ActionType::Script;
 

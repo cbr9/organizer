@@ -19,11 +19,9 @@ impl<'a> FromStr for Resource<'a> {
 	type Err = Infallible;
 
 	fn from_str(s: &str) -> Result<Self, Self::Err> {
-		Ok(Self {
-			context: Context::new(),
-			variables: &[],
-			path: PathBuf::from_str(s)?,
-		})
+		let path = PathBuf::from_str(s)?;
+		let parent = path.parent().unwrap().to_path_buf();
+		Ok(Self::new(path, parent, &[]))
 	}
 }
 

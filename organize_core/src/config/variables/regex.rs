@@ -1,17 +1,21 @@
 use serde::Deserialize;
 use tera::Context;
 
-use crate::{config::filters::regex::RegularExpression, templates::TERA};
+use crate::{
+	config::filters::regex::{deserialize_regex, RegularExpression},
+	templates::TERA,
+};
 
 use super::AsVariable;
 
-#[derive(Deserialize, Clone, Debug, PartialEq)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct RegexVariable {
-	pattern: RegularExpression,
-	input: String,
+	#[serde(deserialize_with = "deserialize_regex")]
+	pub pattern: regex::Regex,
+	pub input: String,
 }
 
-impl AsVariable for RegexVariable {
+impl AsVariable for RegularExpression {
 	fn register(&self, context: &mut Context) {
 		let input = TERA.lock().unwrap().render_str(&self.input, context).unwrap();
 		if let Some(captures) = self.pattern.captures(&input) {

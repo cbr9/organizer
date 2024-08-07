@@ -28,12 +28,6 @@ pub enum Filter {
 	Extension(Extension),
 	Script(Script),
 	Mime(Mime),
-	AnyOf {
-		filters: Vec<Filter>,
-	},
-	AllOf {
-		filters: Vec<Filter>,
-	},
 	#[serde(rename = "!regex")]
 	NotRegex(Regex),
 	#[serde(rename = "!empty")]
@@ -46,12 +40,13 @@ pub enum Filter {
 	NotScript(Script),
 	#[serde(rename = "!mime")]
 	NotMime(Mime),
-	#[serde(rename = "!any_of")]
-	NotAnyOf {
+	AnyOf {
 		filters: Vec<Filter>,
 	},
-	#[serde(rename = "!all_of")]
-	NotAllOf {
+	AllOf {
+		filters: Vec<Filter>,
+	},
+	NoneOf {
 		filters: Vec<Filter>,
 	},
 }
@@ -65,20 +60,19 @@ impl AsFilter for Filter {
 		match self {
 			Filter::AllOf { filters } => filters.par_iter().all(|f| f.matches(res)),
 			Filter::AnyOf { filters } => filters.par_iter().any(|f| f.matches(res)),
-			Filter::Empty(empty) => empty.matches(res),
-			Filter::Extension(extension) => extension.matches(res),
-			Filter::Filename(filename) => filename.matches(res),
-			Filter::Mime(mime) => mime.matches(res),
-			Filter::NotAllOf { filters } => !filters.par_iter().all(|f| f.matches(res)),
-			Filter::NotAnyOf { filters } => !filters.par_iter().any(|f| f.matches(res)),
-			Filter::NotEmpty(f) => !f.matches(res),
-			Filter::NotExtension(f) => !f.matches(res),
-			Filter::NotFilename(f) => !f.matches(res),
-			Filter::NotMime(f) => !f.matches(res),
-			Filter::NotRegex(f) => !f.matches(res),
-			Filter::NotScript(f) => !f.matches(res),
-			Filter::Regex(regex) => regex.matches(res),
-			Filter::Script(script) => script.matches(res),
+			Filter::NoneOf { filters } => filters.par_iter().all(|f| !f.matches(res)),
+			Filter::Empty(filter) => filter.matches(res),
+			Filter::Extension(filter) => filter.matches(res),
+			Filter::Filename(filter) => filter.matches(res),
+			Filter::Mime(filter) => filter.matches(res),
+			Filter::Regex(filter) => filter.matches(res),
+			Filter::Script(filter) => filter.matches(res),
+			Filter::NotEmpty(filter) => !filter.matches(res),
+			Filter::NotExtension(filter) => !filter.matches(res),
+			Filter::NotFilename(filter) => !filter.matches(res),
+			Filter::NotMime(filter) => !filter.matches(res),
+			Filter::NotRegex(filter) => !filter.matches(res),
+			Filter::NotScript(filter) => !filter.matches(res),
 		}
 	}
 }

@@ -8,7 +8,7 @@ use hardlink::Hardlink;
 use r#move::Move;
 use script::Script;
 use serde::Deserialize;
-use strum_macros::{Display, EnumString};
+use strum::{Display, EnumString};
 use symlink::Symlink;
 
 use crate::{config::actions::trash::Trash, resource::Resource};
@@ -26,11 +26,11 @@ pub(crate) mod script;
 pub(crate) mod symlink;
 pub(crate) mod trash;
 
-pub trait ActionRunner {
+pub trait ActionPipeline {
 	fn run(&self, src: &Resource, dry_run: bool) -> Result<Option<PathBuf>>;
 }
 
-impl<T: ActionPipeline> ActionRunner for T {
+impl<T: AsAction> ActionPipeline for T {
 	#[allow(clippy::nonminimal_bool)]
 	fn run(&self, src: &Resource, dry_run: bool) -> Result<Option<PathBuf>> {
 		let dest = self.get_target_path(src);
@@ -61,7 +61,7 @@ impl<T: ActionPipeline> ActionRunner for T {
 	}
 }
 
-impl ActionRunner for Action {
+impl ActionPipeline for Action {
 	fn run(&self, src: &Resource, dry_run: bool) -> Result<Option<PathBuf>> {
 		use Action::*;
 		match self {
@@ -78,7 +78,7 @@ impl ActionRunner for Action {
 	}
 }
 
-pub trait ActionPipeline {
+pub trait AsAction {
 	const TYPE: ActionType;
 	const REQUIRES_DEST: bool;
 

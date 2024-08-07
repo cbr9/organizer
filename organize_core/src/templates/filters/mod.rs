@@ -10,7 +10,7 @@ impl tera::Filter for Parent {
 		let path = PathBuf::from(value);
 		let parent = match path.parent() {
 			Some(p) => p,
-			None => return Err("No parent found for the given path".into()),
+			None => return Err(format!("No parent found for path {}", path.display()).into()),
 		};
 		Ok(to_value(parent)?)
 	}
@@ -24,7 +24,7 @@ impl tera::Filter for Stem {
 		let path = PathBuf::from(value);
 		let parent = match path.file_stem().and_then(|f| f.to_str()) {
 			Some(p) => p,
-			None => return Err("No filestem found for the given path".into()),
+			None => return Err(format!("No stem found for path {}", path.display()).into()),
 		};
 		Ok(to_value(parent)?)
 	}
@@ -38,7 +38,7 @@ impl tera::Filter for Filename {
 		let path = PathBuf::from(value);
 		let parent = match path.file_name().and_then(|f| f.to_str()) {
 			Some(p) => p,
-			None => return Err("No filename found for the given path".into()),
+			None => return Err(format!("No filename found for path {}", path.display()).into()),
 		};
 		Ok(to_value(parent)?)
 	}
@@ -52,7 +52,7 @@ impl tera::Filter for Extension {
 		let path = PathBuf::from(value);
 		let parent = match path.extension().and_then(|f| f.to_str()) {
 			Some(p) => p,
-			None => return Err("No extension found for the given path".into()),
+			None => return Err(format!("No extension found for path {}", path.display()).into()),
 		};
 		Ok(to_value(parent)?)
 	}

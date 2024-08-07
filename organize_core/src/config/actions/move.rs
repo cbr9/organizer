@@ -5,7 +5,7 @@ use serde::Deserialize;
 
 use crate::{path::prepare_target_path, resource::Resource};
 
-use super::{common::ConflictOption, ActionPipeline, ActionType};
+use super::{common::ConflictOption, ActionType, AsAction};
 
 #[derive(Deserialize, Debug, Clone, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
@@ -17,7 +17,7 @@ pub struct Move {
 	pub confirm: bool,
 }
 
-impl ActionPipeline for Move {
+impl AsAction for Move {
 	const REQUIRES_DEST: bool = true;
 	const TYPE: ActionType = ActionType::Move;
 
