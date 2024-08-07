@@ -13,7 +13,7 @@ use rayon::iter::{IntoParallelRefMutIterator, ParallelIterator};
 use std::collections::HashSet;
 
 use organize_core::{
-	config::{actions::ActionRunner, filters::AsFilter, options::Options, rule::Rule, Config},
+	config::{actions::ActionPipeline, filters::AsFilter, options::Options, rule::Rule, Config},
 	resource::Resource,
 };
 

@@ -4,7 +4,7 @@ use crate::{config::actions::ActionType, resource::Resource, PROJECT_NAME};
 use anyhow::{Context, Result};
 use serde::Deserialize;
 
-use super::ActionPipeline;
+use super::AsAction;
 
 fn enabled() -> bool {
 	true
@@ -26,7 +26,7 @@ impl Trash {
 	}
 }
 
-impl ActionPipeline for Trash {
+impl AsAction for Trash {
 	const REQUIRES_DEST: bool = false;
 	const TYPE: ActionType = ActionType::Trash;
 

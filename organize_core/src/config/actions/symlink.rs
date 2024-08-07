@@ -5,7 +5,7 @@ use serde::Deserialize;
 
 use crate::{path::prepare_target_path, resource::Resource};
 
-use super::{common::ConflictOption, ActionPipeline, ActionType};
+use super::{common::ConflictOption, AsAction, ActionType};
 
 #[derive(Deserialize, Debug, Clone, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
@@ -31,7 +31,7 @@ impl Default for ContinueWith {
 	}
 }
 
-impl ActionPipeline for Symlink {
+impl AsAction for Symlink {
 	const REQUIRES_DEST: bool = true;
 	const TYPE: ActionType = ActionType::Symlink;
 

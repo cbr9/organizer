@@ -7,7 +7,7 @@ use std::{
 
 use crate::{path::prepare_target_path, resource::Resource};
 
-use super::{common::ConflictOption, ActionPipeline, ActionType};
+use super::{common::ConflictOption, ActionType, AsAction};
 
 #[derive(Deserialize, Debug, Clone, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
@@ -19,7 +19,7 @@ pub struct Extract {
 	pub confirm: bool,
 }
 
-impl ActionPipeline for Extract {
+impl AsAction for Extract {
 	const REQUIRES_DEST: bool = true;
 	const TYPE: super::ActionType = ActionType::Extract;
 

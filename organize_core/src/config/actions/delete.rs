@@ -4,7 +4,7 @@ use crate::{config::actions::ActionType, resource::Resource};
 use anyhow::{Context, Result};
 use serde::Deserialize;
 
-use super::ActionPipeline;
+use super::AsAction;
 
 fn enabled() -> bool {
 	true
@@ -17,7 +17,7 @@ pub struct Delete {
 	pub confirm: bool,
 }
 
-impl ActionPipeline for Delete {
+impl AsAction for Delete {
 	const REQUIRES_DEST: bool = false;
 	const TYPE: ActionType = ActionType::Delete;
 

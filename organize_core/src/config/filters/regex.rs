@@ -15,11 +15,14 @@ pub struct RegularExpression {
 	pub pattern: regex::Regex,
 	#[serde(default)]
 	pub negate: bool,
+	#[serde(default = "RegularExpression::default_input")]
 	pub input: String,
 }
 
-fn default_input() -> String {
-	"{{path | filename}}".into()
+impl RegularExpression {
+	fn default_input() -> String {
+		"{{path | filename}}".into()
+	}
 }
 
 impl Deref for RegularExpression {
@@ -30,7 +33,7 @@ impl Deref for RegularExpression {
 	}
 }
 
-fn deserialize_regex<'de, D>(deserializer: D) -> Result<regex::Regex, D::Error>
+pub fn deserialize_regex<'de, D>(deserializer: D) -> Result<regex::Regex, D::Error>
 where
 	D: Deserializer<'de>,
 {
@@ -52,7 +55,7 @@ impl TryFrom<String> for RegularExpression {
 		Ok(Self {
 			pattern,
 			negate: false,
-			input: default_input(),
+			input: Self::default_input(),
 		})
 	}
 }

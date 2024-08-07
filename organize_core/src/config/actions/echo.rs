@@ -6,7 +6,7 @@ use serde::Deserialize;
 use crate::{config::actions::ActionType, resource::Resource, templates::TERA};
 use anyhow::Result;
 
-use super::ActionPipeline;
+use super::AsAction;
 
 #[derive(Debug, Clone, Deserialize, Deref, Default, Eq, PartialEq)]
 #[serde(deny_unknown_fields)]
@@ -14,7 +14,7 @@ pub struct Echo {
 	message: String,
 }
 
-impl ActionPipeline for Echo {
+impl AsAction for Echo {
 	const REQUIRES_DEST: bool = false;
 	const TYPE: ActionType = ActionType::Echo;
 

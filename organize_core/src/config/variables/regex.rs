@@ -1,8 +1,19 @@
+use serde::Deserialize;
 use tera::Context;
 
-use crate::{config::filters::regex::RegularExpression, templates::TERA};
+use crate::{
+	config::filters::regex::{deserialize_regex, RegularExpression},
+	templates::TERA,
+};
 
 use super::AsVariable;
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct RegexVariable {
+	#[serde(deserialize_with = "deserialize_regex")]
+	pub pattern: regex::Regex,
+	pub input: String,
+}
 
 impl AsVariable for RegularExpression {
 	fn register(&self, context: &mut Context) {
