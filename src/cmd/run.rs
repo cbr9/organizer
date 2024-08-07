@@ -24,26 +24,16 @@ use crate::{Cmd, CONFIG};
 pub struct Run {
 	#[arg(long, short = 'c', value_hint = ValueHint::FilePath)]
 	config: Option<PathBuf>,
-	#[arg(long, conflicts_with = "rules", help = "A comma-separated list of tags used to select the rules to be run", value_parser = parse_comma_separated_values)]
+	#[arg(long, conflicts_with = "rules", help = "A comma-separated list of tags used to select the rules to be run", value_delimiter = ' ', num_args = 1..)]
 	tags: Option<Vec<String>>,
-	#[arg(long, conflicts_with = "rules", help = "A comma-separated list of tags used to filter out rules", value_parser = parse_comma_separated_values)]
+	#[arg(long, conflicts_with = "rules", help = "A space-separated list of tags used to filter out rules", value_delimiter = ' ', num_args = 1..)]
 	skip_tags: Option<Vec<String>>,
-	#[arg(long, help = "Select specific rules to be run by their IDs", value_parser = parse_comma_separated_values)]
+	#[arg(long, help = "Select specific rules to be run by their IDs", value_delimiter = ' ', num_args = 1..)]
 	rules: Option<Vec<String>>,
 	#[arg(long, short = 'i', conflicts_with_all = ["rules", "tags", "skip_tags"], help = "Filter out rules in an interactive way")]
 	interactive_filter: bool,
 	#[arg(long)]
 	dry_run: bool,
-}
-
-fn parse_comma_separated_values(s: &str) -> Result<Vec<String>, String> {
-	let values = s
-		.split(',')
-		.map(str::trim)
-		.filter(|s| !s.is_empty())
-		.map(String::from)
-		.collect();
-	Ok(values)
 }
 
 #[derive(Debug, VariantNames, AsRefStr)]
@@ -129,31 +119,39 @@ impl Run {
 	}
 
 	fn filter_rules(&mut self, rule: &Rule, all_tags: &Vec<String>, all_ids: &Vec<String>) -> bool {
+		if self.interactive_filter {
+			self.choose_filters(all_tags, all_ids);
+		}
+
 		if let Some(ids) = self.rules.as_ref() {
 			return rule.id.as_ref().is_some_and(|id| ids.contains(id));
-		} else if self.tags.is_some() || self.skip_tags.is_some() {
-			let chosen_tags: HashSet<String> = HashSet::from_iter(self.tags.clone().unwrap_or_default());
-			let skipped_tags = HashSet::from_iter(self.skip_tags.clone().unwrap_or_default());
-			return rule.tags.iter().any(|tag| {
-				if tag == "always" {
-					return !skipped_tags.contains(tag);
-				}
-
-				if tag == "never" {
-					return chosen_tags.contains(tag);
-				}
-
-				return chosen_tags
-					.difference(&skipped_tags)
-					.map(|s| s.to_string())
-					.collect::<HashSet<String>>()
-					.contains(tag);
-			});
-		} else if self.interactive_filter {
-			self.choose_filters(all_tags, all_ids);
-			return self.filter_rules(rule, all_tags, all_ids);
 		}
-		true
+
+		let mut chosen_tags: HashSet<&String> = HashSet::from_iter(all_tags);
+		if let Some(tags) = self.tags.as_ref() {
+			chosen_tags = HashSet::from_iter(tags);
+		}
+
+		let mut skipped_tags: HashSet<&String> = HashSet::new();
+		if let Some(tags) = self.skip_tags.as_ref() {
+			skipped_tags = HashSet::from_iter(tags);
+		}
+
+		let final_tags = chosen_tags
+			.difference(&skipped_tags)
+			.map(|s| s.to_string())
+			.collect::<HashSet<String>>();
+
+		rule.tags.iter().any(|tag| {
+			if tag == "always" {
+				return !skipped_tags.contains(tag);
+			}
+
+			if tag == "never" {
+				return chosen_tags.contains(tag);
+			}
+			final_tags.contains(tag)
+		})
 	}
 }
 
@@ -165,8 +163,11 @@ impl Cmd for Run {
 		});
 
 		let processed_files: Arc<Mutex<HashMap<PathBuf, &Rule>>> = Arc::new(Mutex::new(HashMap::new()));
-		let all_tags: Vec<String> = config.rules.iter().flat_map(|rule| &rule.tags).cloned().collect();
-		let all_ids: Vec<String> = config.rules.iter().filter_map(|rule| rule.id.clone()).collect();
+		let mut all_tags: Vec<String> = config.rules.iter().flat_map(|rule| &rule.tags).cloned().collect();
+		let mut all_ids: Vec<String> = config.rules.iter().filter_map(|rule| rule.id.clone()).collect();
+		all_tags.dedup();
+		all_ids.dedup();
+
 		let filtered_rules: Vec<Rule> = config
 			.rules
 			.iter()
