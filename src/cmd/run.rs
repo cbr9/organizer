@@ -11,6 +11,7 @@ use dialoguer::{theme::ColorfulTheme, MultiSelect, Select};
 use log::error;
 use rayon::iter::{IntoParallelRefMutIterator, ParallelIterator};
 use std::collections::HashSet;
+use strum::{AsRefStr, VariantNames};
 
 use organize_core::{
 	config::{actions::ActionPipeline, filters::AsFilter, options::Options, rule::Rule, Config},
@@ -45,57 +46,85 @@ fn parse_comma_separated_values(s: &str) -> Result<Vec<String>, String> {
 	Ok(values)
 }
 
-impl Run {
-	fn choose(prompt: &str, items: &[String]) -> Vec<String> {
+#[derive(Debug, VariantNames, AsRefStr)]
+enum InteractiveChoice {
+	Tags(Vec<String>),
+	#[strum(serialize = "Skip Tags")]
+	SkipTags(Vec<String>),
+	IDs(Vec<String>),
+}
+
+impl InteractiveChoice {
+	fn choose(&self) -> Option<Vec<String>> {
+		let items = match self {
+			InteractiveChoice::Tags(tags) | InteractiveChoice::SkipTags(tags) => {
+				if tags.is_empty() {
+					println!("There are no rules with an associated tag");
+					return None;
+				}
+				tags
+			}
+			InteractiveChoice::IDs(ids) => {
+				if ids.is_empty() {
+					println!("There are no rules with an associated ID");
+					return None;
+				}
+				ids
+			}
+		};
+
 		let choice = MultiSelect::with_theme(&ColorfulTheme::default())
-			.with_prompt(prompt)
+			.with_prompt(self.as_ref())
 			.items(items)
 			.interact_opt()
 			.unwrap()
 			.unwrap_or_default();
 
-		return items
-			.iter()
-			.enumerate()
-			.filter(|(i, _)| choice.contains(i))
-			.map(|(_, tag)| tag)
-			.cloned()
-			.collect();
+		return Some(
+			items
+				.iter()
+				.enumerate()
+				.filter(|(i, _)| choice.contains(i))
+				.map(|(_, tag)| tag)
+				.cloned()
+				.collect(),
+		);
 	}
+}
 
+impl From<usize> for InteractiveChoice {
+	fn from(value: usize) -> Self {
+		match value {
+			0 => Self::Tags(vec![]),
+			1 => Self::SkipTags(vec![]),
+			2 => Self::IDs(vec![]),
+			_ => unimplemented!(),
+		}
+	}
+}
+
+impl Run {
 	fn choose_filters(&mut self, all_tags: &[String], all_ids: &[String]) {
 		self.interactive_filter = false;
-		let modes = &["Select tags", "Skip tags", "ID"];
-		let mode = Select::with_theme(&ColorfulTheme::default())
+		let chooser = Select::with_theme(&ColorfulTheme::default())
 			.with_prompt("Mode")
-			.items(modes)
+			.items(InteractiveChoice::VARIANTS)
 			.interact_opt()
 			.unwrap()
+			.map(|u| {
+				let mut choice = InteractiveChoice::from(u);
+				match choice {
+					InteractiveChoice::Tags(ref mut v) | InteractiveChoice::SkipTags(ref mut v) => *v = all_tags.into(),
+					InteractiveChoice::IDs(ref mut v) => *v = all_ids.into(),
+				};
+				choice
+			})
 			.unwrap();
 
-		match mode {
-			0 => {
-				if all_tags.is_empty() {
-					println!("There are no rules with an associated tag");
-					return;
-				}
-				self.tags = Some(Self::choose("Tags", all_tags))
-			}
-			1 => {
-				if all_tags.is_empty() {
-					println!("There are no rules with an associated tag");
-					return;
-				}
-				self.skip_tags = Some(Self::choose("Skip Tags", all_tags))
-			}
-			2 => {
-				if all_ids.is_empty() {
-					println!("There are no rules with an associated ID");
-					return;
-				}
-				self.rules = Some(Self::choose("IDs", all_ids));
-			}
-			_ => (),
+		match chooser {
+			InteractiveChoice::Tags(_) => self.tags = chooser.choose(),
+			InteractiveChoice::SkipTags(_) => self.skip_tags = chooser.choose(),
+			InteractiveChoice::IDs(_) => self.rules = chooser.choose(),
 		}
 	}
 

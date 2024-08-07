@@ -1,5 +1,3 @@
-extern crate strum_macros;
-
 pub mod path {
 	pub use expand::*;
 	pub use is_hidden::*;

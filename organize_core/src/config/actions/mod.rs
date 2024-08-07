@@ -8,7 +8,7 @@ use hardlink::Hardlink;
 use r#move::Move;
 use script::Script;
 use serde::Deserialize;
-use strum_macros::{Display, EnumString};
+use strum::{Display, EnumString};
 use symlink::Symlink;
 
 use crate::{config::actions::trash::Trash, resource::Resource};
