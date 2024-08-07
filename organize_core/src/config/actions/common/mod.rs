@@ -67,7 +67,7 @@ mod tests {
 	fn overwrite_exists() {
 		let file = NamedTempFile::new().unwrap();
 		let path = file.path();
-		let new = ConflictOption::Overwrite.resolve_naming_conflict(&path);
+		let new = ConflictOption::Overwrite.resolve_naming_conflict(path);
 		assert_eq!(new, Some(path.to_path_buf()))
 	}
 	#[test]
