@@ -38,6 +38,7 @@ impl IsHidden for Path {
 #[cfg(test)]
 mod tests {
 	use super::*;
+	#[cfg(target_family = "unix")]
 	#[test]
 	fn check_hidden() {
 		let path = Path::new("/home/user/.testfile");
