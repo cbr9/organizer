@@ -9,8 +9,8 @@ use serde::{Deserialize, Serialize};
 #[serde(rename_all(serialize = "lowercase", deserialize = "lowercase"))]
 pub enum ConflictOption {
 	Overwrite,
-	Skip,
 	#[default]
+	Skip,
 	Rename,
 }
 

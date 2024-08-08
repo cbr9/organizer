@@ -3,11 +3,7 @@ use std::path::{PathBuf, MAIN_SEPARATOR};
 
 use anyhow::{bail, Result};
 
-use crate::{
-	config::actions::common::ConflictOption,
-	resource::Resource,
-	templates::{Template},
-};
+use crate::{config::actions::common::ConflictOption, resource::Resource, templates::Template};
 
 use super::Expand;
 

@@ -24,7 +24,6 @@ pub(crate) mod r#move;
 pub(crate) mod script;
 pub(crate) mod symlink;
 pub(crate) mod trash;
-pub mod write;
 
 pub trait ActionPipeline {
 	fn run(&self, src: &Resource, dry_run: bool) -> Result<Option<PathBuf>>;
@@ -92,9 +91,7 @@ pub trait AsAction<'a> {
 		}
 	}
 
-	fn log_message<T: AsRef<Path>>(&self, src: &Resource, dest: Option<&T>, dry_run: bool) -> Result<String> {
-		let config = &Self::CONFIG;
-
+	fn log_message<T: AsRef<Path>>(&self, src: &Resource, dest: Option<&T>, _dry_run: bool) -> Result<String> {
 		match dest {
 			Some(path) => Ok(format!("{} -> {}", src.path.display(), path.as_ref().display())),
 			None => Ok(format!("{}", src.path.display())),

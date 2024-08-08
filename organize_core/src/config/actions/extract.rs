@@ -24,30 +24,7 @@ impl<'a> AsAction<'a> for Extract {
 	};
 
 	fn get_target_path(&self, src: &Resource) -> anyhow::Result<Option<PathBuf>> {
-		let file = File::open(&src.path)?;
-		let archive = zip::ZipArchive::new(file)?;
-		let mut common_prefix = None;
-
-		for file in archive.file_names() {
-			let file_path = Path::new(file);
-
-			// Extract the directory component of the file path
-			if let Some(parent) = file_path.parent() {
-				if common_prefix.is_none() {
-					common_prefix = Some(parent);
-				}
-			}
-		}
-
-		let common_prefix = match common_prefix {
-			Some(p) => p.to_path_buf(),
-			None => src.path.with_extension(""),
-		};
-
-		let mut to: PathBuf = self.to.render(&src.context)?.into();
-		to = to.join(common_prefix);
-		let to = Template(to.to_string_lossy().to_string());
-		prepare_target_path(&self.if_exists, src, &to, false)
+		prepare_target_path(&self.if_exists, src, &self.to, false)
 	}
 
 	fn execute<T: AsRef<Path>>(&self, src: &Resource, dest: Option<T>, dry_run: bool) -> anyhow::Result<Option<std::path::PathBuf>> {

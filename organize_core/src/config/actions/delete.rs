@@ -6,10 +6,6 @@ use serde::Deserialize;
 
 use super::{script::ActionConfig, AsAction};
 
-fn enabled() -> bool {
-	true
-}
-
 #[derive(Debug, Clone, Deserialize, Default, PartialEq, Eq)]
 pub struct Delete;
 
