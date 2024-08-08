@@ -77,7 +77,7 @@ impl Script {
 	fn write(&self, src: &Resource) -> anyhow::Result<PathBuf> {
 		let script = tempfile::NamedTempFile::new()?;
 		let script_path = script.into_temp_path().to_path_buf();
-		let content = self.content.expand(&src.context)?;
+		let content = self.content.render(&src.context)?;
 		std::fs::write(&script_path, content)?;
 		Ok(script_path)
 	}

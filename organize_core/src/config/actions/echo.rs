@@ -23,7 +23,7 @@ impl<'a> AsAction<'a> for Echo {
 	}
 
 	fn log_message<T: AsRef<Path>>(&self, src: &Resource, _: Option<&T>, _: bool) -> Result<String> {
-		self.message.expand(&src.context).map_err(anyhow::Error::msg)
+		self.message.render(&src.context).map_err(anyhow::Error::msg)
 	}
 
 	const CONFIG: ActionConfig<'a> = ActionConfig {

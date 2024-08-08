@@ -5,11 +5,7 @@ use path_clean::PathClean;
 use serde::Deserialize;
 use tera::Context;
 
-use crate::{
-	config::options::Options,
-	path::Expand,
-	templates::{Template},
-};
+use crate::{config::options::Options, path::Expand, templates::Template};
 
 #[derive(Deserialize, Debug, PartialEq, Clone)]
 #[serde(deny_unknown_fields)]
@@ -26,7 +22,7 @@ impl Folder {
 		let context = Context::new();
 		let path = self
 			.path
-			.expand(&context)
+			.render(&context)
 			.with_context(|| "cannot expand folder name")
 			.map(PathBuf::from)
 			.and_then(|p| p.canonicalize().map_err(anyhow::Error::msg))

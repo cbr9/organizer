@@ -15,7 +15,7 @@ pub fn prepare_target_path(if_exists: &ConflictOption, src: &Resource, dest: &Te
 	// if there are any placeholders in the destination, expand them
 
 	let path = &src.path;
-	let mut to = match dest.expand(&src.context) {
+	let mut to = match dest.render(&src.context) {
 		Ok(str) => PathBuf::from(str).expand_user().clean(),
 		Err(e) => {
 			log::error!("{:?}", e);

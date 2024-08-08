@@ -25,7 +25,7 @@ pub mod variables;
 
 pub static CONFIG: OnceCell<Config> = OnceCell::new();
 
-#[derive(Deserialize, Clone, Debug, PartialEq)]
+#[derive(Deserialize, Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct Config {
 	pub rules: Vec<Rule>,

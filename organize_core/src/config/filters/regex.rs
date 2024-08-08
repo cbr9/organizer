@@ -1,4 +1,4 @@
-use crate::{config::filters::AsFilter, resource::Resource, templates::TERA};
+use crate::{config::filters::AsFilter, resource::Resource, templates::Template};
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use serde::{Deserialize, Deserializer};
 use std::{convert::TryFrom, ops::Deref, str::FromStr};
@@ -16,11 +16,11 @@ pub struct RegularExpression {
 	#[serde(default)]
 	pub negate: bool,
 	#[serde(default = "RegularExpression::default_input")]
-	pub input: String,
+	pub input: Template,
 }
 
 impl RegularExpression {
-	fn default_input() -> String {
+	fn default_input() -> Template {
 		"{{path | filename}}".into()
 	}
 }
@@ -62,7 +62,7 @@ impl TryFrom<String> for RegularExpression {
 
 impl AsFilter for RegularExpression {
 	fn matches(&self, res: &Resource) -> bool {
-		let input = TERA.lock().unwrap().render_str(&self.input, &res.context).unwrap();
+		let input = self.input.render(&res.context).unwrap();
 		let mut matches = self.pattern.is_match(&input);
 		if self.negate {
 			matches = !matches;

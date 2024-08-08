@@ -8,7 +8,7 @@ use tera::{Context, Tera};
 pub mod filters;
 
 lazy_static! {
-	pub static ref TERA: Mutex<Tera> = {
+	static ref TERA: Mutex<Tera> = {
 		let mut tera = Tera::default();
 		tera.register_filter("parent", Parent);
 		tera.register_filter("stem", Stem);
@@ -19,11 +19,11 @@ lazy_static! {
 	};
 }
 
-#[derive(Deserialize, Default, Debug, PartialEq, Clone)]
+#[derive(Deserialize, Default, Debug, Eq, PartialEq, Clone)]
 pub struct Template(pub String);
 
 impl Template {
-	pub fn expand(&self, context: &Context) -> tera::Result<String> {
+	pub fn render(&self, context: &Context) -> tera::Result<String> {
 		TERA.lock().unwrap().render_str(&self.0, context)
 	}
 }
@@ -33,8 +33,15 @@ impl From<Template> for String {
 		val.0
 	}
 }
+
 impl From<String> for Template {
 	fn from(val: String) -> Self {
 		Template(val)
+	}
+}
+
+impl From<&str> for Template {
+	fn from(val: &str) -> Self {
+		Template(val.to_string())
 	}
 }

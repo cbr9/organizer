@@ -44,7 +44,7 @@ impl<'a> AsAction<'a> for Extract {
 			None => src.path.with_extension(""),
 		};
 
-		let mut to: PathBuf = self.to.expand(&src.context)?.into();
+		let mut to: PathBuf = self.to.render(&src.context)?.into();
 		to = to.join(common_prefix);
 		let to = Template(to.to_string_lossy().to_string());
 		prepare_target_path(&self.if_exists, src, &to, false)

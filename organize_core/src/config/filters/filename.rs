@@ -1,4 +1,4 @@
-use crate::{config::filters::AsFilter, resource::Resource, templates::TERA};
+use crate::{config::filters::AsFilter, resource::Resource, templates::Template};
 use serde::Deserialize;
 
 // TODO: refactor
@@ -7,11 +7,11 @@ use serde::Deserialize;
 #[serde(deny_unknown_fields)]
 pub struct Filename {
 	#[serde(default)]
-	pub startswith: Vec<String>,
+	pub startswith: Vec<Template>,
 	#[serde(default)]
-	pub endswith: Vec<String>,
+	pub endswith: Vec<Template>,
 	#[serde(default)]
-	pub contains: Vec<String>,
+	pub contains: Vec<Template>,
 	#[serde(default)]
 	pub case_sensitive: bool,
 }
@@ -26,7 +26,7 @@ impl AsFilter for Filename {
 		let startswith = self
 			.startswith
 			.iter()
-			.map(|s| TERA.lock().unwrap().render_str(s, &res.context).unwrap())
+			.map(|s| s.render(&res.context).unwrap())
 			.map(|s| if !self.case_sensitive { s.to_lowercase() } else { s })
 			.any(|mut s| {
 				let mut negate = false;
@@ -45,7 +45,7 @@ impl AsFilter for Filename {
 		let endswith = self
 			.endswith
 			.iter()
-			.map(|s| TERA.lock().unwrap().render_str(s, &res.context).unwrap())
+			.map(|s| s.render(&res.context).unwrap())
 			.map(|s| if !self.case_sensitive { s.to_lowercase() } else { s })
 			.any(|mut s| {
 				let mut negate = false;
@@ -64,7 +64,7 @@ impl AsFilter for Filename {
 		let contains = self
 			.contains
 			.iter()
-			.map(|s| TERA.lock().unwrap().render_str(s, &res.context).unwrap())
+			.map(|s| s.render(&res.context).unwrap())
 			.map(|s| if !self.case_sensitive { s.to_lowercase() } else { s })
 			.any(|mut s| {
 				let mut negate = false;
