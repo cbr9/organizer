@@ -1,10 +1,10 @@
 use std::path::{Path, PathBuf};
 
-use crate::{config::actions::ActionType, resource::Resource, PROJECT_NAME};
+use crate::{resource::Resource, PROJECT_NAME};
 use anyhow::{Context, Result};
 use serde::Deserialize;
 
-use super::AsAction;
+use super::{script::ActionConfig, AsAction};
 
 fn enabled() -> bool {
 	true
@@ -26,9 +26,11 @@ impl Trash {
 	}
 }
 
-impl AsAction for Trash {
-	const REQUIRES_DEST: bool = false;
-	const TYPE: ActionType = ActionType::Trash;
+impl<'a> AsAction<'a> for Trash {
+	const CONFIG: ActionConfig<'a> = ActionConfig {
+		requires_dest: false,
+		log_hint: "TRASH",
+	};
 
 	fn execute<T: AsRef<Path>>(&self, src: &Resource, _: Option<T>, dry_run: bool) -> Result<Option<PathBuf>> {
 		if !dry_run {

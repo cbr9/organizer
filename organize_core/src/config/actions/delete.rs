@@ -1,25 +1,23 @@
 use std::path::{Path, PathBuf};
 
-use crate::{config::actions::ActionType, resource::Resource};
+use crate::resource::Resource;
 use anyhow::{Context, Result};
 use serde::Deserialize;
 
-use super::AsAction;
+use super::{script::ActionConfig, AsAction};
 
 fn enabled() -> bool {
 	true
 }
 
 #[derive(Debug, Clone, Deserialize, Default, PartialEq, Eq)]
-#[serde(deny_unknown_fields)]
-pub struct Delete {
-	#[serde(default = "enabled")]
-	pub confirm: bool,
-}
+pub struct Delete;
 
-impl AsAction for Delete {
-	const REQUIRES_DEST: bool = false;
-	const TYPE: ActionType = ActionType::Delete;
+impl<'a> AsAction<'a> for Delete {
+	const CONFIG: ActionConfig<'a> = ActionConfig {
+		requires_dest: false,
+		log_hint: "DELETE",
+	};
 
 	fn execute<T: AsRef<Path>>(&self, src: &Resource, _: Option<T>, dry_run: bool) -> Result<Option<PathBuf>> {
 		if !dry_run {
@@ -40,7 +38,7 @@ mod tests {
 		let tmp_path = tmp_dir.path().to_owned();
 		let tmp_file = tmp_path.join("delete_me.txt");
 		let resource = Resource::new(&tmp_file, tmp_dir.path(), &[]);
-		let action = Delete { confirm: false };
+		let action = Delete;
 
 		std::fs::write(&tmp_file, "").expect("Could not create target file");
 		assert!(tmp_file.exists());

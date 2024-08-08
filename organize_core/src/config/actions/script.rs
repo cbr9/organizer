@@ -8,26 +8,33 @@ use serde::Deserialize;
 use tempfile;
 
 use crate::{
-	config::{actions::ActionType, filters::AsFilter},
+	config::filters::AsFilter,
 	resource::Resource,
-	templates::TERA,
+	templates::{Template},
 };
 use anyhow::{bail, Result};
 
 use super::AsAction;
 
-#[derive(Deserialize, Debug, Clone, Default, Eq, PartialEq)]
+#[derive(Deserialize, Debug, Clone, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct Script {
 	exec: String,
 	#[serde(default)]
 	args: Vec<String>,
-	content: String,
+	content: Template,
 }
 
-impl AsAction for Script {
-	const REQUIRES_DEST: bool = false;
-	const TYPE: ActionType = ActionType::Script;
+pub struct ActionConfig<'a> {
+	pub requires_dest: bool,
+	pub log_hint: &'a str,
+}
+
+impl<'a> AsAction<'a> for Script {
+	const CONFIG: ActionConfig<'a> = ActionConfig {
+		requires_dest: true,
+		log_hint: "SCRIPT",
+	};
 
 	fn execute<T: AsRef<Path>>(&self, src: &Resource, _: Option<T>, dry_run: bool) -> Result<Option<PathBuf>> {
 		if dry_run {
@@ -37,15 +44,6 @@ impl AsAction for Script {
 			let output = String::from_utf8_lossy(&output.stdout);
 			output.lines().last().map(|last| PathBuf::from(&last.trim()))
 		})
-	}
-
-	fn log_success_msg<T: AsRef<Path>>(&self, src: &Resource, dest: Option<&T>, _: bool) -> Result<String> {
-		Ok(format!(
-			"({} SCRIPT) {} -> {}",
-			self.exec.to_uppercase(),
-			src.path.display(),
-			dest.expect("Script did not output a valid path to stdout").as_ref().display()
-		))
 	}
 }
 
@@ -68,7 +66,7 @@ impl AsFilter for Script {
 }
 
 impl Script {
-	pub fn new<T: Into<String>>(exec: T, content: T) -> Self {
+	pub fn new<T: Into<String>, C: Into<Template>>(exec: T, content: C) -> Self {
 		Self {
 			exec: exec.into(),
 			content: content.into(),
@@ -79,10 +77,8 @@ impl Script {
 	fn write(&self, src: &Resource) -> anyhow::Result<PathBuf> {
 		let script = tempfile::NamedTempFile::new()?;
 		let script_path = script.into_temp_path().to_path_buf();
-		let content = TERA.lock().unwrap().render_str(&self.content, &src.context);
-		if let Ok(content) = content {
-			std::fs::write(&script_path, content)?;
-		}
+		let content = self.content.expand(&src.context)?;
+		std::fs::write(&script_path, content)?;
 		Ok(script_path)
 	}
 
@@ -105,8 +101,8 @@ mod tests {
 	#[test]
 	fn test_script_filter() {
 		let src = Resource::new("/home", "/", &[]);
-		let content = "print('huh')\nprint('{{path}}'.islower())";
-		let mut script = Script::new("python", content);
+		let content = String::from("print('huh')\nprint('{{path}}'.islower())");
+		let mut script = Script::new("python", content.clone());
 		script.run_script(&src).unwrap_or_else(|_| {
 			// some linux distributions don't have a `python` executable, but a `python3`
 			script = Script::new("python3", content);

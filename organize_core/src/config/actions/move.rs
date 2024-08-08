@@ -3,26 +3,26 @@ use std::path::{Path, PathBuf};
 use anyhow::{Context as ErrorContext, Result};
 use serde::Deserialize;
 
-use crate::{path::prepare_target_path, resource::Resource};
+use crate::{path::prepare_target_path, resource::Resource, templates::Template};
 
-use super::{common::ConflictOption, ActionType, AsAction};
+use super::{common::ConflictOption, script::ActionConfig, AsAction};
 
-#[derive(Deserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Deserialize, Debug, Clone, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct Move {
-	pub to: PathBuf,
+	pub to: Template,
 	#[serde(default)]
 	pub if_exists: ConflictOption,
-	#[serde(default)]
-	pub confirm: bool,
 }
 
-impl AsAction for Move {
-	const REQUIRES_DEST: bool = true;
-	const TYPE: ActionType = ActionType::Move;
+impl<'a> AsAction<'a> for Move {
+	const CONFIG: ActionConfig<'a> = ActionConfig {
+		requires_dest: true,
+		log_hint: "MOVE",
+	};
 
 	fn get_target_path(&self, src: &Resource) -> Result<Option<PathBuf>> {
-		prepare_target_path(&self.if_exists, src, self.to.as_path(), true)
+		prepare_target_path(&self.if_exists, src, &self.to, true)
 	}
 
 	fn execute<T: AsRef<Path>>(&self, src: &Resource, dest: Option<T>, dry_run: bool) -> Result<Option<PathBuf>> {

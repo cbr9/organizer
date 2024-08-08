@@ -5,23 +5,23 @@ use std::{
 	path::{Path, PathBuf},
 };
 
-use crate::{path::prepare_target_path, resource::Resource};
+use crate::{path::prepare_target_path, resource::Resource, templates::Template};
 
-use super::{common::ConflictOption, ActionType, AsAction};
+use super::{common::ConflictOption, script::ActionConfig, AsAction};
 
-#[derive(Deserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Deserialize, Debug, Clone, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct Extract {
-	pub to: PathBuf,
+	pub to: Template,
 	#[serde(default)]
 	pub if_exists: ConflictOption,
-	#[serde(default)]
-	pub confirm: bool,
 }
 
-impl AsAction for Extract {
-	const REQUIRES_DEST: bool = true;
-	const TYPE: super::ActionType = ActionType::Extract;
+impl<'a> AsAction<'a> for Extract {
+	const CONFIG: ActionConfig<'a> = ActionConfig {
+		requires_dest: true,
+		log_hint: "EXTRACT",
+	};
 
 	fn get_target_path(&self, src: &Resource) -> anyhow::Result<Option<PathBuf>> {
 		let file = File::open(&src.path)?;
@@ -44,7 +44,10 @@ impl AsAction for Extract {
 			None => src.path.with_extension(""),
 		};
 
-		prepare_target_path(&self.if_exists, src, &self.to.join(common_prefix), false)
+		let mut to: PathBuf = self.to.expand(&src.context)?.into();
+		to = to.join(common_prefix);
+		let to = Template(to.to_string_lossy().to_string());
+		prepare_target_path(&self.if_exists, src, &to, false)
 	}
 
 	fn execute<T: AsRef<Path>>(&self, src: &Resource, dest: Option<T>, dry_run: bool) -> anyhow::Result<Option<std::path::PathBuf>> {

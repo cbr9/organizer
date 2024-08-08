@@ -6,9 +6,8 @@ use echo::Echo;
 use extract::Extract;
 use hardlink::Hardlink;
 use r#move::Move;
-use script::Script;
+use script::{ActionConfig, Script};
 use serde::Deserialize;
-use strum::{Display, EnumString};
 use symlink::Symlink;
 
 use crate::{config::actions::trash::Trash, resource::Resource};
@@ -25,37 +24,38 @@ pub(crate) mod r#move;
 pub(crate) mod script;
 pub(crate) mod symlink;
 pub(crate) mod trash;
+pub mod write;
 
 pub trait ActionPipeline {
 	fn run(&self, src: &Resource, dry_run: bool) -> Result<Option<PathBuf>>;
 }
 
-impl<T: AsAction> ActionPipeline for T {
+impl<'a, T: AsAction<'a>> ActionPipeline for T {
 	#[allow(clippy::nonminimal_bool)]
 	fn run(&self, src: &Resource, dry_run: bool) -> Result<Option<PathBuf>> {
-		let dest = self.get_target_path(src);
-		if let Ok(dest) = dest {
-			if (Self::REQUIRES_DEST && dest.is_some()) || !Self::REQUIRES_DEST {
-				if Self::REQUIRES_DEST && dest.is_some() && &src.path == dest.as_ref().unwrap() {
-					return Ok(dest);
-				}
-
-				if !dry_run && dest.is_some() {
-					let dest = dest.clone().unwrap();
-					std::fs::create_dir_all(dest.parent().unwrap())?;
-				}
-
-				return match self.execute(src, dest.clone(), dry_run) {
-					Ok(new_path) => {
-						log::info!("{}", self.log_success_msg(src, new_path.as_ref(), dry_run)?);
-						Ok(new_path)
-					}
-					Err(e) => {
-						log::error!("{:?}", e);
-						Err(e)
-					}
-				};
+		let dest = self.get_target_path(src)?;
+		let config = Self::CONFIG;
+		if (config.requires_dest && dest.is_some()) || !config.requires_dest {
+			if config.requires_dest && dest.is_some() && &src.path == dest.as_ref().unwrap() {
+				return Ok(dest);
 			}
+
+			if !dry_run && dest.is_some() {
+				let dest = dest.clone().unwrap();
+				std::fs::create_dir_all(dest.parent().unwrap())?;
+			}
+
+			return match self.execute(src, dest.clone(), dry_run) {
+				Ok(new_path) => {
+					let hint = Self::get_hint(dry_run);
+					log::info!("({}) {}", hint, self.log_message(src, new_path.as_ref(), dry_run)?);
+					Ok(new_path)
+				}
+				Err(e) => {
+					log::error!("{:?}", e);
+					Err(e)
+				}
+			};
 		}
 		Ok(None)
 	}
@@ -78,41 +78,40 @@ impl ActionPipeline for Action {
 	}
 }
 
-pub trait AsAction {
-	const TYPE: ActionType;
-	const REQUIRES_DEST: bool;
+pub trait AsAction<'a> {
+	const CONFIG: ActionConfig<'a>;
 
 	fn execute<T: AsRef<Path>>(&self, src: &Resource, dest: Option<T>, dry_run: bool) -> Result<Option<PathBuf>>;
 
-	fn log_success_msg<T: AsRef<Path>>(&self, src: &Resource, dest: Option<&T>, dry_run: bool) -> Result<String> {
-		use ActionType::*;
-		let hint = if !dry_run {
-			Self::TYPE.to_string().to_uppercase()
+	fn get_hint(dry_run: bool) -> String {
+		let config = &Self::CONFIG;
+		if !dry_run {
+			config.log_hint.to_string().to_uppercase()
 		} else {
-			format!("SIMULATED {}", Self::TYPE.to_string().to_uppercase())
-		};
-		match Self::TYPE {
-			Copy | Move | Hardlink | Symlink | Extract => Ok(format!(
-				"({}) {} -> {}",
-				hint,
-				src.path.display(),
-				dest.expect("dest should not be none").as_ref().display()
-			)),
-			Delete | Trash => Ok(format!("({}) {}", hint, src.path.display())),
-			_ => unimplemented!(),
+			format!("SIMULATED {}", config.log_hint)
+		}
+	}
+
+	fn log_message<T: AsRef<Path>>(&self, src: &Resource, dest: Option<&T>, dry_run: bool) -> Result<String> {
+		let config = &Self::CONFIG;
+
+		match dest {
+			Some(path) => Ok(format!("{} -> {}", src.path.display(), path.as_ref().display())),
+			None => Ok(format!("{}", src.path.display())),
 		}
 	}
 
 	// required only for some actions
 	fn get_target_path(&self, _: &Resource) -> Result<Option<PathBuf>> {
-		if Self::REQUIRES_DEST {
+		let config = &Self::CONFIG;
+		if config.requires_dest {
 			unimplemented!()
 		}
 		Ok(None)
 	}
 }
 
-#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Deserialize, PartialEq)]
 #[serde(tag = "type", rename_all(deserialize = "lowercase"))]
 pub enum Action {
 	Move(Move),
@@ -124,18 +123,4 @@ pub enum Action {
 	Trash(Trash),
 	Script(Script),
 	Extract(Extract),
-}
-
-#[derive(Eq, PartialEq, Display, EnumString)]
-#[strum(serialize_all = "lowercase")]
-pub enum ActionType {
-	Copy,
-	Extract,
-	Delete,
-	Echo,
-	Move,
-	Hardlink,
-	Symlink,
-	Script,
-	Trash,
 }

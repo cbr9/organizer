@@ -1,5 +1,6 @@
 use config::{Config as LayeredConfig, File};
 use itertools::Itertools;
+use once_cell::sync::OnceCell;
 use rule::Rule;
 use std::{
 	borrow::Cow,
@@ -22,7 +23,10 @@ pub mod options;
 pub mod rule;
 pub mod variables;
 
+pub static CONFIG: OnceCell<Config> = OnceCell::new();
+
 #[derive(Deserialize, Clone, Debug, PartialEq)]
+#[serde(deny_unknown_fields)]
 pub struct Config {
 	pub rules: Vec<Rule>,
 	#[serde(skip)]

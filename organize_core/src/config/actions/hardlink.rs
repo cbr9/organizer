@@ -3,18 +3,16 @@ use std::path::{Path, PathBuf};
 use anyhow::{Context as ErrorContext, Result};
 use serde::Deserialize;
 
-use crate::{path::prepare_target_path, resource::Resource};
+use crate::{path::prepare_target_path, resource::Resource, templates::Template};
 
-use super::{common::ConflictOption, AsAction, ActionType};
+use super::{common::ConflictOption, script::ActionConfig, AsAction};
 
-#[derive(Deserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Deserialize, Debug, Clone, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct Hardlink {
-	to: PathBuf,
+	to: Template,
 	#[serde(default)]
 	if_exists: ConflictOption,
-	#[serde(default)]
-	confirm: bool,
 	#[serde(default)]
 	continue_with: ContinueWith,
 }
@@ -31,12 +29,14 @@ impl Default for ContinueWith {
 	}
 }
 
-impl AsAction for Hardlink {
-	const REQUIRES_DEST: bool = true;
-	const TYPE: ActionType = ActionType::Hardlink;
+impl<'a> AsAction<'a> for Hardlink {
+	const CONFIG: ActionConfig<'a> = ActionConfig {
+		requires_dest: true,
+		log_hint: "HARDLINK",
+	};
 
 	fn get_target_path(&self, src: &Resource) -> Result<Option<PathBuf>> {
-		prepare_target_path(&self.if_exists, src, self.to.as_path(), true)
+		prepare_target_path(&self.if_exists, src, &self.to, true)
 	}
 
 	fn execute<T: AsRef<Path>>(&self, src: &Resource, dest: Option<T>, dry_run: bool) -> Result<Option<PathBuf>> {

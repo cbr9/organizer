@@ -10,11 +10,11 @@ use log::error;
 use rayon::iter::{IntoParallelRefMutIterator, ParallelIterator};
 
 use organize_core::{
-	config::{actions::ActionPipeline, filters::AsFilter, options::Options, rule::Rule, Config},
+	config::{actions::ActionPipeline, filters::AsFilter, options::Options, rule::Rule, Config, CONFIG},
 	resource::Resource,
 };
 
-use crate::{Cmd, CONFIG};
+use crate::Cmd;
 
 #[derive(Parser, Default)]
 pub struct Run {
