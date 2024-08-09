@@ -85,6 +85,14 @@ impl AsFilter for Mime {
 mod tests {
 	use super::*;
 	#[test]
+	fn test_match_negative() {
+		let types = Mime::try_from(vec!["!image/*", "audio/*"]).unwrap();
+		let img = Resource::from_str("test.jpg").unwrap();
+		let audio = Resource::from_str("test.ogg").unwrap();
+		assert!(!types.matches(&img));
+		assert!(types.matches(&audio));
+	}
+	#[test]
 	fn test_match() {
 		let types = Mime::try_from(vec!["image/*", "audio/*"]).unwrap();
 		let img = Resource::from_str("test.jpg").unwrap();

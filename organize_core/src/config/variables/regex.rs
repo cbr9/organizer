@@ -1,10 +1,7 @@
 use serde::Deserialize;
 use tera::Context;
 
-use crate::{
-	config::filters::regex::{deserialize_regex, RegularExpression},
-	templates::Template,
-};
+use crate::{config::filters::regex::deserialize_regex, templates::Template};
 
 use super::AsVariable;
 
@@ -13,6 +10,12 @@ pub struct RegexVariable {
 	#[serde(deserialize_with = "deserialize_regex")]
 	pub pattern: regex::Regex,
 	pub input: Template,
+}
+
+impl PartialEq for RegexVariable {
+	fn eq(&self, other: &Self) -> bool {
+		self.pattern.as_str() == other.pattern.as_str() && self.input == other.input
+	}
 }
 
 impl AsVariable for RegexVariable {

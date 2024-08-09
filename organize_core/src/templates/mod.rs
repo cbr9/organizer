@@ -1,4 +1,4 @@
-use std::{path::PathBuf, sync::Mutex};
+use std::sync::Mutex;
 
 use filters::{Extension, Filename, Mime, Parent, Stem};
 use lazy_static::lazy_static;

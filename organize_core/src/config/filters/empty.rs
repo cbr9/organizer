@@ -18,3 +18,49 @@ impl AsFilter for Empty {
 		}
 	}
 }
+
+#[cfg(test)]
+mod tests {
+	use std::io::Write;
+
+	use tempfile::NamedTempFile;
+
+	use crate::{
+		config::filters::{empty::Empty, AsFilter},
+		resource::Resource,
+	};
+
+	#[test]
+	fn test_file_positive() {
+		let file = NamedTempFile::new().unwrap();
+		let path = file.path();
+		let res = Resource::from(path);
+		let action = Empty;
+		assert!(action.matches(&res))
+	}
+	#[test]
+	fn test_dir_positive() {
+		let dir = tempfile::tempdir().unwrap();
+		let path = dir.path();
+		let res = Resource::from(path);
+		let action = Empty;
+		assert!(action.matches(&res))
+	}
+	#[test]
+	fn test_file_negative() {
+		let mut file = NamedTempFile::new().unwrap();
+		file.write_all(b"test").unwrap();
+		let path = file.path();
+		let res = Resource::from(path);
+		let action = Empty;
+		assert!(!action.matches(&res))
+	}
+	#[test]
+	fn test_dir_negative() {
+		let dir = NamedTempFile::new().unwrap();
+		let path = dir.path().parent().unwrap();
+		let res = Resource::from(path);
+		let action = Empty;
+		assert!(!action.matches(&res))
+	}
+}

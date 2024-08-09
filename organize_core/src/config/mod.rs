@@ -100,7 +100,13 @@ impl Config {
 		}
 	}
 
-	pub fn filter_rules(&self, tags: Option<&Vec<String>>, ids: Option<&Vec<String>>) -> Vec<&Rule> {
+	pub fn filter_rules<I, T>(&self, tags: Option<I>, ids: Option<T>) -> Vec<&Rule>
+	where
+		I: IntoIterator,
+		T: IntoIterator,
+		I::Item: AsRef<str>,
+		T::Item: AsRef<str>,
+	{
 		if let Some(tags) = tags {
 			return self.filter_rules_by_tag(tags);
 		}
@@ -112,11 +118,15 @@ impl Config {
 		self.rules.iter().collect_vec()
 	}
 
-	pub fn filter_rules_by_tag(&self, tags: &Vec<String>) -> Vec<&Rule> {
-		let chosen_tags: HashSet<&String> = HashSet::from_iter(tags);
+	pub fn filter_rules_by_tag<I>(&self, tags: I) -> Vec<&Rule>
+	where
+		I: IntoIterator,
+		I::Item: AsRef<str>,
+	{
+		let chosen_tags: HashSet<String> = HashSet::from_iter(tags.into_iter().map(|s| s.as_ref().to_string()));
 		let all_tags = self.rules.iter().flat_map(|r| &r.tags).collect_vec();
 
-		for tag in tags {
+		for tag in chosen_tags.iter() {
 			if !all_tags.contains(&tag) && !all_tags.contains(&&tag.replacen('!', "", 1)) {
 				println!("no tag named {}", tag);
 				return vec![];
@@ -127,19 +137,11 @@ impl Config {
 			.iter()
 			.filter(|rule| {
 				chosen_tags.iter().any(|tag| {
-					let mut tag = Cow::Borrowed(*tag);
+					let mut tag = Cow::Borrowed(tag);
 					let mut negate = false;
 					if tag.starts_with('!') {
 						tag = Cow::Owned(tag.into_owned().replacen('!', "", 1));
 						negate = true;
-					}
-
-					if *tag == "always" {
-						return !negate;
-					}
-
-					if *tag == "never" {
-						return negate;
 					}
 
 					let mut matches = rule.tags.contains(&*tag);
@@ -152,11 +154,15 @@ impl Config {
 			.collect_vec()
 	}
 
-	pub fn filter_rules_by_id(&self, ids: &Vec<String>) -> Vec<&Rule> {
-		let chosen_ids: HashSet<&String> = HashSet::from_iter(ids);
+	pub fn filter_rules_by_id<I>(&self, ids: I) -> Vec<&Rule>
+	where
+		I: IntoIterator,
+		I::Item: AsRef<str>,
+	{
+		let chosen_ids: HashSet<String> = HashSet::from_iter(ids.into_iter().map(|s| s.as_ref().to_string()));
 		let all_ids = self.rules.iter().flat_map(|r| &r.id).collect_vec();
 
-		for id in ids {
+		for id in chosen_ids.iter() {
 			if !all_ids.contains(&id) && !all_ids.contains(&&id.replacen('!', "", 1)) {
 				println!("no tag named {}", id);
 				return vec![];
@@ -167,9 +173,9 @@ impl Config {
 			.iter()
 			.filter(|rule| {
 				chosen_ids.iter().any(|id| {
-					let mut id = Cow::Borrowed(*id);
+					let mut id = Cow::Borrowed(id);
 					let mut negate = false;
-					dbg!(&id);
+
 					if id.starts_with('!') {
 						id = Cow::Owned(id.to_mut().replacen('!', "", 1));
 						negate = true;
@@ -183,5 +189,102 @@ impl Config {
 				})
 			})
 			.collect_vec()
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use super::Config;
+	use itertools::Itertools;
+	use lazy_static::lazy_static;
+	// use pretty_assertions::assert_eq;
+	use toml::toml;
+
+	lazy_static! {
+		static ref TOML: toml::Table = toml! {
+			[[rules]]
+			id = "test-rule-1"
+			tags = ["tag1", "always"]
+
+			actions = []
+			filters = []
+			folders = []
+
+			[[rules]]
+			id = "test-rule-2"
+			tags = ["tag2"]
+
+			actions = []
+			filters = []
+			folders = []
+
+			[[rules]]
+			id = "test-rule-3"
+			tags = ["tag2"]
+
+			actions = []
+			filters = []
+			folders = []
+		};
+		static ref CONFIG: Config = toml::from_str(&TOML.to_string()).unwrap();
+	}
+
+	#[test]
+	fn filter_rules_by_tag_positive() {
+		let found_rules = CONFIG.filter_rules_by_tag(["tag2"]).iter().map(|&r| r.clone()).collect_vec();
+		let expected_rules = CONFIG.rules.get(1..=2).unwrap();
+		assert_eq!(found_rules, expected_rules)
+	}
+	#[test]
+	fn filter_rules_by_tag_negative() {
+		let found_rules = CONFIG.filter_rules_by_tag(["!tag2"]).iter().copied().cloned().collect_vec();
+		let expected_rules = CONFIG.rules.get(..=0).unwrap();
+		assert_eq!(found_rules, expected_rules)
+	}
+	#[test]
+	fn filter_rules_by_id_positive() {
+		let found_rules = CONFIG.filter_rules_by_id(["test-rule-1"]).iter().copied().collect_vec();
+		let expected_rules = vec![CONFIG.rules.first().unwrap()];
+		assert_eq!(found_rules, expected_rules)
+	}
+	#[test]
+	fn filter_rules_by_id_negative() {
+		let found_rules = CONFIG
+			.filter_rules_by_id(["!test-rule-1"])
+			.iter()
+			.map(|r| (*r).clone())
+			.collect_vec();
+		let expected_rules = CONFIG.rules.get(1..).unwrap();
+		assert_eq!(found_rules, expected_rules)
+	}
+	#[test]
+	fn filter_rules_by_id_multiple_positive() {
+		let found_rules = CONFIG
+			.filter_rules_by_id(["test-rule-1", "test-rule-2"])
+			.iter()
+			.map(|&r| r.clone())
+			.collect_vec();
+		let expected_rules = CONFIG.rules.get(0..=1).unwrap();
+		assert_eq!(found_rules, expected_rules)
+	}
+	#[test]
+	fn filter_rules_by_id_multiple_negative() {
+		let found_rules = CONFIG
+			.filter_rules_by_id(["!test-rule-1", "!test-rule-2"])
+			.iter()
+			.copied()
+			.collect_vec();
+		let expected_rules = vec![CONFIG.rules.get(2).unwrap()];
+		assert_eq!(found_rules, expected_rules)
+	}
+	#[test]
+	fn filter_rules_by_id_multiple_mixed() {
+		let found_rules = CONFIG
+			.filter_rules_by_id(["test-rule-1", "!test-rule-2"])
+			.iter()
+			.copied()
+			.collect_vec();
+		let expected_rules = vec![CONFIG.rules.first().unwrap(), CONFIG.rules.last().unwrap()];
+		assert_eq!(found_rules, expected_rules)
 	}
 }

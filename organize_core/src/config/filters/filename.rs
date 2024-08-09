@@ -18,69 +18,79 @@ pub struct Filename {
 
 impl AsFilter for Filename {
 	fn matches(&self, res: &Resource) -> bool {
-		let filename = res.path.file_name().unwrap_or_default().to_string_lossy().to_string();
+		let filename = res.path.file_name().unwrap_or_default().to_string_lossy();
+
 		if filename.is_empty() {
 			return false;
 		}
 
-		let startswith = self
-			.startswith
-			.iter()
-			.map(|s| s.render(&res.context).unwrap())
-			.map(|s| if !self.case_sensitive { s.to_lowercase() } else { s })
-			.any(|mut s| {
-				let mut negate = false;
+		let startswith = if self.startswith.is_empty() {
+			true
+		} else {
+			self.startswith
+				.iter()
+				.map(|s| s.render(&res.context).unwrap())
+				.map(|s| if !self.case_sensitive { s.to_lowercase() } else { s })
+				.any(|mut s| {
+					let mut negate = false;
+					if s.starts_with('!') {
+						negate = true;
+						s = s.replacen('!', "", 1);
+					}
+					let mut matches = filename.starts_with(&s);
+					if negate {
+						matches = !matches
+					}
+					matches
+				})
+		};
 
-				if s.starts_with('!') {
-					negate = true;
-					s = s.replacen('!', "", 1);
-				}
-				let mut matches = filename.starts_with(&s);
-				if negate {
-					matches = !matches
-				}
-				matches
-			});
+		let endswith = if self.endswith.is_empty() {
+			true
+		} else {
+			self.endswith
+				.iter()
+				.map(|s| s.render(&res.context).unwrap())
+				.map(|s| if !self.case_sensitive { s.to_lowercase() } else { s })
+				.any(|mut s| {
+					let mut negate = false;
+					if s.starts_with('!') {
+						negate = true;
+						s = s.replacen('!', "", 1);
+					}
+					let mut matches = filename.ends_with(&s);
+					if negate {
+						matches = !matches
+					}
+					matches
+				})
+		};
 
-		let endswith = self
-			.endswith
-			.iter()
-			.map(|s| s.render(&res.context).unwrap())
-			.map(|s| if !self.case_sensitive { s.to_lowercase() } else { s })
-			.any(|mut s| {
-				let mut negate = false;
+		let contains = if self.contains.is_empty() {
+			true
+		} else {
+			self.contains
+				.iter()
+				.map(|s| s.render(&res.context).unwrap())
+				.map(|s| if !self.case_sensitive { s.to_lowercase() } else { s })
+				.any(|mut s| {
+					let mut negate = false;
 
-				if s.starts_with('!') {
-					negate = true;
-					s = s.replacen('!', "", 1);
-				}
-				let mut matches = filename.ends_with(&s);
-				if negate {
-					matches = !matches
-				}
-				matches
-			});
-
-		let contains = self
-			.contains
-			.iter()
-			.map(|s| s.render(&res.context).unwrap())
-			.map(|s| if !self.case_sensitive { s.to_lowercase() } else { s })
-			.any(|mut s| {
-				let mut negate = false;
-
-				if s.starts_with('!') {
-					negate = true;
-					s = s.replacen('!', "", 1);
-				}
-				let mut matches = filename.contains(&s);
-				if negate {
-					matches = !matches
-				}
-				matches
-			});
-
-		startswith || endswith || contains
+					if s.starts_with('!') {
+						negate = true;
+						s = s.replacen('!', "", 1);
+					}
+					let mut matches = filename.contains(&s);
+					if negate {
+						matches = !matches
+					}
+					matches
+				})
+		};
+		dbg!(&startswith);
+		dbg!(&endswith);
+		dbg!(&contains);
+		startswith && endswith && contains
 	}
 }
 
@@ -159,6 +169,17 @@ mod tests {
 			case_sensitive: true,
 			contains: vec!["ES".into()],
 			..Default::default()
+		};
+		assert!(filename.matches(&path))
+	}
+	#[test]
+	fn match_multiple_conditions_case_sensitive() {
+		let path = Resource::from_str("$HOME/Downloads/tESt.pdf").unwrap();
+		let filename = Filename {
+			case_sensitive: true,
+			contains: vec!["ES".into()],
+			startswith: vec!["t".into()],
+			endswith: vec!["df".into()],
 		};
 		assert!(filename.matches(&path))
 	}

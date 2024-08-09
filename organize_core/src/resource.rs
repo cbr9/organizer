@@ -51,3 +51,9 @@ impl<'a> Resource<'a> {
 		self.refresh();
 	}
 }
+
+impl<'a, T: AsRef<Path>> From<T> for Resource<'a> {
+	fn from(value: T) -> Self {
+		Resource::new(value.as_ref(), value.as_ref().parent().unwrap(), &[])
+	}
+}

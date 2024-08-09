@@ -49,6 +49,20 @@ pub mod tests {
 	use crate::{config::filters::AsFilter, resource::Resource};
 
 	#[test]
+	fn empty_list() {
+		let extension = Extension { extensions: vec![] };
+		let path = Resource::from_str("$HOME/Downloads/test.pdf").unwrap();
+		assert!(extension.matches(&path))
+	}
+	#[test]
+	fn negative_match() {
+		let extension = Extension {
+			extensions: vec!["!pdf".into()],
+		};
+		let path = Resource::from_str("$HOME/Downloads/test.pdf").unwrap();
+		assert!(!extension.matches(&path))
+	}
+	#[test]
 	fn single_match_pdf() {
 		let extension = Extension {
 			extensions: vec!["pdf".into()],
@@ -63,6 +77,14 @@ pub mod tests {
 		};
 		let path = Resource::from_str("$HOME/Downloads/test.pdf").unwrap();
 		assert!(extension.matches(&path))
+	}
+	#[test]
+	fn multiple_match_negative() {
+		let extension = Extension {
+			extensions: vec!["!pdf".into(), "doc".into(), "docx".into()],
+		};
+		let path = Resource::from_str("$HOME/Downloads/test.pdf").unwrap();
+		assert!(!extension.matches(&path))
 	}
 
 	#[test]

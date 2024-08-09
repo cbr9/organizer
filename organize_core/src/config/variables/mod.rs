@@ -3,8 +3,6 @@ use serde::Deserialize;
 use simple::SimpleVariable;
 use tera::Context;
 
-use super::filters::regex::RegularExpression;
-
 pub mod regex;
 pub mod simple;
 
@@ -12,7 +10,7 @@ pub trait AsVariable {
 	fn register(&self, context: &mut Context);
 }
 
-#[derive(Deserialize, Clone, Debug)]
+#[derive(Deserialize, PartialEq, Clone, Debug)]
 #[serde(tag = "type", rename_all(deserialize = "lowercase"))]
 pub enum Variable {
 	Simple(SimpleVariable),
