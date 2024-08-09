@@ -87,9 +87,6 @@ impl AsFilter for Filename {
 					matches
 				})
 		};
-		dbg!(&startswith);
-		dbg!(&endswith);
-		dbg!(&contains);
 		startswith && endswith && contains
 	}
 }
@@ -180,6 +177,39 @@ mod tests {
 			contains: vec!["ES".into()],
 			startswith: vec!["t".into()],
 			endswith: vec!["df".into()],
+		};
+		assert!(filename.matches(&path))
+	}
+	#[test]
+	fn match_multiple_conditions_some_negative() {
+		let path = Resource::from_str("$HOME/Downloads/tESt.pdf").unwrap();
+		let filename = Filename {
+			case_sensitive: true,
+			contains: vec!["ES".into()],
+			startswith: vec!["t".into()],
+			endswith: vec!["!df".into()],
+		};
+		assert!(!filename.matches(&path))
+	}
+	#[test]
+	fn match_multiple_conditions_some_negative_2() {
+		let path = Resource::from_str("$HOME/Downloads/tESt.pdf").unwrap();
+		let filename = Filename {
+			case_sensitive: true,
+			contains: vec!["!ES".into(), "ES".into()],
+			startswith: vec!["t".into()],
+			endswith: vec!["!df".into()],
+		};
+		assert!(!filename.matches(&path))
+	}
+	#[test]
+	fn match_multiple_conditions_some_negative_3() {
+		let path = Resource::from_str("$HOME/Downloads/tESt.txt").unwrap();
+		let filename = Filename {
+			case_sensitive: true,
+			contains: vec!["!ES".into(), "ES".into()],
+			startswith: vec!["t".into()],
+			endswith: vec!["!df".into()],
 		};
 		assert!(filename.matches(&path))
 	}

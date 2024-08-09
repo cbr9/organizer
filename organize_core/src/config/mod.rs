@@ -262,6 +262,11 @@ mod tests {
 			actions = []
 			filters = []
 			folders = []
+
+			[[rules]]
+			actions = []
+			filters = []
+			folders = []
 		};
 		static ref CONFIG: Config = toml::from_str(&TOML.to_string()).unwrap();
 	}
@@ -308,7 +313,7 @@ mod tests {
 			.copied()
 			.cloned()
 			.collect_vec();
-		let expected_rules = CONFIG.rules.get(1..).unwrap();
+		let expected_rules = CONFIG.rules.get(1..=3).unwrap();
 		assert_eq!(found_rules, expected_rules)
 	}
 	#[test]
