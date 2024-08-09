@@ -12,7 +12,7 @@ use organize_core::{
 	config::{actions::ActionPipeline, filters::AsFilter, options::Options, rule::Rule, Config, CONFIG},
 	resource::Resource,
 };
-use tracing::{debug, error};
+use tracing::debug;
 
 use crate::Cmd;
 

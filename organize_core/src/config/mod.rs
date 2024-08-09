@@ -123,7 +123,7 @@ impl Config {
 		I::Item: AsRef<str>,
 	{
 		let chosen_tags: HashSet<String> = HashSet::from_iter(tags.into_iter().map(|s| s.as_ref().to_string()));
-		let all_tags: HashSet<String> = HashSet::from_iter(self.rules.iter().flat_map(|r| &r.tags).cloned());
+		let all_tags: HashSet<&String> = HashSet::from_iter(self.rules.iter().flat_map(|r| &r.tags));
 
 		let positive_tags: HashSet<String> = HashSet::from_iter(chosen_tags.iter().filter(|s| !s.starts_with('!')).cloned());
 		let negative_tags: HashSet<String> = HashSet::from_iter(
@@ -140,15 +140,14 @@ impl Config {
 			}
 		}
 
-		let positive: HashSet<String> = HashSet::from_iter(
+		let positive: HashSet<&String> = HashSet::from_iter(
 			self.rules
 				.iter()
 				.filter(|rule| positive_tags.iter().any(|tag| rule.tags.contains(tag)))
-				.map(|r| r.tags.clone())
-				.flatten(),
+				.flat_map(|r| &r.tags),
 		);
 
-		let negative: HashSet<String> = HashSet::from_iter(
+		let negative: HashSet<&String> = HashSet::from_iter(
 			self.rules
 				.iter()
 				.filter(|rule| {
@@ -157,11 +156,10 @@ impl Config {
 					}
 					negative_tags.iter().all(|tag| !rule.tags.contains(tag))
 				})
-				.map(|r| r.tags.clone())
-				.flatten(),
+				.flat_map(|r| &r.tags),
 		);
 
-		let tags = positive.union(&negative).collect_vec();
+		let tags = positive.union(&negative).copied().collect_vec();
 		self.rules
 			.iter()
 			.filter(|r| r.tags.iter().any(|tag| tags.contains(&tag)))
@@ -186,7 +184,7 @@ impl Config {
 			}
 		}
 
-		let positive: HashSet<String> = HashSet::from_iter(
+		let positive: HashSet<&String> = HashSet::from_iter(
 			self.rules
 				.iter()
 				.filter(|rule| {
@@ -194,11 +192,10 @@ impl Config {
 						.iter()
 						.any(|id| rule.id.as_ref().is_some_and(|rule_id| *rule_id == *id))
 				})
-				.map(|r| r.id.clone())
-				.flatten(),
+				.filter_map(|r| r.id.as_ref()),
 		);
 
-		let negative: HashSet<String> = HashSet::from_iter(
+		let negative: HashSet<&String> = HashSet::from_iter(
 			self.rules
 				.iter()
 				.filter(|rule| {
@@ -209,11 +206,10 @@ impl Config {
 						.iter()
 						.all(|id| rule.id.as_ref().is_some_and(|rule_id| *rule_id != *id))
 				})
-				.map(|r| r.id.clone())
-				.flatten(),
+				.flat_map(|r| r.id.as_ref()),
 		);
 
-		let ids = positive.union(&negative).collect_vec();
+		let ids = positive.union(&negative).copied().collect_vec();
 		self.rules
 			.iter()
 			.filter(|r| r.id.as_ref().is_some_and(|id| ids.contains(&id)))
