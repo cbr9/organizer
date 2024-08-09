@@ -9,7 +9,8 @@ use super::AsFilter;
 pub struct Empty;
 
 impl AsFilter for Empty {
-	fn matches(&self, res: &Resource) -> bool {
+	#[tracing::instrument(ret, level = "debug")]
+	fn filter(&self, res: &Resource) -> bool {
 		let path = &res.path;
 		if path.is_file() {
 			std::fs::metadata(path).map(|md| md.len() == 0).unwrap_or(false)
@@ -36,7 +37,7 @@ mod tests {
 		let path = file.path();
 		let res = Resource::from(path);
 		let action = Empty;
-		assert!(action.matches(&res))
+		assert!(action.filter(&res))
 	}
 	#[test]
 	fn test_dir_positive() {
@@ -44,7 +45,7 @@ mod tests {
 		let path = dir.path();
 		let res = Resource::from(path);
 		let action = Empty;
-		assert!(action.matches(&res))
+		assert!(action.filter(&res))
 	}
 	#[test]
 	fn test_file_negative() {
@@ -53,7 +54,7 @@ mod tests {
 		let path = file.path();
 		let res = Resource::from(path);
 		let action = Empty;
-		assert!(!action.matches(&res))
+		assert!(!action.filter(&res))
 	}
 	#[test]
 	fn test_dir_negative() {
@@ -61,6 +62,6 @@ mod tests {
 		let path = dir.path().parent().unwrap();
 		let res = Resource::from(path);
 		let action = Empty;
-		assert!(!action.matches(&res))
+		assert!(!action.filter(&res))
 	}
 }

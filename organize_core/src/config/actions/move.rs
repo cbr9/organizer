@@ -15,16 +15,14 @@ pub struct Move {
 	pub if_exists: ConflictOption,
 }
 
-impl<'a> AsAction<'a> for Move {
-	const CONFIG: ActionConfig<'a> = ActionConfig {
-		requires_dest: true,
-		log_hint: "MOVE",
-	};
+impl AsAction for Move {
+	const CONFIG: ActionConfig = ActionConfig { requires_dest: true };
 
 	fn get_target_path(&self, src: &Resource) -> Result<Option<PathBuf>> {
 		prepare_target_path(&self.if_exists, src, &self.to, true)
 	}
 
+	#[tracing::instrument(ret(level = "info"), err, level = "debug", skip(dest))]
 	fn execute<T: AsRef<Path>>(&self, src: &Resource, dest: Option<T>, dry_run: bool) -> Result<Option<PathBuf>> {
 		let dest = dest.unwrap();
 		if !dry_run {

@@ -17,7 +17,8 @@ pub struct Filename {
 }
 
 impl AsFilter for Filename {
-	fn matches(&self, res: &Resource) -> bool {
+	#[tracing::instrument(ret, level = "debug")]
+	fn filter(&self, res: &Resource) -> bool {
 		let filename = res.path.file_name().unwrap_or_default().to_string_lossy();
 
 		if filename.is_empty() {
@@ -104,7 +105,7 @@ mod tests {
 			startswith: vec!["TE".into()],
 			..Default::default()
 		};
-		assert!(filename.matches(&path))
+		assert!(filename.filter(&path))
 	}
 
 	#[test]
@@ -114,7 +115,7 @@ mod tests {
 			endswith: vec!["DF".into()],
 			..Default::default()
 		};
-		assert!(filename.matches(&path))
+		assert!(filename.filter(&path))
 	}
 
 	#[test]
@@ -124,7 +125,7 @@ mod tests {
 			contains: vec!["ES".into()],
 			..Default::default()
 		};
-		assert!(filename.matches(&path))
+		assert!(filename.filter(&path))
 	}
 
 	#[test]
@@ -135,7 +136,7 @@ mod tests {
 			startswith: vec!["TE".into()],
 			..Default::default()
 		};
-		assert!(!filename.matches(&path))
+		assert!(!filename.filter(&path))
 	}
 
 	#[test]
@@ -146,7 +147,7 @@ mod tests {
 			startswith: vec!["DF".into()],
 			..Default::default()
 		};
-		assert!(!filename.matches(&path))
+		assert!(!filename.filter(&path))
 	}
 
 	#[test]
@@ -157,7 +158,7 @@ mod tests {
 			contains: vec!["ES".into()],
 			..Default::default()
 		};
-		assert!(!filename.matches(&path))
+		assert!(!filename.filter(&path))
 	}
 	#[test]
 	fn match_containing_case_sensitive() {
@@ -167,7 +168,7 @@ mod tests {
 			contains: vec!["ES".into()],
 			..Default::default()
 		};
-		assert!(filename.matches(&path))
+		assert!(filename.filter(&path))
 	}
 	#[test]
 	fn match_multiple_conditions_case_sensitive() {
@@ -178,7 +179,7 @@ mod tests {
 			startswith: vec!["t".into()],
 			endswith: vec!["df".into()],
 		};
-		assert!(filename.matches(&path))
+		assert!(filename.filter(&path))
 	}
 	#[test]
 	fn match_multiple_conditions_some_negative() {
@@ -189,7 +190,7 @@ mod tests {
 			startswith: vec!["t".into()],
 			endswith: vec!["!df".into()],
 		};
-		assert!(!filename.matches(&path))
+		assert!(!filename.filter(&path))
 	}
 	#[test]
 	fn match_multiple_conditions_some_negative_2() {
@@ -200,7 +201,7 @@ mod tests {
 			startswith: vec!["t".into()],
 			endswith: vec!["!df".into()],
 		};
-		assert!(!filename.matches(&path))
+		assert!(!filename.filter(&path))
 	}
 	#[test]
 	fn match_multiple_conditions_some_negative_3() {
@@ -211,6 +212,6 @@ mod tests {
 			startswith: vec!["t".into()],
 			endswith: vec!["!df".into()],
 		};
-		assert!(filename.matches(&path))
+		assert!(filename.filter(&path))
 	}
 }

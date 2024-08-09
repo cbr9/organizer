@@ -2,6 +2,7 @@ use crate::{config::filters::AsFilter, resource::Resource, templates::Template};
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use serde::{Deserialize, Deserializer};
 use std::{convert::TryFrom, ops::Deref, str::FromStr};
+use tracing::{event, info, Level};
 
 #[derive(PartialEq, Deserialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -61,7 +62,8 @@ impl TryFrom<String> for RegularExpression {
 }
 
 impl AsFilter for RegularExpression {
-	fn matches(&self, res: &Resource) -> bool {
+	#[tracing::instrument(ret, level = "debug")]
+	fn filter(&self, res: &Resource) -> bool {
 		let input = self.input.render(&res.context).unwrap();
 		let mut matches = self.pattern.is_match(&input);
 		if self.negate {
@@ -72,8 +74,8 @@ impl AsFilter for RegularExpression {
 }
 
 impl AsFilter for Regex {
-	fn matches(&self, res: &Resource) -> bool {
-		self.patterns.par_iter().any(|f| f.matches(res))
+	fn filter(&self, res: &Resource) -> bool {
+		self.patterns.par_iter().any(|f| f.filter(res))
 	}
 }
 
@@ -101,20 +103,20 @@ mod tests {
 	fn match_single() {
 		let regex = Regex::try_from(vec![r".*unsplash.*"]).unwrap();
 		let path = Resource::from_str("$HOME/Pictures/test_unsplash_img.jpg").unwrap();
-		assert!(regex.matches(&path))
+		assert!(regex.filter(&path))
 	}
 
 	#[test]
 	fn match_multiple() {
 		let regex = Regex::try_from(vec![r".*unsplash.*", r"\w"]).unwrap();
 		let path = Resource::from_str("$HOME/Pictures/test_unsplash_img.jpg").unwrap();
-		assert!(regex.matches(&path))
+		assert!(regex.filter(&path))
 	}
 
 	#[test]
 	fn no_match_multiple() {
 		let regex = Regex::try_from(vec![r".*unsplash.*", r"\d"]).unwrap();
 		let path = Resource::from_str("$HOME/Documents/deep_learning.pdf").unwrap();
-		assert!(!regex.matches(&path))
+		assert!(!regex.filter(&path))
 	}
 }

@@ -3,7 +3,6 @@ use itertools::Itertools;
 use once_cell::sync::OnceCell;
 use rule::Rule;
 use std::{
-	borrow::Cow,
 	collections::HashSet,
 	iter::FromIterator,
 	path::{Path, PathBuf},

@@ -15,7 +15,8 @@ pub enum ConflictOption {
 }
 
 impl ConflictOption {
-	pub fn resolve_naming_conflict<T: AsRef<Path>>(&self, target_path: T) -> Option<PathBuf> {
+	#[tracing::instrument(ret, level = "debug")]
+	pub fn resolve_naming_conflict<T: AsRef<Path> + std::fmt::Debug>(&self, target_path: T) -> Option<PathBuf> {
 		use ConflictOption::*;
 		let mut path = target_path.as_ref().to_path_buf();
 		if !path.exists() {

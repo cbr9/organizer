@@ -9,13 +9,11 @@ use super::{script::ActionConfig, AsAction};
 #[derive(Debug, Clone, Deserialize, Default, PartialEq, Eq)]
 pub struct Delete;
 
-impl<'a> AsAction<'a> for Delete {
-	const CONFIG: ActionConfig<'a> = ActionConfig {
-		requires_dest: false,
-		log_hint: "DELETE",
-	};
+impl AsAction for Delete {
+	const CONFIG: ActionConfig = ActionConfig { requires_dest: false };
 
-	fn execute<T: AsRef<Path>>(&self, src: &Resource, _: Option<T>, dry_run: bool) -> Result<Option<PathBuf>> {
+	#[tracing::instrument(ret(level = "info"), err, level = "debug", skip(_dest))]
+	fn execute<T: AsRef<Path>>(&self, src: &Resource, _dest: Option<T>, dry_run: bool) -> Result<Option<PathBuf>> {
 		if !dry_run {
 			std::fs::remove_file(&src.path).with_context(|| format!("could not delete {}", &src.path.display()))?;
 		}

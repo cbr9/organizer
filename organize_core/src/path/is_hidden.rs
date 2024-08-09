@@ -1,17 +1,23 @@
-use std::path::Path;
+use std::{convert::Infallible, path::Path};
+
+use anyhow::{Error, Result};
+use tracing::error_span;
 
 pub trait IsHidden {
-	fn is_hidden(&self) -> bool;
+	type Err;
+	fn is_hidden(&self) -> Result<bool, Self::Err>;
 }
 
 #[cfg(target_family = "unix")]
 impl IsHidden for Path {
-	fn is_hidden(&self) -> bool {
+	fn is_hidden(&self) -> Result<bool, Self::Err> {
 		match self.file_name() {
-			None => false,
-			Some(filename) => filename.to_string_lossy().starts_with('.'),
+			None => Ok(false),
+			Some(filename) => Ok(filename.to_string_lossy().starts_with('.')),
 		}
 	}
+
+	type Err = Infallible;
 }
 
 #[cfg(target_family = "windows")]
@@ -28,7 +34,7 @@ impl IsHidden for Path {
 				}
 			}
 			Err(e) => {
-				log::error!("{}", e);
+				error!("{}", e);
 				false
 			}
 		}
@@ -42,12 +48,13 @@ mod tests {
 	#[test]
 	fn check_hidden() {
 		let path = Path::new("/home/user/.testfile");
-		assert!(path.is_hidden())
+		assert!(path.is_hidden().unwrap())
 	}
 
+	#[cfg(target_family = "unix")]
 	#[test]
 	fn not_hidden() {
 		let path = Path::new("/home/user/testfile");
-		assert!(!path.is_hidden())
+		assert!(!path.is_hidden().unwrap())
 	}
 }

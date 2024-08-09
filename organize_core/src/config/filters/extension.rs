@@ -12,7 +12,7 @@ pub struct Extension {
 }
 
 impl AsFilter for Extension {
-	fn matches(&self, res: &Resource) -> bool {
+	fn filter(&self, res: &Resource) -> bool {
 		let extension = res.path.extension().unwrap_or_default().to_string_lossy();
 		if extension.is_empty() {
 			return false;
@@ -52,7 +52,7 @@ pub mod tests {
 	fn empty_list() {
 		let extension = Extension { extensions: vec![] };
 		let path = Resource::from_str("$HOME/Downloads/test.pdf").unwrap();
-		assert!(extension.matches(&path))
+		assert!(extension.filter(&path))
 	}
 	#[test]
 	fn negative_match() {
@@ -60,7 +60,7 @@ pub mod tests {
 			extensions: vec!["!pdf".into()],
 		};
 		let path = Resource::from_str("$HOME/Downloads/test.pdf").unwrap();
-		assert!(!extension.matches(&path))
+		assert!(!extension.filter(&path))
 	}
 	#[test]
 	fn single_match_pdf() {
@@ -68,7 +68,7 @@ pub mod tests {
 			extensions: vec!["pdf".into()],
 		};
 		let path = Resource::from_str("$HOME/Downloads/test.pdf").unwrap();
-		assert!(extension.matches(&path))
+		assert!(extension.filter(&path))
 	}
 	#[test]
 	fn multiple_match_pdf() {
@@ -76,7 +76,7 @@ pub mod tests {
 			extensions: vec!["pdf".into(), "doc".into(), "docx".into()],
 		};
 		let path = Resource::from_str("$HOME/Downloads/test.pdf").unwrap();
-		assert!(extension.matches(&path))
+		assert!(extension.filter(&path))
 	}
 	#[test]
 	fn multiple_match_negative() {
@@ -84,7 +84,7 @@ pub mod tests {
 			extensions: vec!["!pdf".into(), "doc".into(), "docx".into()],
 		};
 		let path = Resource::from_str("$HOME/Downloads/test.pdf").unwrap();
-		assert!(!extension.matches(&path))
+		assert!(!extension.filter(&path))
 	}
 
 	#[test]
@@ -93,6 +93,6 @@ pub mod tests {
 			extensions: vec!["pdf".into(), "doc".into(), "docx".into()],
 		};
 		let path = Resource::from_str("$HOME/Downloads/test.jpg").unwrap();
-		assert!(!extension.matches(&path))
+		assert!(!extension.filter(&path))
 	}
 }

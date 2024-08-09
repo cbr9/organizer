@@ -31,16 +31,14 @@ impl Default for ContinueWith {
 	}
 }
 
-impl<'a> AsAction<'a> for Symlink {
-	const CONFIG: ActionConfig<'a> = ActionConfig {
-		requires_dest: true,
-		log_hint: "SYMLINK",
-	};
+impl AsAction for Symlink {
+	const CONFIG: ActionConfig = ActionConfig { requires_dest: true };
 
 	fn get_target_path(&self, src: &Resource) -> Result<Option<PathBuf>> {
 		prepare_target_path(&self.if_exists, src, &self.to, true)
 	}
 
+	#[tracing::instrument(ret(level = "info"), err, level = "debug", skip(dest))]
 	fn execute<T: AsRef<Path>>(&self, src: &Resource, dest: Option<T>, dry_run: bool) -> Result<Option<PathBuf>> {
 		let dest = dest.unwrap();
 		if !dry_run {

@@ -1,6 +1,7 @@
 use itertools::Itertools;
 use serde::Deserialize;
 use std::{
+	fmt::Debug,
 	fs::{self, File},
 	path::{Path, PathBuf},
 };
@@ -17,16 +18,14 @@ pub struct Extract {
 	pub if_exists: ConflictOption,
 }
 
-impl<'a> AsAction<'a> for Extract {
-	const CONFIG: ActionConfig<'a> = ActionConfig {
-		requires_dest: true,
-		log_hint: "EXTRACT",
-	};
+impl AsAction for Extract {
+	const CONFIG: ActionConfig = ActionConfig { requires_dest: true };
 
 	fn get_target_path(&self, src: &Resource) -> anyhow::Result<Option<PathBuf>> {
 		prepare_target_path(&self.if_exists, src, &self.to, false)
 	}
 
+	#[tracing::instrument(ret(level = "info"), err, level = "debug", skip(dest))]
 	fn execute<T: AsRef<Path>>(&self, src: &Resource, dest: Option<T>, dry_run: bool) -> anyhow::Result<Option<std::path::PathBuf>> {
 		let dest = dest.unwrap().as_ref().to_path_buf();
 		if !dry_run {

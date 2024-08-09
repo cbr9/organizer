@@ -1,8 +1,7 @@
 use clap::{Parser, Subcommand};
-use organize_core::logger::Logger;
+use tracing::Level;
 
-use crate::cmd::edit::Edit;
-use crate::cmd::run::Run;
+use crate::cmd::{edit::Edit, run::Run};
 
 mod edit;
 mod run;
@@ -18,9 +17,8 @@ enum Command {
 pub struct App {
 	#[command(subcommand)]
 	command: Command,
-	/// Do not print colored logs
-	#[arg(long, default_value_t = false)]
-	pub(crate) no_color: bool,
+	#[arg(long, short = 'v')]
+	verbose: bool,
 }
 
 pub trait Cmd {
@@ -29,7 +27,12 @@ pub trait Cmd {
 
 impl Cmd for App {
 	fn run(self) -> anyhow::Result<()> {
-		Logger::setup(self.no_color)?;
+		let format = tracing_subscriber::fmt::format().pretty();
+		tracing_subscriber::fmt()
+			.event_format(format)
+			.with_max_level(Level::DEBUG)
+			.init();
+
 		match self.command {
 			Command::Run(cmd) => cmd.run(),
 			Command::Edit(edit) => edit.run(),

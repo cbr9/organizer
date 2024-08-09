@@ -7,11 +7,7 @@ use std::{
 use serde::Deserialize;
 use tempfile;
 
-use crate::{
-	config::filters::AsFilter,
-	resource::Resource,
-	templates::{Template},
-};
+use crate::{config::filters::AsFilter, resource::Resource, templates::Template};
 use anyhow::{bail, Result};
 
 use super::AsAction;
@@ -25,18 +21,16 @@ pub struct Script {
 	content: Template,
 }
 
-pub struct ActionConfig<'a> {
+#[derive(Debug)]
+pub struct ActionConfig {
 	pub requires_dest: bool,
-	pub log_hint: &'a str,
 }
 
-impl<'a> AsAction<'a> for Script {
-	const CONFIG: ActionConfig<'a> = ActionConfig {
-		requires_dest: true,
-		log_hint: "SCRIPT",
-	};
+impl AsAction for Script {
+	const CONFIG: ActionConfig = ActionConfig { requires_dest: true };
 
-	fn execute<T: AsRef<Path>>(&self, src: &Resource, _: Option<T>, dry_run: bool) -> Result<Option<PathBuf>> {
+	#[tracing::instrument(ret(level = "info"), err, level = "debug", skip(_dest))]
+	fn execute<T: AsRef<Path>>(&self, src: &Resource, _dest: Option<T>, dry_run: bool) -> Result<Option<PathBuf>> {
 		if dry_run {
 			bail!("Cannot run scripted actions during a dry run")
 		}
@@ -48,7 +42,7 @@ impl<'a> AsAction<'a> for Script {
 }
 
 impl AsFilter for Script {
-	fn matches(&self, res: &Resource) -> bool {
+	fn filter(&self, res: &Resource) -> bool {
 		self.run_script(res)
 			.map(|output| {
 				// get the last line in stdout and parse it as a boolean
@@ -108,6 +102,6 @@ mod tests {
 			script = Script::new("python3", content);
 			script.run_script(&src).unwrap()
 		});
-		assert!(script.matches(&src))
+		assert!(script.filter(&src))
 	}
 }

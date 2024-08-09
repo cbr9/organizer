@@ -52,27 +52,28 @@ pub enum Filter {
 }
 
 pub trait AsFilter {
-	fn matches(&self, res: &Resource) -> bool;
+	fn filter(&self, res: &Resource) -> bool;
 }
 
 impl AsFilter for Filter {
-	fn matches(&self, res: &Resource) -> bool {
+	#[tracing::instrument(ret, level = "debug")]
+	fn filter(&self, res: &Resource) -> bool {
 		match self {
-			Filter::AllOf { filters } => filters.par_iter().all(|f| f.matches(res)),
-			Filter::AnyOf { filters } => filters.par_iter().any(|f| f.matches(res)),
-			Filter::NoneOf { filters } => filters.par_iter().all(|f| !f.matches(res)),
-			Filter::Empty(filter) => filter.matches(res),
-			Filter::Extension(filter) => filter.matches(res),
-			Filter::Filename(filter) => filter.matches(res),
-			Filter::Mime(filter) => filter.matches(res),
-			Filter::Regex(filter) => filter.matches(res),
-			Filter::Script(filter) => filter.matches(res),
-			Filter::NotEmpty(filter) => !filter.matches(res),
-			Filter::NotExtension(filter) => !filter.matches(res),
-			Filter::NotFilename(filter) => !filter.matches(res),
-			Filter::NotMime(filter) => !filter.matches(res),
-			Filter::NotRegex(filter) => !filter.matches(res),
-			Filter::NotScript(filter) => !filter.matches(res),
+			Filter::AllOf { filters } => filters.par_iter().all(|f| f.filter(res)),
+			Filter::AnyOf { filters } => filters.par_iter().any(|f| f.filter(res)),
+			Filter::NoneOf { filters } => filters.par_iter().all(|f| !f.filter(res)),
+			Filter::Empty(filter) => filter.filter(res),
+			Filter::Extension(filter) => filter.filter(res),
+			Filter::Filename(filter) => filter.filter(res),
+			Filter::Mime(filter) => filter.filter(res),
+			Filter::Regex(filter) => filter.filter(res),
+			Filter::Script(filter) => filter.filter(res),
+			Filter::NotEmpty(filter) => !filter.filter(res),
+			Filter::NotExtension(filter) => !filter.filter(res),
+			Filter::NotFilename(filter) => !filter.filter(res),
+			Filter::NotMime(filter) => !filter.filter(res),
+			Filter::NotRegex(filter) => !filter.filter(res),
+			Filter::NotScript(filter) => !filter.filter(res),
 		}
 	}
 }
@@ -81,8 +82,9 @@ impl AsFilter for Filter {
 pub struct Filters(pub(crate) Vec<Filter>);
 
 impl AsFilter for Filters {
-	fn matches(&self, res: &Resource) -> bool {
-		self.par_iter().all(|filter| filter.matches(res))
+	#[tracing::instrument(ret, level = "debug")]
+	fn filter(&self, res: &Resource) -> bool {
+		self.par_iter().all(|filter| filter.filter(res))
 	}
 }
 
@@ -98,7 +100,7 @@ mod tests {
 			Filter::Regex(Regex::try_from(vec![".*unsplash.*"]).unwrap()),
 			Filter::Regex(Regex::try_from(vec![".*\\.jpg"]).unwrap()),
 		]);
-		assert!(filters.matches(&Resource::from_str("$HOME/Downloads/unsplash_image.jpg").unwrap()));
-		assert!(!filters.matches(&Resource::from_str("$HOME/Downloads/unsplash_doc.pdf").unwrap()));
+		assert!(filters.filter(&Resource::from_str("$HOME/Downloads/unsplash_image.jpg").unwrap()));
+		assert!(!filters.filter(&Resource::from_str("$HOME/Downloads/unsplash_doc.pdf").unwrap()));
 	}
 }

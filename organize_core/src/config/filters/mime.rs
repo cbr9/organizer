@@ -65,7 +65,8 @@ impl<T: ToString> TryFrom<Vec<T>> for Mime {
 }
 
 impl AsFilter for Mime {
-	fn matches(&self, res: &Resource) -> bool {
+	#[tracing::instrument(ret, level = "debug")]
+	fn filter(&self, res: &Resource) -> bool {
 		let guess = mime_guess::from_path(&res.path).first_or_octet_stream();
 		self.types.iter().any(|mime| {
 			let mut matches = match (mime.type_(), mime.subtype()) {
@@ -89,15 +90,15 @@ mod tests {
 		let types = Mime::try_from(vec!["!image/*", "audio/*"]).unwrap();
 		let img = Resource::from_str("test.jpg").unwrap();
 		let audio = Resource::from_str("test.ogg").unwrap();
-		assert!(!types.matches(&img));
-		assert!(types.matches(&audio));
+		assert!(!types.filter(&img));
+		assert!(types.filter(&audio));
 	}
 	#[test]
 	fn test_match() {
 		let types = Mime::try_from(vec!["image/*", "audio/*"]).unwrap();
 		let img = Resource::from_str("test.jpg").unwrap();
 		let audio = Resource::from_str("test.ogg").unwrap();
-		assert!(types.matches(&img));
-		assert!(types.matches(&audio));
+		assert!(types.filter(&img));
+		assert!(types.filter(&audio));
 	}
 }

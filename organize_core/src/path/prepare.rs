@@ -11,13 +11,7 @@ pub fn prepare_target_path(if_exists: &ConflictOption, src: &Resource, dest: &Te
 	// if there are any placeholders in the destination, expand them
 
 	let path = &src.path;
-	let mut to = match dest.render(&src.context) {
-		Ok(str) => PathBuf::from(str).expand_user().clean(),
-		Err(e) => {
-			log::error!("{:?}", e);
-			bail!("something went wrong");
-		}
-	};
+	let mut to = dest.render(&src.context).map(|s| PathBuf::from(s).expand_user().clean())?;
 
 	if to.extension().is_none() || to.is_dir() || to.to_string_lossy().ends_with(MAIN_SEPARATOR) {
 		if with_extension {

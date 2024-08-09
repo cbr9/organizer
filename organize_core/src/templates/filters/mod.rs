@@ -52,7 +52,7 @@ impl tera::Filter for Extension {
 		let path = PathBuf::from(value);
 		let parent = match path.extension().and_then(|f| f.to_str()) {
 			Some(p) => p,
-			None => return Err(format!("No extension found for path {}", path.display()).into()),
+			None => return Err(tera::Error::msg(format!("No extension found for path {}", path.display()))),
 		};
 		Ok(to_value(parent)?)
 	}

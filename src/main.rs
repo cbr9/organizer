@@ -1,10 +1,9 @@
 use crate::cmd::{App, Cmd};
+use anyhow::Result;
 use clap::Parser;
 mod cmd;
 
-fn main() {
+fn main() -> Result<()> {
 	let app: App = App::parse();
-	if let Err(e) = app.run() {
-		log::error!("{:?}", e);
-	}
+	app.run()
 }

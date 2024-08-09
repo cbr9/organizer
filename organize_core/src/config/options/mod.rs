@@ -1,10 +1,15 @@
 use crate::path::IsHidden;
 use anyhow::{Context, Result};
+use num_traits::Float;
+use tracing::trace;
 
 use crate::utils::DefaultOpt;
 
 use serde::Deserialize;
-use std::path::{Path, PathBuf};
+use std::{
+	fmt::Debug,
+	path::{Path, PathBuf},
+};
 use walkdir::WalkDir;
 
 use super::{folders::Folder, Config, Rule};
@@ -69,10 +74,13 @@ impl Options {
 		let home = &dirs::home_dir().context("unable to find home directory")?;
 		let max_depth = if path == home { 1.0 } else { Self::max_depth(config, rule, folder) };
 		let min_depth = if path == home { 1.0 } else { Self::min_depth(config, rule, folder) };
-		Ok(WalkDir::new(path).min_depth(min_depth as usize).max_depth(max_depth as usize))
+		Ok(WalkDir::new(path)
+			.min_depth(min_depth.max(1.0) as usize)
+			.max_depth(max_depth as usize))
 	}
 
-	pub fn prefilter<T: AsRef<Path>>(config: &Config, rule: &Rule, folder: &Folder, path: T) -> bool {
+	#[tracing::instrument(ret, level = "debug", skip(config, rule, folder))]
+	pub fn prefilter<T: AsRef<Path> + Debug>(config: &Config, rule: &Rule, folder: &Folder, path: T) -> bool {
 		let mut excluded = Self::excluded(config, rule, folder);
 		if excluded.is_empty() {
 			return true;
@@ -88,13 +96,16 @@ impl Options {
 		})
 	}
 
-	pub fn postfilter<T: AsRef<Path>>(config: &Config, rule: &Rule, folder: &Folder, path: T) -> bool {
+	#[tracing::instrument(ret, level = "debug", skip(config, rule, folder))]
+	pub fn postfilter<T: AsRef<Path> + Debug>(config: &Config, rule: &Rule, folder: &Folder, path: T) -> bool {
 		let path = path.as_ref();
 
 		if path.is_file() && Self::targets(config, rule, folder) == Targets::Dir {
+			tracing::debug!("{} is not a directory", path.display());
 			return false;
 		}
 		if path.is_dir() && Self::targets(config, rule, folder) == Targets::File {
+			tracing::debug!("{} is not a file", path.display());
 			return false;
 		}
 		// filter by partial_files option
@@ -111,7 +122,7 @@ impl Options {
 
 			// filter by hidden_files option
 			let allows_hidden_files = Self::hidden_files(config, rule, folder);
-			let is_hidden = path.is_hidden();
+			let is_hidden = path.is_hidden().unwrap();
 			if is_hidden && !allows_hidden_files {
 				return false;
 			}

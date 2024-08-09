@@ -8,7 +8,7 @@ use tera::Context;
 
 use crate::config::variables::{AsVariable, Variable};
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct Resource<'a> {
 	pub context: Context,
 	variables: &'a [Variable],

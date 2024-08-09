@@ -6,13 +6,13 @@ use std::{
 
 use anyhow::Result;
 use clap::{Parser, ValueHint};
-use log::{debug, error, trace};
 use rayon::iter::{IntoParallelRefMutIterator, ParallelIterator};
 
 use organize_core::{
 	config::{actions::ActionPipeline, filters::AsFilter, options::Options, rule::Rule, Config, CONFIG},
 	resource::Resource,
 };
+use tracing::{debug, error};
 
 use crate::Cmd;
 
@@ -31,6 +31,7 @@ pub struct Run {
 }
 
 impl Cmd for Run {
+	#[tracing::instrument(skip(self))]
 	fn run(mut self) -> Result<()> {
 		let config = CONFIG.get_or_init(|| match self.config {
 			Some(ref path) => Config::new(path).expect("Could not parse config"),
@@ -56,7 +57,7 @@ impl Cmd for Run {
 					.filter_entry(|e| Options::prefilter(config, rule, folder, e.path()))
 					.flatten()
 					.map(|e| Resource::new(e.path(), &location, &rule.variables))
-					.filter(|e| rule.filters.matches(e))
+					.filter(|e| rule.filters.filter(e))
 					.filter(|e| Options::postfilter(config, rule, folder, &e.path))
 					.collect::<Vec<_>>();
 
@@ -74,10 +75,7 @@ impl Cmd for Run {
 					'actions: for action in rule.actions.iter() {
 						let path = match action.run(entry, self.dry_run) {
 							Ok(path) => path,
-							Err(e) => {
-								error!("{}", e);
-								None
-							}
+							Err(_e) => None,
 						};
 
 						match path {

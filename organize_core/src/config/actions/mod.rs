@@ -29,12 +29,12 @@ pub trait ActionPipeline {
 	fn run(&self, src: &Resource, dry_run: bool) -> Result<Option<PathBuf>>;
 }
 
-impl<'a, T: AsAction<'a>> ActionPipeline for T {
+impl<T: AsAction> ActionPipeline for T {
 	#[allow(clippy::nonminimal_bool)]
 	fn run(&self, src: &Resource, dry_run: bool) -> Result<Option<PathBuf>> {
 		let dest = self.get_target_path(src)?;
 		let config = Self::CONFIG;
-		if (config.requires_dest && dest.is_some()) || !config.requires_dest {
+		if (config.requires_dest && dest.is_some()) || (!config.requires_dest && dest.is_none()) {
 			if config.requires_dest && dest.is_some() && &src.path == dest.as_ref().unwrap() {
 				return Ok(dest);
 			}
@@ -44,17 +44,7 @@ impl<'a, T: AsAction<'a>> ActionPipeline for T {
 				std::fs::create_dir_all(dest.parent().unwrap())?;
 			}
 
-			return match self.execute(src, dest.clone(), dry_run) {
-				Ok(new_path) => {
-					let hint = Self::get_hint(dry_run);
-					log::info!("({}) {}", hint, self.log_message(src, new_path.as_ref(), dry_run)?);
-					Ok(new_path)
-				}
-				Err(e) => {
-					log::error!("{:?}", e);
-					Err(e)
-				}
-			};
+			return self.execute(src, dest.clone(), dry_run);
 		}
 		Ok(None)
 	}
@@ -77,26 +67,10 @@ impl ActionPipeline for Action {
 	}
 }
 
-pub trait AsAction<'a> {
-	const CONFIG: ActionConfig<'a>;
+pub trait AsAction {
+	const CONFIG: ActionConfig;
 
 	fn execute<T: AsRef<Path>>(&self, src: &Resource, dest: Option<T>, dry_run: bool) -> Result<Option<PathBuf>>;
-
-	fn get_hint(dry_run: bool) -> String {
-		let config = &Self::CONFIG;
-		if !dry_run {
-			config.log_hint.to_string().to_uppercase()
-		} else {
-			format!("SIMULATED {}", config.log_hint)
-		}
-	}
-
-	fn log_message<T: AsRef<Path>>(&self, src: &Resource, dest: Option<&T>, _dry_run: bool) -> Result<String> {
-		match dest {
-			Some(path) => Ok(format!("{} -> {}", src.path.display(), path.as_ref().display())),
-			None => Ok(format!("{}", src.path.display())),
-		}
-	}
 
 	// required only for some actions
 	fn get_target_path(&self, _: &Resource) -> Result<Option<PathBuf>> {

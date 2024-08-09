@@ -26,13 +26,11 @@ impl Trash {
 	}
 }
 
-impl<'a> AsAction<'a> for Trash {
-	const CONFIG: ActionConfig<'a> = ActionConfig {
-		requires_dest: false,
-		log_hint: "TRASH",
-	};
+impl AsAction for Trash {
+	const CONFIG: ActionConfig = ActionConfig { requires_dest: false };
 
-	fn execute<T: AsRef<Path>>(&self, src: &Resource, _: Option<T>, dry_run: bool) -> Result<Option<PathBuf>> {
+	#[tracing::instrument(ret(level = "info"), err, level = "debug", skip(_dest))]
+	fn execute<T: AsRef<Path>>(&self, src: &Resource, _dest: Option<T>, dry_run: bool) -> Result<Option<PathBuf>> {
 		if !dry_run {
 			let to = Self::dir()?.join(src.path.file_name().unwrap());
 			let from = &src.path;
