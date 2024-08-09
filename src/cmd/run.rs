@@ -6,7 +6,7 @@ use std::{
 
 use anyhow::Result;
 use clap::{Parser, ValueHint};
-use log::error;
+use log::{debug, error, trace};
 use rayon::iter::{IntoParallelRefMutIterator, ParallelIterator};
 
 use organize_core::{
@@ -24,12 +24,14 @@ pub struct Run {
 	tags: Option<Vec<String>>,
 	#[arg(long, conflicts_with = "tags", help = "A space-separated list of tags used to filter out rules. To exclude an ID, prefix it with '!'", value_delimiter = ' ', num_args = 1..)]
 	ids: Option<Vec<String>>,
-	#[arg(long)]
+	#[arg(long, default_value_t = true, conflicts_with = "no_dry_run")]
 	dry_run: bool,
+	#[arg(long, conflicts_with = "dry_run")]
+	no_dry_run: bool,
 }
 
 impl Cmd for Run {
-	fn run(self) -> Result<()> {
+	fn run(mut self) -> Result<()> {
 		let config = CONFIG.get_or_init(|| match self.config {
 			Some(ref path) => Config::new(path).expect("Could not parse config"),
 			None => Config::new(Config::path().unwrap()).expect("Could not parse config"),
@@ -38,7 +40,12 @@ impl Cmd for Run {
 		let processed_files: Arc<Mutex<HashMap<PathBuf, &Rule>>> = Arc::new(Mutex::new(HashMap::new()));
 		let filtered_rules = config.filter_rules(self.tags.as_ref(), self.ids.as_ref());
 
-		for rule in filtered_rules.iter() {
+		if self.no_dry_run {
+			self.dry_run = false;
+		}
+
+		for (i, rule) in filtered_rules.iter().enumerate() {
+			debug!("now running rule {}", i);
 			processed_files.lock().unwrap().retain(|key, _| key.exists());
 			for folder in rule.folders.iter() {
 				let location = folder.path()?;
@@ -52,6 +59,10 @@ impl Cmd for Run {
 					.filter(|e| rule.filters.matches(e))
 					.filter(|e| Options::postfilter(config, rule, folder, &e.path))
 					.collect::<Vec<_>>();
+
+				if entries.is_empty() {
+					debug!("No targets match the filters in folder {}", location.display());
+				}
 
 				entries.par_iter_mut().for_each(|entry| {
 					if let Some(last_rule) = processed_files.lock().unwrap().get(&entry.path) {
