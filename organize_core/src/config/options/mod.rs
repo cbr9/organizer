@@ -1,7 +1,5 @@
 use crate::path::IsHidden;
 use anyhow::{Context, Result};
-use num_traits::Float;
-use tracing::trace;
 
 use crate::utils::DefaultOpt;
 

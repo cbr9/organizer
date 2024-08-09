@@ -1,7 +1,6 @@
 use std::{convert::Infallible, path::Path};
 
-use anyhow::{Error, Result};
-use tracing::error_span;
+use anyhow::Result;
 
 pub trait IsHidden {
 	type Err;

@@ -2,7 +2,6 @@ use crate::{config::filters::AsFilter, resource::Resource, templates::Template};
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use serde::{Deserialize, Deserializer};
 use std::{convert::TryFrom, ops::Deref, str::FromStr};
-use tracing::{event, info, Level};
 
 #[derive(PartialEq, Deserialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
