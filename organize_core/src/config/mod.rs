@@ -124,33 +124,48 @@ impl Config {
 		I::Item: AsRef<str>,
 	{
 		let chosen_tags: HashSet<String> = HashSet::from_iter(tags.into_iter().map(|s| s.as_ref().to_string()));
-		let all_tags = self.rules.iter().flat_map(|r| &r.tags).collect_vec();
+		let all_tags: HashSet<String> = HashSet::from_iter(self.rules.iter().flat_map(|r| &r.tags).cloned());
+
+		let positive_tags: HashSet<String> = HashSet::from_iter(chosen_tags.iter().filter(|s| !s.starts_with('!')).cloned());
+		let negative_tags: HashSet<String> = HashSet::from_iter(
+			chosen_tags
+				.iter()
+				.filter(|s| s.starts_with('!'))
+				.map(|s| s.replacen('!', "", 1)),
+		);
 
 		for tag in chosen_tags.iter() {
-			if !all_tags.contains(&tag) && !all_tags.contains(&&tag.replacen('!', "", 1)) {
+			if !all_tags.contains(tag) && !all_tags.contains(&tag.replacen('!', "", 1)) {
 				println!("no tag named {}", tag);
 				return vec![];
 			}
 		}
 
+		let positive: HashSet<String> = HashSet::from_iter(
+			self.rules
+				.iter()
+				.filter(|rule| positive_tags.iter().any(|tag| rule.tags.contains(tag)))
+				.map(|r| r.tags.clone())
+				.flatten(),
+		);
+
+		let negative: HashSet<String> = HashSet::from_iter(
+			self.rules
+				.iter()
+				.filter(|rule| {
+					if negative_tags.is_empty() {
+						return false;
+					}
+					negative_tags.iter().all(|tag| !rule.tags.contains(tag))
+				})
+				.map(|r| r.tags.clone())
+				.flatten(),
+		);
+
+		let tags = positive.union(&negative).collect_vec();
 		self.rules
 			.iter()
-			.filter(|rule| {
-				chosen_tags.iter().any(|tag| {
-					let mut tag = Cow::Borrowed(tag);
-					let mut negate = false;
-					if tag.starts_with('!') {
-						tag = Cow::Owned(tag.into_owned().replacen('!', "", 1));
-						negate = true;
-					}
-
-					let mut matches = rule.tags.contains(&*tag);
-					if negate {
-						matches = !matches;
-					}
-					matches
-				})
-			})
+			.filter(|r| r.tags.iter().any(|tag| tags.contains(&tag)))
 			.collect_vec()
 	}
 
@@ -160,34 +175,49 @@ impl Config {
 		I::Item: AsRef<str>,
 	{
 		let chosen_ids: HashSet<String> = HashSet::from_iter(ids.into_iter().map(|s| s.as_ref().to_string()));
-		let all_ids = self.rules.iter().flat_map(|r| &r.id).collect_vec();
+		let all_ids: HashSet<String> = HashSet::from_iter(self.rules.iter().flat_map(|r| &r.id).cloned());
+
+		let positive_ids: HashSet<String> = HashSet::from_iter(chosen_ids.iter().filter(|s| !s.starts_with('!')).cloned());
+		let negative_ids: HashSet<String> = HashSet::from_iter(chosen_ids.iter().filter(|s| s.starts_with('!')).map(|s| s.replacen('!', "", 1)));
 
 		for id in chosen_ids.iter() {
-			if !all_ids.contains(&id) && !all_ids.contains(&&id.replacen('!', "", 1)) {
+			if !all_ids.contains(id) && !all_ids.contains(&id.replacen('!', "", 1)) {
 				println!("no tag named {}", id);
 				return vec![];
 			}
 		}
 
+		let positive: HashSet<String> = HashSet::from_iter(
+			self.rules
+				.iter()
+				.filter(|rule| {
+					positive_ids
+						.iter()
+						.any(|id| rule.id.as_ref().is_some_and(|rule_id| *rule_id == *id))
+				})
+				.map(|r| r.id.clone())
+				.flatten(),
+		);
+
+		let negative: HashSet<String> = HashSet::from_iter(
+			self.rules
+				.iter()
+				.filter(|rule| {
+					if negative_ids.is_empty() {
+						return false;
+					}
+					negative_ids
+						.iter()
+						.all(|id| rule.id.as_ref().is_some_and(|rule_id| *rule_id != *id))
+				})
+				.map(|r| r.id.clone())
+				.flatten(),
+		);
+
+		let ids = positive.union(&negative).collect_vec();
 		self.rules
 			.iter()
-			.filter(|rule| {
-				chosen_ids.iter().any(|id| {
-					let mut id = Cow::Borrowed(id);
-					let mut negate = false;
-
-					if id.starts_with('!') {
-						id = Cow::Owned(id.to_mut().replacen('!', "", 1));
-						negate = true;
-					}
-
-					let mut matches = rule.id.as_ref().is_some_and(|rule_id| *rule_id == *id);
-					if negate {
-						matches = !matches;
-					}
-					matches
-				})
-			})
+			.filter(|r| r.id.as_ref().is_some_and(|id| ids.contains(&id)))
 			.collect_vec()
 	}
 }
@@ -204,7 +234,7 @@ mod tests {
 		static ref TOML: toml::Table = toml! {
 			[[rules]]
 			id = "test-rule-1"
-			tags = ["tag1", "always"]
+			tags = ["tag1"]
 
 			actions = []
 			filters = []
@@ -220,7 +250,14 @@ mod tests {
 
 			[[rules]]
 			id = "test-rule-3"
-			tags = ["tag2"]
+			tags = ["tag3"]
+
+			actions = []
+			filters = []
+			folders = []
+
+			[[rules]]
+			tags = ["tag3"]
 
 			actions = []
 			filters = []
@@ -232,13 +269,46 @@ mod tests {
 	#[test]
 	fn filter_rules_by_tag_positive() {
 		let found_rules = CONFIG.filter_rules_by_tag(["tag2"]).iter().map(|&r| r.clone()).collect_vec();
-		let expected_rules = CONFIG.rules.get(1..=2).unwrap();
+		let expected_rules = CONFIG.rules.get(1..=1).unwrap();
 		assert_eq!(found_rules, expected_rules)
 	}
 	#[test]
 	fn filter_rules_by_tag_negative() {
-		let found_rules = CONFIG.filter_rules_by_tag(["!tag2"]).iter().copied().cloned().collect_vec();
-		let expected_rules = CONFIG.rules.get(..=0).unwrap();
+		let found_rules = CONFIG.filter_rules_by_tag(["!tag2"]).iter().copied().collect_vec();
+		let expected_rules = vec![CONFIG.rules.first().unwrap(), CONFIG.rules.get(2).unwrap(), CONFIG.rules.get(3).unwrap()];
+		assert_eq!(found_rules, expected_rules)
+	}
+	#[test]
+	fn filter_rules_by_tag_multiple_positive() {
+		let found_rules = CONFIG
+			.filter_rules_by_tag(["tag2", "tag1"])
+			.iter()
+			.copied()
+			.cloned()
+			.collect_vec();
+		let expected_rules = CONFIG.rules.get(..=1).unwrap();
+		assert_eq!(found_rules, expected_rules)
+	}
+	#[test]
+	fn filter_rules_by_tag_multiple_negative() {
+		let found_rules = CONFIG
+			.filter_rules_by_tag(["!tag2", "!tag1"])
+			.iter()
+			.copied()
+			.cloned()
+			.collect_vec();
+		let expected_rules = CONFIG.rules.get(2..=3).unwrap();
+		assert_eq!(found_rules, expected_rules)
+	}
+	#[test]
+	fn filter_rules_by_tag_multiple_mixed() {
+		let found_rules = CONFIG
+			.filter_rules_by_tag(["tag2", "!tag1"])
+			.iter()
+			.copied()
+			.cloned()
+			.collect_vec();
+		let expected_rules = CONFIG.rules.get(1..).unwrap();
 		assert_eq!(found_rules, expected_rules)
 	}
 	#[test]
@@ -254,7 +324,7 @@ mod tests {
 			.iter()
 			.map(|r| (*r).clone())
 			.collect_vec();
-		let expected_rules = CONFIG.rules.get(1..).unwrap();
+		let expected_rules = CONFIG.rules.get(1..=2).unwrap();
 		assert_eq!(found_rules, expected_rules)
 	}
 	#[test]
@@ -284,7 +354,7 @@ mod tests {
 			.iter()
 			.copied()
 			.collect_vec();
-		let expected_rules = vec![CONFIG.rules.first().unwrap(), CONFIG.rules.last().unwrap()];
+		let expected_rules = vec![CONFIG.rules.first().unwrap(), CONFIG.rules.get(2).unwrap()];
 		assert_eq!(found_rules, expected_rules)
 	}
 }
