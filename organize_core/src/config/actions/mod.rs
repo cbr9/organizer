@@ -1,18 +1,26 @@
-use std::path::{Path, PathBuf};
+use std::fmt::Debug;
+use std::{
+	collections::HashMap,
+	iter::FromIterator,
+	path::{Path, PathBuf},
+};
 
+use anyhow::Result;
 use copy::Copy;
 use delete::Delete;
 use echo::Echo;
 use extract::Extract;
 use hardlink::Hardlink;
+use itertools::Itertools;
 use r#move::Move;
+use rayon::iter::{FromParallelIterator, IndexedParallelIterator, IntoParallelIterator, IntoParallelRefMutIterator, ParallelIterator};
 use script::{ActionConfig, Script};
 use serde::Deserialize;
 use symlink::Symlink;
 
 use crate::{config::actions::trash::Trash, resource::Resource};
 
-use anyhow::Result;
+use anyhow::Context;
 
 pub(crate) mod common;
 pub(crate) mod copy;
@@ -26,45 +34,8 @@ pub(crate) mod symlink;
 pub(crate) mod trash;
 
 pub trait ActionPipeline {
-	fn run(&self, src: &Resource, dry_run: bool) -> Result<Option<PathBuf>>;
-}
-
-impl<T: AsAction> ActionPipeline for T {
-	#[allow(clippy::nonminimal_bool)]
-	fn run(&self, src: &Resource, dry_run: bool) -> Result<Option<PathBuf>> {
-		let dest = self.get_target_path(src)?;
-		let config = Self::CONFIG;
-		if (config.requires_dest && dest.is_some()) || (!config.requires_dest && dest.is_none()) {
-			if config.requires_dest && dest.is_some() && &src.path == dest.as_ref().unwrap() {
-				return Ok(dest);
-			}
-
-			if !dry_run && dest.is_some() {
-				let dest = dest.clone().unwrap();
-				std::fs::create_dir_all(dest.parent().unwrap())?;
-			}
-
-			return self.execute(src, dest.clone(), dry_run);
-		}
-		Ok(None)
-	}
-}
-
-impl ActionPipeline for Action {
-	fn run(&self, src: &Resource, dry_run: bool) -> Result<Option<PathBuf>> {
-		use Action::*;
-		match self {
-			Copy(copy) => copy.run(src, dry_run),
-			Move(r#move) => r#move.run(src, dry_run),
-			Hardlink(hardlink) => hardlink.run(src, dry_run),
-			Symlink(symlink) => symlink.run(src, dry_run),
-			Delete(delete) => delete.run(src, dry_run),
-			Echo(echo) => echo.run(src, dry_run),
-			Trash(trash) => trash.run(src, dry_run),
-			Script(script) => script.run(src, dry_run),
-			Extract(extract) => extract.run(src, dry_run),
-		}
-	}
+	fn run(&self, resources: Vec<Resource>, dry_run: bool) -> Vec<Option<Resource>>;
+	fn run_atomic(&self, resource: Resource, dry_run: bool) -> Option<Resource>;
 }
 
 pub trait AsAction {
@@ -79,6 +50,80 @@ pub trait AsAction {
 			unimplemented!()
 		}
 		Ok(None)
+	}
+}
+
+impl<T: AsAction + Sync + Debug> ActionPipeline for T {
+	#[tracing::instrument]
+	#[allow(clippy::nonminimal_bool)]
+	fn run_atomic(&self, mut resource: Resource, dry_run: bool) -> Option<Resource> {
+		let config = Self::CONFIG;
+		let mut value = Ok(None);
+		if let Ok(dest) = self.get_target_path(&resource) {
+			if (config.requires_dest && dest.is_some()) || (!config.requires_dest && dest.is_none()) {
+				if config.requires_dest && dest.is_some() && &resource.path == dest.as_ref().unwrap() {
+					return Some(resource);
+				}
+
+				if !dry_run && dest.is_some() {
+					let dest = dest.as_ref()?;
+					let parent = dest.parent()?;
+					if let Err(e) = std::fs::create_dir_all(parent).with_context(|| format!("Could not create {}", parent.display())) {
+						tracing::error!("{:?}", e);
+						return None;
+					}
+				}
+
+				value = self.execute(&resource, dest, dry_run);
+			}
+		}
+
+		if let Ok(value) = value {
+			resource.set_path(value?);
+			return Some(resource);
+		}
+		None
+	}
+
+	fn run(&self, resources: Vec<Resource>, dry_run: bool) -> Vec<Option<Resource>> {
+		let config = Self::CONFIG;
+		if config.parallelize {
+			resources.into_par_iter().map(|res| self.run_atomic(res, dry_run)).collect()
+		} else {
+			resources.into_iter().map(|res| self.run_atomic(res, dry_run)).collect()
+		}
+	}
+}
+
+impl ActionPipeline for Action {
+	fn run(&self, resources: Vec<Resource>, dry_run: bool) -> Vec<Option<Resource>> {
+		use Action::*;
+		match self {
+			Copy(copy) => copy.run(resources, dry_run),
+			Move(r#move) => r#move.run(resources, dry_run),
+			Hardlink(hardlink) => hardlink.run(resources, dry_run),
+			Symlink(symlink) => symlink.run(resources, dry_run),
+			Delete(delete) => delete.run(resources, dry_run),
+			Echo(echo) => echo.run(resources, dry_run),
+			Trash(trash) => trash.run(resources, dry_run),
+			Script(script) => script.run(resources, dry_run),
+			Extract(extract) => extract.run(resources, dry_run),
+		}
+	}
+
+	fn run_atomic(&self, resource: Resource, dry_run: bool) -> Option<Resource> {
+		use Action::*;
+		match self {
+			Copy(copy) => copy.run_atomic(resource, dry_run),
+			Move(r#move) => r#move.run_atomic(resource, dry_run),
+			Hardlink(hardlink) => hardlink.run_atomic(resource, dry_run),
+			Symlink(symlink) => symlink.run_atomic(resource, dry_run),
+			Delete(delete) => delete.run_atomic(resource, dry_run),
+			Echo(echo) => echo.run_atomic(resource, dry_run),
+			Trash(trash) => trash.run_atomic(resource, dry_run),
+			Script(script) => script.run_atomic(resource, dry_run),
+			Extract(extract) => extract.run_atomic(resource, dry_run),
+		}
 	}
 }
 

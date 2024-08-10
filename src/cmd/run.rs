@@ -6,6 +6,7 @@ use std::{
 
 use anyhow::Result;
 use clap::{Parser, ValueHint};
+use itertools::Itertools;
 use rayon::iter::{IntoParallelRefMutIterator, ParallelIterator};
 
 use organize_core::{
@@ -56,41 +57,15 @@ impl Cmd for Run {
 					.into_iter()
 					.filter_entry(|e| Options::prefilter(config, rule, folder, e.path()))
 					.flatten()
-					.map(|e| Resource::new(e.path(), &location, &rule.variables))
+					.map(|e| Resource::new(e.path(), &location, rule.variables.to_vec()))
 					.filter(|e| rule.filters.filter(e))
 					.filter(|e| Options::postfilter(config, rule, folder, &e.path))
 					.collect::<Vec<_>>();
 
-				if entries.is_empty() {
-					debug!("No targets match the filters in folder {}", location.display());
+				for action in rule.actions.iter() {
+					let new = action.run(entries, self.dry_run);
+					entries = new.into_iter().flatten().collect();
 				}
-
-				entries.par_iter_mut().for_each(|entry| {
-					if let Some(last_rule) = processed_files.lock().unwrap().get(&entry.path) {
-						if !last_rule.r#continue {
-							return;
-						}
-					}
-
-					'actions: for action in rule.actions.iter() {
-						let path = match action.run(entry, self.dry_run) {
-							Ok(path) => path,
-							Err(_e) => None,
-						};
-
-						match path {
-							Some(path) => entry.set_path(path),
-							None => break 'actions,
-						};
-					}
-
-					processed_files
-						.lock()
-						.unwrap()
-						.entry(entry.path.clone())
-						.and_modify(|value| *value = rule)
-						.or_insert(rule);
-				})
 			}
 		}
 		Ok(())

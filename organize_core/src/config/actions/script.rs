@@ -24,10 +24,14 @@ pub struct Script {
 #[derive(Debug)]
 pub struct ActionConfig {
 	pub requires_dest: bool,
+	pub parallelize: bool,
 }
 
 impl AsAction for Script {
-	const CONFIG: ActionConfig = ActionConfig { requires_dest: true };
+	const CONFIG: ActionConfig = ActionConfig {
+		requires_dest: true,
+		parallelize: true,
+	};
 
 	#[tracing::instrument(ret(level = "info"), err, level = "debug", skip(_dest))]
 	fn execute<T: AsRef<Path>>(&self, src: &Resource, _dest: Option<T>, dry_run: bool) -> Result<Option<PathBuf>> {
@@ -94,7 +98,7 @@ mod tests {
 
 	#[test]
 	fn test_script_filter() {
-		let src = Resource::new("/home", "/", &[]);
+		let src = Resource::new("/home", "/", vec![]);
 		let content = String::from("print('huh')\nprint('{{path}}'.islower())");
 		let mut script = Script::new("python", content.clone());
 		script.run_script(&src).unwrap_or_else(|_| {

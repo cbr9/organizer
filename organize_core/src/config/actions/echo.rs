@@ -15,7 +15,10 @@ pub struct Echo {
 }
 
 impl AsAction for Echo {
-	const CONFIG: ActionConfig = ActionConfig { requires_dest: false };
+	const CONFIG: ActionConfig = ActionConfig {
+		requires_dest: false,
+		parallelize: true,
+	};
 
 	#[tracing::instrument(ret(level = "info"), err, level = "debug", skip(_dest, _dry_run))]
 	fn execute<T: AsRef<Path>>(&self, src: &Resource, _dest: Option<T>, _dry_run: bool) -> Result<Option<PathBuf>> {

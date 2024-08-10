@@ -9,24 +9,24 @@ use tera::Context;
 use crate::config::variables::{AsVariable, Variable};
 
 #[derive(Debug, Clone)]
-pub struct Resource<'a> {
+pub struct Resource {
 	pub context: Context,
-	variables: &'a [Variable],
+	variables: Vec<Variable>,
 	pub path: PathBuf,
 }
 
-impl<'a> FromStr for Resource<'a> {
+impl FromStr for Resource {
 	type Err = Infallible;
 
 	fn from_str(s: &str) -> Result<Self, Self::Err> {
 		let path = PathBuf::from_str(s)?;
 		let parent = path.parent().unwrap().to_path_buf();
-		Ok(Self::new(path, parent, &[]))
+		Ok(Self::new(path, parent, vec![]))
 	}
 }
 
-impl<'a> Resource<'a> {
-	pub fn new<T: AsRef<Path>, P: AsRef<Path>>(path: T, root: P, variables: &'a [Variable]) -> Self {
+impl Resource {
+	pub fn new<T: AsRef<Path>, P: AsRef<Path>>(path: T, root: P, variables: Vec<Variable>) -> Self {
 		let mut context = Context::new();
 		context.insert("root", &root.as_ref().to_string_lossy());
 		let mut resource = Self {
@@ -41,7 +41,7 @@ impl<'a> Resource<'a> {
 	fn refresh(&mut self) {
 		let path = self.path.to_string_lossy();
 		self.context.insert("path", &path);
-		for var in self.variables {
+		for var in self.variables.iter() {
 			var.register(&mut self.context)
 		}
 	}
@@ -52,8 +52,8 @@ impl<'a> Resource<'a> {
 	}
 }
 
-impl<'a, T: AsRef<Path>> From<T> for Resource<'a> {
+impl<T: AsRef<Path>> From<T> for Resource {
 	fn from(value: T) -> Self {
-		Resource::new(value.as_ref(), value.as_ref().parent().unwrap(), &[])
+		Resource::new(value.as_ref(), value.as_ref().parent().unwrap(), vec![])
 	}
 }

@@ -10,7 +10,10 @@ use super::{script::ActionConfig, AsAction};
 pub struct Delete;
 
 impl AsAction for Delete {
-	const CONFIG: ActionConfig = ActionConfig { requires_dest: false };
+	const CONFIG: ActionConfig = ActionConfig {
+		requires_dest: false,
+		parallelize: true,
+	};
 
 	#[tracing::instrument(ret(level = "info"), err, level = "debug", skip(_dest))]
 	fn execute<T: AsRef<Path>>(&self, src: &Resource, _dest: Option<T>, dry_run: bool) -> Result<Option<PathBuf>> {
@@ -31,7 +34,7 @@ mod tests {
 		let tmp_dir = tempfile::tempdir().expect("Couldn't create temporary directory");
 		let tmp_path = tmp_dir.path().to_owned();
 		let tmp_file = tmp_path.join("delete_me.txt");
-		let resource = Resource::new(&tmp_file, tmp_dir.path(), &[]);
+		let resource = Resource::new(&tmp_file, tmp_dir.path(), vec![]);
 		let action = Delete;
 
 		std::fs::write(&tmp_file, "").expect("Could not create target file");

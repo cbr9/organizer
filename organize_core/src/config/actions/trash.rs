@@ -27,7 +27,10 @@ impl Trash {
 }
 
 impl AsAction for Trash {
-	const CONFIG: ActionConfig = ActionConfig { requires_dest: false };
+	const CONFIG: ActionConfig = ActionConfig {
+		requires_dest: false,
+		parallelize: true,
+	};
 
 	#[tracing::instrument(ret(level = "info"), err, level = "debug", skip(_dest))]
 	fn execute<T: AsRef<Path>>(&self, src: &Resource, _dest: Option<T>, dry_run: bool) -> Result<Option<PathBuf>> {
@@ -50,7 +53,7 @@ mod tests {
 	fn test_trash() {
 		let tmp_file = tempfile::NamedTempFile::new().unwrap();
 		let path = tmp_file.path();
-		let resource = Resource::new(path, path.parent().unwrap(), &[]);
+		let resource = Resource::new(path, path.parent().unwrap(), vec![]);
 		let action = Trash { confirm: false };
 
 		assert!(path.exists());

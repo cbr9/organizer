@@ -30,7 +30,10 @@ impl Default for ContinueWith {
 }
 
 impl AsAction for Hardlink {
-	const CONFIG: ActionConfig = ActionConfig { requires_dest: true };
+	const CONFIG: ActionConfig = ActionConfig {
+		requires_dest: true,
+		parallelize: true,
+	};
 
 	fn get_target_path(&self, src: &Resource) -> Result<Option<PathBuf>> {
 		prepare_target_path(&self.if_exists, src, &self.to, true)
