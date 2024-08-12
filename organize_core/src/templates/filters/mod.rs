@@ -2,6 +2,8 @@ use serde::Deserialize;
 use std::{collections::HashMap, path::PathBuf};
 use tera::{to_value, Result, Value};
 
+pub mod size;
+
 pub struct Parent;
 
 impl tera::Filter for Parent {

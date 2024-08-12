@@ -1,6 +1,6 @@
-use std::sync::Mutex;
+use std::{sync::Mutex};
 
-use filters::{Extension, Filename, Mime, Parent, Stem};
+use filters::{size::size, Extension, Filename, Mime, Parent, Stem};
 use lazy_static::lazy_static;
 use serde::Deserialize;
 use tera::{Context, Tera};
@@ -15,6 +15,7 @@ lazy_static! {
 		tera.register_filter("filename", Filename);
 		tera.register_filter("extension", Extension);
 		tera.register_filter("mime", Mime);
+		tera.register_filter("filesize", size);
 		Mutex::new(tera)
 	};
 }
