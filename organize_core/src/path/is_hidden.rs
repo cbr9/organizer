@@ -1,4 +1,6 @@
-use std::{convert::Infallible, path::Path};
+#[cfg(target_family = "unix")]
+use std::convert::Infallible;
+use std::path::Path;
 
 use anyhow::Result;
 
@@ -9,33 +11,29 @@ pub trait IsHidden {
 
 #[cfg(target_family = "unix")]
 impl IsHidden for Path {
+	type Err = Infallible;
+
 	fn is_hidden(&self) -> Result<bool, Self::Err> {
 		match self.file_name() {
 			None => Ok(false),
 			Some(filename) => Ok(filename.to_string_lossy().starts_with('.')),
 		}
 	}
-
-	type Err = Infallible;
 }
 
 #[cfg(target_family = "windows")]
 impl IsHidden for Path {
-	fn is_hidden(&self) -> bool {
+	type Err = std::io::Error;
+
+	#[tracing::instrument(err)]
+	fn is_hidden(&self) -> Result<bool, Self::Err> {
 		use std::{fs, os::windows::prelude::*};
-		match fs::metadata(self) {
-			Ok(metadata) => {
-				let attributes = metadata.file_attributes();
-				if (attributes & 0x2) > 0 {
-					true
-				} else {
-					false
-				}
-			}
-			Err(e) => {
-				error!("{}", e);
-				false
-			}
+		let metadata = fs::metadata(self)?;
+		let attributes = metadata.file_attributes();
+		if (attributes & 0x2) > 0 {
+			Ok(true)
+		} else {
+			Ok(false)
 		}
 	}
 }
