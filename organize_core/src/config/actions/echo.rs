@@ -20,7 +20,7 @@ impl AsAction for Echo {
 		parallelize: true,
 	};
 
-	#[tracing::instrument(ret(level = "info"), err, level = "debug", skip(_dest, _dry_run))]
+	#[tracing::instrument(ret(level = "info"), err(Debug), level = "debug", skip(_dest, _dry_run))]
 	fn execute<T: AsRef<Path>>(&self, src: &Resource, _dest: Option<T>, _dry_run: bool) -> Result<Option<PathBuf>> {
 		let message = self.message.render(&src.context).map_err(anyhow::Error::msg)?;
 		tracing::info!("{}", message);

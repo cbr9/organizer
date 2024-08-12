@@ -1,6 +1,77 @@
 use serde::Deserialize;
-use std::{collections::HashMap, path::PathBuf};
-use tera::{to_value, Result, Value};
+use std::{collections::HashMap, path::PathBuf, str::FromStr};
+use strum::{EnumString, VariantNames};
+use tera::{to_value, try_get_value, Result, Value};
+
+struct Size {
+	bytes: u64,
+	format: SizeFormat,
+}
+
+#[derive(EnumString, strum::VariantNames, PartialEq)]
+#[strum(serialize_all = "lowercase")]
+enum SizeFormat {
+	Bytes,
+	Decimal,
+	Binary,
+}
+
+impl SizeFormat {
+	const BINARY_UNITS: [&'static str; 8] = ["KiB", "MiB", "GiB", "TiB", "PiB", "EiB", "ZiB", "YiB"];
+	const DECIMAL_UNITS: [&'static str; 8] = ["KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"];
+
+	pub fn base(&self) -> u16 {
+		match self {
+			SizeFormat::Bytes => 0,
+			SizeFormat::Decimal => 1000,
+			SizeFormat::Binary => 1024,
+		}
+	}
+}
+
+impl Size {
+	fn format(&self) -> String {
+		let base = self.format.base() as u64;
+		if self.format == SizeFormat::Bytes || self.bytes < base {
+			return self.bytes.to_string();
+		}
+
+		let units = match self.format {
+			SizeFormat::Bytes => unreachable!(),
+			SizeFormat::Decimal => SizeFormat::DECIMAL_UNITS,
+			SizeFormat::Binary => SizeFormat::BINARY_UNITS,
+		};
+
+		let (unit, suffix) = units
+			.iter()
+			.enumerate()
+			.find_map(|(i, suffix)| {
+				let unit = base.pow((i + 2) as u32);
+				if self.bytes < unit {
+					return Some((unit, suffix));
+				}
+				None
+			})
+			.unwrap();
+
+		return format!("{} {}", (base * self.bytes) / unit, suffix);
+	}
+}
+
+pub fn size(value: &Value, args: &HashMap<String, Value>) -> Result<Value> {
+	let value = PathBuf::deserialize(value).unwrap();
+	let unit = match args.get("unit") {
+		Some(unit) => SizeFormat::from_str(&unit.to_string()).map_err(tera::Error::msg)?,
+		None => SizeFormat::Binary,
+	};
+	let metadata = std::fs::metadata(value)?;
+	let size = Size {
+		bytes: metadata.len(),
+		format: unit,
+	};
+
+	Ok(to_value(size.format())?)
+}
 
 pub struct Parent;
 
