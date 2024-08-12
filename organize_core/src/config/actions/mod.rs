@@ -1,9 +1,5 @@
 use std::fmt::Debug;
-use std::{
-	collections::HashMap,
-	iter::FromIterator,
-	path::{Path, PathBuf},
-};
+use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 use copy::Copy;
@@ -11,12 +7,12 @@ use delete::Delete;
 use echo::Echo;
 use extract::Extract;
 use hardlink::Hardlink;
-use itertools::Itertools;
 use r#move::Move;
-use rayon::iter::{FromParallelIterator, IndexedParallelIterator, IntoParallelIterator, IntoParallelRefMutIterator, ParallelIterator};
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use script::{ActionConfig, Script};
 use serde::Deserialize;
 use symlink::Symlink;
+use write::Write;
 
 use crate::{config::actions::trash::Trash, resource::Resource};
 
@@ -32,9 +28,10 @@ pub(crate) mod r#move;
 pub(crate) mod script;
 pub(crate) mod symlink;
 pub(crate) mod trash;
+pub mod write;
 
 pub trait ActionPipeline {
-	fn run(&self, resources: Vec<Resource>, dry_run: bool) -> Vec<Option<Resource>>;
+	fn run(&self, resources: Vec<Resource>, dry_run: bool) -> Vec<Resource>;
 	fn run_atomic(&self, resource: Resource, dry_run: bool) -> Option<Resource>;
 }
 
@@ -42,6 +39,10 @@ pub trait AsAction {
 	const CONFIG: ActionConfig;
 
 	fn execute<T: AsRef<Path>>(&self, src: &Resource, dest: Option<T>, dry_run: bool) -> Result<Option<PathBuf>>;
+
+	fn on_finish(&self, _resources: &[Resource], _dry_run: bool) -> Result<()> {
+		Ok(())
+	}
 
 	// required only for some actions
 	fn get_target_path(&self, _: &Resource) -> Result<Option<PathBuf>> {
@@ -61,10 +62,6 @@ impl<T: AsAction + Sync + Debug> ActionPipeline for T {
 		let mut value = Ok(None);
 		if let Ok(dest) = self.get_target_path(&resource) {
 			if (config.requires_dest && dest.is_some()) || (!config.requires_dest && dest.is_none()) {
-				if config.requires_dest && dest.is_some() && &resource.path == dest.as_ref().unwrap() {
-					return Some(resource);
-				}
-
 				if !dry_run && dest.is_some() {
 					let dest = dest.as_ref()?;
 					let parent = dest.parent()?;
@@ -85,18 +82,24 @@ impl<T: AsAction + Sync + Debug> ActionPipeline for T {
 		None
 	}
 
-	fn run(&self, resources: Vec<Resource>, dry_run: bool) -> Vec<Option<Resource>> {
+	fn run(&self, resources: Vec<Resource>, dry_run: bool) -> Vec<Resource> {
 		let config = Self::CONFIG;
-		if config.parallelize {
-			resources.into_par_iter().map(|res| self.run_atomic(res, dry_run)).collect()
+		let resources: Vec<Resource> = if config.parallelize {
+			resources
+				.into_par_iter()
+				.filter_map(|res| self.run_atomic(res, dry_run))
+				.collect()
 		} else {
-			resources.into_iter().map(|res| self.run_atomic(res, dry_run)).collect()
-		}
+			resources.into_iter().filter_map(|res| self.run_atomic(res, dry_run)).collect()
+		};
+
+		self.on_finish(&resources, dry_run).unwrap();
+		resources
 	}
 }
 
 impl ActionPipeline for Action {
-	fn run(&self, resources: Vec<Resource>, dry_run: bool) -> Vec<Option<Resource>> {
+	fn run(&self, resources: Vec<Resource>, dry_run: bool) -> Vec<Resource> {
 		use Action::*;
 		match self {
 			Copy(copy) => copy.run(resources, dry_run),
@@ -108,6 +111,7 @@ impl ActionPipeline for Action {
 			Trash(trash) => trash.run(resources, dry_run),
 			Script(script) => script.run(resources, dry_run),
 			Extract(extract) => extract.run(resources, dry_run),
+			Write(write) => write.run(resources, dry_run),
 		}
 	}
 
@@ -123,6 +127,7 @@ impl ActionPipeline for Action {
 			Trash(trash) => trash.run_atomic(resource, dry_run),
 			Script(script) => script.run_atomic(resource, dry_run),
 			Extract(extract) => extract.run_atomic(resource, dry_run),
+			Write(write) => write.run_atomic(resource, dry_run),
 		}
 	}
 }
@@ -131,6 +136,7 @@ impl ActionPipeline for Action {
 #[serde(tag = "type", rename_all(deserialize = "lowercase"))]
 pub enum Action {
 	Move(Move),
+	Write(Write),
 	Copy(Copy),
 	Hardlink(Hardlink),
 	Symlink(Symlink),

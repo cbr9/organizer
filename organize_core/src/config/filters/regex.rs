@@ -3,6 +3,8 @@ use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use serde::{Deserialize, Deserializer};
 use std::{convert::TryFrom, ops::Deref, str::FromStr};
 
+use super::FilterUtils;
+
 #[derive(PartialEq, Deserialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct Regex {
@@ -62,19 +64,25 @@ impl TryFrom<String> for RegularExpression {
 
 impl AsFilter for RegularExpression {
 	#[tracing::instrument(ret, level = "debug")]
-	fn filter(&self, res: &Resource) -> bool {
-		let input = self.input.render(&res.context).unwrap();
-		let mut matches = self.pattern.is_match(&input);
-		if self.negate {
-			matches = !matches;
-		}
-		matches
+	fn filter(&self, resources: &[&Resource]) -> Vec<bool> {
+		resources
+			.par_iter()
+			.map(|res| {
+				let input = self.input.render(&res.context).unwrap();
+				let mut matches = self.pattern.is_match(&input);
+				if self.negate {
+					matches = !matches;
+				}
+				matches
+			})
+			.collect()
 	}
 }
 
 impl AsFilter for Regex {
-	fn filter(&self, res: &Resource) -> bool {
-		self.patterns.par_iter().any(|f| f.filter(res))
+	fn filter(&self, resources: &[&Resource]) -> Vec<bool> {
+		let results: Vec<Vec<bool>> = self.patterns.par_iter().map(|f| f.filter(resources)).collect();
+		self.fold_vecs_with_any(results)
 	}
 }
 
@@ -102,20 +110,20 @@ mod tests {
 	fn match_single() {
 		let regex = Regex::try_from(vec![r".*unsplash.*"]).unwrap();
 		let path = Resource::from_str("$HOME/Pictures/test_unsplash_img.jpg").unwrap();
-		assert!(regex.filter(&path))
+		assert_eq!(regex.filter(&[&path]), vec![true])
 	}
 
 	#[test]
 	fn match_multiple() {
 		let regex = Regex::try_from(vec![r".*unsplash.*", r"\w"]).unwrap();
 		let path = Resource::from_str("$HOME/Pictures/test_unsplash_img.jpg").unwrap();
-		assert!(regex.filter(&path))
+		assert_eq!(regex.filter(&[&path]), vec![true])
 	}
 
 	#[test]
 	fn no_match_multiple() {
 		let regex = Regex::try_from(vec![r".*unsplash.*", r"\d"]).unwrap();
 		let path = Resource::from_str("$HOME/Documents/deep_learning.pdf").unwrap();
-		assert!(!regex.filter(&path))
+		assert_eq!(regex.filter(&[&path]), vec![false])
 	}
 }

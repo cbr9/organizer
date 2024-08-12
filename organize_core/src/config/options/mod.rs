@@ -1,4 +1,4 @@
-use crate::path::IsHidden;
+use crate::{path::IsHidden, resource::Resource};
 use anyhow::{Context, Result};
 
 use crate::utils::DefaultOpt;
@@ -67,7 +67,7 @@ getters! {
 }
 
 impl Options {
-	pub fn walker(config: &Config, rule: &Rule, folder: &Folder) -> Result<WalkDir> {
+	fn walker(config: &Config, rule: &Rule, folder: &Folder) -> Result<WalkDir> {
 		let path = &folder.path()?;
 		let home = &dirs::home_dir().context("unable to find home directory")?;
 		let max_depth = if path == home { 1.0 } else { Self::max_depth(config, rule, folder) };
@@ -75,6 +75,17 @@ impl Options {
 		Ok(WalkDir::new(path)
 			.min_depth(min_depth.max(1.0) as usize)
 			.max_depth(max_depth as usize))
+	}
+
+	pub fn get_entries(config: &Config, rule: &Rule, folder: &Folder) -> Result<Vec<Resource>> {
+		let location = folder.path()?;
+		Ok(Self::walker(config, rule, folder)?
+			.into_iter()
+			.filter_entry(|e| Options::prefilter(config, rule, folder, e.path()))
+			.flatten()
+			.filter(|e| Options::postfilter(config, rule, folder, e.path()))
+			.map(|e| Resource::new(e.path(), &location, rule.variables.to_vec()))
+			.collect())
 	}
 
 	#[tracing::instrument(ret, level = "debug", skip(config, rule, folder))]

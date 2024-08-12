@@ -4,6 +4,7 @@ use std::{
 	str::FromStr,
 };
 
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use serde::Deserialize;
 use tempfile;
 
@@ -46,20 +47,25 @@ impl AsAction for Script {
 }
 
 impl AsFilter for Script {
-	fn filter(&self, res: &Resource) -> bool {
-		self.run_script(res)
-			.map(|output| {
-				// get the last line in stdout and parse it as a boolean
-				// if it can't be parsed, return false
-				let out = String::from_utf8_lossy(&output.stdout);
-				out.lines().last().map(|last| {
-					let last = last.trim().to_lowercase();
-					bool::from_str(&last).expect("Filter script did not output a valid boolean to stdout")
-				})
+	fn filter(&self, resources: &[&Resource]) -> Vec<bool> {
+		resources
+			.par_iter()
+			.map(|res| {
+				self.run_script(res)
+					.map(|output| {
+						// get the last line in stdout and parse it as a boolean
+						// if it can't be parsed, return false
+						let out = String::from_utf8_lossy(&output.stdout);
+						out.lines().last().map(|last| {
+							let last = last.trim().to_lowercase();
+							bool::from_str(&last).expect("Filter script did not output a valid boolean to stdout")
+						})
+					})
+					.ok()
+					.flatten()
+					.unwrap_or_default()
 			})
-			.ok()
-			.flatten()
-			.unwrap_or_default()
+			.collect()
 	}
 }
 
@@ -106,6 +112,6 @@ mod tests {
 			script = Script::new("python3", content);
 			script.run_script(&src).unwrap()
 		});
-		assert!(script.filter(&src))
+		assert_eq!(script.filter(&[&src]), vec![true])
 	}
 }

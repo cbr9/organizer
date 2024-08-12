@@ -1,6 +1,7 @@
 use crate::{config::filters::AsFilter, resource::Resource};
 use itertools::Itertools;
 use mime::FromStrError;
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use serde::{Deserialize, Deserializer};
 use std::{convert::TryFrom, ops::Deref, str::FromStr};
 
@@ -66,19 +67,24 @@ impl<T: ToString> TryFrom<Vec<T>> for Mime {
 
 impl AsFilter for Mime {
 	#[tracing::instrument(ret, level = "debug")]
-	fn filter(&self, res: &Resource) -> bool {
-		let guess = mime_guess::from_path(&res.path).first_or_octet_stream();
-		self.types.iter().any(|mime| {
-			let mut matches = match (mime.type_(), mime.subtype()) {
-				(mime::STAR, subtype) => subtype == guess.subtype(),
-				(type_, mime::STAR) => type_ == guess.type_(),
-				(type_, subtype) => type_ == guess.type_() && subtype == guess.subtype(),
-			};
-			if mime.negate {
-				matches = !matches;
-			}
-			matches
-		})
+	fn filter(&self, resources: &[&Resource]) -> Vec<bool> {
+		resources
+			.into_par_iter()
+			.map(|res| {
+				let guess = mime_guess::from_path(&res.path).first_or_octet_stream();
+				self.types.iter().any(|mime| {
+					let mut matches = match (mime.type_(), mime.subtype()) {
+						(mime::STAR, subtype) => subtype == guess.subtype(),
+						(type_, mime::STAR) => type_ == guess.type_(),
+						(type_, subtype) => type_ == guess.type_() && subtype == guess.subtype(),
+					};
+					if mime.negate {
+						matches = !matches;
+					}
+					matches
+				})
+			})
+			.collect()
 	}
 }
 
@@ -90,15 +96,15 @@ mod tests {
 		let types = Mime::try_from(vec!["!image/*", "audio/*"]).unwrap();
 		let img = Resource::from_str("test.jpg").unwrap();
 		let audio = Resource::from_str("test.ogg").unwrap();
-		assert!(!types.filter(&img));
-		assert!(types.filter(&audio));
+		assert_eq!(types.filter(&[&img]), vec![false]);
+		assert_eq!(types.filter(&[&audio]), vec![true]);
 	}
 	#[test]
 	fn test_match() {
 		let types = Mime::try_from(vec!["image/*", "audio/*"]).unwrap();
 		let img = Resource::from_str("test.jpg").unwrap();
 		let audio = Resource::from_str("test.ogg").unwrap();
-		assert!(types.filter(&img));
-		assert!(types.filter(&audio));
+		assert_eq!(types.filter(&[&img]), vec![true]);
+		assert_eq!(types.filter(&[&audio]), vec![true]);
 	}
 }

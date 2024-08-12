@@ -1,5 +1,6 @@
 use std::{
 	convert::Infallible,
+	hash::Hash,
 	path::{Path, PathBuf},
 	str::FromStr,
 };
@@ -13,6 +14,19 @@ pub struct Resource {
 	pub context: Context,
 	variables: Vec<Variable>,
 	pub path: PathBuf,
+}
+
+impl Eq for Resource {}
+impl PartialEq for Resource {
+	fn eq(&self, other: &Self) -> bool {
+		self.path.eq(&other.path)
+	}
+}
+
+impl Hash for Resource {
+	fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+		self.path.hash(state)
+	}
 }
 
 impl FromStr for Resource {

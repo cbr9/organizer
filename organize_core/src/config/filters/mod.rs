@@ -1,5 +1,6 @@
 use derive_more::Deref;
 use empty::Empty;
+use itertools::Itertools;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use serde::Deserialize;
 
@@ -51,29 +52,67 @@ pub enum Filter {
 	},
 }
 
+pub trait FilterUtils {
+	fn fold_vecs_with_any(&self, vecs: Vec<Vec<bool>>) -> Vec<bool> {
+		let length = vecs.first().map_or(0, |v| v.len()); // Get the length of the first Vec or 0 if empty
+
+		(0..length)
+			.map(|index| vecs.iter().any(|vec| vec.get(index).copied().unwrap_or(false)))
+			.collect()
+	}
+
+	fn fold_vecs_with_all(&self, vecs: Vec<Vec<bool>>) -> Vec<bool> {
+		let length = vecs.first().map_or(0, |v| v.len()); // Get the length of the first Vec or 0 if empty
+
+		(0..length)
+			.map(|index| vecs.iter().all(|vec| vec.get(index).copied().unwrap_or(false)))
+			.collect()
+	}
+
+	fn fold_vecs_with_none(&self, vecs: Vec<Vec<bool>>) -> Vec<bool> {
+		let length = vecs.first().map_or(0, |v| v.len()); // Get the length of the first Vec or 0 if empty
+
+		(0..length)
+			.map(|index| vecs.iter().all(|vec| !vec.get(index).copied().unwrap_or(false)))
+			.collect()
+	}
+}
+
+impl<T> FilterUtils for T where T: AsFilter {}
+impl FilterUtils for Filters {}
+
 pub trait AsFilter {
-	fn filter(&self, res: &Resource) -> bool;
+	fn filter(&self, resources: &[&Resource]) -> Vec<bool>;
 }
 
 impl AsFilter for Filter {
 	#[tracing::instrument(ret, level = "debug")]
-	fn filter(&self, res: &Resource) -> bool {
+	fn filter(&self, resources: &[&Resource]) -> Vec<bool> {
 		match self {
-			Filter::AllOf { filters } => filters.par_iter().all(|f| f.filter(res)),
-			Filter::AnyOf { filters } => filters.par_iter().any(|f| f.filter(res)),
-			Filter::NoneOf { filters } => filters.par_iter().all(|f| !f.filter(res)),
-			Filter::Empty(filter) => filter.filter(res),
-			Filter::Extension(filter) => filter.filter(res),
-			Filter::Filename(filter) => filter.filter(res),
-			Filter::Mime(filter) => filter.filter(res),
-			Filter::Regex(filter) => filter.filter(res),
-			Filter::Script(filter) => filter.filter(res),
-			Filter::NotEmpty(filter) => !filter.filter(res),
-			Filter::NotExtension(filter) => !filter.filter(res),
-			Filter::NotFilename(filter) => !filter.filter(res),
-			Filter::NotMime(filter) => !filter.filter(res),
-			Filter::NotRegex(filter) => !filter.filter(res),
-			Filter::NotScript(filter) => !filter.filter(res),
+			Filter::AllOf { filters } => {
+				let results: Vec<Vec<bool>> = filters.par_iter().map(|filter| filter.filter(resources)).collect();
+				self.fold_vecs_with_all(results)
+			}
+			Filter::AnyOf { filters } => {
+				let results: Vec<Vec<bool>> = filters.par_iter().map(|filter| filter.filter(resources)).collect();
+				self.fold_vecs_with_any(results)
+			}
+			Filter::NoneOf { filters } => {
+				let results: Vec<Vec<bool>> = filters.par_iter().map(|filter| filter.filter(resources)).collect();
+				self.fold_vecs_with_none(results)
+			}
+			Filter::Empty(filter) => filter.filter(resources),
+			Filter::Extension(filter) => filter.filter(resources),
+			Filter::Filename(filter) => filter.filter(resources),
+			Filter::Mime(filter) => filter.filter(resources),
+			Filter::Regex(filter) => filter.filter(resources),
+			Filter::Script(filter) => filter.filter(resources),
+			Filter::NotEmpty(filter) => filter.filter(resources).into_iter().map(|matches| !matches).collect(),
+			Filter::NotExtension(filter) => filter.filter(resources).into_iter().map(|matches| !matches).collect(),
+			Filter::NotFilename(filter) => filter.filter(resources).into_iter().map(|matches| !matches).collect(),
+			Filter::NotMime(filter) => filter.filter(resources).into_iter().map(|matches| !matches).collect(),
+			Filter::NotRegex(filter) => filter.filter(resources).into_iter().map(|matches| !matches).collect(),
+			Filter::NotScript(filter) => filter.filter(resources).into_iter().map(|matches| !matches).collect(),
 		}
 	}
 }
@@ -81,10 +120,23 @@ impl AsFilter for Filter {
 #[derive(Debug, Clone, Deserialize, Deref, PartialEq)]
 pub struct Filters(pub(crate) Vec<Filter>);
 
-impl AsFilter for Filters {
-	#[tracing::instrument(ret, level = "debug")]
-	fn filter(&self, res: &Resource) -> bool {
-		self.par_iter().all(|filter| filter.filter(res))
+impl Filters {
+	pub fn filter(&self, resources: Vec<Resource>) -> Vec<Resource> {
+		let results: Vec<Vec<bool>> = self
+			.iter()
+			.map(|filter| filter.filter(&resources.iter().collect_vec()))
+			.collect();
+
+		resources
+			.into_iter()
+			.zip(self.fold_vecs_with_all(results))
+			.filter_map(|(res, matches)| {
+				if matches {
+					return Some(res);
+				}
+				None
+			})
+			.collect_vec()
 	}
 }
 
@@ -99,8 +151,13 @@ mod tests {
 		let filters = Filters(vec![
 			Filter::Regex(Regex::try_from(vec![".*unsplash.*"]).unwrap()),
 			Filter::Regex(Regex::try_from(vec![".*\\.jpg"]).unwrap()),
+			Filter::Extension(Extension {
+				extensions: vec!["jpg".into()],
+			}),
 		]);
-		assert!(filters.filter(&Resource::from_str("$HOME/Downloads/unsplash_image.jpg").unwrap()));
-		assert!(!filters.filter(&Resource::from_str("$HOME/Downloads/unsplash_doc.pdf").unwrap()));
+		let resources = vec![Resource::from_str("$HOME/Downloads/unsplash_image.jpg").unwrap()];
+		assert_eq!(filters.filter(resources.clone()), resources);
+		let resources = vec![Resource::from_str("$HOME/Downloads/unsplash_doc.pdf").unwrap()];
+		assert_eq!(filters.filter(resources.clone()), vec![]);
 	}
 }

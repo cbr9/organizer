@@ -1,19 +1,10 @@
-use std::{
-	collections::HashMap,
-	path::PathBuf,
-	sync::{Arc, Mutex},
-};
+use std::path::PathBuf;
 
 use anyhow::Result;
 use clap::{Parser, ValueHint};
-use itertools::Itertools;
-use rayon::iter::{IntoParallelRefMutIterator, ParallelIterator};
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
-use organize_core::{
-	config::{actions::ActionPipeline, filters::AsFilter, options::Options, rule::Rule, Config, CONFIG},
-	resource::Resource,
-};
-use tracing::debug;
+use organize_core::config::{actions::ActionPipeline, options::Options, Config, CONFIG};
 
 use crate::Cmd;
 
@@ -39,33 +30,24 @@ impl Cmd for Run {
 			None => Config::new(Config::path().unwrap()).expect("Could not parse config"),
 		});
 
-		let processed_files: Arc<Mutex<HashMap<PathBuf, &Rule>>> = Arc::new(Mutex::new(HashMap::new()));
 		let filtered_rules = config.filter_rules(self.tags.as_ref(), self.ids.as_ref());
 
 		if self.no_dry_run {
 			self.dry_run = false;
 		}
 
-		for (i, rule) in filtered_rules.iter().enumerate() {
-			debug!("now running rule {}", i);
-			processed_files.lock().unwrap().retain(|key, _| key.exists());
-			for folder in rule.folders.iter() {
-				let location = folder.path()?;
-				let walker = Options::walker(config, rule, folder)?;
+		for rule in filtered_rules.into_iter() {
+			let mut entries = rule
+				.folders
+				.par_iter()
+				.map(|folder| Options::get_entries(config, rule, folder).unwrap())
+				.flatten()
+				.collect::<Vec<_>>();
 
-				let mut entries = walker
-					.into_iter()
-					.filter_entry(|e| Options::prefilter(config, rule, folder, e.path()))
-					.flatten()
-					.map(|e| Resource::new(e.path(), &location, rule.variables.to_vec()))
-					.filter(|e| rule.filters.filter(e))
-					.filter(|e| Options::postfilter(config, rule, folder, &e.path))
-					.collect::<Vec<_>>();
+			entries = rule.filters.filter(entries);
 
-				for action in rule.actions.iter() {
-					let new = action.run(entries, self.dry_run);
-					entries = new.into_iter().flatten().collect();
-				}
+			for action in rule.actions.iter() {
+				entries = action.run(entries, self.dry_run);
 			}
 		}
 		Ok(())

@@ -1,3 +1,4 @@
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use serde::Deserialize;
 
 use crate::resource::Resource;
@@ -10,13 +11,18 @@ pub struct Empty;
 
 impl AsFilter for Empty {
 	#[tracing::instrument(ret, level = "debug")]
-	fn filter(&self, res: &Resource) -> bool {
-		let path = &res.path;
-		if path.is_file() {
-			std::fs::metadata(path).map(|md| md.len() == 0).unwrap_or(false)
-		} else {
-			path.read_dir().map(|mut i| i.next().is_none()).unwrap_or(false)
-		}
+	fn filter(&self, resources: &[&Resource]) -> Vec<bool> {
+		resources
+			.par_iter()
+			.map(|res| {
+				let path = &res.path;
+				if path.is_file() {
+					std::fs::metadata(path).map(|md| md.len() == 0).unwrap_or(false)
+				} else {
+					path.read_dir().map(|mut i| i.next().is_none()).unwrap_or(false)
+				}
+			})
+			.collect()
 	}
 }
 
@@ -37,7 +43,7 @@ mod tests {
 		let path = file.path();
 		let res = Resource::from(path);
 		let action = Empty;
-		assert!(action.filter(&res))
+		assert_eq!(action.filter(&[&res]), vec![true])
 	}
 	#[test]
 	fn test_dir_positive() {
@@ -45,7 +51,7 @@ mod tests {
 		let path = dir.path();
 		let res = Resource::from(path);
 		let action = Empty;
-		assert!(action.filter(&res))
+		assert_eq!(action.filter(&[&res]), vec![true])
 	}
 	#[test]
 	fn test_file_negative() {
@@ -54,7 +60,7 @@ mod tests {
 		let path = file.path();
 		let res = Resource::from(path);
 		let action = Empty;
-		assert!(!action.filter(&res))
+		assert_eq!(action.filter(&[&res]), vec![false])
 	}
 	#[test]
 	fn test_dir_negative() {
@@ -62,6 +68,6 @@ mod tests {
 		let path = dir.path().parent().unwrap();
 		let res = Resource::from(path);
 		let action = Empty;
-		assert!(!action.filter(&res))
+		assert_eq!(action.filter(&[&res]), vec![false])
 	}
 }
