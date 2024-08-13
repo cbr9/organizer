@@ -5,7 +5,7 @@ use anyhow::Result;
 
 use crate::{config::actions::common::ConflictOption, resource::Resource, templates::Template};
 
-use super::Expand;
+use super::expand::Expand;
 
 pub fn prepare_target_path(if_exists: &ConflictOption, src: &Resource, dest: &Template, with_extension: bool) -> Result<Option<PathBuf>> {
 	// if there are any placeholders in the destination, expand them

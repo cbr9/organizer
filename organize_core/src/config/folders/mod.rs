@@ -5,7 +5,7 @@ use path_clean::PathClean;
 use serde::Deserialize;
 use tera::Context;
 
-use crate::{config::options::Options, path::Expand, templates::Template};
+use crate::{config::options::Options, path::expand::Expand, templates::Template};
 
 #[derive(Deserialize, Debug, PartialEq, Clone)]
 #[serde(deny_unknown_fields)]

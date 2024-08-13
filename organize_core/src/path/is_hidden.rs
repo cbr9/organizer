@@ -30,11 +30,7 @@ impl IsHidden for Path {
 		use std::{fs, os::windows::prelude::*};
 		let metadata = fs::metadata(self)?;
 		let attributes = metadata.file_attributes();
-		if (attributes & 0x2) > 0 {
-			Ok(true)
-		} else {
-			Ok(false)
-		}
+		Ok((attributes & 0x2) > 0)
 	}
 }
 

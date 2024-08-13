@@ -6,7 +6,7 @@ use std::{
 	path::{Path, PathBuf},
 };
 
-use crate::{path::prepare_target_path, resource::Resource, templates::Template};
+use crate::{path::prepare::prepare_target_path, resource::Resource, templates::Template};
 
 use super::{common::ConflictOption, script::ActionConfig, AsAction};
 

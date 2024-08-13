@@ -1,4 +1,4 @@
-use crate::{path::IsHidden, resource::Resource};
+use crate::{path::is_hidden::IsHidden, resource::Resource};
 use anyhow::{Context, Result};
 
 use crate::utils::DefaultOpt;
@@ -110,11 +110,9 @@ impl Options {
 		let path = path.as_ref();
 
 		if path.is_file() && Self::targets(config, rule, folder) == Targets::Dir {
-			tracing::debug!("{} is not a directory", path.display());
 			return false;
 		}
 		if path.is_dir() && Self::targets(config, rule, folder) == Targets::File {
-			tracing::debug!("{} is not a file", path.display());
 			return false;
 		}
 		// filter by partial_files option

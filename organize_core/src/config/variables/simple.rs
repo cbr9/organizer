@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use serde::Deserialize;
 use tera::Context;
 
@@ -12,7 +14,7 @@ pub struct SimpleVariable {
 }
 impl AsVariable for SimpleVariable {
 	fn register(&self, context: &mut Context) {
-		let value = self.value.render(context).unwrap();
+		let value = tera::Value::from_str(&self.value.render(context).unwrap()).unwrap();
 		context.insert(&self.name, &value);
 	}
 }
