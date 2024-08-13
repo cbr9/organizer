@@ -3,11 +3,6 @@ use std::{collections::HashMap, path::PathBuf};
 use serde::Deserialize;
 use tera::{to_value, Result, Value};
 
-struct Size {
-	bytes: f64,
-	format: SizeUnit,
-}
-
 #[derive(Deserialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
 enum SizeUnit {
@@ -31,7 +26,7 @@ enum SizeUnit {
 }
 
 impl SizeUnit {
-	pub fn unit_value(&self) -> f64 {
+	pub fn value(&self) -> f64 {
 		match self {
 			SizeUnit::Bytes => 1.0,
 			SizeUnit::KiB => 1024.0_f64.powi(1),
@@ -54,12 +49,6 @@ impl SizeUnit {
 	}
 }
 
-impl Size {
-	fn format(&self) -> f64 {
-		self.bytes / self.format.unit_value()
-	}
-}
-
 pub fn size(value: &Value, args: &HashMap<String, Value>) -> Result<Value> {
 	let value = PathBuf::deserialize(value)?;
 
@@ -68,10 +57,7 @@ pub fn size(value: &Value, args: &HashMap<String, Value>) -> Result<Value> {
 		None => SizeUnit::Bytes,
 	};
 	let metadata = std::fs::metadata(value)?;
-	let size = Size {
-		bytes: metadata.len() as f64,
-		format: unit,
-	};
+	let bytes = metadata.len() as f64;
 
-	Ok(to_value(size.format())?)
+	Ok(to_value(bytes / unit.value())?)
 }

@@ -1,6 +1,10 @@
 use std::sync::Mutex;
 
-use filters::{hash, size::size, Extension, Filename, Mime, Parent, Stem};
+use filters::{
+	misc::{hash, mime},
+	path::{extension, filename, parent, stem},
+	size::size,
+};
 use lazy_static::lazy_static;
 use serde::Deserialize;
 use tera::{Context, Tera};
@@ -10,11 +14,11 @@ pub mod filters;
 lazy_static! {
 	static ref TERA: Mutex<Tera> = {
 		let mut tera = Tera::default();
-		tera.register_filter("parent", Parent);
-		tera.register_filter("stem", Stem);
-		tera.register_filter("filename", Filename);
-		tera.register_filter("extension", Extension);
-		tera.register_filter("mime", Mime);
+		tera.register_filter("parent", parent);
+		tera.register_filter("stem", stem);
+		tera.register_filter("filename", filename);
+		tera.register_filter("extension", extension);
+		tera.register_filter("mime", mime);
 		tera.register_filter("filesize", size);
 		tera.register_filter("hash", hash);
 		Mutex::new(tera)
