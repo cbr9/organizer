@@ -4,6 +4,13 @@ use tera::{to_value, Result, Value};
 
 pub mod size;
 
+pub fn hash(value: &Value, _: &HashMap<String, Value>) -> Result<Value> {
+	let value = PathBuf::deserialize(value)?;
+	let bytes = std::fs::read(value)?; // Vec<u8>
+	let hash = sha256::digest(&bytes);
+	Ok(to_value(hash)?)
+}
+
 pub struct Parent;
 
 impl tera::Filter for Parent {
