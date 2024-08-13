@@ -1,6 +1,7 @@
 use std::sync::Mutex;
 
 use filters::{
+	content::file_content,
 	misc::{hash, mime},
 	path::{extension, filename, parent, stem},
 	size::size,
@@ -21,6 +22,7 @@ lazy_static! {
 		tera.register_filter("mime", mime);
 		tera.register_filter("filesize", size);
 		tera.register_filter("hash", hash);
+		tera.register_filter("filecontent", file_content);
 		Mutex::new(tera)
 	};
 }
