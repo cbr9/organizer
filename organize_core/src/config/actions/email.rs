@@ -10,7 +10,7 @@ use std::sync::Mutex;
 use anyhow::Result;
 use lazy_static::lazy_static;
 use lettre::message::header::ContentType;
-use lettre::message::{Attachment, Mailbox, MessageBuilder};
+use lettre::message::{Attachment, Mailbox, MessageBuilder, MultiPart, SinglePart};
 use lettre::transport::smtp::authentication::Credentials;
 use lettre::Address;
 use lettre::{Message, SmtpTransport, Transport};
@@ -33,6 +33,7 @@ pub struct Email {
 	recipient: Mailbox,
 	smtp_server: String,
 	subject: Option<Template>,
+	body: Option<Template>,
 	#[serde(default)]
 	attach: bool,
 }
@@ -54,23 +55,25 @@ impl AsAction for Email {
 			email = email.subject(subject.render(&res.context)?);
 		}
 
-		let attachment = if self.attach {
+		let mut multipart = MultiPart::mixed().build();
+
+		// Add body if it exists
+		if let Some(body) = &self.body {
+			let body = body.render(&res.context).unwrap();
+			multipart = multipart.singlepart(SinglePart::plain(body));
+		}
+
+		if self.attach {
 			if let Some(mime) = mime_guess::from_path(&res.path).first() {
 				let content = std::fs::read(&res.path)?;
 				let content_type = ContentType::from(mime);
-				Some(Attachment::new(res.path.file_name().unwrap().to_string_lossy().to_string()).body(content, content_type))
-			} else {
-				None
+				let attachment = Attachment::new(res.path.file_name().unwrap().to_string_lossy().to_string()).body(content, content_type);
+
+				multipart = multipart.singlepart(attachment);
 			}
-		} else {
-			None
 		};
 
-		let email = if let Some(attachment) = attachment {
-			email.singlepart(attachment)?
-		} else {
-			email.body(vec![])?
-		};
+		let email = email.multipart(multipart)?;
 
 		let creds = {
 			let mut lock = CREDENTIALS.lock().unwrap();
