@@ -1,9 +1,8 @@
+use super::FilterUtils;
 use crate::{config::filters::AsFilter, resource::Resource, templates::Template};
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use serde::{Deserialize, Deserializer};
 use std::{convert::TryFrom, ops::Deref, str::FromStr};
-
-use super::FilterUtils;
 
 #[derive(PartialEq, Deserialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -13,7 +12,7 @@ pub struct Regex {
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct RegularExpression {
-	#[serde(deserialize_with = "deserialize_regex")]
+	#[serde(deserialize_with = "serde_regex::deserialize")]
 	pub pattern: regex::Regex,
 	#[serde(default)]
 	pub negate: bool,
@@ -33,15 +32,6 @@ impl Deref for RegularExpression {
 	fn deref(&self) -> &Self::Target {
 		&self.pattern
 	}
-}
-
-pub fn deserialize_regex<'de, D>(deserializer: D) -> Result<regex::Regex, D::Error>
-where
-	D: Deserializer<'de>,
-{
-	// Deserialize as a Vec<String>
-	let patterns_str: String = String::deserialize(deserializer)?;
-	regex::Regex::from_str(patterns_str.as_str()).map_err(serde::de::Error::custom)
 }
 
 impl PartialEq for RegularExpression {

@@ -5,6 +5,7 @@ use anyhow::Result;
 use copy::Copy;
 use delete::Delete;
 use echo::Echo;
+use email::Email;
 use extract::Extract;
 use hardlink::Hardlink;
 use r#move::Move;
@@ -18,16 +19,17 @@ use crate::{config::actions::trash::Trash, resource::Resource};
 
 use anyhow::Context;
 
-pub(crate) mod common;
-pub(crate) mod copy;
-pub(crate) mod delete;
-pub(crate) mod echo;
+pub mod common;
+pub mod copy;
+pub mod delete;
+pub mod echo;
+pub mod email;
 pub mod extract;
-pub(crate) mod hardlink;
-pub(crate) mod r#move;
-pub(crate) mod script;
-pub(crate) mod symlink;
-pub(crate) mod trash;
+pub mod hardlink;
+pub mod r#move;
+pub mod script;
+pub mod symlink;
+pub mod trash;
 pub mod write;
 
 pub trait ActionPipeline {
@@ -112,6 +114,7 @@ impl ActionPipeline for Action {
 			Script(script) => script.run(resources, dry_run),
 			Extract(extract) => extract.run(resources, dry_run),
 			Write(write) => write.run(resources, dry_run),
+			Email(email) => email.run(resources, dry_run),
 		}
 	}
 
@@ -128,6 +131,7 @@ impl ActionPipeline for Action {
 			Script(script) => script.run_atomic(resource, dry_run),
 			Extract(extract) => extract.run_atomic(resource, dry_run),
 			Write(write) => write.run_atomic(resource, dry_run),
+			Email(email) => email.run_atomic(resource, dry_run),
 		}
 	}
 }
@@ -145,4 +149,5 @@ pub enum Action {
 	Trash(Trash),
 	Script(Script),
 	Extract(Extract),
+	Email(Email),
 }

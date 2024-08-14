@@ -123,7 +123,7 @@ pub struct Filters(pub(crate) Vec<Filter>);
 impl Filters {
 	pub fn filter(&self, resources: Vec<Resource>) -> Vec<Resource> {
 		let results: Vec<Vec<bool>> = self
-			.iter()
+			.par_iter()
 			.map(|filter| filter.filter(&resources.iter().collect_vec()))
 			.collect();
 

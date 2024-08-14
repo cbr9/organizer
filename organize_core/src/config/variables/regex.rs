@@ -3,13 +3,13 @@ use std::str::FromStr;
 use serde::Deserialize;
 use tera::{Context, Value};
 
-use crate::{config::filters::regex::deserialize_regex, templates::Template};
+use crate::templates::Template;
 
 use super::AsVariable;
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct RegexVariable {
-	#[serde(deserialize_with = "deserialize_regex")]
+	#[serde(deserialize_with = "serde_regex::deserialize")]
 	pub pattern: regex::Regex,
 	pub input: Template,
 }
