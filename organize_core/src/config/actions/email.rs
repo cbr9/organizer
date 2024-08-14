@@ -1,7 +1,14 @@
+use colored::Colorize;
+use itertools::Itertools;
+use std::collections::HashMap;
+use std::ops::Deref;
 use std::path::PathBuf;
+use std::process::Command;
 use std::str::FromStr;
+use std::sync::Mutex;
 
 use anyhow::Result;
+use lazy_static::lazy_static;
 use lettre::message::header::ContentType;
 use lettre::message::{Attachment, Mailbox, MessageBuilder};
 use lettre::transport::smtp::authentication::Credentials;
@@ -15,11 +22,16 @@ use crate::templates::Template;
 use super::script::ActionConfig;
 use super::AsAction;
 
+lazy_static! {
+	static ref CREDENTIALS: Mutex<HashMap<Mailbox, Credentials>> = Mutex::new(HashMap::new());
+}
+
 #[derive(Deserialize, PartialEq, Clone, Debug)]
 pub struct Email {
 	sender: Mailbox,
-	password: String,
+	password_cmd: String,
 	recipient: Mailbox,
+	smtp_server: String,
 	subject: Option<Template>,
 	#[serde(default)]
 	attach: bool,
@@ -60,9 +72,25 @@ impl AsAction for Email {
 			email.body(vec![])?
 		};
 
-		let creds = Credentials::new(self.sender.email.to_string(), self.password.clone());
+		let creds = {
+			let mut lock = CREDENTIALS.lock().unwrap();
+			if let Some(creds) = lock.get(&self.sender) {
+				creds.clone()
+			} else {
+				let command_and_args = self.password_cmd.split(" ").collect_vec();
+				let executable = command_and_args[0];
 
-		let mailer = SmtpTransport::relay("smtp.gmail.com").unwrap().credentials(creds).build();
+				let args = &command_and_args[1..];
+				let mut command = Command::new(executable);
+				let output = command.args(args).output()?;
+				let password = String::from_utf8(output.stdout)?.trim().to_string();
+				let creds = Credentials::new(self.sender.email.to_string(), password);
+				lock.insert(self.sender.clone(), creds.clone());
+				creds
+			}
+		};
+
+		let mailer = SmtpTransport::relay(&self.smtp_server).unwrap().credentials(creds).build();
 
 		match mailer.send(&email) {
 			Ok(_) => tracing::info!("Email sent successfully!"),

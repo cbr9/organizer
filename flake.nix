@@ -30,6 +30,8 @@
           rust-analyzer
           rustfmt
           sqlite
+          openssl
+          pkg-config
         ];
       };
     });
