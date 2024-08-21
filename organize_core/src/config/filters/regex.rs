@@ -1,8 +1,8 @@
 use super::FilterUtils;
 use crate::{config::filters::AsFilter, resource::Resource, templates::Template};
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
-use serde::{Deserialize, Deserializer};
-use std::{convert::TryFrom, ops::Deref, str::FromStr};
+use serde::Deserialize;
+use std::{convert::TryFrom, ops::Deref};
 
 #[derive(PartialEq, Deserialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]

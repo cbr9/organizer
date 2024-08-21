@@ -1,10 +1,7 @@
-use colored::Colorize;
 use itertools::Itertools;
 use std::collections::HashMap;
-use std::ops::Deref;
 use std::path::PathBuf;
 use std::process::Command;
-use std::str::FromStr;
 use std::sync::Mutex;
 
 use anyhow::Result;
@@ -12,8 +9,7 @@ use lazy_static::lazy_static;
 use lettre::message::header::ContentType;
 use lettre::message::{Attachment, Mailbox, MessageBuilder, MultiPart, SinglePart};
 use lettre::transport::smtp::authentication::Credentials;
-use lettre::Address;
-use lettre::{Message, SmtpTransport, Transport};
+use lettre::{SmtpTransport, Transport};
 use serde::Deserialize;
 
 use crate::resource::Resource;
@@ -27,6 +23,7 @@ lazy_static! {
 }
 
 #[derive(Deserialize, PartialEq, Clone, Debug)]
+#[serde(deny_unknown_fields)]
 pub struct Email {
 	sender: Mailbox,
 	password_cmd: String,
