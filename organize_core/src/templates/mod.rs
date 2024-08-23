@@ -31,7 +31,7 @@ lazy_static! {
 pub struct Template(pub String);
 
 impl Template {
-	// #[tracing::instrument(ret(level = "debug"), err(Debug))]
+	#[tracing::instrument(err(Debug))]
 	pub fn render(&self, context: &Context) -> tera::Result<String> {
 		TERA.lock().unwrap().render_str(&self.0, context)
 	}

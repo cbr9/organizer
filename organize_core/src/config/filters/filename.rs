@@ -1,5 +1,5 @@
-
 use crate::{config::filters::AsFilter, resource::Resource, templates::Template};
+use itertools::Itertools;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use serde::Deserialize;
 
@@ -35,8 +35,11 @@ impl AsFilter for Filename {
 				} else {
 					self.startswith
 						.iter()
-						.map(|s| s.render(&res.context).unwrap())
-						.map(|s| if !self.case_sensitive { s.to_lowercase() } else { s })
+						.map(|s| {
+							s.render(&res.context)
+								.map(|s| if !self.case_sensitive { s.to_lowercase() } else { s })
+						})
+						.flatten()
 						.any(|mut s| {
 							let mut negate = false;
 							if s.starts_with('!') {
@@ -56,8 +59,11 @@ impl AsFilter for Filename {
 				} else {
 					self.endswith
 						.iter()
-						.map(|s| s.render(&res.context).unwrap())
-						.map(|s| if !self.case_sensitive { s.to_lowercase() } else { s })
+						.map(|s| {
+							s.render(&res.context)
+								.map(|s| if !self.case_sensitive { s.to_lowercase() } else { s })
+						})
+						.flatten()
 						.any(|mut s| {
 							let mut negate = false;
 							if s.starts_with('!') {
@@ -77,8 +83,11 @@ impl AsFilter for Filename {
 				} else {
 					self.contains
 						.iter()
-						.map(|s| s.render(&res.context).unwrap())
-						.map(|s| if !self.case_sensitive { s.to_lowercase() } else { s })
+						.map(|s| {
+							s.render(&res.context)
+								.map(|s| if !self.case_sensitive { s.to_lowercase() } else { s })
+						})
+						.flatten()
 						.any(|mut s| {
 							let mut negate = false;
 

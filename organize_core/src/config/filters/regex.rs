@@ -58,12 +58,13 @@ impl AsFilter for RegularExpression {
 		resources
 			.par_iter()
 			.map(|res| {
-				let input = self.input.render(&res.context).unwrap();
-				let mut matches = self.pattern.is_match(&input);
-				if self.negate {
-					matches = !matches;
-				}
-				matches
+				self.input.render(&res.context).is_ok_and(|s| {
+					let mut matches = self.pattern.is_match(&s);
+					if self.negate {
+						matches = !matches;
+					}
+					matches
+				})
 			})
 			.collect()
 	}
