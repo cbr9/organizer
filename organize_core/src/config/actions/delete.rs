@@ -15,10 +15,16 @@ impl AsAction for Delete {
 		parallelize: true,
 	};
 
-	#[tracing::instrument(ret(level = "info"), err, level = "debug", skip(_dest))]
+	#[tracing::instrument(ret(level = "info"), err(Debug), level = "debug", skip(_dest))]
 	fn execute<T: AsRef<Path>>(&self, src: &Resource, _dest: Option<T>, dry_run: bool) -> Result<Option<PathBuf>> {
 		if !dry_run {
-			std::fs::remove_file(&src.path).with_context(|| format!("could not delete {}", &src.path.display()))?;
+			if src.path.is_file() {
+				std::fs::remove_file(&src.path).with_context(|| format!("could not delete {}", &src.path.display()))?;
+			}
+
+			if src.path.is_dir() {
+				std::fs::remove_dir_all(&src.path).with_context(|| format!("could not delete {}", &src.path.display()))?;
+			}
 		}
 		Ok(None)
 	}

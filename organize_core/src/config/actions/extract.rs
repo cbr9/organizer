@@ -28,7 +28,7 @@ impl AsAction for Extract {
 		prepare_target_path(&self.if_exists, src, &self.to, false)
 	}
 
-	#[tracing::instrument(ret(level = "info"), err, level = "debug", skip(dest))]
+	#[tracing::instrument(ret(level = "info"), err(Debug), level = "debug", skip(dest))]
 	fn execute<T: AsRef<Path>>(&self, src: &Resource, dest: Option<T>, dry_run: bool) -> anyhow::Result<Option<std::path::PathBuf>> {
 		let dest = dest.unwrap().as_ref().to_path_buf();
 		if !dry_run {

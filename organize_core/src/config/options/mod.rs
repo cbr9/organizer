@@ -20,14 +20,15 @@ pub struct Options {
 	pub exclude: Option<Vec<PathBuf>>,
 	pub hidden_files: Option<bool>,
 	pub partial_files: Option<bool>,
-	pub targets: Option<Targets>,
+	pub target: Option<Target>,
 }
 
 #[derive(Debug, Default, Clone, Deserialize, PartialEq)]
-pub enum Targets {
+#[serde(rename_all = "lowercase")]
+pub enum Target {
 	#[default]
-	File,
-	Dir,
+	Files,
+	Folders,
 }
 
 macro_rules! getters {
@@ -61,8 +62,8 @@ getters! {
 	pub fn min_depth() -> f64 {
 		min_depth
 	}
-	pub fn targets() -> Targets {
-		targets
+	pub fn target() -> Target {
+		target
 	}
 }
 
@@ -109,10 +110,10 @@ impl Options {
 	pub fn postfilter<T: AsRef<Path> + Debug>(config: &Config, rule: &Rule, folder: &Folder, path: T) -> bool {
 		let path = path.as_ref();
 
-		if path.is_file() && Self::targets(config, rule, folder) == Targets::Dir {
+		if path.is_file() && Self::target(config, rule, folder) == Target::Folders {
 			return false;
 		}
-		if path.is_dir() && Self::targets(config, rule, folder) == Targets::File {
+		if path.is_dir() && Self::target(config, rule, folder) == Target::Files {
 			return false;
 		}
 		// filter by partial_files option
@@ -152,7 +153,7 @@ impl DefaultOpt for Options {
 			exclude: None,
 			hidden_files: None,
 			partial_files: None,
-			targets: None,
+			target: None,
 			min_depth: None,
 		}
 	}
@@ -164,7 +165,7 @@ impl DefaultOpt for Options {
 			exclude: Some(vec![]),
 			hidden_files: Some(false),
 			partial_files: Some(false),
-			targets: Some(Targets::default()),
+			target: Some(Target::default()),
 		}
 	}
 }

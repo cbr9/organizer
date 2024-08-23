@@ -60,7 +60,7 @@ impl AsAction for Write {
 		parallelize: true,
 	};
 
-	#[tracing::instrument(ret, err)]
+	#[tracing::instrument(ret, err(Debug))]
 	fn get_target_path(&self, res: &Resource) -> Result<Option<PathBuf>> {
 		let path = prepare_target_path(&ConflictOption::Overwrite, res, &self.outfile, true)?;
 		if let Some(path) = path.as_ref() {

@@ -25,7 +25,7 @@ impl AsAction for Move {
 		prepare_target_path(&self.if_exists, src, &self.to, true)
 	}
 
-	#[tracing::instrument(ret(level = "info"), err, level = "debug", skip(dest))]
+	#[tracing::instrument(ret(level = "info"), err(Debug), level = "debug", skip(dest))]
 	fn execute<T: AsRef<Path>>(&self, src: &Resource, dest: Option<T>, dry_run: bool) -> Result<Option<PathBuf>> {
 		let dest = dest.unwrap();
 		if !dry_run {
