@@ -56,7 +56,7 @@ impl AsAction for Email {
 
 		// Add body if it exists
 		if let Some(body) = &self.body {
-			let body = body.render(&res.context).unwrap();
+			let body = body.render(&res.context)?;
 			multipart = multipart.singlepart(SinglePart::plain(body));
 		}
 
