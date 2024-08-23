@@ -1,11 +1,11 @@
 use config::{Config as LayeredConfig, File};
 use itertools::Itertools;
-use once_cell::sync::OnceCell;
 use rule::Rule;
 use std::{
 	collections::HashSet,
 	iter::FromIterator,
 	path::{Path, PathBuf},
+	sync::OnceLock,
 };
 
 use anyhow::{Context as ErrorContext, Result};
@@ -22,7 +22,7 @@ pub mod options;
 pub mod rule;
 pub mod variables;
 
-pub static CONFIG: OnceCell<Config> = OnceCell::new();
+pub static CONFIG: OnceLock<Config> = OnceLock::new();
 
 #[derive(Deserialize, Clone, Debug)]
 #[serde(deny_unknown_fields)]
@@ -219,52 +219,55 @@ impl Config {
 
 #[cfg(test)]
 mod tests {
+	use std::sync::LazyLock;
+
 	use super::Config;
 	use itertools::Itertools;
-	use lazy_static::lazy_static;
-	// use pretty_assertions::assert_eq;
 	use toml::toml;
 
-	lazy_static! {
-		static ref TOML: toml::Table = toml! {
-			[[rules]]
-			id = "test-rule-1"
-			tags = ["tag1"]
+	static TOML: LazyLock<toml::Table> = LazyLock::new(|| {
+		toml! {
 
-			actions = []
-			filters = []
-			folders = []
+				[[rules]]
+				id = "test-rule-1"
+				tags = ["tag1"]
 
-			[[rules]]
-			id = "test-rule-2"
-			tags = ["tag2"]
+				actions = []
+				filters = []
+				folders = []
 
-			actions = []
-			filters = []
-			folders = []
+				[[rules]]
+				id = "test-rule-2"
+				tags = ["tag2"]
 
-			[[rules]]
-			id = "test-rule-3"
-			tags = ["tag3"]
+				actions = []
+				filters = []
+				folders = []
 
-			actions = []
-			filters = []
-			folders = []
+				[[rules]]
+				id = "test-rule-3"
+				tags = ["tag3"]
 
-			[[rules]]
-			tags = ["tag3"]
+				actions = []
+				filters = []
+				folders = []
 
-			actions = []
-			filters = []
-			folders = []
+				[[rules]]
+				tags = ["tag3"]
 
-			[[rules]]
-			actions = []
-			filters = []
-			folders = []
-		};
-		static ref CONFIG: Config = toml::from_str(&TOML.to_string()).unwrap();
-	}
+				actions = []
+				filters = []
+				folders = []
+
+				[[rules]]
+				actions = []
+				filters = []
+				folders = []
+
+		}
+	});
+
+	static CONFIG: LazyLock<Config> = LazyLock::new(|| toml::from_str(&TOML.to_string()).unwrap());
 
 	#[test]
 	fn filter_rules_by_tag_positive() {

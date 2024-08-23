@@ -25,7 +25,6 @@ impl Folder {
 			.render(&context)
 			.with_context(|| "cannot expand folder name")
 			.map(PathBuf::from)
-			.and_then(|p| p.canonicalize().map_err(anyhow::Error::msg))
 			.map(|p| p.expand_user().clean())?;
 		Ok(path)
 	}

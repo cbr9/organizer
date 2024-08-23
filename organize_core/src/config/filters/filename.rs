@@ -1,5 +1,4 @@
 use crate::{config::filters::AsFilter, resource::Resource, templates::Template};
-use itertools::Itertools;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use serde::Deserialize;
 

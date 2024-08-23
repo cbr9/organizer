@@ -1,5 +1,3 @@
-#[cfg(target_family = "unix")]
-use std::convert::Infallible;
 use std::path::Path;
 
 use anyhow::Result;
@@ -11,7 +9,7 @@ pub trait IsHidden {
 
 #[cfg(target_family = "unix")]
 impl IsHidden for Path {
-	type Err = Infallible;
+	type Err = std::convert::Infallible;
 
 	fn is_hidden(&self) -> Result<bool, Self::Err> {
 		match self.file_name() {
@@ -36,17 +34,18 @@ impl IsHidden for Path {
 
 #[cfg(test)]
 mod tests {
-	use super::*;
 	#[cfg(target_family = "unix")]
 	#[test]
 	fn check_hidden() {
+		use super::*;
 		let path = Path::new("/home/user/.testfile");
 		assert!(path.is_hidden().unwrap())
 	}
 
-	#[cfg(target_family = "unix")]
+	#[cfg(target_family = "windows")]
 	#[test]
 	fn not_hidden() {
+		use super::*;
 		let path = Path::new("/home/user/testfile");
 		assert!(!path.is_hidden().unwrap())
 	}

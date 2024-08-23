@@ -5,12 +5,12 @@ use std::process::Command;
 use std::sync::Mutex;
 
 use anyhow::Result;
-use lazy_static::lazy_static;
 use lettre::message::header::ContentType;
 use lettre::message::{Attachment, Mailbox, MessageBuilder, MultiPart, SinglePart};
 use lettre::transport::smtp::authentication::Credentials;
 use lettre::{SmtpTransport, Transport};
 use serde::Deserialize;
+use std::sync::LazyLock;
 
 use crate::resource::Resource;
 use crate::templates::Template;
@@ -18,9 +18,7 @@ use crate::templates::Template;
 use super::script::ActionConfig;
 use super::AsAction;
 
-lazy_static! {
-	static ref CREDENTIALS: Mutex<HashMap<Mailbox, Credentials>> = Mutex::new(HashMap::new());
-}
+static CREDENTIALS: LazyLock<Mutex<HashMap<Mailbox, Credentials>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
 
 #[derive(Deserialize, PartialEq, Clone, Debug)]
 #[serde(deny_unknown_fields)]

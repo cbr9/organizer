@@ -5,21 +5,18 @@ use std::{
 	io::{BufWriter, Read, Seek, Write as Writer},
 	ops::Deref,
 	path::{Path, PathBuf},
-	sync::Mutex,
+	sync::{LazyLock, Mutex},
 };
 
 use anyhow::Result;
 use itertools::Itertools;
-use lazy_static::lazy_static;
 use serde::Deserialize;
 
 use crate::{path::prepare::prepare_target_path, resource::Resource, templates::Template};
 
 use super::{common::ConflictOption, script::ActionConfig, AsAction};
 
-lazy_static! {
-	static ref KNOWN_FILES: Mutex<HashMap<PathBuf, Mutex<File>>> = Mutex::new(HashMap::new());
-}
+static KNOWN_FILES: LazyLock<Mutex<HashMap<PathBuf, Mutex<File>>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
 
 #[derive(Clone, Deserialize, PartialEq, Default, Debug)]
 #[serde(rename = "lowercase")]
