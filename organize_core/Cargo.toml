@@ -1,6 +1,6 @@
 [package]
 name = "organize_core"
-version = "0.3.0"
+version = "0.3.0-alpha"
 authors = ["KBR9 <cabero96@gmail.com>"]
 edition = "2018"
 
