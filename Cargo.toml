@@ -16,10 +16,8 @@ chrono = "0.4.24"
 colored = "2.0.0"
 strum = { version = "0.26", features = ["derive"] }
 tempfile = "3"
-sysinfo = "0.28.4"
 rayon = "1.7"
 log = "0.4"
-fern = {version = "0.6", features = ["colored"] }
 toml = "0.7.3"
 anyhow = "1.0.70"
 organize_core = { path = "organize_core" }
