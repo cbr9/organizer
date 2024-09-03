@@ -10,7 +10,7 @@ use crate::{config::options::Options, path::expand::Expand, templates::Template}
 #[derive(Deserialize, Debug, PartialEq, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct Folder {
-	path: Template,
+	root: Template,
 	#[serde(flatten, default = "Options::default_none")]
 	pub options: Options,
 	#[serde(default)]
@@ -21,7 +21,7 @@ impl Folder {
 	pub fn path(&self) -> Result<PathBuf> {
 		let context = Context::new();
 		let path = self
-			.path
+			.root
 			.render(&context)
 			.with_context(|| "cannot expand folder name")
 			.map(PathBuf::from)

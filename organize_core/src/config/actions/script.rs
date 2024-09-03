@@ -30,7 +30,7 @@ pub struct ActionConfig {
 
 impl AsAction for Script {
 	const CONFIG: ActionConfig = ActionConfig {
-		requires_dest: true,
+		requires_dest: false,
 		parallelize: true,
 	};
 

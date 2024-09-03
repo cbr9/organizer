@@ -1,7 +1,5 @@
-use std::str::FromStr;
-
 use serde::Deserialize;
-use tera::{Context, Value};
+use tera::Context;
 
 use crate::templates::Template;
 
@@ -26,8 +24,7 @@ impl AsVariable for RegexVariable {
 		if let Some(captures) = self.pattern.captures(&input) {
 			for name in self.pattern.capture_names().flatten() {
 				if let Some(r#match) = captures.name(name) {
-					let value = Value::from_str(r#match.as_str()).unwrap();
-					context.insert(name, &value);
+					context.insert(name, r#match.as_str());
 				}
 			}
 		}
