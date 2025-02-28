@@ -11,7 +11,7 @@ use tempfile;
 use crate::{config::filters::AsFilter, resource::Resource, templates::Template};
 use anyhow::{bail, Result};
 
-use super::AsAction;
+use super::{ActionConfig, AsAction};
 
 #[derive(Deserialize, Debug, Clone, PartialEq)]
 #[serde(deny_unknown_fields)]
@@ -22,29 +22,23 @@ pub struct Script {
 	content: Template,
 }
 
-#[derive(Debug)]
-pub struct ActionConfig {
-	pub requires_dest: bool,
-	pub parallelize: bool,
-}
+// impl AsAction for Script {
+// 	const CONFIG: ActionConfig = ActionConfig {
+// 		requires_dest: false,
+// 		parallelize: true,
+// 	};
 
-impl AsAction for Script {
-	const CONFIG: ActionConfig = ActionConfig {
-		requires_dest: false,
-		parallelize: true,
-	};
-
-	#[tracing::instrument(ret(level = "info"), err(Debug), level = "debug", skip(_dest))]
-	fn execute<T: AsRef<Path>>(&self, src: &Resource, _dest: Option<T>, dry_run: bool) -> Result<Option<PathBuf>> {
-		if dry_run {
-			bail!("Cannot run scripted actions during a dry run")
-		}
-		self.run_script(src).map(|output| {
-			let output = String::from_utf8_lossy(&output.stdout);
-			output.lines().last().map(|last| PathBuf::from(&last.trim()))
-		})
-	}
-}
+// 	#[tracing::instrument(ret(level = "info"), err(Debug), level = "debug", skip(_dest))]
+// 	fn execute<T: AsRef<Path>>(&self, src: &Resource, _dest: Option<T>, dry_run: bool) -> Result<Option<PathBuf>> {
+// 		if dry_run {
+// 			bail!("Cannot run scripted actions during a dry run")
+// 		}
+// 		self.run_script(src).map(|output| {
+// 			let output = String::from_utf8_lossy(&output.stdout);
+// 			output.lines().last().map(|last| PathBuf::from(&last.trim()))
+// 		})
+// 	}
+// }
 
 impl AsFilter for Script {
 	fn filter(&self, resources: &[&Resource]) -> Vec<bool> {

@@ -14,6 +14,7 @@ pub struct Resource {
 	pub context: Context,
 	variables: Vec<Variable>,
 	pub path: PathBuf,
+	pub last_event_id: Option<i32>,
 }
 
 impl Eq for Resource {}
@@ -47,6 +48,7 @@ impl Resource {
 			path: path.as_ref().to_path_buf(),
 			variables,
 			context,
+			last_event_id: None,
 		};
 		resource.refresh();
 		resource

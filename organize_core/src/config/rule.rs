@@ -1,10 +1,14 @@
 use std::collections::HashSet;
 
+use derive_more::Deref;
 use serde::Deserialize;
 
 use crate::utils::DefaultOpt;
 
 use super::{actions::Action, filters::Filters, folders::Folders, options::Options, variables::Variable};
+
+#[derive(Debug, PartialEq, Deref, Clone, Deserialize)]
+pub struct Actions(pub Vec<Action>);
 
 #[derive(Debug, PartialEq, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -14,7 +18,7 @@ pub struct Rule {
 	pub tags: HashSet<String>,
 	#[serde(default)]
 	pub r#continue: bool,
-	pub actions: Vec<Action>,
+	pub actions: Actions,
 	pub filters: Filters,
 	pub folders: Folders,
 	#[serde(default = "Options::default_none")]
@@ -30,7 +34,7 @@ impl Default for Rule {
 			tags: HashSet::new(),
 			r#continue: false,
 			variables: vec![],
-			actions: vec![],
+			actions: Actions(vec![]),
 			filters: Filters(vec![]),
 			folders: vec![],
 			options: Options::default_none(),
