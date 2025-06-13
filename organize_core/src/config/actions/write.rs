@@ -4,21 +4,21 @@ use std::{
 	fs::{File, OpenOptions},
 	io::{BufWriter, Read, Seek, Write as Writer},
 	ops::Deref,
-	path::{Path, PathBuf},
+	path::PathBuf,
 	sync::{LazyLock, Mutex},
 };
 
 use anyhow::Result;
 use itertools::Itertools;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::{path::prepare::prepare_target_path, resource::Resource, templates::Template};
 
-use super::{common::ConflictOption, script::ActionConfig, AsAction};
+use super::{common::ConflictOption, script::ActionConfig, Action};
 
 static KNOWN_FILES: LazyLock<Mutex<HashMap<PathBuf, Mutex<File>>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
 
-#[derive(Clone, Deserialize, PartialEq, Default, Debug)]
+#[derive(Clone, Deserialize, Serialize, PartialEq, Eq, Default, Debug)]
 #[serde(rename = "lowercase")]
 pub enum WriteMode {
 	#[default]
@@ -26,7 +26,7 @@ pub enum WriteMode {
 	Prepend,
 }
 
-#[derive(Deserialize, PartialEq, Clone, Debug)]
+#[derive(Deserialize, Serialize, PartialEq, Eq, Clone, Debug)]
 pub struct Write {
 	text: Template,
 	outfile: Template,
@@ -40,7 +40,7 @@ pub struct Write {
 	continue_with: ContinueWith,
 }
 
-#[derive(Deserialize, Default, PartialEq, Clone, Debug)]
+#[derive(Deserialize, Serialize, Default, PartialEq, Eq, Clone, Debug)]
 #[serde(rename = "kebab_case")]
 pub enum ContinueWith {
 	#[default]
@@ -51,12 +51,14 @@ fn r#true() -> bool {
 	true
 }
 
-impl AsAction for Write {
-	const CONFIG: ActionConfig = ActionConfig {
-		requires_dest: true,
-		parallelize: true,
-	};
-
+#[typetag::serde]
+impl Action for Write {
+	fn config(&self) -> ActionConfig {
+		ActionConfig {
+			requires_dest: true,
+			parallelize: true,
+		}
+	}
 	#[tracing::instrument(ret, err(Debug))]
 	fn get_target_path(&self, res: &Resource) -> Result<Option<PathBuf>> {
 		let path = prepare_target_path(&ConflictOption::Overwrite, res, &self.outfile, true)?;
@@ -77,13 +79,13 @@ impl AsAction for Write {
 	}
 
 	// #[tracing::instrument(ret, err, skip(dest))]
-	fn execute<T: AsRef<Path>>(&self, res: &Resource, dest: Option<T>, dry_run: bool) -> Result<Option<PathBuf>> {
-		let path = dest.as_ref().unwrap().as_ref();
+	fn execute(&self, res: &Resource, dest: Option<PathBuf>, dry_run: bool) -> Result<Option<PathBuf>> {
+		let path = dest.unwrap();
 
 		if !dry_run {
 			let mut text = self.text.render(&res.context)?;
 			if self.mode == WriteMode::Prepend {
-				let mut existing_content = std::fs::read_to_string(path)?;
+				let mut existing_content = std::fs::read_to_string(&path)?;
 				if !existing_content.ends_with('\n') {
 					existing_content += "\n";
 				}
@@ -92,7 +94,7 @@ impl AsAction for Write {
 
 			{
 				let lock = KNOWN_FILES.lock().unwrap();
-				let file = lock.get(path).expect("file should be there").lock().unwrap();
+				let file = lock.get(&path).expect("file should be there").lock().unwrap();
 				let mut writer = BufWriter::new(file.deref());
 				writeln!(writer, "{}", text)?;
 				writer.flush()?;
@@ -100,7 +102,7 @@ impl AsAction for Write {
 		}
 
 		if self.continue_with == ContinueWith::WrittenFile {
-			Ok(Some(path.to_path_buf()))
+			Ok(Some(path))
 		} else {
 			Ok(Some(res.path.clone()))
 		}

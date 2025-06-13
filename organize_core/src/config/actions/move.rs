@@ -1,13 +1,13 @@
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use anyhow::{Context as ErrorContext, Result};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::{path::prepare::prepare_target_path, resource::Resource, templates::Template};
 
-use super::{common::ConflictOption, script::ActionConfig, AsAction};
+use super::{common::ConflictOption, script::ActionConfig, Action};
 
-#[derive(Deserialize, Debug, Clone, PartialEq)]
+#[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct Move {
 	pub to: Template,
@@ -15,24 +15,26 @@ pub struct Move {
 	pub if_exists: ConflictOption,
 }
 
-impl AsAction for Move {
-	const CONFIG: ActionConfig = ActionConfig {
-		requires_dest: true,
-		parallelize: true,
-	};
+#[typetag::serde(name = "move")]
+impl Action for Move {
+	fn config(&self) -> ActionConfig {
+		ActionConfig {
+			requires_dest: true,
+			parallelize: true,
+		}
+	}
 
 	fn get_target_path(&self, src: &Resource) -> Result<Option<PathBuf>> {
 		prepare_target_path(&self.if_exists, src, &self.to, true)
 	}
 
 	#[tracing::instrument(ret(level = "info"), err(Debug), level = "debug", skip(dest))]
-	fn execute<T: AsRef<Path>>(&self, src: &Resource, dest: Option<T>, dry_run: bool) -> Result<Option<PathBuf>> {
+	fn execute(&self, src: &Resource, dest: Option<PathBuf>, dry_run: bool) -> Result<Option<PathBuf>> {
 		let dest = dest.unwrap();
 		if !dry_run {
-			std::fs::rename(&src.path, dest.as_ref())
-				.with_context(|| format!("Could not move {} -> {}", src.path.display(), dest.as_ref().display()))?;
+			std::fs::rename(&src.path, &dest).with_context(|| format!("Could not move {} -> {}", src.path.display(), dest.display()))?;
 		}
 
-		Ok(Some(dest.as_ref().to_path_buf()))
+		Ok(Some(dest))
 	}
 }

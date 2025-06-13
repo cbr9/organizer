@@ -1,13 +1,13 @@
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use anyhow::{Context, Result};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::{path::prepare::prepare_target_path, resource::Resource, templates::Template};
 
-use super::{common::ConflictOption, script::ActionConfig, AsAction};
+use super::{common::ConflictOption, script::ActionConfig, Action};
 
-#[derive(Deserialize, Debug, Clone, PartialEq)]
+#[derive(Deserialize, Serialize, Debug, Clone, Eq, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct Copy {
 	to: Template,
@@ -17,7 +17,7 @@ pub struct Copy {
 	continue_with: ContinueWith,
 }
 
-#[derive(Deserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]
 enum ContinueWith {
 	Original,
 	Copy,
@@ -29,25 +29,28 @@ impl Default for ContinueWith {
 	}
 }
 
-impl AsAction for Copy {
-	const CONFIG: ActionConfig = ActionConfig {
-		requires_dest: true,
-		parallelize: true,
-	};
+#[typetag::serde(name = "copy")]
+impl Action for Copy {
+	fn config(&self) -> ActionConfig {
+		ActionConfig {
+			requires_dest: true,
+			parallelize: true,
+		}
+	}
 
 	fn get_target_path(&self, src: &Resource) -> Result<Option<PathBuf>> {
 		prepare_target_path(&self.if_exists, src, &self.to, true)
 	}
 
 	#[tracing::instrument(ret(level = "info"), err(Debug), level = "debug", skip(dest))]
-	fn execute<T: AsRef<Path>>(&self, src: &Resource, dest: Option<T>, dry_run: bool) -> Result<Option<PathBuf>> {
+	fn execute(&self, src: &Resource, dest: Option<PathBuf>, dry_run: bool) -> Result<Option<PathBuf>> {
 		let dest = dest.unwrap();
 		if !dry_run {
 			std::fs::copy(&src.path, &dest).with_context(|| "Failed to copy file")?;
 		}
 
 		if self.continue_with == ContinueWith::Copy {
-			Ok(Some(dest.as_ref().to_path_buf()))
+			Ok(Some(dest))
 		} else {
 			Ok(Some(src.path.clone()))
 		}

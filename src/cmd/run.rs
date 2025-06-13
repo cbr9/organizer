@@ -4,7 +4,7 @@ use anyhow::Result;
 use clap::{Parser, ValueHint};
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
-use organize_core::config::{actions::ActionPipeline, options::Options, Config, CONFIG};
+use organize_core::config::{options::Options, Config, CONFIG};
 
 use crate::Cmd;
 

@@ -1,21 +1,13 @@
 use std::fmt::Debug;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use anyhow::Result;
-use copy::Copy;
-use delete::Delete;
-use echo::Echo;
-use email::Email;
-use extract::Extract;
-use hardlink::Hardlink;
-use r#move::Move;
+use dyn_clone::DynClone;
+use dyn_eq::DynEq;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
-use script::{ActionConfig, Script};
-use serde::Deserialize;
-use symlink::Symlink;
-use write::Write;
+use script::ActionConfig;
 
-use crate::{config::actions::trash::Trash, resource::Resource};
+use crate::resource::Resource;
 
 use anyhow::Context;
 
@@ -32,15 +24,14 @@ pub mod symlink;
 pub mod trash;
 pub mod write;
 
-pub trait ActionPipeline {
-	fn run(&self, resources: Vec<Resource>, dry_run: bool) -> Vec<Resource>;
-	fn run_atomic(&self, resource: Resource, dry_run: bool) -> Option<Resource>;
-}
+dyn_clone::clone_trait_object!(Action);
+dyn_eq::eq_trait_object!(Action);
 
-pub trait AsAction {
-	const CONFIG: ActionConfig;
+#[typetag::serde(tag = "type")]
+pub trait Action: DynEq + DynClone + Sync + Send + Debug {
+	fn config(&self) -> ActionConfig;
 
-	fn execute<T: AsRef<Path>>(&self, src: &Resource, dest: Option<T>, dry_run: bool) -> Result<Option<PathBuf>>;
+	fn execute(&self, src: &Resource, dest: Option<PathBuf>, dry_run: bool) -> Result<Option<PathBuf>>;
 
 	fn on_finish(&self, _resources: &[Resource], _dry_run: bool) -> Result<()> {
 		Ok(())
@@ -48,19 +39,30 @@ pub trait AsAction {
 
 	// required only for some actions
 	fn get_target_path(&self, _: &Resource) -> Result<Option<PathBuf>> {
-		let config = &Self::CONFIG;
+		let config = self.config();
 		if config.requires_dest {
 			unimplemented!()
 		}
 		Ok(None)
 	}
-}
 
-impl<T: AsAction + Sync + Debug> ActionPipeline for T {
-	#[tracing::instrument]
-	#[allow(clippy::nonminimal_bool)]
+	fn run(&self, resources: Vec<Resource>, dry_run: bool) -> Vec<Resource> {
+		let config = self.config();
+		let resources: Vec<Resource> = if config.parallelize {
+			resources
+				.into_par_iter()
+				.filter_map(|res| self.run_atomic(res, dry_run))
+				.collect()
+		} else {
+			resources.into_iter().filter_map(|res| self.run_atomic(res, dry_run)).collect()
+		};
+
+		self.on_finish(&resources, dry_run).unwrap();
+		resources
+	}
+
 	fn run_atomic(&self, mut resource: Resource, dry_run: bool) -> Option<Resource> {
-		let config = Self::CONFIG;
+		let config = self.config();
 		let mut value = Ok(None);
 		if let Ok(dest) = self.get_target_path(&resource) {
 			if (config.requires_dest && dest.is_some()) || (!config.requires_dest && dest.is_none()) {
@@ -83,71 +85,4 @@ impl<T: AsAction + Sync + Debug> ActionPipeline for T {
 		}
 		None
 	}
-
-	fn run(&self, resources: Vec<Resource>, dry_run: bool) -> Vec<Resource> {
-		let config = Self::CONFIG;
-		let resources: Vec<Resource> = if config.parallelize {
-			resources
-				.into_par_iter()
-				.filter_map(|res| self.run_atomic(res, dry_run))
-				.collect()
-		} else {
-			resources.into_iter().filter_map(|res| self.run_atomic(res, dry_run)).collect()
-		};
-
-		self.on_finish(&resources, dry_run).unwrap();
-		resources
-	}
-}
-
-impl ActionPipeline for Action {
-	fn run(&self, resources: Vec<Resource>, dry_run: bool) -> Vec<Resource> {
-		use Action::*;
-		match self {
-			Copy(copy) => copy.run(resources, dry_run),
-			Move(r#move) => r#move.run(resources, dry_run),
-			Hardlink(hardlink) => hardlink.run(resources, dry_run),
-			Symlink(symlink) => symlink.run(resources, dry_run),
-			Delete(delete) => delete.run(resources, dry_run),
-			Echo(echo) => echo.run(resources, dry_run),
-			Trash(trash) => trash.run(resources, dry_run),
-			Script(script) => script.run(resources, dry_run),
-			Extract(extract) => extract.run(resources, dry_run),
-			Write(write) => write.run(resources, dry_run),
-			Email(email) => email.run(resources, dry_run),
-		}
-	}
-
-	fn run_atomic(&self, resource: Resource, dry_run: bool) -> Option<Resource> {
-		use Action::*;
-		match self {
-			Copy(copy) => copy.run_atomic(resource, dry_run),
-			Move(r#move) => r#move.run_atomic(resource, dry_run),
-			Hardlink(hardlink) => hardlink.run_atomic(resource, dry_run),
-			Symlink(symlink) => symlink.run_atomic(resource, dry_run),
-			Delete(delete) => delete.run_atomic(resource, dry_run),
-			Echo(echo) => echo.run_atomic(resource, dry_run),
-			Trash(trash) => trash.run_atomic(resource, dry_run),
-			Script(script) => script.run_atomic(resource, dry_run),
-			Extract(extract) => extract.run_atomic(resource, dry_run),
-			Write(write) => write.run_atomic(resource, dry_run),
-			Email(email) => email.run_atomic(resource, dry_run),
-		}
-	}
-}
-
-#[derive(Debug, Clone, Deserialize, PartialEq)]
-#[serde(tag = "type", rename_all(deserialize = "lowercase"))]
-pub enum Action {
-	Move(Move),
-	Write(Write),
-	Copy(Copy),
-	Hardlink(Hardlink),
-	Symlink(Symlink),
-	Delete(Delete),
-	Echo(Echo),
-	Trash(Trash),
-	Script(Script),
-	Extract(Extract),
-	Email(Email),
 }

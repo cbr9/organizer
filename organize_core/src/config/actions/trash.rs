@@ -1,16 +1,16 @@
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use crate::{resource::Resource, PROJECT_NAME};
 use anyhow::{Context, Result};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
-use super::{script::ActionConfig, AsAction};
+use super::{script::ActionConfig, Action};
 
 fn enabled() -> bool {
 	true
 }
 
-#[derive(Debug, Clone, Deserialize, Default, Eq, PartialEq)]
+#[derive(Debug, Clone, Serialize, Default, Deserialize, Eq, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct Trash {
 	#[serde(default = "enabled")]
@@ -26,14 +26,16 @@ impl Trash {
 	}
 }
 
-impl AsAction for Trash {
-	const CONFIG: ActionConfig = ActionConfig {
-		requires_dest: false,
-		parallelize: true,
-	};
-
+#[typetag::serde(name = "trash")]
+impl Action for Trash {
+	fn config(&self) -> ActionConfig {
+		ActionConfig {
+			requires_dest: false,
+			parallelize: true,
+		}
+	}
 	#[tracing::instrument(ret(level = "info"), err(Debug), level = "debug", skip(_dest))]
-	fn execute<T: AsRef<Path>>(&self, src: &Resource, _dest: Option<T>, dry_run: bool) -> Result<Option<PathBuf>> {
+	fn execute(&self, src: &Resource, _dest: Option<PathBuf>, dry_run: bool) -> Result<Option<PathBuf>> {
 		if !dry_run {
 			let to = Self::dir()?.join(src.path.file_name().unwrap());
 			let from = &src.path;
@@ -58,9 +60,7 @@ mod tests {
 
 		assert!(path.exists());
 
-		action
-			.execute::<&Path>(&resource, None, false)
-			.expect("Could not trash target file");
+		action.execute(&resource, None, false).expect("Could not trash target file");
 		assert!(!path.exists());
 	}
 }

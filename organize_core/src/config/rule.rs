@@ -6,7 +6,7 @@ use crate::utils::DefaultOpt;
 
 use super::{actions::Action, filters::Filters, folders::Folders, options::Options, variables::Variable};
 
-#[derive(Debug, PartialEq, Clone, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Rule {
 	pub id: Option<String>,
@@ -14,8 +14,8 @@ pub struct Rule {
 	pub tags: HashSet<String>,
 	#[serde(default)]
 	pub r#continue: bool,
-	pub actions: Vec<Action>,
 	pub filters: Filters,
+	pub actions: Vec<Box<dyn Action>>,
 	pub folders: Folders,
 	#[serde(default = "Options::default_none")]
 	pub options: Options,

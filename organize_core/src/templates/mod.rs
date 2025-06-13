@@ -6,7 +6,7 @@ use filters::{
 	path::{extension, filename, parent, stem},
 	size::size,
 };
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use tera::{Context, Tera};
 
 pub mod filters;
@@ -24,7 +24,7 @@ static TERA: LazyLock<Mutex<Tera>> = LazyLock::new(|| {
 	Mutex::new(tera)
 });
 
-#[derive(Deserialize, Default, Debug, Eq, PartialEq, Clone)]
+#[derive(Deserialize, Serialize, Default, Debug, Eq, PartialEq, Clone)]
 pub struct Template(pub String);
 
 impl Template {

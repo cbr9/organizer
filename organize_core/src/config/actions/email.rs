@@ -9,18 +9,18 @@ use lettre::message::header::ContentType;
 use lettre::message::{Attachment, Mailbox, MessageBuilder, MultiPart, SinglePart};
 use lettre::transport::smtp::authentication::Credentials;
 use lettre::{SmtpTransport, Transport};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::sync::LazyLock;
 
 use crate::resource::Resource;
 use crate::templates::Template;
 
 use super::script::ActionConfig;
-use super::AsAction;
+use super::Action;
 
 static CREDENTIALS: LazyLock<Mutex<HashMap<Mailbox, Credentials>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
 
-#[derive(Deserialize, PartialEq, Clone, Debug)]
+#[derive(Deserialize, Serialize, Eq, PartialEq, Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct Email {
 	sender: Mailbox,
@@ -33,14 +33,17 @@ pub struct Email {
 	attach: bool,
 }
 
-impl AsAction for Email {
-	const CONFIG: ActionConfig = ActionConfig {
-		requires_dest: false,
-		parallelize: true,
-	};
+#[typetag::serde(name = "email")]
+impl Action for Email {
+	fn config(&self) -> ActionConfig {
+		ActionConfig {
+			requires_dest: false,
+			parallelize: true,
+		}
+	}
 
 	#[tracing::instrument(err(Debug), skip(_dest))]
-	fn execute<T: AsRef<std::path::Path>>(&self, res: &Resource, _dest: Option<T>, dry_run: bool) -> Result<Option<PathBuf>> {
+	fn execute(&self, res: &Resource, _dest: Option<PathBuf>, dry_run: bool) -> Result<Option<PathBuf>> {
 		if !dry_run {
 			let mut email = MessageBuilder::new()
 				.from(self.sender.clone())

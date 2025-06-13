@@ -1,16 +1,15 @@
 use itertools::Itertools;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::{
-	fmt::Debug,
 	fs::{self, File},
-	path::{Path, PathBuf},
+	path::PathBuf,
 };
 
 use crate::{path::prepare::prepare_target_path, resource::Resource, templates::Template};
 
-use super::{common::ConflictOption, script::ActionConfig, AsAction};
+use super::{common::ConflictOption, script::ActionConfig, Action};
 
-#[derive(Deserialize, Debug, Clone, PartialEq)]
+#[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct Extract {
 	pub to: Template,
@@ -18,19 +17,21 @@ pub struct Extract {
 	pub if_exists: ConflictOption,
 }
 
-impl AsAction for Extract {
-	const CONFIG: ActionConfig = ActionConfig {
-		requires_dest: true,
-		parallelize: true,
-	};
-
+#[typetag::serde(name = "extract")]
+impl Action for Extract {
+	fn config(&self) -> ActionConfig {
+		ActionConfig {
+			requires_dest: true,
+			parallelize: true,
+		}
+	}
 	fn get_target_path(&self, src: &Resource) -> anyhow::Result<Option<PathBuf>> {
 		prepare_target_path(&self.if_exists, src, &self.to, false)
 	}
 
 	#[tracing::instrument(ret(level = "info"), err(Debug), level = "debug", skip(dest))]
-	fn execute<T: AsRef<Path>>(&self, src: &Resource, dest: Option<T>, dry_run: bool) -> anyhow::Result<Option<std::path::PathBuf>> {
-		let dest = dest.unwrap().as_ref().to_path_buf();
+	fn execute(&self, src: &Resource, dest: Option<PathBuf>, dry_run: bool) -> anyhow::Result<Option<std::path::PathBuf>> {
+		let dest = dest.unwrap();
 		if !dry_run {
 			let file = File::open(&src.path)?;
 			let mut archive = zip::ZipArchive::new(file)?;

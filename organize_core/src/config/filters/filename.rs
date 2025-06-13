@@ -34,11 +34,10 @@ impl AsFilter for Filename {
 				} else {
 					self.startswith
 						.iter()
-						.map(|s| {
+						.flat_map(|s| {
 							s.render(&res.context)
 								.map(|s| if !self.case_sensitive { s.to_lowercase() } else { s })
 						})
-						.flatten()
 						.any(|mut s| {
 							let mut negate = false;
 							if s.starts_with('!') {
@@ -58,11 +57,10 @@ impl AsFilter for Filename {
 				} else {
 					self.endswith
 						.iter()
-						.map(|s| {
+						.flat_map(|s| {
 							s.render(&res.context)
 								.map(|s| if !self.case_sensitive { s.to_lowercase() } else { s })
 						})
-						.flatten()
 						.any(|mut s| {
 							let mut negate = false;
 							if s.starts_with('!') {
@@ -82,11 +80,10 @@ impl AsFilter for Filename {
 				} else {
 					self.contains
 						.iter()
-						.map(|s| {
+						.flat_map(|s| {
 							s.render(&res.context)
 								.map(|s| if !self.case_sensitive { s.to_lowercase() } else { s })
 						})
-						.flatten()
 						.any(|mut s| {
 							let mut negate = false;
 

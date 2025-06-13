@@ -1,19 +1,19 @@
 use std::{
-	path::{Path, PathBuf},
+	path::PathBuf,
 	process::{Command, Output, Stdio},
 	str::FromStr,
 };
 
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use tempfile;
 
 use crate::{config::filters::AsFilter, resource::Resource, templates::Template};
 use anyhow::{bail, Result};
 
-use super::AsAction;
+use super::Action;
 
-#[derive(Deserialize, Debug, Clone, PartialEq)]
+#[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct Script {
 	exec: String,
@@ -28,14 +28,17 @@ pub struct ActionConfig {
 	pub parallelize: bool,
 }
 
-impl AsAction for Script {
-	const CONFIG: ActionConfig = ActionConfig {
-		requires_dest: false,
-		parallelize: true,
-	};
+#[typetag::serde(name = "script")]
+impl Action for Script {
+	fn config(&self) -> ActionConfig {
+		ActionConfig {
+			requires_dest: false,
+			parallelize: true,
+		}
+	}
 
 	#[tracing::instrument(ret(level = "info"), err(Debug), level = "debug", skip(_dest))]
-	fn execute<T: AsRef<Path>>(&self, src: &Resource, _dest: Option<T>, dry_run: bool) -> Result<Option<PathBuf>> {
+	fn execute(&self, src: &Resource, _dest: Option<PathBuf>, dry_run: bool) -> Result<Option<PathBuf>> {
 		if dry_run {
 			bail!("Cannot run scripted actions during a dry run")
 		}

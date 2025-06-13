@@ -1,22 +1,25 @@
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use crate::resource::Resource;
 use anyhow::{Context, Result};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
-use super::{script::ActionConfig, AsAction};
+use super::{script::ActionConfig, Action};
 
-#[derive(Debug, Clone, Deserialize, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Deserialize, Serialize, Default, PartialEq, Eq)]
 pub struct Delete;
 
-impl AsAction for Delete {
-	const CONFIG: ActionConfig = ActionConfig {
-		requires_dest: false,
-		parallelize: true,
-	};
+#[typetag::serde(name = "delete")]
+impl Action for Delete {
+	fn config(&self) -> ActionConfig {
+		ActionConfig {
+			requires_dest: false,
+			parallelize: true,
+		}
+	}
 
 	#[tracing::instrument(ret(level = "info"), err(Debug), level = "debug", skip(_dest))]
-	fn execute<T: AsRef<Path>>(&self, src: &Resource, _dest: Option<T>, dry_run: bool) -> Result<Option<PathBuf>> {
+	fn execute(&self, src: &Resource, _dest: Option<PathBuf>, dry_run: bool) -> Result<Option<PathBuf>> {
 		if !dry_run {
 			if src.path.is_file() {
 				std::fs::remove_file(&src.path).with_context(|| format!("could not delete {}", &src.path.display()))?;
@@ -46,9 +49,7 @@ mod tests {
 		std::fs::write(&tmp_file, "").expect("Could not create target file");
 		assert!(tmp_file.exists());
 
-		action
-			.execute::<&Path>(&resource, None, false)
-			.expect("Could not delete target file");
+		action.execute(&resource, None, false).expect("Could not delete target file");
 		assert!(!tmp_file.exists());
 	}
 }
