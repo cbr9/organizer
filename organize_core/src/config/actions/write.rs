@@ -41,7 +41,7 @@ pub struct Write {
 	#[serde(default)]
 	clear_before_first_write: bool,
 	#[serde(default = "r#true")]
-	sort: bool,
+	sort_lines: bool,
 	#[serde(default)]
 	continue_with: ContinueWith,
 	#[serde(default = "enabled")]
@@ -129,8 +129,9 @@ impl Action for Write {
 	}
 
 	fn on_finish(&self, _resources: &[Resource], dry_run: bool) -> Result<()> {
+		// sort lines in the file
 		let mut lock = KNOWN_FILES.lock().unwrap();
-		if self.sort && !dry_run {
+		if self.sort_lines && !dry_run {
 			for (_path, file) in lock.iter() {
 				let mut file = file.lock().unwrap();
 				file.seek(std::io::SeekFrom::Start(0))?;

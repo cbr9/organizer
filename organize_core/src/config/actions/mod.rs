@@ -11,7 +11,6 @@ use crate::{
 	templates::{template::Template, TemplateEngine},
 };
 
-
 use super::variables::Variable;
 
 pub mod common;
