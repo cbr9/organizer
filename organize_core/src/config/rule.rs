@@ -1,39 +1,60 @@
 use std::collections::HashSet;
 
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 
-use crate::utils::DefaultOpt;
+use super::{
+	actions::Action,
+	filters::Filter,
+	folders::{Folder, FolderBuilder},
+	options::OptionsBuilder,
+	variables::Variable,
+};
 
-use super::{actions::Action, filters::Filter, folders::Folders, options::Options, variables::Variable};
-
-#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+#[derive(Deserialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
-pub struct Rule {
+pub struct RuleBuilder {
 	pub id: Option<String>,
 	#[serde(default)]
 	pub tags: HashSet<String>,
 	#[serde(default)]
 	pub r#continue: bool,
-	pub filters: Vec<Box<dyn Filter>>,
 	pub actions: Vec<Box<dyn Action>>,
-	pub folders: Folders,
-	#[serde(default = "Options::default_none")]
-	pub options: Options,
+	pub filters: Vec<Box<dyn Filter>>,
+	pub folders: Vec<FolderBuilder>,
+	#[serde(flatten)]
+	pub options: OptionsBuilder,
 	#[serde(default)]
 	pub variables: Vec<Variable>,
 }
 
-impl Default for Rule {
-	fn default() -> Self {
-		Self {
-			id: None,
-			tags: HashSet::new(),
-			r#continue: false,
-			variables: vec![],
-			actions: vec![],
-			filters: vec![],
-			folders: vec![],
-			options: Options::default_none(),
-		}
+impl RuleBuilder {
+	pub fn build(self, defaults: &OptionsBuilder) -> anyhow::Result<Rule> {
+		let folders = self
+			.folders
+			.clone()
+			.into_iter()
+			.map(|builder| builder.build(defaults, &self.options)) // Pass this rule's options builder
+			.collect::<anyhow::Result<Vec<Folder>>>()?;
+
+		Ok(Rule {
+			id: self.id,
+			tags: self.tags,
+			r#continue: self.r#continue,
+			actions: self.actions,
+			filters: self.filters,
+			folders, // Contains fully compiled Folders, each with its own Options
+			variables: self.variables,
+		})
 	}
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct Rule {
+	pub id: Option<String>,
+	pub tags: HashSet<String>,
+	pub r#continue: bool,
+	pub actions: Vec<Box<dyn Action>>,
+	pub filters: Vec<Box<dyn Filter>>,
+	pub folders: Vec<Folder>,
+	pub variables: Vec<Variable>,
 }

@@ -4,7 +4,7 @@ use anyhow::Result;
 use clap::{Parser, ValueHint};
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
-use organize_core::config::{options::Options, Config};
+use organize_core::config::Config;
 
 use crate::Cmd;
 
@@ -46,13 +46,14 @@ impl Cmd for Run {
 				.folders
 				.par_iter()
 				.filter_map(|folder| {
-					Options::get_entries(&config, rule, folder)
+					folder
+						.get_resources(&rule.variables)
 						.inspect_err(|e| {
 							tracing::error!(
 								"Rule [number = {}, id = {}]: Could not read entries from folder '{}'. Error: {}",
 								i,
 								rule.id.as_deref().unwrap_or("untitled"),
-								folder.path().unwrap_or_default().display(),
+								folder.path.display(),
 								e
 							)
 						})

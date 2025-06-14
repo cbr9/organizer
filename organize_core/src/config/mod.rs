@@ -1,6 +1,6 @@
 use config::{Config as LayeredConfig, File};
 use itertools::Itertools;
-use rule::Rule;
+use rule::{Rule, RuleBuilder};
 use std::{
 	collections::HashSet,
 	iter::FromIterator,
@@ -10,9 +10,9 @@ use std::{
 use anyhow::{Context as ErrorContext, Result};
 use serde::Deserialize;
 
-use crate::{utils::DefaultOpt, PROJECT_NAME};
+use crate::PROJECT_NAME;
 
-use self::options::Options;
+use self::options::OptionsBuilder;
 
 pub mod actions;
 pub mod filters;
@@ -23,15 +23,43 @@ pub mod variables;
 
 #[derive(Deserialize, Clone, Debug)]
 #[serde(deny_unknown_fields)]
+pub struct ConfigBuilder {
+	pub rules: Vec<RuleBuilder>,
+	#[serde(flatten)]
+	pub defaults: OptionsBuilder,
+}
+
+impl ConfigBuilder {
+	/// Consumes the builder and returns a final, validated `Config`.
+	/// The `defaults` are used in the build process but are not stored in the final `Config`.
+	pub fn build(self, path: PathBuf) -> Result<Config> {
+		let rules = self
+			.rules
+			.clone()
+			.into_iter()
+			.map(|builder| builder.build(&self.defaults))
+			.collect::<Result<Vec<Rule>>>()?;
+
+		Ok(Config { rules, path })
+	}
+}
+
+#[derive(Clone, Debug)]
 pub struct Config {
 	pub rules: Vec<Rule>,
-	#[serde(skip)]
 	pub path: PathBuf,
-	#[serde(default = "Options::default_none")]
-	pub defaults: Options,
 }
 
 impl Config {
+	pub fn new<T: AsRef<Path>>(path: T) -> Result<Self> {
+		let builder = LayeredConfig::builder()
+			.add_source(File::from(path.as_ref()))
+			.build()?
+			.try_deserialize::<ConfigBuilder>()
+			.context("Could not deserialize config")?;
+		builder.build(path.as_ref().to_path_buf())
+	}
+
 	pub fn default_dir() -> PathBuf {
 		let var = format!("{}_CONFIG", PROJECT_NAME.to_uppercase());
 		std::env::var_os(&var).map_or_else(
@@ -48,16 +76,6 @@ impl Config {
 		Self::default_dir().join("config.toml")
 	}
 
-	pub fn new<T: AsRef<Path>>(path: T) -> Result<Self> {
-		let mut config: Config = LayeredConfig::builder()
-			.add_source(File::from(path.as_ref()))
-			.build()?
-			.try_deserialize::<Self>()
-			.context("Could not deserialize config")?;
-		config.path = path.as_ref().to_path_buf();
-		Ok(config)
-	}
-
 	pub fn path() -> Result<PathBuf> {
 		std::env::current_dir()
 			.context("Cannot determine current directory")?
@@ -66,11 +84,12 @@ impl Config {
 			.find_map(|file| {
 				let path = file.ok()?.path();
 				if path.is_dir() && path.file_stem()?.to_string_lossy().ends_with(PROJECT_NAME) {
-					return Some(path.join("config.toml"));
-				} else if path.file_stem()?.to_string_lossy().ends_with(PROJECT_NAME) && path.extension()? == "toml" {
-					return Some(path);
+					Some(path.join("config.toml"))
+				} else if path.file_stem()?.to_string_lossy().ends_with(PROJECT_NAME) && path.extension().is_some_and(|ext| ext == "toml") {
+					Some(path)
+				} else {
+					None
 				}
-				None
 			})
 			.map_or_else(
 				|| Ok(Self::default_path()),
@@ -216,9 +235,9 @@ impl Config {
 
 #[cfg(test)]
 mod tests {
-	use std::sync::LazyLock;
+	use std::{path::PathBuf, sync::LazyLock};
 
-	use super::Config;
+	use super::{Config, ConfigBuilder};
 	use itertools::Itertools;
 	use toml::toml;
 
@@ -264,7 +283,10 @@ mod tests {
 		}
 	});
 
-	static CONFIG: LazyLock<Config> = LazyLock::new(|| toml::from_str(&TOML.to_string()).unwrap());
+	static CONFIG: LazyLock<Config> = LazyLock::new(|| {
+		let builder: ConfigBuilder = toml::from_str(&TOML.to_string()).unwrap();
+		builder.build(PathBuf::new()).unwrap()
+	});
 
 	#[test]
 	fn filter_rules_by_tag_positive() {
