@@ -5,7 +5,6 @@ use std::{
 	collections::HashSet,
 	iter::FromIterator,
 	path::{Path, PathBuf},
-	sync::OnceLock,
 };
 
 use anyhow::{Context as ErrorContext, Result};
@@ -21,8 +20,6 @@ pub mod folders;
 pub mod options;
 pub mod rule;
 pub mod variables;
-
-pub static CONFIG: OnceLock<Config> = OnceLock::new();
 
 #[derive(Deserialize, Clone, Debug)]
 #[serde(deny_unknown_fields)]

@@ -1,48 +1,43 @@
-use std::{borrow::Cow};
+use std::borrow::Cow;
 
-use crate::{config::filters::AsFilter, resource::Resource};
+use crate::{config::filters::Filter, resource::Resource};
 use derive_more::Deref;
-use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Deserialize, Deref, Clone, Eq, PartialEq)]
+#[derive(Debug, Deserialize, Serialize, Deref, Clone, Eq, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct Extension {
 	#[serde(default)]
 	pub extensions: Vec<String>,
 }
 
-impl AsFilter for Extension {
-	fn filter(&self, resources: &[&Resource]) -> Vec<bool> {
-		resources
-			.par_iter()
-			.map(|res| {
-				let extension = res.path.extension().unwrap_or_default().to_string_lossy();
-				if extension.is_empty() {
-					return false;
-				}
+#[typetag::serde(name = "extension")]
+impl Filter for Extension {
+	fn filter(&self, res: &Resource) -> bool {
+		let extension = res.path.extension().unwrap_or_default().to_string_lossy();
+		if extension.is_empty() {
+			return false;
+		}
 
-				if self.extensions.is_empty() {
-					return true;
-				}
+		if self.extensions.is_empty() {
+			return true;
+		}
 
-				self.extensions.iter().any(|e| {
-					let mut negate = false;
-					let mut parsed = Cow::from(e);
+		self.extensions.iter().any(|e| {
+			let mut negate = false;
+			let mut parsed = Cow::from(e);
 
-					if parsed.starts_with('!') {
-						negate = true;
-						parsed = Cow::Owned(parsed.to_mut().replacen('!', "", 1));
-					}
+			if parsed.starts_with('!') {
+				negate = true;
+				parsed = Cow::Owned(parsed.to_mut().replacen('!', "", 1));
+			}
 
-					let mut matches = parsed == extension;
-					if negate {
-						matches = !matches
-					}
-					matches
-				})
-			})
-			.collect()
+			let mut matches = parsed == extension;
+			if negate {
+				matches = !matches
+			}
+			matches
+		})
 	}
 }
 
@@ -52,13 +47,13 @@ pub mod tests {
 	use std::str::FromStr;
 
 	use super::Extension;
-	use crate::{config::filters::AsFilter, resource::Resource};
+	use crate::{config::filters::Filter, resource::Resource};
 
 	#[test]
 	fn empty_list() {
 		let extension = Extension { extensions: vec![] };
 		let path = Resource::from_str("$HOME/Downloads/test.pdf").unwrap();
-		assert_eq!(extension.filter(&[&path]), vec![true])
+		assert!(extension.filter(&path))
 	}
 	#[test]
 	fn negative_match() {
@@ -66,7 +61,7 @@ pub mod tests {
 			extensions: vec!["!pdf".into()],
 		};
 		let path = Resource::from_str("$HOME/Downloads/test.pdf").unwrap();
-		assert_eq!(extension.filter(&[&path]), vec![false])
+		assert!(!extension.filter(&path))
 	}
 	#[test]
 	fn single_match_pdf() {
@@ -74,7 +69,7 @@ pub mod tests {
 			extensions: vec!["pdf".into()],
 		};
 		let path = Resource::from_str("$HOME/Downloads/test.pdf").unwrap();
-		assert_eq!(extension.filter(&[&path]), vec![true])
+		assert!(extension.filter(&path))
 	}
 	#[test]
 	fn multiple_match_pdf() {
@@ -82,7 +77,7 @@ pub mod tests {
 			extensions: vec!["pdf".into(), "doc".into(), "docx".into()],
 		};
 		let path = Resource::from_str("$HOME/Downloads/test.pdf").unwrap();
-		assert_eq!(extension.filter(&[&path]), vec![true])
+		assert!(extension.filter(&path))
 	}
 	#[test]
 	fn multiple_match_negative() {
@@ -90,7 +85,7 @@ pub mod tests {
 			extensions: vec!["!pdf".into(), "doc".into(), "docx".into()],
 		};
 		let path = Resource::from_str("$HOME/Downloads/test.pdf").unwrap();
-		assert_eq!(extension.filter(&[&path]), vec![false])
+		assert!(!extension.filter(&path))
 	}
 
 	#[test]
@@ -99,6 +94,6 @@ pub mod tests {
 			extensions: vec!["pdf".into(), "doc".into(), "docx".into()],
 		};
 		let path = Resource::from_str("$HOME/Downloads/test.jpg").unwrap();
-		assert_eq!(extension.filter(&[&path]), vec![false])
+		assert!(!extension.filter(&path))
 	}
 }

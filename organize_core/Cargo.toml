@@ -41,6 +41,7 @@ lettre = { version = "0.11.7", features = ["serde", "tracing", "mime03"] }
 typetag = "0.2.20"
 dyn-clone = "1.0.19"
 dyn-eq = "0.1.3"
+tracing-appender = "0.2.3"
 
 [dev-dependencies]
 pretty_assertions = "1.3.0"

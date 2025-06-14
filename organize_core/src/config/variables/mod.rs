@@ -1,5 +1,5 @@
 use regex::RegexVariable;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use simple::SimpleVariable;
 use tera::Context;
 
@@ -10,7 +10,7 @@ pub trait AsVariable {
 	fn register(&self, context: &mut Context);
 }
 
-#[derive(Deserialize, PartialEq, Clone, Debug)]
+#[derive(Deserialize, Serialize, PartialEq, Clone, Debug)]
 #[serde(tag = "type", rename_all(deserialize = "lowercase"))]
 pub enum Variable {
 	Simple(SimpleVariable),

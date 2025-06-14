@@ -1,28 +1,23 @@
-use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::resource::Resource;
 
-use super::AsFilter;
+use super::Filter;
 
-#[derive(Eq, PartialEq, Deserialize, Debug, Clone, Default)]
+#[derive(Eq, PartialEq, Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
 pub struct Empty;
 
-impl AsFilter for Empty {
+#[typetag::serde(name = "empty")]
+impl Filter for Empty {
 	#[tracing::instrument(ret, level = "debug")]
-	fn filter(&self, resources: &[&Resource]) -> Vec<bool> {
-		resources
-			.par_iter()
-			.map(|res| {
-				let path = &res.path;
-				if path.is_file() {
-					std::fs::metadata(path).map(|md| md.len() == 0).unwrap_or(false)
-				} else {
-					path.read_dir().map(|mut i| i.next().is_none()).unwrap_or(false)
-				}
-			})
-			.collect()
+	fn filter(&self, res: &Resource) -> bool {
+		let path = &res.path;
+		if path.is_file() {
+			std::fs::metadata(path).map(|md| md.len() == 0).unwrap_or(false)
+		} else {
+			path.read_dir().map(|mut i| i.next().is_none()).unwrap_or(false)
+		}
 	}
 }
 
@@ -33,7 +28,7 @@ mod tests {
 	use tempfile::NamedTempFile;
 
 	use crate::{
-		config::filters::{empty::Empty, AsFilter},
+		config::filters::{empty::Empty, Filter},
 		resource::Resource,
 	};
 
@@ -43,7 +38,7 @@ mod tests {
 		let path = file.path();
 		let res = Resource::from(path);
 		let action = Empty;
-		assert_eq!(action.filter(&[&res]), vec![true])
+		assert!(action.filter(&res))
 	}
 	#[test]
 	fn test_dir_positive() {
@@ -51,7 +46,7 @@ mod tests {
 		let path = dir.path();
 		let res = Resource::from(path);
 		let action = Empty;
-		assert_eq!(action.filter(&[&res]), vec![true])
+		assert!(action.filter(&res))
 	}
 	#[test]
 	fn test_file_negative() {
@@ -60,7 +55,7 @@ mod tests {
 		let path = file.path();
 		let res = Resource::from(path);
 		let action = Empty;
-		assert_eq!(action.filter(&[&res]), vec![false])
+		assert!(!action.filter(&res))
 	}
 	#[test]
 	fn test_dir_negative() {
@@ -68,6 +63,6 @@ mod tests {
 		let path = dir.path().parent().unwrap();
 		let res = Resource::from(path);
 		let action = Empty;
-		assert_eq!(action.filter(&[&res]), vec![false])
+		assert!(!action.filter(&res))
 	}
 }

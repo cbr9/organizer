@@ -1,8 +1,7 @@
-use crate::{config::filters::AsFilter, resource::Resource};
+use crate::{config::filters::Filter, resource::Resource};
 use itertools::Itertools;
 use mime::FromStrError;
-use rayon::iter::{IntoParallelIterator, ParallelIterator};
-use serde::{Deserialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::{convert::TryFrom, ops::Deref, str::FromStr};
 
 impl FromStr for Mime {
@@ -13,10 +12,10 @@ impl FromStr for Mime {
 	}
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Deserialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct Mime {
-	#[serde(deserialize_with = "deserialize_mimetypes")]
+	#[serde(deserialize_with = "deserialize_mimetypes", serialize_with = "serialize_mimetypes")]
 	types: Vec<MimeInternal>,
 }
 
@@ -32,6 +31,23 @@ impl Deref for MimeInternal {
 	fn deref(&self) -> &Self::Target {
 		&self.mime
 	}
+}
+
+fn serialize_mimetypes<S>(types: &[MimeInternal], serializer: S) -> Result<S::Ok, S::Error>
+where
+	S: Serializer,
+{
+	let patterns_str: Vec<String> = types
+		.iter()
+		.map(|mime_internal| {
+			if mime_internal.negate {
+				format!("!{}", mime_internal.mime)
+			} else {
+				mime_internal.mime.to_string()
+			}
+		})
+		.collect();
+	patterns_str.serialize(serializer)
 }
 
 fn deserialize_mimetypes<'de, D>(deserializer: D) -> Result<Vec<MimeInternal>, D::Error>
@@ -65,26 +81,22 @@ impl<T: ToString> TryFrom<Vec<T>> for Mime {
 	}
 }
 
-impl AsFilter for Mime {
+#[typetag::serde(name = "mime")]
+impl Filter for Mime {
 	#[tracing::instrument(ret, level = "debug")]
-	fn filter(&self, resources: &[&Resource]) -> Vec<bool> {
-		resources
-			.into_par_iter()
-			.map(|res| {
-				let guess = mime_guess::from_path(&res.path).first_or_octet_stream();
-				self.types.iter().any(|mime| {
-					let mut matches = match (mime.type_(), mime.subtype()) {
-						(mime::STAR, subtype) => subtype == guess.subtype(),
-						(type_, mime::STAR) => type_ == guess.type_(),
-						(type_, subtype) => type_ == guess.type_() && subtype == guess.subtype(),
-					};
-					if mime.negate {
-						matches = !matches;
-					}
-					matches
-				})
-			})
-			.collect()
+	fn filter(&self, res: &Resource) -> bool {
+		let guess = mime_guess::from_path(&res.path).first_or_octet_stream();
+		self.types.iter().any(|mime| {
+			let mut matches = match (mime.type_(), mime.subtype()) {
+				(mime::STAR, subtype) => subtype == guess.subtype(),
+				(type_, mime::STAR) => type_ == guess.type_(),
+				(type_, subtype) => type_ == guess.type_() && subtype == guess.subtype(),
+			};
+			if mime.negate {
+				matches = !matches;
+			}
+			matches
+		})
 	}
 }
 
@@ -96,15 +108,23 @@ mod tests {
 		let types = Mime::try_from(vec!["!image/*", "audio/*"]).unwrap();
 		let img = Resource::from_str("test.jpg").unwrap();
 		let audio = Resource::from_str("test.ogg").unwrap();
-		assert_eq!(types.filter(&[&img]), vec![false]);
-		assert_eq!(types.filter(&[&audio]), vec![true]);
+		assert!(!types.filter(&img));
+		assert!(types.filter(&audio));
+	}
+	#[test]
+	fn test_match_negative_one_mime() {
+		let types = Mime::try_from(vec!["!image/*"]).unwrap();
+		let img = Resource::from_str("test.jpg").unwrap();
+		let audio = Resource::from_str("test.ogg").unwrap();
+		assert!(!types.filter(&img));
+		assert!(types.filter(&audio));
 	}
 	#[test]
 	fn test_match() {
 		let types = Mime::try_from(vec!["image/*", "audio/*"]).unwrap();
 		let img = Resource::from_str("test.jpg").unwrap();
 		let audio = Resource::from_str("test.ogg").unwrap();
-		assert_eq!(types.filter(&[&img]), vec![true]);
-		assert_eq!(types.filter(&[&audio]), vec![true]);
+		assert!(types.filter(&img));
+		assert!(types.filter(&audio));
 	}
 }

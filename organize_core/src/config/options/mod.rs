@@ -3,7 +3,7 @@ use anyhow::{Context, Result};
 
 use crate::utils::DefaultOpt;
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::{
 	fmt::Debug,
 	path::{Path, PathBuf},
@@ -12,7 +12,7 @@ use walkdir::WalkDir;
 
 use super::{folders::Folder, Config, Rule};
 
-#[derive(Deserialize, Debug, Clone, PartialEq)]
+#[derive(Deserialize, Serialize, Debug, Clone, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct Options {
 	pub max_depth: Option<f64>,
@@ -23,7 +23,7 @@ pub struct Options {
 	pub target: Option<Target>,
 }
 
-#[derive(Debug, Default, Clone, Deserialize, PartialEq)]
+#[derive(Debug, Default, Clone, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum Target {
 	#[default]
@@ -89,7 +89,7 @@ impl Options {
 			.collect())
 	}
 
-	#[tracing::instrument(ret, level = "debug", skip(config, rule, folder))]
+	#[tracing::instrument(ret, level = "debug", skip(config, rule))]
 	pub fn prefilter<T: AsRef<Path> + Debug>(config: &Config, rule: &Rule, folder: &Folder, path: T) -> bool {
 		let mut excluded = Self::excluded(config, rule, folder);
 		if excluded.is_empty() {
@@ -106,7 +106,7 @@ impl Options {
 		})
 	}
 
-	#[tracing::instrument(ret, level = "debug", skip(config, rule, folder))]
+	#[tracing::instrument(ret, level = "debug", skip(config, rule))]
 	pub fn postfilter<T: AsRef<Path> + Debug>(config: &Config, rule: &Rule, folder: &Folder, path: T) -> bool {
 		let path = path.as_ref();
 

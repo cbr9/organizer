@@ -4,9 +4,11 @@ use anyhow::Result;
 use clap::{Parser, ValueHint};
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
-use organize_core::config::{options::Options, Config, CONFIG};
+use organize_core::config::{options::Options, Config};
 
 use crate::Cmd;
+
+use super::logs;
 
 #[derive(Parser, Default)]
 pub struct Run {
@@ -20,15 +22,18 @@ pub struct Run {
 	dry_run: bool,
 	#[arg(long, conflicts_with = "dry_run")]
 	no_dry_run: bool,
+	#[arg(long, short = 'v')]
+	verbose: bool,
 }
 
 impl Cmd for Run {
 	#[tracing::instrument(skip(self))]
 	fn run(mut self) -> Result<()> {
-		let config = CONFIG.get_or_init(|| match self.config {
+		let config = match self.config {
 			Some(ref path) => Config::new(path).expect("Could not parse config"),
 			None => Config::new(Config::path().unwrap()).expect("Could not parse config"),
-		});
+		};
+		logs::init(self.verbose, &config.path);
 
 		let filtered_rules = config.filter_rules(self.tags.as_ref(), self.ids.as_ref());
 
@@ -36,19 +41,30 @@ impl Cmd for Run {
 			self.dry_run = false;
 		}
 
-		for rule in filtered_rules.into_iter() {
-			let mut entries = rule
+		for (i, rule) in filtered_rules.into_iter().enumerate() {
+			let entries = rule
 				.folders
 				.par_iter()
-				.map(|folder| Options::get_entries(config, rule, folder).unwrap())
+				.filter_map(|folder| {
+					Options::get_entries(&config, rule, folder)
+						.inspect_err(|e| {
+							tracing::error!(
+								"Rule [number = {}, id = {}]: Could not read entries from folder '{}'. Error: {}",
+								i,
+								rule.id.as_deref().unwrap_or("untitled"),
+								folder.path().unwrap_or_default().display(),
+								e
+							)
+						})
+						.ok()
+				})
 				.flatten()
+				.filter(|res| rule.filters.iter().all(|f| f.filter(res)))
 				.collect::<Vec<_>>();
 
-			entries = rule.filters.filter(entries);
-
-			for action in rule.actions.iter() {
-				entries = action.run(entries, self.dry_run);
-			}
+			rule.actions
+				.iter()
+				.fold(entries, |current_entries, action| action.run(current_entries, self.dry_run));
 		}
 		Ok(())
 	}

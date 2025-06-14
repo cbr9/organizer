@@ -2,12 +2,12 @@ use std::path::PathBuf;
 
 use anyhow::{Context as ErrorContext, Result};
 use path_clean::PathClean;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use tera::Context;
 
 use crate::{config::options::Options, path::expand::Expand, templates::Template};
 
-#[derive(Deserialize, Debug, PartialEq, Clone)]
+#[derive(Deserialize, Serialize, Debug, PartialEq, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct Folder {
 	root: Template,

@@ -1,10 +1,9 @@
-use crate::{config::filters::AsFilter, resource::Resource, templates::Template};
-use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
-use serde::Deserialize;
+use crate::{config::filters::Filter, resource::Resource, templates::Template};
+use serde::{Deserialize, Serialize};
 
 // TODO: refactor
 
-#[derive(Eq, PartialEq, Deserialize, Debug, Clone, Default)]
+#[derive(Eq, PartialEq, Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
 pub struct Filename {
 	#[serde(default)]
@@ -17,90 +16,86 @@ pub struct Filename {
 	pub case_sensitive: bool,
 }
 
-impl AsFilter for Filename {
+#[typetag::serde(name = "filename")]
+impl Filter for Filename {
 	#[tracing::instrument(ret, level = "debug")]
-	fn filter(&self, resources: &[&Resource]) -> Vec<bool> {
-		resources
-			.par_iter()
-			.map(|res| {
-				let filename = res.path.file_name().unwrap_or_default().to_string_lossy();
+	fn filter(&self, res: &Resource) -> bool {
+		let filename = res.path.file_name().unwrap_or_default().to_string_lossy();
 
-				if filename.is_empty() {
-					return false;
-				}
+		if filename.is_empty() {
+			return false;
+		}
 
-				let startswith = if self.startswith.is_empty() {
-					true
-				} else {
-					self.startswith
-						.iter()
-						.flat_map(|s| {
-							s.render(&res.context)
-								.map(|s| if !self.case_sensitive { s.to_lowercase() } else { s })
-						})
-						.any(|mut s| {
-							let mut negate = false;
-							if s.starts_with('!') {
-								negate = true;
-								s = s.replacen('!', "", 1);
-							}
-							let mut matches = filename.starts_with(&s);
-							if negate {
-								matches = !matches
-							}
-							matches
-						})
-				};
+		let startswith = if self.startswith.is_empty() {
+			true
+		} else {
+			self.startswith
+				.iter()
+				.flat_map(|s| {
+					s.render(&res.context)
+						.map(|s| if !self.case_sensitive { s.to_lowercase() } else { s })
+				})
+				.any(|mut s| {
+					let mut negate = false;
+					if s.starts_with('!') {
+						negate = true;
+						s = s.replacen('!', "", 1);
+					}
+					let mut matches = filename.starts_with(&s);
+					if negate {
+						matches = !matches
+					}
+					matches
+				})
+		};
 
-				let endswith = if self.endswith.is_empty() {
-					true
-				} else {
-					self.endswith
-						.iter()
-						.flat_map(|s| {
-							s.render(&res.context)
-								.map(|s| if !self.case_sensitive { s.to_lowercase() } else { s })
-						})
-						.any(|mut s| {
-							let mut negate = false;
-							if s.starts_with('!') {
-								negate = true;
-								s = s.replacen('!', "", 1);
-							}
-							let mut matches = filename.ends_with(&s);
-							if negate {
-								matches = !matches
-							}
-							matches
-						})
-				};
+		let endswith = if self.endswith.is_empty() {
+			true
+		} else {
+			self.endswith
+				.iter()
+				.flat_map(|s| {
+					s.render(&res.context)
+						.map(|s| if !self.case_sensitive { s.to_lowercase() } else { s })
+				})
+				.any(|mut s| {
+					let mut negate = false;
+					if s.starts_with('!') {
+						negate = true;
+						s = s.replacen('!', "", 1);
+					}
+					let mut matches = filename.ends_with(&s);
+					if negate {
+						matches = !matches
+					}
+					matches
+				})
+		};
 
-				let contains = if self.contains.is_empty() {
-					true
-				} else {
-					self.contains
-						.iter()
-						.flat_map(|s| {
-							s.render(&res.context)
-								.map(|s| if !self.case_sensitive { s.to_lowercase() } else { s })
-						})
-						.any(|mut s| {
-							let mut negate = false;
+		let contains = if self.contains.is_empty() {
+			true
+		} else {
+			self.contains
+				.iter()
+				.flat_map(|s| {
+					s.render(&res.context)
+						.map(|s| if !self.case_sensitive { s.to_lowercase() } else { s })
+				})
+				.any(|mut s| {
+					let mut negate = false;
 
-							if s.starts_with('!') {
-								negate = true;
-								s = s.replacen('!', "", 1);
-							}
-							let mut matches = filename.contains(&s);
-							if negate {
-								matches = !matches
-							}
-							matches
-						})
-				};
-				startswith && endswith && contains
-			})
-			.collect()
+					if s.starts_with('!') {
+						negate = true;
+						s = s.replacen('!', "", 1);
+					}
+					let mut matches = filename.contains(&s);
+					if negate {
+						matches = !matches
+					}
+					matches
+				})
+		};
+		startswith && endswith && contains
 	}
 }
 
@@ -117,7 +112,7 @@ mod tests {
 			startswith: vec!["TE".into()],
 			..Default::default()
 		};
-		assert_eq!(filename.filter(&[&path]), vec![true])
+		assert!(filename.filter(&path))
 	}
 
 	#[test]
@@ -127,7 +122,7 @@ mod tests {
 			endswith: vec!["DF".into()],
 			..Default::default()
 		};
-		assert_eq!(filename.filter(&[&path]), vec![true])
+		assert!(filename.filter(&path))
 	}
 
 	#[test]
@@ -137,7 +132,7 @@ mod tests {
 			contains: vec!["ES".into()],
 			..Default::default()
 		};
-		assert_eq!(filename.filter(&[&path]), vec![true])
+		assert!(filename.filter(&path))
 	}
 
 	#[test]
@@ -148,7 +143,7 @@ mod tests {
 			startswith: vec!["TE".into()],
 			..Default::default()
 		};
-		assert_eq!(filename.filter(&[&path]), vec![false])
+		assert!(!filename.filter(&path))
 	}
 
 	#[test]
@@ -159,7 +154,7 @@ mod tests {
 			startswith: vec!["DF".into()],
 			..Default::default()
 		};
-		assert_eq!(filename.filter(&[&path]), vec![false])
+		assert!(!filename.filter(&path))
 	}
 
 	#[test]
@@ -170,7 +165,7 @@ mod tests {
 			contains: vec!["ES".into()],
 			..Default::default()
 		};
-		assert_eq!(filename.filter(&[&path]), vec![false])
+		assert!(!filename.filter(&path))
 	}
 	#[test]
 	fn match_containing_case_sensitive() {
@@ -180,7 +175,7 @@ mod tests {
 			contains: vec!["ES".into()],
 			..Default::default()
 		};
-		assert_eq!(filename.filter(&[&path]), vec![true])
+		assert!(filename.filter(&path))
 	}
 	#[test]
 	fn match_multiple_conditions_case_sensitive() {
@@ -191,7 +186,7 @@ mod tests {
 			startswith: vec!["t".into()],
 			endswith: vec!["df".into()],
 		};
-		assert_eq!(filename.filter(&[&path]), vec![true])
+		assert!(filename.filter(&path))
 	}
 	#[test]
 	fn match_multiple_conditions_some_negative() {
@@ -202,7 +197,7 @@ mod tests {
 			startswith: vec!["t".into()],
 			endswith: vec!["!df".into()],
 		};
-		assert_eq!(filename.filter(&[&path]), vec![false])
+		assert!(!filename.filter(&path))
 	}
 	#[test]
 	fn match_multiple_conditions_some_negative_2() {
@@ -213,7 +208,7 @@ mod tests {
 			startswith: vec!["t".into()],
 			endswith: vec!["!df".into()],
 		};
-		assert_eq!(filename.filter(&[&path]), vec![false])
+		assert!(!filename.filter(&path))
 	}
 	#[test]
 	fn match_multiple_conditions_some_negative_3() {
@@ -224,6 +219,6 @@ mod tests {
 			startswith: vec!["t".into()],
 			endswith: vec!["!df".into()],
 		};
-		assert_eq!(filename.filter(&[&path]), vec![true])
+		assert!(filename.filter(&path))
 	}
 }

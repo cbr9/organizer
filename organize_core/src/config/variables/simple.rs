@@ -1,11 +1,11 @@
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use tera::Context;
 
 use crate::templates::Template;
 
 use super::AsVariable;
 
-#[derive(Deserialize, Clone, Debug, PartialEq)]
+#[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
 pub struct SimpleVariable {
 	name: String,
 	value: Template,

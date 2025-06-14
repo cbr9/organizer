@@ -31,6 +31,7 @@ dirs = "5.0.1"
 tracing = "0.1.40"
 tracing-subscriber = "0.3.18"
 itertools = "0.13.0"
+tracing-appender = "0.2.3"
 
 [workspace]
 members = ["organize_core"]
