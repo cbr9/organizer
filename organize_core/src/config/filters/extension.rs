@@ -1,6 +1,10 @@
 use std::borrow::Cow;
 
-use crate::{config::filters::Filter, resource::Resource};
+use crate::{
+	config::{filters::Filter, variables::Variable},
+	resource::Resource,
+	templates::{template::Template, TemplateEngine},
+};
 use derive_more::Deref;
 use serde::{Deserialize, Serialize};
 
@@ -13,7 +17,10 @@ pub struct Extension {
 
 #[typetag::serde(name = "extension")]
 impl Filter for Extension {
-	fn filter(&self, res: &Resource) -> bool {
+	fn templates(&self) -> Vec<Template> {
+		vec![]
+	}
+	fn filter(&self, res: &Resource, _template_engine: &TemplateEngine, _variables: &[Box<dyn Variable>]) -> bool {
 		let extension = res.path.extension().unwrap_or_default().to_string_lossy();
 		if extension.is_empty() {
 			return false;
@@ -47,13 +54,15 @@ pub mod tests {
 	use std::str::FromStr;
 
 	use super::Extension;
-	use crate::{config::filters::Filter, resource::Resource};
+	use crate::{config::filters::Filter, resource::Resource, templates::TemplateEngine};
 
 	#[test]
 	fn empty_list() {
 		let extension = Extension { extensions: vec![] };
 		let path = Resource::from_str("$HOME/Downloads/test.pdf").unwrap();
-		assert!(extension.filter(&path))
+		let template_engine = TemplateEngine::default();
+		let variables = vec![];
+		assert!(extension.filter(&path, &template_engine, &variables))
 	}
 	#[test]
 	fn negative_match() {
@@ -61,7 +70,9 @@ pub mod tests {
 			extensions: vec!["!pdf".into()],
 		};
 		let path = Resource::from_str("$HOME/Downloads/test.pdf").unwrap();
-		assert!(!extension.filter(&path))
+		let template_engine = TemplateEngine::default();
+		let variables = vec![];
+		assert!(!extension.filter(&path, &template_engine, &variables))
 	}
 	#[test]
 	fn single_match_pdf() {
@@ -69,7 +80,9 @@ pub mod tests {
 			extensions: vec!["pdf".into()],
 		};
 		let path = Resource::from_str("$HOME/Downloads/test.pdf").unwrap();
-		assert!(extension.filter(&path))
+		let template_engine = TemplateEngine::default();
+		let variables = vec![];
+		assert!(extension.filter(&path, &template_engine, &variables))
 	}
 	#[test]
 	fn multiple_match_pdf() {
@@ -77,7 +90,9 @@ pub mod tests {
 			extensions: vec!["pdf".into(), "doc".into(), "docx".into()],
 		};
 		let path = Resource::from_str("$HOME/Downloads/test.pdf").unwrap();
-		assert!(extension.filter(&path))
+		let template_engine = TemplateEngine::default();
+		let variables = vec![];
+		assert!(extension.filter(&path, &template_engine, &variables))
 	}
 	#[test]
 	fn multiple_match_negative() {
@@ -85,7 +100,9 @@ pub mod tests {
 			extensions: vec!["!pdf".into(), "doc".into(), "docx".into()],
 		};
 		let path = Resource::from_str("$HOME/Downloads/test.pdf").unwrap();
-		assert!(!extension.filter(&path))
+		let template_engine = TemplateEngine::default();
+		let variables = vec![];
+		assert!(!extension.filter(&path, &template_engine, &variables))
 	}
 
 	#[test]
@@ -94,6 +111,8 @@ pub mod tests {
 			extensions: vec!["pdf".into(), "doc".into(), "docx".into()],
 		};
 		let path = Resource::from_str("$HOME/Downloads/test.jpg").unwrap();
-		assert!(!extension.filter(&path))
+		let template_engine = TemplateEngine::default();
+		let variables = vec![];
+		assert!(!extension.filter(&path, &template_engine, &variables))
 	}
 }

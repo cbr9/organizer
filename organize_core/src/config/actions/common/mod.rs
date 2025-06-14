@@ -14,32 +14,34 @@ pub enum ConflictOption {
 	Rename,
 }
 
-impl ConflictOption {
-	#[tracing::instrument(ret, level = "debug")]
-	pub fn resolve_naming_conflict<T: AsRef<Path> + std::fmt::Debug>(&self, target_path: T) -> Option<PathBuf> {
-		use ConflictOption::*;
-		let mut path = target_path.as_ref().to_path_buf();
-		if !path.exists() {
-			return Some(path);
-		}
-		match self {
-			Skip => None,
-			Overwrite => Some(path),
-			Rename => {
-				let counter_separator = " ";
-				let extension = path.extension().unwrap_or_default().to_string_lossy().to_string();
-				let stem = path.file_stem()?.to_string_lossy().to_string();
-				let mut n = 1;
-				while path.exists() {
-					if extension.is_empty() {
-						path.set_file_name(format!("{}{}({:?})", stem, counter_separator, n));
-					} else {
-						path.set_file_name(format!("{}{}({:?}).{}", stem, counter_separator, n, extension));
-					}
-					n += 1;
+pub fn enabled() -> bool {
+	true
+}
+
+#[tracing::instrument(ret, level = "debug")]
+pub fn resolve_naming_conflict<T: AsRef<Path> + std::fmt::Debug>(strategy: &ConflictOption, target_path: T) -> Option<PathBuf> {
+	use ConflictOption::*;
+	let mut path = target_path.as_ref().to_path_buf();
+	if !path.exists() {
+		return Some(path);
+	}
+	match strategy {
+		Skip => None,
+		Overwrite => Some(path),
+		Rename => {
+			let counter_separator = " ";
+			let extension = path.extension().unwrap_or_default().to_string_lossy().to_string();
+			let stem = path.file_stem()?.to_string_lossy().to_string();
+			let mut n = 1;
+			while path.exists() {
+				if extension.is_empty() {
+					path.set_file_name(format!("{}{}({:?})", stem, counter_separator, n));
+				} else {
+					path.set_file_name(format!("{}{}({:?}).{}", stem, counter_separator, n, extension));
 				}
-				Some(path)
+				n += 1;
 			}
+			Some(path)
 		}
 	}
 }
@@ -54,13 +56,14 @@ mod tests {
 	#[test]
 	fn skip_exists() {
 		let file = NamedTempFile::new().unwrap();
-		let new = ConflictOption::Skip.resolve_naming_conflict(file.path());
+		let strategy = ConflictOption::Skip;
+		let new = resolve_naming_conflict(&strategy, file.path());
 		assert_eq!(new, None)
 	}
 	#[test]
 	fn skip_not_exists() {
 		let path = PathBuf::from("/home/user/skipped_file.txt");
-		let new = ConflictOption::Skip.resolve_naming_conflict(&path);
+		let new = resolve_naming_conflict(&ConflictOption::Skip, &path);
 		assert_eq!(new, Some(path))
 	}
 
@@ -68,13 +71,13 @@ mod tests {
 	fn overwrite_exists() {
 		let file = NamedTempFile::new().unwrap();
 		let path = file.path();
-		let new = ConflictOption::Overwrite.resolve_naming_conflict(path);
+		let new = resolve_naming_conflict(&ConflictOption::Overwrite, &path);
 		assert_eq!(new, Some(path.to_path_buf()))
 	}
 	#[test]
 	fn overwrite_not_exists() {
 		let path = PathBuf::from("/home/user/skipped_file.txt");
-		let new = ConflictOption::Overwrite.resolve_naming_conflict(&path);
+		let new = resolve_naming_conflict(&ConflictOption::Overwrite, &path);
 		assert_eq!(new, Some(path))
 	}
 
@@ -85,7 +88,7 @@ mod tests {
 		let file_name = path.file_stem().unwrap().to_string_lossy();
 		let mut expected = path.clone();
 		expected.set_file_name(format!("{} (1)", file_name));
-		let new = ConflictOption::Rename.resolve_naming_conflict(&path);
+		let new = resolve_naming_conflict(&ConflictOption::Rename, &path);
 		assert_eq!(new, Some(expected))
 	}
 
@@ -96,7 +99,7 @@ mod tests {
 		let file_name = path.file_stem().unwrap().to_string_lossy();
 		let mut expected = path.clone();
 		expected.set_file_name(format!("{} (1).txt", file_name));
-		let new = ConflictOption::Rename.resolve_naming_conflict(&path);
+		let new = resolve_naming_conflict(&ConflictOption::Rename, &path);
 		assert_eq!(new, Some(expected))
 	}
 }

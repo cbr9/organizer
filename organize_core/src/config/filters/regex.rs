@@ -1,4 +1,8 @@
-use crate::{config::filters::Filter, resource::Resource, templates::Template};
+use crate::{
+	config::{filters::Filter, variables::Variable},
+	resource::Resource,
+	templates::{template::Template, TemplateEngine},
+};
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Debug, Clone, Serialize)]
@@ -22,9 +26,13 @@ impl Eq for Regex {}
 
 #[typetag::serde(name = "regex")]
 impl Filter for RegularExpression {
+	fn templates(&self) -> Vec<Template> {
+		vec![self.input.clone()]
+	}
 	#[tracing::instrument(ret, level = "debug")]
-	fn filter(&self, res: &Resource) -> bool {
-		self.input.render(&res.context).is_ok_and(|s| {
+	fn filter(&self, res: &Resource, template_engine: &TemplateEngine, variables: &[Box<dyn Variable>]) -> bool {
+		let context = TemplateEngine::new_context(res, variables);
+		template_engine.render(&self.input, &context).is_ok_and(|s| {
 			let mut matches = self.pattern.0.is_match(&s);
 			if self.negate {
 				matches = !matches;

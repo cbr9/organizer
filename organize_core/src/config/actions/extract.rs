@@ -1,3 +1,4 @@
+use anyhow::{Context, Result};
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -5,9 +6,15 @@ use std::{
 	path::PathBuf,
 };
 
-use crate::{path::prepare::prepare_target_path, resource::Resource, templates::Template};
+use crate::{
+	config::variables::Variable,
+	path::prepare::prepare_target_path,
+	resource::Resource,
+	templates::{template::Template, TemplateEngine},
+};
 
-use super::{common::ConflictOption, script::ActionConfig, Action};
+use super::{common::ConflictOption, Action, ActionConfig};
+use crate::config::actions::common::enabled;
 
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
@@ -15,45 +22,51 @@ pub struct Extract {
 	pub to: Template,
 	#[serde(default)]
 	pub if_exists: ConflictOption,
+	#[serde(default = "enabled")]
+	enabled: bool,
 }
 
 #[typetag::serde(name = "extract")]
 impl Action for Extract {
+	fn templates(&self) -> Vec<Template> {
+		vec![self.to.clone()]
+	}
 	fn config(&self) -> ActionConfig {
-		ActionConfig {
-			requires_dest: true,
-			parallelize: true,
-		}
-	}
-	fn get_target_path(&self, src: &Resource) -> anyhow::Result<Option<PathBuf>> {
-		prepare_target_path(&self.if_exists, src, &self.to, false)
+		ActionConfig { parallelize: true }
 	}
 
-	#[tracing::instrument(ret(level = "info"), err(Debug), level = "debug", skip(dest))]
-	fn execute(&self, src: &Resource, dest: Option<PathBuf>, dry_run: bool) -> anyhow::Result<Option<std::path::PathBuf>> {
-		let dest = dest.unwrap();
-		if !dry_run {
-			let file = File::open(&src.path)?;
-			let mut archive = zip::ZipArchive::new(file)?;
-			archive.extract(&dest)?;
+	#[tracing::instrument(ret(level = "info"), err(Debug), level = "debug")]
+	fn execute(&self, res: &Resource, template_engine: &TemplateEngine, variables: &[Box<dyn Variable>], dry_run: bool) -> Result<Option<PathBuf>> {
+		match prepare_target_path(&self.if_exists, res, &self.to, false, template_engine, variables)? {
+			Some(dest) => {
+				if !dry_run && self.enabled {
+					if let Some(parent) = dest.parent() {
+						std::fs::create_dir_all(parent).with_context(|| format!("Could not create parent directory for {}", dest.display()))?;
+					}
+					let file = File::open(&res.path)?;
+					let mut archive = zip::ZipArchive::new(file)?;
+					archive.extract(&dest)?;
 
-			let content = fs::read_dir(&dest)?.flatten().collect_vec();
-			if content.len() == 1 {
-				if let Some(dir) = content.first() {
-					let dir = dir.path();
-					if dir.is_dir() {
-						let inner_content = fs::read_dir(&dir)?.flatten().collect_vec();
-						let components = dir.components().collect_vec();
-						for entry in inner_content {
-							let mut new_path: PathBuf = entry.path().components().filter(|c| !components.contains(c)).collect();
-							new_path = dest.join(new_path);
-							std::fs::rename(entry.path(), new_path)?;
+					let content = fs::read_dir(&dest)?.flatten().collect_vec();
+					if content.len() == 1 {
+						if let Some(dir) = content.first() {
+							let dir = dir.path();
+							if dir.is_dir() {
+								let inner_content = fs::read_dir(&dir)?.flatten().collect_vec();
+								let components = dir.components().collect_vec();
+								for entry in inner_content {
+									let mut new_path: PathBuf = entry.path().components().filter(|c| !components.contains(c)).collect();
+									new_path = dest.join(new_path);
+									std::fs::rename(entry.path(), new_path)?;
+								}
+								std::fs::remove_dir(dir)?;
+							}
 						}
-						std::fs::remove_dir(dir)?;
 					}
 				}
+				Ok(Some(dest))
 			}
+			None => Ok(None),
 		}
-		Ok(Some(dest))
 	}
 }

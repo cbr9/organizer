@@ -8,13 +8,19 @@ use std::{
 	sync::{LazyLock, Mutex},
 };
 
-use anyhow::Result;
+use crate::config::actions::common::enabled;
+use anyhow::{Context, Result};
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 
-use crate::{path::prepare::prepare_target_path, resource::Resource, templates::Template};
+use crate::{
+	config::variables::Variable,
+	path::prepare::prepare_target_path,
+	resource::Resource,
+	templates::{template::Template, TemplateEngine},
+};
 
-use super::{common::ConflictOption, script::ActionConfig, Action};
+use super::{common::ConflictOption, Action, ActionConfig};
 
 static KNOWN_FILES: LazyLock<Mutex<HashMap<PathBuf, Mutex<File>>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
 
@@ -38,6 +44,8 @@ pub struct Write {
 	sort: bool,
 	#[serde(default)]
 	continue_with: ContinueWith,
+	#[serde(default = "enabled")]
+	enabled: bool,
 }
 
 #[derive(Deserialize, Serialize, Default, PartialEq, Eq, Clone, Debug)]
@@ -51,17 +59,9 @@ fn r#true() -> bool {
 	true
 }
 
-#[typetag::serde]
-impl Action for Write {
-	fn config(&self) -> ActionConfig {
-		ActionConfig {
-			requires_dest: true,
-			parallelize: true,
-		}
-	}
-	#[tracing::instrument(ret, err(Debug))]
-	fn get_target_path(&self, res: &Resource) -> Result<Option<PathBuf>> {
-		let path = prepare_target_path(&ConflictOption::Overwrite, res, &self.outfile, true)?;
+impl Write {
+	fn get_target_path(&self, res: &Resource, template_engine: &TemplateEngine, variables: &[Box<dyn Variable>]) -> Result<Option<PathBuf>> {
+		let path = prepare_target_path(&ConflictOption::Overwrite, res, &self.outfile, true, template_engine, variables)?;
 		if let Some(path) = path.as_ref() {
 			let mut lock = KNOWN_FILES.lock().unwrap();
 			if !lock.contains_key(path) {
@@ -77,34 +77,54 @@ impl Action for Write {
 		}
 		Ok(path)
 	}
+}
 
-	// #[tracing::instrument(ret, err, skip(dest))]
-	fn execute(&self, res: &Resource, dest: Option<PathBuf>, dry_run: bool) -> Result<Option<PathBuf>> {
-		let path = dest.unwrap();
+#[typetag::serde]
+impl Action for Write {
+	fn templates(&self) -> Vec<Template> {
+		vec![self.text.clone(), self.outfile.clone()]
+	}
+	fn config(&self) -> ActionConfig {
+		ActionConfig { parallelize: true }
+	}
 
-		if !dry_run {
-			let mut text = self.text.render(&res.context)?;
-			if self.mode == WriteMode::Prepend {
-				let mut existing_content = std::fs::read_to_string(&path)?;
-				if !existing_content.ends_with('\n') {
-					existing_content += "\n";
+	#[tracing::instrument(ret(level = "info"), err(Debug), level = "debug")]
+	fn execute(&self, res: &Resource, template_engine: &TemplateEngine, variables: &[Box<dyn Variable>], dry_run: bool) -> Result<Option<PathBuf>> {
+		match self.get_target_path(res, template_engine, variables)? {
+			Some(dest) => {
+				if !dry_run && self.enabled {
+					if let Some(parent) = dest.parent() {
+						std::fs::create_dir_all(parent).with_context(|| format!("Could not create parent directory for {}", dest.display()))?;
+					}
+					if let Some(parent) = dest.parent() {
+						std::fs::create_dir_all(parent).with_context(|| format!("Could not create parent directory for {}", dest.display()))?;
+					}
+					let context = TemplateEngine::new_context(res, variables);
+					let mut text = template_engine.render(&self.text, &context)?;
+					if self.mode == WriteMode::Prepend {
+						let mut existing_content = std::fs::read_to_string(&dest)?;
+						if !existing_content.ends_with('\n') {
+							existing_content += "\n";
+						}
+						text = existing_content + text.as_str();
+					}
+
+					{
+						let lock = KNOWN_FILES.lock().unwrap();
+						let file = lock.get(&dest).expect("file should be there").lock().unwrap();
+						let mut writer = BufWriter::new(file.deref());
+						writeln!(writer, "{}", text)?;
+						writer.flush()?;
+					}
 				}
-				text = existing_content + text.as_str();
-			}
 
-			{
-				let lock = KNOWN_FILES.lock().unwrap();
-				let file = lock.get(&path).expect("file should be there").lock().unwrap();
-				let mut writer = BufWriter::new(file.deref());
-				writeln!(writer, "{}", text)?;
-				writer.flush()?;
+				if self.continue_with == ContinueWith::WrittenFile {
+					Ok(Some(dest))
+				} else {
+					Ok(Some(res.path.clone()))
+				}
 			}
-		}
-
-		if self.continue_with == ContinueWith::WrittenFile {
-			Ok(Some(path))
-		} else {
-			Ok(Some(res.path.clone()))
+			None => Ok(None),
 		}
 	}
 

@@ -4,6 +4,7 @@ use std::path::PathBuf;
 use std::process::Command;
 use std::sync::Mutex;
 
+use crate::config::actions::common::enabled;
 use anyhow::Result;
 use lettre::message::header::ContentType;
 use lettre::message::{Attachment, Mailbox, MessageBuilder, MultiPart, SinglePart};
@@ -12,11 +13,12 @@ use lettre::{SmtpTransport, Transport};
 use serde::{Deserialize, Serialize};
 use std::sync::LazyLock;
 
+use crate::config::variables::Variable;
 use crate::resource::Resource;
-use crate::templates::Template;
+use crate::templates::template::Template;
+use crate::templates::TemplateEngine;
 
-use super::script::ActionConfig;
-use super::Action;
+use super::{Action, ActionConfig};
 
 static CREDENTIALS: LazyLock<Mutex<HashMap<Mailbox, Credentials>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
 
@@ -31,34 +33,45 @@ pub struct Email {
 	body: Option<Template>,
 	#[serde(default)]
 	attach: bool,
+	#[serde(default = "enabled")]
+	pub enabled: bool,
 }
 
 #[typetag::serde(name = "email")]
 impl Action for Email {
 	fn config(&self) -> ActionConfig {
-		ActionConfig {
-			requires_dest: false,
-			parallelize: true,
+		ActionConfig { parallelize: true }
+	}
+	fn templates(&self) -> Vec<Template> {
+		let mut templates = vec![];
+		if let Some(subject) = self.subject.clone() {
+			templates.push(subject);
 		}
+		if let Some(body) = self.body.clone() {
+			templates.push(body);
+		}
+		templates
 	}
 
-	#[tracing::instrument(err(Debug), skip(_dest))]
-	fn execute(&self, res: &Resource, _dest: Option<PathBuf>, dry_run: bool) -> Result<Option<PathBuf>> {
-		if !dry_run {
+	#[tracing::instrument(err(Debug))]
+	fn execute(&self, res: &Resource, template_engine: &TemplateEngine, variables: &[Box<dyn Variable>], dry_run: bool) -> Result<Option<PathBuf>> {
+		if !dry_run && self.enabled {
 			let mut email = MessageBuilder::new()
 				.from(self.sender.clone())
 				.to(self.recipient.clone())
 				.date_now();
 
+			let context = TemplateEngine::new_context(res, variables);
 			if let Some(subject) = &self.subject {
-				email = email.subject(subject.render(&res.context)?);
+				let subject = template_engine.render(subject, &context)?;
+				email = email.subject(subject);
 			}
 
 			let mut multipart = MultiPart::mixed().build();
 
 			// Add body if it exists
 			if let Some(body) = &self.body {
-				let body = body.render(&res.context)?;
+				let body = template_engine.render(body, &context)?;
 				multipart = multipart.singlepart(SinglePart::plain(body));
 			}
 

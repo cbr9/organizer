@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use tera::Context;
 
-use crate::templates::Template;
+use crate::templates::{template::Template, TemplateEngine};
 
 use super::Variable;
 
@@ -22,8 +22,11 @@ impl Eq for RegexVariable {}
 
 #[typetag::serde(name = "regex")]
 impl Variable for RegexVariable {
-	fn register(&self, context: &mut Context) {
-		let input = self.input.render(context).unwrap();
+	fn templates(&self) -> Vec<Template> {
+		vec![self.input.clone()]
+	}
+	fn register(&self, template_engine: &TemplateEngine, context: &mut Context) {
+		let input = template_engine.render(&self.input, context).unwrap();
 		if let Some(captures) = self.pattern.captures(&input) {
 			for name in self.pattern.capture_names().flatten() {
 				if let Some(r#match) = captures.name(name) {

@@ -5,11 +5,14 @@ use anyhow::Result;
 use dyn_clone::DynClone;
 use dyn_eq::DynEq;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
-use script::ActionConfig;
 
-use crate::resource::Resource;
+use crate::{
+	resource::Resource,
+	templates::{template::Template, TemplateEngine},
+};
 
-use anyhow::Context;
+
+use super::variables::Variable;
 
 pub mod common;
 pub mod copy;
@@ -27,62 +30,48 @@ pub mod write;
 dyn_clone::clone_trait_object!(Action);
 dyn_eq::eq_trait_object!(Action);
 
+#[derive(Debug)]
+pub struct ActionConfig {
+	pub parallelize: bool,
+}
+
 #[typetag::serde(tag = "type")]
 pub trait Action: DynEq + DynClone + Sync + Send + Debug {
 	fn config(&self) -> ActionConfig;
 
-	fn execute(&self, src: &Resource, dest: Option<PathBuf>, dry_run: bool) -> Result<Option<PathBuf>>;
+	fn execute(&self, src: &Resource, template_engine: &TemplateEngine, variables: &[Box<dyn Variable>], dry_run: bool) -> Result<Option<PathBuf>>;
 
 	fn on_finish(&self, _resources: &[Resource], _dry_run: bool) -> Result<()> {
 		Ok(())
 	}
 
-	// required only for some actions
-	fn get_target_path(&self, _: &Resource) -> Result<Option<PathBuf>> {
-		let config = self.config();
-		if config.requires_dest {
-			unimplemented!()
-		}
-		Ok(None)
-	}
+	fn templates(&self) -> Vec<Template>;
 
-	fn run(&self, resources: Vec<Resource>, dry_run: bool) -> Vec<Resource> {
+	#[doc(hidden)]
+	fn run(&self, resources: Vec<Resource>, template_engine: &TemplateEngine, variables: &[Box<dyn Variable>], dry_run: bool) -> Vec<Resource> {
 		let config = self.config();
+
+		let filter_fn = |mut res| {
+			let path = self
+				.execute(&res, template_engine, variables, dry_run)
+				.inspect_err(|e| tracing::error!("{}", e))
+				.ok()
+				.flatten();
+			if let Some(path) = path {
+				res.set_path(path);
+				Some(res)
+			} else {
+				None
+			}
+		};
+
 		let resources: Vec<Resource> = if config.parallelize {
-			resources
-				.into_par_iter()
-				.filter_map(|res| self.run_atomic(res, dry_run))
-				.collect()
+			resources.into_par_iter().filter_map(filter_fn).collect()
 		} else {
-			resources.into_iter().filter_map(|res| self.run_atomic(res, dry_run)).collect()
+			resources.into_iter().filter_map(filter_fn).collect()
 		};
 
 		self.on_finish(&resources, dry_run).unwrap();
 		resources
-	}
-
-	fn run_atomic(&self, mut resource: Resource, dry_run: bool) -> Option<Resource> {
-		let config = self.config();
-		let mut value = Ok(None);
-		if let Ok(dest) = self.get_target_path(&resource) {
-			if (config.requires_dest && dest.is_some()) || (!config.requires_dest && dest.is_none()) {
-				if !dry_run && dest.is_some() {
-					let dest = dest.as_ref()?;
-					let parent = dest.parent()?;
-					if let Err(e) = std::fs::create_dir_all(parent).with_context(|| format!("Could not create {}", parent.display())) {
-						tracing::error!("{:?}", e);
-						return None;
-					}
-				}
-
-				value = self.execute(&resource, dest, dry_run);
-			}
-		}
-
-		if let Ok(value) = value {
-			resource.set_path(value?);
-			return Some(resource);
-		}
-		None
 	}
 }

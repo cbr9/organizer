@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use anyhow::Result;
 use clap::{Parser, ValueHint};
-use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
+use rayon::iter::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
 
 use organize_core::config::Config;
 
@@ -44,7 +44,7 @@ impl Cmd for Run {
 				.par_iter()
 				.filter_map(|folder| {
 					folder
-						.get_resources(&rule.variables)
+						.get_resources()
 						.inspect_err(|e| {
 							tracing::error!(
 								"Rule [number = {}, id = {}]: Could not read entries from folder '{}'. Error: {}",
@@ -57,12 +57,17 @@ impl Cmd for Run {
 						.ok()
 				})
 				.flatten()
-				.filter(|res| rule.filters.iter().all(|f| f.filter(res)))
+				.into_par_iter()
+				.filter(|res| {
+					rule.filters
+						.iter()
+						.all(|f| f.filter(res, &rule.template_engine, &rule.variables))
+				})
 				.collect::<Vec<_>>();
 
-			rule.actions
-				.iter()
-				.fold(entries, |current_entries, action| action.run(current_entries, self.dry_run));
+			rule.actions.iter().fold(entries, |current_entries, action| {
+				action.run(current_entries, &rule.template_engine, &rule.variables, self.dry_run)
+			});
 		}
 		Ok(())
 	}

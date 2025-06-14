@@ -1,9 +1,8 @@
 use serde::{Deserialize, Serialize};
 use tera::Context;
 
-use crate::templates::Template;
-
 use super::Variable;
+use crate::templates::{template::Template, TemplateEngine};
 
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
 pub struct SimpleVariable {
@@ -13,8 +12,11 @@ pub struct SimpleVariable {
 
 #[typetag::serde(name = "simple")]
 impl Variable for SimpleVariable {
-	fn register(&self, context: &mut Context) {
-		let value = &self.value.render(context).unwrap();
+	fn templates(&self) -> Vec<Template> {
+		vec![self.value.clone()]
+	}
+	fn register(&self, template_engine: &TemplateEngine, context: &mut Context) {
+		let value = template_engine.render(&self.value, context).unwrap();
 		context.insert(&self.name, &value);
 	}
 }

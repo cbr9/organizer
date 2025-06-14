@@ -1,46 +1,32 @@
 use std::path::PathBuf;
 
-use crate::{resource::Resource, PROJECT_NAME};
-use anyhow::{Context, Result};
+use crate::config::actions::common::enabled;
+use crate::templates::template::Template;
+use crate::{config::variables::Variable, resource::Resource, templates::TemplateEngine};
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
-use super::{script::ActionConfig, Action};
-
-fn enabled() -> bool {
-	true
-}
+use super::{Action, ActionConfig};
 
 #[derive(Debug, Clone, Serialize, Default, Deserialize, Eq, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct Trash {
 	#[serde(default = "enabled")]
-	pub confirm: bool,
-}
-
-impl Trash {
-	fn dir() -> Result<PathBuf> {
-		let dir = dirs::data_local_dir().unwrap().join(PROJECT_NAME).join(".trash");
-		std::fs::create_dir_all(&dir)
-			.with_context(|| format!("Could not create trash directory at {}", &dir.display()))
-			.map(|_| dir)
-	}
+	enabled: bool,
 }
 
 #[typetag::serde(name = "trash")]
 impl Action for Trash {
-	fn config(&self) -> ActionConfig {
-		ActionConfig {
-			requires_dest: false,
-			parallelize: true,
-		}
+	fn templates(&self) -> Vec<Template> {
+		vec![]
 	}
-	#[tracing::instrument(ret(level = "info"), err(Debug), level = "debug", skip(_dest))]
-	fn execute(&self, src: &Resource, _dest: Option<PathBuf>, dry_run: bool) -> Result<Option<PathBuf>> {
-		if !dry_run {
-			let to = Self::dir()?.join(src.path.file_name().unwrap());
-			let from = &src.path;
-			std::fs::copy(from, &to).with_context(|| format!("Could not copy file ({} -> {})", from.display(), to.display()))?;
-			std::fs::remove_file(from).with_context(|| format!("could not move ({} -> {})", from.display(), to.display()))?;
+	fn config(&self) -> ActionConfig {
+		ActionConfig { parallelize: true }
+	}
+	#[tracing::instrument(ret(level = "info"), err(Debug), level = "debug")]
+	fn execute(&self, res: &Resource, _template_engine: &TemplateEngine, _variables: &[Box<dyn Variable>], dry_run: bool) -> Result<Option<PathBuf>> {
+		if !dry_run && self.enabled {
+			trash::delete(&res.path)?;
 		}
 		Ok(None)
 	}
@@ -55,12 +41,16 @@ mod tests {
 	fn test_trash() {
 		let tmp_file = tempfile::NamedTempFile::new().unwrap();
 		let path = tmp_file.path();
-		let resource = Resource::new(path, path.parent().unwrap(), vec![]);
-		let action = Trash { confirm: false };
+		let resource = Resource::new(path, path.parent().unwrap());
+		let action = Trash { enabled: true };
+		let template_engine = TemplateEngine::default();
+		let variables = vec![];
 
 		assert!(path.exists());
 
-		action.execute(&resource, None, false).expect("Could not trash target file");
+		action
+			.execute(&resource, &template_engine, &variables, false)
+			.expect("Could not trash target file");
 		assert!(!path.exists());
 	}
 }

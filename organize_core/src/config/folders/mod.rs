@@ -3,14 +3,13 @@ use std::path::{Path, PathBuf};
 use anyhow::{Context as ErrorContext, Result};
 use path_clean::PathClean;
 use serde::{Deserialize, Serialize};
-use tera::Context;
 use walkdir::WalkDir;
 
 use crate::{
 	config::options::OptionsBuilder,
 	path::{expand::Expand, is_hidden::IsHidden},
 	resource::Resource,
-	templates::Template,
+	templates::{template::Template, TemplateEngine},
 };
 
 use super::{
@@ -27,11 +26,18 @@ pub struct FolderBuilder {
 }
 
 impl FolderBuilder {
-	pub fn build(self, defaults: &OptionsBuilder, rule_options: &OptionsBuilder) -> Result<Folder> {
+	pub fn build(
+		self,
+		defaults: &OptionsBuilder,
+		rule_options: &OptionsBuilder,
+		template_engine: &mut TemplateEngine,
+		variables: &[Box<dyn Variable>],
+	) -> Result<Folder> {
 		let path = {
-			let context = Context::new();
-			self.root
-				.render(&context)
+			let context = TemplateEngine::new_empty_context(variables);
+			template_engine
+				.tera
+				.render_str(&self.root.text, &context)
 				.with_context(|| "cannot expand folder name")
 				.map(PathBuf::from)
 				.map(|p| p.expand_user().clean())?
@@ -49,7 +55,7 @@ pub struct Folder {
 }
 
 impl Folder {
-	pub fn get_resources(&self, rule_variables: &[Box<dyn Variable>]) -> Result<Vec<Resource>> {
+	pub fn get_resources(&self) -> Result<Vec<Resource>> {
 		let home = &dirs::home_dir().context("unable to find home directory")?;
 		let min_depth = if &self.path == home { 1.0 } else { self.options.min_depth };
 		let max_depth = if &self.path == home { 1.0 } else { self.options.max_depth };
@@ -63,7 +69,7 @@ impl Folder {
 			.filter_entry(|e| self.prefilter(e.path()))
 			.flatten()
 			.filter(|e| self.postfilter(e.path()))
-			.map(|e| Resource::new(e.path(), &self.path, rule_variables.to_vec()))
+			.map(|e| Resource::new(e.path(), &self.path))
 			.collect();
 
 		Ok(entries)

@@ -10,14 +10,20 @@ pub mod filename;
 pub mod mime;
 pub mod regex;
 
-use crate::resource::Resource;
+use crate::{
+	resource::Resource,
+	templates::{template::Template, TemplateEngine},
+};
+
+use super::variables::Variable;
 
 dyn_clone::clone_trait_object!(Filter);
 dyn_eq::eq_trait_object!(Filter);
 
 #[typetag::serde(tag = "type")]
 pub trait Filter: DynClone + DynEq + Debug + Send + Sync {
-	fn filter(&self, res: &Resource) -> bool;
+	fn filter(&self, res: &Resource, template_engine: &TemplateEngine, variables: &[Box<dyn Variable>]) -> bool;
+	fn templates(&self) -> Vec<Template>;
 }
 
 #[derive(Eq, PartialEq, Deserialize, Serialize, Debug, Clone)]
@@ -27,8 +33,11 @@ struct Not {
 
 #[typetag::serde(name = "not")]
 impl Filter for Not {
-	fn filter(&self, res: &Resource) -> bool {
-		!self.filter.filter(res)
+	fn filter(&self, res: &Resource, template_engine: &TemplateEngine, variables: &[Box<dyn Variable>]) -> bool {
+		!self.filter.filter(res, template_engine, variables)
+	}
+	fn templates(&self) -> Vec<Template> {
+		vec![]
 	}
 }
 
@@ -39,8 +48,11 @@ struct AnyOf {
 
 #[typetag::serde(name = "any_of")]
 impl Filter for AnyOf {
-	fn filter(&self, res: &Resource) -> bool {
-		self.filters.par_iter().any(|f| f.filter(res))
+	fn filter(&self, res: &Resource, template_engine: &TemplateEngine, variables: &[Box<dyn Variable>]) -> bool {
+		self.filters.par_iter().any(|f| f.filter(res, template_engine, variables))
+	}
+	fn templates(&self) -> Vec<Template> {
+		vec![]
 	}
 }
 
@@ -51,8 +63,11 @@ struct AllOf {
 
 #[typetag::serde(name = "all_of")]
 impl Filter for AllOf {
-	fn filter(&self, res: &Resource) -> bool {
-		self.filters.par_iter().all(|f| f.filter(res))
+	fn filter(&self, res: &Resource, template_engine: &TemplateEngine, variables: &[Box<dyn Variable>]) -> bool {
+		self.filters.par_iter().all(|f| f.filter(res, template_engine, variables))
+	}
+	fn templates(&self) -> Vec<Template> {
+		vec![]
 	}
 }
 
@@ -63,7 +78,10 @@ struct NoneOf {
 
 #[typetag::serde(name = "none_of")]
 impl Filter for NoneOf {
-	fn filter(&self, res: &Resource) -> bool {
-		!self.filters.par_iter().any(|f| f.filter(res))
+	fn filter(&self, res: &Resource, template_engine: &TemplateEngine, variables: &[Box<dyn Variable>]) -> bool {
+		!self.filters.par_iter().any(|f| f.filter(res, template_engine, variables))
+	}
+	fn templates(&self) -> Vec<Template> {
+		vec![]
 	}
 }

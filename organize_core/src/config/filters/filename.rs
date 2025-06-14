@@ -1,4 +1,8 @@
-use crate::{config::filters::Filter, resource::Resource, templates::Template};
+use crate::{
+	config::{filters::Filter, variables::Variable},
+	resource::Resource,
+	templates::{template::Template, TemplateEngine},
+};
 use serde::{Deserialize, Serialize};
 
 // TODO: refactor
@@ -18,9 +22,17 @@ pub struct Filename {
 
 #[typetag::serde(name = "filename")]
 impl Filter for Filename {
+	fn templates(&self) -> Vec<Template> {
+		let mut templates = vec![];
+		templates.extend(self.startswith.clone());
+		templates.extend(self.endswith.clone());
+		templates.extend(self.contains.clone());
+		templates
+	}
 	#[tracing::instrument(ret, level = "debug")]
-	fn filter(&self, res: &Resource) -> bool {
+	fn filter(&self, res: &Resource, template_engine: &TemplateEngine, variables: &[Box<dyn Variable>]) -> bool {
 		let filename = res.path.file_name().unwrap_or_default().to_string_lossy();
+		let context = TemplateEngine::new_context(res, variables);
 
 		if filename.is_empty() {
 			return false;
@@ -32,7 +44,8 @@ impl Filter for Filename {
 			self.startswith
 				.iter()
 				.flat_map(|s| {
-					s.render(&res.context)
+					template_engine
+						.render(s, &context)
 						.map(|s| if !self.case_sensitive { s.to_lowercase() } else { s })
 				})
 				.any(|mut s| {
@@ -55,7 +68,8 @@ impl Filter for Filename {
 			self.endswith
 				.iter()
 				.flat_map(|s| {
-					s.render(&res.context)
+					template_engine
+						.render(s, &context)
 						.map(|s| if !self.case_sensitive { s.to_lowercase() } else { s })
 				})
 				.any(|mut s| {
@@ -78,7 +92,8 @@ impl Filter for Filename {
 			self.contains
 				.iter()
 				.flat_map(|s| {
-					s.render(&res.context)
+					template_engine
+						.render(s, &context)
 						.map(|s| if !self.case_sensitive { s.to_lowercase() } else { s })
 				})
 				.any(|mut s| {
@@ -103,6 +118,8 @@ impl Filter for Filename {
 mod tests {
 	use std::str::FromStr;
 
+	use crate::templates::TemplateEngine;
+
 	use super::*;
 
 	#[test]
@@ -112,7 +129,9 @@ mod tests {
 			startswith: vec!["TE".into()],
 			..Default::default()
 		};
-		assert!(filename.filter(&path))
+		let template_engine = TemplateEngine::default();
+		let variables = vec![];
+		assert!(filename.filter(&path, &template_engine, &variables))
 	}
 
 	#[test]
@@ -122,7 +141,9 @@ mod tests {
 			endswith: vec!["DF".into()],
 			..Default::default()
 		};
-		assert!(filename.filter(&path))
+		let template_engine = TemplateEngine::default();
+		let variables = vec![];
+		assert!(filename.filter(&path, &template_engine, &variables))
 	}
 
 	#[test]
@@ -132,7 +153,9 @@ mod tests {
 			contains: vec!["ES".into()],
 			..Default::default()
 		};
-		assert!(filename.filter(&path))
+		let template_engine = TemplateEngine::default();
+		let variables = vec![];
+		assert!(filename.filter(&path, &template_engine, &variables))
 	}
 
 	#[test]
@@ -143,7 +166,9 @@ mod tests {
 			startswith: vec!["TE".into()],
 			..Default::default()
 		};
-		assert!(!filename.filter(&path))
+		let template_engine = TemplateEngine::default();
+		let variables = vec![];
+		assert!(!filename.filter(&path, &template_engine, &variables))
 	}
 
 	#[test]
@@ -154,7 +179,9 @@ mod tests {
 			startswith: vec!["DF".into()],
 			..Default::default()
 		};
-		assert!(!filename.filter(&path))
+		let template_engine = TemplateEngine::default();
+		let variables = vec![];
+		assert!(!filename.filter(&path, &template_engine, &variables))
 	}
 
 	#[test]
@@ -165,7 +192,9 @@ mod tests {
 			contains: vec!["ES".into()],
 			..Default::default()
 		};
-		assert!(!filename.filter(&path))
+		let template_engine = TemplateEngine::default();
+		let variables = vec![];
+		assert!(!filename.filter(&path, &template_engine, &variables))
 	}
 	#[test]
 	fn match_containing_case_sensitive() {
@@ -175,7 +204,9 @@ mod tests {
 			contains: vec!["ES".into()],
 			..Default::default()
 		};
-		assert!(filename.filter(&path))
+		let template_engine = TemplateEngine::default();
+		let variables = vec![];
+		assert!(filename.filter(&path, &template_engine, &variables))
 	}
 	#[test]
 	fn match_multiple_conditions_case_sensitive() {
@@ -186,7 +217,9 @@ mod tests {
 			startswith: vec!["t".into()],
 			endswith: vec!["df".into()],
 		};
-		assert!(filename.filter(&path))
+		let template_engine = TemplateEngine::default();
+		let variables = vec![];
+		assert!(filename.filter(&path, &template_engine, &variables))
 	}
 	#[test]
 	fn match_multiple_conditions_some_negative() {
@@ -197,7 +230,9 @@ mod tests {
 			startswith: vec!["t".into()],
 			endswith: vec!["!df".into()],
 		};
-		assert!(!filename.filter(&path))
+		let template_engine = TemplateEngine::default();
+		let variables = vec![];
+		assert!(!filename.filter(&path, &template_engine, &variables))
 	}
 	#[test]
 	fn match_multiple_conditions_some_negative_2() {
@@ -208,7 +243,9 @@ mod tests {
 			startswith: vec!["t".into()],
 			endswith: vec!["!df".into()],
 		};
-		assert!(!filename.filter(&path))
+		let template_engine = TemplateEngine::default();
+		let variables = vec![];
+		assert!(!filename.filter(&path, &template_engine, &variables))
 	}
 	#[test]
 	fn match_multiple_conditions_some_negative_3() {
@@ -219,6 +256,8 @@ mod tests {
 			startswith: vec!["t".into()],
 			endswith: vec!["!df".into()],
 		};
-		assert!(filename.filter(&path))
+		let template_engine = TemplateEngine::default();
+		let variables = vec![];
+		assert!(filename.filter(&path, &template_engine, &variables))
 	}
 }

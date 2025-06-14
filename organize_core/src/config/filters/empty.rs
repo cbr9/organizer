@@ -1,6 +1,10 @@
 use serde::{Deserialize, Serialize};
 
-use crate::resource::Resource;
+use crate::{
+	config::variables::Variable,
+	resource::Resource,
+	templates::{template::Template, TemplateEngine},
+};
 
 use super::Filter;
 
@@ -11,13 +15,16 @@ pub struct Empty;
 #[typetag::serde(name = "empty")]
 impl Filter for Empty {
 	#[tracing::instrument(ret, level = "debug")]
-	fn filter(&self, res: &Resource) -> bool {
-		let path = &res.path;
+	fn filter(&self, src: &Resource, _template_engine: &TemplateEngine, _variables: &[Box<dyn Variable>]) -> bool {
+		let path = &src.path;
 		if path.is_file() {
 			std::fs::metadata(path).map(|md| md.len() == 0).unwrap_or(false)
 		} else {
 			path.read_dir().map(|mut i| i.next().is_none()).unwrap_or(false)
 		}
+	}
+	fn templates(&self) -> Vec<Template> {
+		vec![]
 	}
 }
 
@@ -30,6 +37,7 @@ mod tests {
 	use crate::{
 		config::filters::{empty::Empty, Filter},
 		resource::Resource,
+		templates::TemplateEngine,
 	};
 
 	#[test]
@@ -38,7 +46,9 @@ mod tests {
 		let path = file.path();
 		let res = Resource::from(path);
 		let action = Empty;
-		assert!(action.filter(&res))
+		let template_engine = TemplateEngine::default();
+		let variables = vec![];
+		assert!(action.filter(&res, &template_engine, &variables))
 	}
 	#[test]
 	fn test_dir_positive() {
@@ -46,7 +56,9 @@ mod tests {
 		let path = dir.path();
 		let res = Resource::from(path);
 		let action = Empty;
-		assert!(action.filter(&res))
+		let template_engine = TemplateEngine::default();
+		let variables = vec![];
+		assert!(action.filter(&res, &template_engine, &variables))
 	}
 	#[test]
 	fn test_file_negative() {
@@ -55,7 +67,9 @@ mod tests {
 		let path = file.path();
 		let res = Resource::from(path);
 		let action = Empty;
-		assert!(!action.filter(&res))
+		let template_engine = TemplateEngine::default();
+		let variables = vec![];
+		assert!(!action.filter(&res, &template_engine, &variables))
 	}
 	#[test]
 	fn test_dir_negative() {
@@ -63,6 +77,8 @@ mod tests {
 		let path = dir.path().parent().unwrap();
 		let res = Resource::from(path);
 		let action = Empty;
-		assert!(!action.filter(&res))
+		let template_engine = TemplateEngine::default();
+		let variables = vec![];
+		assert!(!action.filter(&res, &template_engine, &variables))
 	}
 }

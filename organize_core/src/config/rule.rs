@@ -2,6 +2,8 @@ use std::collections::HashSet;
 
 use serde::Deserialize;
 
+use crate::templates::TemplateEngine;
+
 use super::{
 	actions::Action,
 	filters::Filter,
@@ -29,11 +31,23 @@ pub struct RuleBuilder {
 
 impl RuleBuilder {
 	pub fn build(self, defaults: &OptionsBuilder) -> anyhow::Result<Rule> {
+		let mut template_engine = TemplateEngine::default();
+
+		for action in self.actions.iter() {
+			let templates = action.templates();
+			template_engine.add_templates(&templates)?;
+		}
+
+		for filter in self.filters.iter() {
+			let templates = filter.templates();
+			template_engine.add_templates(&templates)?;
+		}
+
 		let folders = self
 			.folders
 			.clone()
 			.into_iter()
-			.map(|builder| builder.build(defaults, &self.options)) // Pass this rule's options builder
+			.map(|builder| builder.build(defaults, &self.options, &mut template_engine, &self.variables)) // Pass this rule's options builder
 			.collect::<anyhow::Result<Vec<Folder>>>()?;
 
 		Ok(Rule {
@@ -44,6 +58,7 @@ impl RuleBuilder {
 			filters: self.filters,
 			folders, // Contains fully compiled Folders, each with its own Options
 			variables: self.variables,
+			template_engine,
 		})
 	}
 }
@@ -57,4 +72,5 @@ pub struct Rule {
 	pub filters: Vec<Box<dyn Filter>>,
 	pub folders: Vec<Folder>,
 	pub variables: Vec<Box<dyn Variable>>,
+	pub template_engine: TemplateEngine,
 }
