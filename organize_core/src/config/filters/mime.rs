@@ -91,7 +91,7 @@ impl Filter for Mime {
 		vec![]
 	}
 	#[tracing::instrument(ret, level = "debug")]
-	fn filter(&self, res: &Resource, _template_engine: &TemplateEngine, _variables: &[Box<dyn Variable>]) -> bool {
+	fn filter(&self, res: &Resource, _: &TemplateEngine, _: &[Box<dyn Variable>]) -> bool {
 		let guess = mime_guess::from_path(&res.path).first_or_octet_stream();
 		self.types.iter().any(|mime| {
 			let mut matches = match (mime.type_(), mime.subtype()) {

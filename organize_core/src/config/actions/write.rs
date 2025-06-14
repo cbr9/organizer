@@ -88,7 +88,7 @@ impl Action for Write {
 		ActionConfig { parallelize: true }
 	}
 
-	#[tracing::instrument(ret(level = "info"), err(Debug), level = "debug")]
+	#[tracing::instrument(ret(level = "info"), err(Debug), level = "debug", skip(template_engine, variables))]
 	fn execute(&self, res: &Resource, template_engine: &TemplateEngine, variables: &[Box<dyn Variable>], dry_run: bool) -> Result<Option<PathBuf>> {
 		match self.get_target_path(res, template_engine, variables)? {
 			Some(dest) => {

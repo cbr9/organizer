@@ -20,7 +20,9 @@ impl Filter for Extension {
 	fn templates(&self) -> Vec<Template> {
 		vec![]
 	}
-	fn filter(&self, res: &Resource, _template_engine: &TemplateEngine, _variables: &[Box<dyn Variable>]) -> bool {
+
+	#[tracing::instrument(ret, level = "debug")]
+	fn filter(&self, res: &Resource, _: &TemplateEngine, _: &[Box<dyn Variable>]) -> bool {
 		let extension = res.path.extension().unwrap_or_default().to_string_lossy();
 		if extension.is_empty() {
 			return false;

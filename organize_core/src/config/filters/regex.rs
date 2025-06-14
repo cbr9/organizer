@@ -29,7 +29,7 @@ impl Filter for RegularExpression {
 	fn templates(&self) -> Vec<Template> {
 		vec![self.input.clone()]
 	}
-	#[tracing::instrument(ret, level = "debug")]
+	#[tracing::instrument(ret, level = "debug", skip(template_engine, variables))]
 	fn filter(&self, res: &Resource, template_engine: &TemplateEngine, variables: &[Box<dyn Variable>]) -> bool {
 		let context = TemplateEngine::new_context(res, variables);
 		template_engine.render(&self.input, &context).is_ok_and(|s| {

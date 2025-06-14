@@ -53,7 +53,7 @@ impl Action for Email {
 		templates
 	}
 
-	#[tracing::instrument(err(Debug))]
+	#[tracing::instrument(ret(level = "info"), err(Debug), level = "debug", skip(template_engine, variables))]
 	fn execute(&self, res: &Resource, template_engine: &TemplateEngine, variables: &[Box<dyn Variable>], dry_run: bool) -> Result<Option<PathBuf>> {
 		if !dry_run && self.enabled {
 			let mut email = MessageBuilder::new()

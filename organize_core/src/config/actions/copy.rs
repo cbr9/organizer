@@ -48,7 +48,7 @@ impl Action for Copy {
 		ActionConfig { parallelize: true }
 	}
 
-	#[tracing::instrument(ret(level = "info"), err(Debug), level = "debug")]
+	#[tracing::instrument(ret(level = "info"), err(Debug), level = "debug", skip(template_engine, variables))]
 	fn execute(&self, res: &Resource, template_engine: &TemplateEngine, variables: &[Box<dyn Variable>], dry_run: bool) -> Result<Option<PathBuf>> {
 		match prepare_target_path(&self.if_exists, res, &self.to, true, template_engine, variables)? {
 			Some(dest) => {

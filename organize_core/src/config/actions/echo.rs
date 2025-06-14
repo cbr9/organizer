@@ -29,8 +29,8 @@ impl Action for Echo {
 		vec![self.message.clone()]
 	}
 
-	#[tracing::instrument(ret(level = "info"), err(Debug), level = "debug", skip(_dry_run))]
-	fn execute(&self, res: &Resource, template_engine: &TemplateEngine, variables: &[Box<dyn Variable>], _dry_run: bool) -> Result<Option<PathBuf>> {
+	#[tracing::instrument(ret(level = "info"), err(Debug), level = "debug", skip(template_engine, variables))]
+	fn execute(&self, res: &Resource, template_engine: &TemplateEngine, variables: &[Box<dyn Variable>], _: bool) -> Result<Option<PathBuf>> {
 		if self.enabled {
 			let context = TemplateEngine::new_context(res, variables);
 			let message = template_engine.render(&self.message, &context).map_err(anyhow::Error::msg)?;

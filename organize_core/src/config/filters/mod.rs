@@ -33,6 +33,7 @@ struct Not {
 
 #[typetag::serde(name = "not")]
 impl Filter for Not {
+	#[tracing::instrument(ret, level = "debug", skip(template_engine, variables))]
 	fn filter(&self, res: &Resource, template_engine: &TemplateEngine, variables: &[Box<dyn Variable>]) -> bool {
 		!self.filter.filter(res, template_engine, variables)
 	}
@@ -48,6 +49,7 @@ struct AnyOf {
 
 #[typetag::serde(name = "any_of")]
 impl Filter for AnyOf {
+	#[tracing::instrument(ret, level = "debug", skip(template_engine, variables))]
 	fn filter(&self, res: &Resource, template_engine: &TemplateEngine, variables: &[Box<dyn Variable>]) -> bool {
 		self.filters.par_iter().any(|f| f.filter(res, template_engine, variables))
 	}
@@ -63,6 +65,7 @@ struct AllOf {
 
 #[typetag::serde(name = "all_of")]
 impl Filter for AllOf {
+	#[tracing::instrument(ret, level = "debug", skip(template_engine, variables))]
 	fn filter(&self, res: &Resource, template_engine: &TemplateEngine, variables: &[Box<dyn Variable>]) -> bool {
 		self.filters.par_iter().all(|f| f.filter(res, template_engine, variables))
 	}
@@ -78,6 +81,7 @@ struct NoneOf {
 
 #[typetag::serde(name = "none_of")]
 impl Filter for NoneOf {
+	#[tracing::instrument(ret, level = "debug", skip(template_engine, variables))]
 	fn filter(&self, res: &Resource, template_engine: &TemplateEngine, variables: &[Box<dyn Variable>]) -> bool {
 		!self.filters.par_iter().any(|f| f.filter(res, template_engine, variables))
 	}

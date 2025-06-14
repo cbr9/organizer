@@ -37,7 +37,7 @@ impl Action for Script {
 		ActionConfig { parallelize: true }
 	}
 
-	#[tracing::instrument(ret(level = "info"), err(Debug), level = "debug")]
+	#[tracing::instrument(ret(level = "info"), err(Debug), level = "debug", skip(template_engine, variables))]
 	fn execute(&self, res: &Resource, template_engine: &TemplateEngine, variables: &[Box<dyn Variable>], dry_run: bool) -> Result<Option<PathBuf>> {
 		if dry_run {
 			bail!("Cannot run scripted actions during a dry run")

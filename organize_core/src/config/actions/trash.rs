@@ -24,7 +24,7 @@ impl Action for Trash {
 		ActionConfig { parallelize: true }
 	}
 	#[tracing::instrument(ret(level = "info"), err(Debug), level = "debug")]
-	fn execute(&self, res: &Resource, _template_engine: &TemplateEngine, _variables: &[Box<dyn Variable>], dry_run: bool) -> Result<Option<PathBuf>> {
+	fn execute(&self, res: &Resource, _: &TemplateEngine, _: &[Box<dyn Variable>], dry_run: bool) -> Result<Option<PathBuf>> {
 		if !dry_run && self.enabled {
 			trash::delete(&res.path)?;
 		}

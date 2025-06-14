@@ -18,16 +18,18 @@ pub mod template;
 #[derive(Clone, Debug)]
 pub struct TemplateEngine {
 	pub tera: Tera,
-	pub templates: HashSet<String>,
 }
 
 impl PartialEq for TemplateEngine {
 	fn eq(&self, other: &Self) -> bool {
-		self.templates == other.templates
+		self.get_template_names() == other.get_template_names()
 	}
 }
 
 impl TemplateEngine {
+	fn get_template_names(&self) -> HashSet<&str> {
+		self.tera.get_template_names().collect()
+	}
 	pub fn new_empty_context(variables: &[Box<dyn Variable>]) -> Context {
 		let mut context = Context::new();
 
@@ -69,18 +71,16 @@ impl TemplateEngine {
 	}
 
 	pub fn add_template(&mut self, template: &Template) -> Result<()> {
-		if !self.templates.contains(&template.id) {
+		if !self.get_template_names().contains(template.id.as_str()) {
 			self.tera.add_raw_template(&template.id, &template.text)?;
-			self.templates.insert(template.id.clone());
 		}
 		Ok(())
 	}
 
 	pub fn add_templates(&mut self, templates: &[Template]) -> Result<()> {
 		for template in templates.iter() {
-			if !self.templates.contains(&template.id) {
+			if !self.get_template_names().contains(template.id.as_str()) {
 				self.tera.add_raw_template(&template.id, &template.text)?;
-				self.templates.insert(template.id.clone());
 			}
 		}
 		Ok(())
@@ -100,9 +100,6 @@ impl Default for TemplateEngine {
 		tera.register_filter("filesize", size);
 		tera.register_filter("hash", hash);
 		tera.register_filter("filecontent", file_content);
-		Self {
-			tera,
-			templates: HashSet::new(),
-		}
+		Self { tera }
 	}
 }

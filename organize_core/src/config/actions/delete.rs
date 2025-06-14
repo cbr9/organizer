@@ -27,7 +27,7 @@ impl Action for Delete {
 	}
 
 	#[tracing::instrument(ret(level = "info"), err(Debug), level = "debug")]
-	fn execute(&self, res: &Resource, _template_engine: &TemplateEngine, _variables: &[Box<dyn Variable>], dry_run: bool) -> Result<Option<PathBuf>> {
+	fn execute(&self, res: &Resource, _: &TemplateEngine, _: &[Box<dyn Variable>], dry_run: bool) -> Result<Option<PathBuf>> {
 		if !dry_run && self.enabled {
 			if res.path.is_file() {
 				std::fs::remove_file(&res.path).with_context(|| format!("could not delete {}", &res.path.display()))?;

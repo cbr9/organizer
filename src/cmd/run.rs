@@ -10,7 +10,7 @@ use crate::Cmd;
 
 use super::logs;
 
-#[derive(Parser, Default)]
+#[derive(Parser, Default, Debug)]
 pub struct Run {
 	#[arg(long, short = 'c', value_hint = ValueHint::FilePath)]
 	config: Option<PathBuf>,
@@ -27,7 +27,7 @@ pub struct Run {
 }
 
 impl Cmd for Run {
-	#[tracing::instrument(skip(self))]
+	#[tracing::instrument(err)]
 	fn run(mut self) -> Result<()> {
 		let config = Config::new(self.config.clone())?;
 		logs::init(self.verbose, &config.path);

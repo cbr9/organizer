@@ -29,7 +29,8 @@ impl Filter for Filename {
 		templates.extend(self.contains.clone());
 		templates
 	}
-	#[tracing::instrument(ret, level = "debug")]
+
+	#[tracing::instrument(ret, level = "debug", skip(template_engine, variables))]
 	fn filter(&self, res: &Resource, template_engine: &TemplateEngine, variables: &[Box<dyn Variable>]) -> bool {
 		let filename = res.path.file_name().unwrap_or_default().to_string_lossy();
 		let context = TemplateEngine::new_context(res, variables);
