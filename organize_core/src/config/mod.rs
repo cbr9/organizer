@@ -1,13 +1,9 @@
 use config::{Config as LayeredConfig, File};
 use itertools::Itertools;
 use rule::{Rule, RuleBuilder};
-use std::{
-	collections::HashSet,
-	iter::FromIterator,
-	path::{Path, PathBuf},
-};
+use std::{collections::HashSet, iter::FromIterator, path::PathBuf};
 
-use anyhow::{Context as ErrorContext, Result};
+use anyhow::{anyhow, Context as ErrorContext, Result};
 use serde::Deserialize;
 
 use crate::PROJECT_NAME;
@@ -51,67 +47,34 @@ pub struct Config {
 }
 
 impl Config {
-	pub fn new<T: AsRef<Path>>(path: T) -> Result<Self> {
+	pub fn new(path: Option<PathBuf>) -> Result<Self> {
+		let path = Self::resolve_path(path);
+		if !path.exists() {
+			return Err(anyhow!("Configuration file not found at {}", path.display()));
+		}
+
 		let builder = LayeredConfig::builder()
-			.add_source(File::from(path.as_ref()))
+			.add_source(File::from(path.clone()))
 			.build()?
 			.try_deserialize::<ConfigBuilder>()
 			.context("Could not deserialize config")?;
-		builder.build(path.as_ref().to_path_buf())
+		builder.build(path)
 	}
 
-	pub fn default_dir() -> PathBuf {
-		let var = format!("{}_CONFIG", PROJECT_NAME.to_uppercase());
-		std::env::var_os(&var).map_or_else(
-			|| {
-				dirs::config_dir()
-					.unwrap_or_else(|| panic!("could not find config directory, please set {} manually", var))
-					.join(PROJECT_NAME)
-			},
-			PathBuf::from,
-		)
-	}
-
-	pub fn default_path() -> PathBuf {
-		Self::default_dir().join("config.toml")
-	}
-
-	pub fn path() -> Result<PathBuf> {
-		std::env::current_dir()
-			.context("Cannot determine current directory")?
-			.read_dir()
-			.context("Cannot determine directory content")?
-			.find_map(|file| {
-				let path = file.ok()?.path();
-				if path.is_dir() && path.file_stem()?.to_string_lossy().ends_with(PROJECT_NAME) {
-					Some(path.join("config.toml"))
-				} else if path.file_stem()?.to_string_lossy().ends_with(PROJECT_NAME) && path.extension().is_some_and(|ext| ext == "toml") {
-					Some(path)
+	pub fn resolve_path(path: Option<PathBuf>) -> PathBuf {
+		match path {
+			Some(path) => path,
+			None => {
+				let organize_config_dir = format!("{}_CONFIG", PROJECT_NAME.to_uppercase());
+				let dir = if let Ok(path_str) = std::env::var(&organize_config_dir) {
+					PathBuf::from(path_str)
 				} else {
-					None
-				}
-			})
-			.map_or_else(
-				|| Ok(Self::default_path()),
-				|path| path.canonicalize().context("Couldn't find config file"),
-			)
-	}
-
-	pub fn set_cwd<T: AsRef<Path>>(path: T) -> Result<PathBuf> {
-		let path = path.as_ref();
-		if path == Self::default_path() {
-			dirs::home_dir().context("could not determine home directory").and_then(|path| {
-				std::env::set_current_dir(&path).context("Could not change into home directory")?;
-				Ok(path)
-			})
-		} else {
-			path.parent()
-				.context("could not determine parent directory")
-				.and_then(|path| {
-					std::env::set_current_dir(path)?;
-					Ok(path.to_path_buf())
-				})
-				.context("could not determine config directory")
+					dirs::config_dir()
+						.map(|dir| dir.join(PROJECT_NAME))
+						.expect(&format!("could not find config directory, please set {}", organize_config_dir))
+				};
+				dir.join("config.toml")
+			}
 		}
 	}
 

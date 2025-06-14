@@ -1,5 +1,6 @@
-use crate::cmd::{edit::Edit, run::Run};
+use crate::cmd::run::Run;
 use clap::{Parser, Subcommand};
+use edit::Edit;
 
 mod edit;
 mod logs;

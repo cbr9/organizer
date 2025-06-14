@@ -16,7 +16,7 @@ pub struct Edit;
 
 impl Cmd for Edit {
 	fn run(self) -> Result<()> {
-		Self::edit(Config::path()?).map(|_| ())
+		Self::edit(Config::resolve_path(None)).map(|_| ())
 	}
 }
 

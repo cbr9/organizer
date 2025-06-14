@@ -29,10 +29,7 @@ pub struct Run {
 impl Cmd for Run {
 	#[tracing::instrument(skip(self))]
 	fn run(mut self) -> Result<()> {
-		let config = match self.config {
-			Some(ref path) => Config::new(path).expect("Could not parse config"),
-			None => Config::new(Config::path().unwrap()).expect("Could not parse config"),
-		};
+		let config = Config::new(self.config.clone())?;
 		logs::init(self.verbose, &config.path);
 
 		let filtered_rules = config.filter_rules(self.tags.as_ref(), self.ids.as_ref());
