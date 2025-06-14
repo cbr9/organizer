@@ -24,7 +24,7 @@ pub struct RuleBuilder {
 	#[serde(flatten)]
 	pub options: OptionsBuilder,
 	#[serde(default)]
-	pub variables: Vec<Variable>,
+	pub variables: Vec<Box<dyn Variable>>,
 }
 
 impl RuleBuilder {
@@ -56,5 +56,5 @@ pub struct Rule {
 	pub actions: Vec<Box<dyn Action>>,
 	pub filters: Vec<Box<dyn Filter>>,
 	pub folders: Vec<Folder>,
-	pub variables: Vec<Variable>,
+	pub variables: Vec<Box<dyn Variable>>,
 }

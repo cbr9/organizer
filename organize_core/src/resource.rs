@@ -7,12 +7,12 @@ use std::{
 
 use tera::Context;
 
-use crate::config::variables::{AsVariable, Variable};
+use crate::config::variables::Variable;
 
 #[derive(Debug, Clone)]
 pub struct Resource {
 	pub context: Context,
-	variables: Vec<Variable>,
+	variables: Vec<Box<dyn Variable>>,
 	pub path: PathBuf,
 }
 
@@ -40,7 +40,7 @@ impl FromStr for Resource {
 }
 
 impl Resource {
-	pub fn new<T: AsRef<Path>, P: AsRef<Path>>(path: T, root: P, variables: Vec<Variable>) -> Self {
+	pub fn new<T: AsRef<Path>, P: AsRef<Path>>(path: T, root: P, variables: Vec<Box<dyn Variable>>) -> Self {
 		let mut context = Context::new();
 		context.insert("root", &root.as_ref().to_string_lossy());
 		let mut resource = Self {

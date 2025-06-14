@@ -49,7 +49,7 @@ pub struct Folder {
 }
 
 impl Folder {
-	pub fn get_resources(&self, rule_variables: &[Variable]) -> Result<Vec<Resource>> {
+	pub fn get_resources(&self, rule_variables: &[Box<dyn Variable>]) -> Result<Vec<Resource>> {
 		let home = &dirs::home_dir().context("unable to find home directory")?;
 		let min_depth = if &self.path == home { 1.0 } else { self.options.min_depth };
 		let max_depth = if &self.path == home { 1.0 } else { self.options.max_depth };

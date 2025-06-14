@@ -71,7 +71,7 @@ impl Config {
 				} else {
 					dirs::config_dir()
 						.map(|dir| dir.join(PROJECT_NAME))
-						.expect(&format!("could not find config directory, please set {}", organize_config_dir))
+						.unwrap_or_else(|| panic!("could not find config directory, please set {}", organize_config_dir))
 				};
 				dir.join("config.toml")
 			}

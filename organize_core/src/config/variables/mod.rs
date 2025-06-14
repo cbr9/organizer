@@ -1,27 +1,15 @@
-use regex::RegexVariable;
-use serde::{Deserialize, Serialize};
-use simple::SimpleVariable;
+use dyn_clone::DynClone;
+use dyn_eq::DynEq;
+use std::fmt::Debug;
 use tera::Context;
 
 pub mod regex;
 pub mod simple;
 
-pub trait AsVariable {
+dyn_clone::clone_trait_object!(Variable);
+dyn_eq::eq_trait_object!(Variable);
+
+#[typetag::serde(tag = "type")]
+pub trait Variable: DynEq + DynClone + Sync + Send + Debug {
 	fn register(&self, context: &mut Context);
-}
-
-#[derive(Deserialize, Serialize, PartialEq, Clone, Debug)]
-#[serde(tag = "type", rename_all(deserialize = "lowercase"))]
-pub enum Variable {
-	Simple(SimpleVariable),
-	Regex(RegexVariable),
-}
-
-impl AsVariable for Variable {
-	fn register(&self, context: &mut Context) {
-		match self {
-			Variable::Simple(s) => s.register(context),
-			Variable::Regex(r) => r.register(context),
-		}
-	}
 }

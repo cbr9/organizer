@@ -3,7 +3,7 @@ use tera::Context;
 
 use crate::templates::Template;
 
-use super::AsVariable;
+use super::Variable;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct RegexVariable {
@@ -18,7 +18,10 @@ impl PartialEq for RegexVariable {
 	}
 }
 
-impl AsVariable for RegexVariable {
+impl Eq for RegexVariable {}
+
+#[typetag::serde(name = "regex")]
+impl Variable for RegexVariable {
 	fn register(&self, context: &mut Context) {
 		let input = self.input.render(context).unwrap();
 		if let Some(captures) = self.pattern.captures(&input) {

@@ -54,5 +54,5 @@ pub fn init<T: AsRef<Path>>(verbose: bool, config_path: T) {
 	tracing_subscriber::registry().with(file_layer).with(stdout_layer).init();
 	std::mem::forget(_guard);
 
-	tracing::info!("Logging initialized. Log file: {}", logs_dir.display());
+	tracing::debug!("Logging initialized. Log file: {}", logs_dir.display());
 }
