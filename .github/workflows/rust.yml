@@ -33,7 +33,7 @@ jobs:
     - name: Install cargo-tarpaulin for code coverage
       run: cargo install cargo-tarpaulin
 
-    - name: Build (Use windows-gnu target on Windows)
+    - name: Build
       run: |
         if [ $RUNNER_OS = "Windows" ]; then
           cargo build --target x86_64-pc-windows-gnu --verbose  # Build for Windows GNU on Windows
@@ -53,6 +53,6 @@ jobs:
       run: cargo tarpaulin --workspace --all-features --ci --coverage-dir target/coverage
 
     - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v3
+      uses: codecov/codecov-action@v5
       with:
         file: target/coverage/lcov-report/index.html  # Path to the coverage report

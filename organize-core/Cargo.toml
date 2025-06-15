@@ -42,7 +42,6 @@ zip.workspace = true
 zip-extensions.workspace = true
 
 [dev-dependencies]
-pretty_assertions.workspace = true
-serde_test.workspace = true
-rand.workspace = true
-
+pretty_assertions = "1.3.0"
+serde_test = "1.0.160"
+rand = "0.8.5"
