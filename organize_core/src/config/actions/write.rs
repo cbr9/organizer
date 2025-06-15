@@ -13,7 +13,6 @@ use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-	config::variables::Variable,
 	resource::Resource,
 	templates::{template::Template, TemplateEngine},
 };
@@ -62,14 +61,8 @@ impl Action for Write {
 		ExecutionModel::Collection
 	}
 
-	#[tracing::instrument(ret(level = "info"), err(Debug), level = "debug", skip(template_engine, variables))]
-	fn execute_collection(
-		&self,
-		resources: Vec<&Resource>,
-		template_engine: &TemplateEngine,
-		variables: &[Box<dyn Variable>],
-		dry_run: bool,
-	) -> Result<Option<Vec<PathBuf>>> {
+	#[tracing::instrument(ret(level = "info"), err(Debug), level = "debug", skip(template_engine))]
+	fn execute_collection(&self, resources: Vec<&Resource>, template_engine: &TemplateEngine, dry_run: bool) -> Result<Option<Vec<PathBuf>>> {
 		if !self.enabled || resources.is_empty() {
 			let paths: Vec<PathBuf> = resources.iter().map(|res| res.path.clone()).collect();
 			return Ok(Some(paths));
@@ -78,7 +71,7 @@ impl Action for Write {
 		let mut texts_by_outfile: HashMap<PathBuf, Vec<String>> = resources
 			.par_iter()
 			.filter_map(|res| {
-				let context = TemplateEngine::new_context(res, variables);
+				let context = template_engine.new_context(res);
 				let outfile_str = template_engine.render(&self.outfile, &context).ok()?;
 				let text = if dry_run {
 					String::new()
@@ -97,8 +90,8 @@ impl Action for Write {
 					std::fs::create_dir_all(parent)?;
 				}
 
-				let mut file = OpenOptions::new().create(true).read(true).write(true).open(&path)?;
 				let original_content = std::fs::read_to_string(path)?;
+				let mut file = OpenOptions::new().truncate(true).read(true).write(true).open(path)?;
 
 				if self.sort_lines {
 					texts.sort_by_key(|a| a.to_lowercase());

@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 
 use crate::{
-	config::{filters::Filter, variables::Variable},
+	config::filters::Filter,
 	resource::Resource,
 	templates::{template::Template, TemplateEngine},
 };
@@ -22,7 +22,7 @@ impl Filter for Extension {
 	}
 
 	#[tracing::instrument(ret, level = "debug")]
-	fn filter(&self, res: &Resource, _: &TemplateEngine, _: &[Box<dyn Variable>]) -> bool {
+	fn filter(&self, res: &Resource, _: &TemplateEngine) -> bool {
 		let extension = res.path.extension().unwrap_or_default().to_string_lossy();
 		if extension.is_empty() {
 			return false;
@@ -63,8 +63,7 @@ pub mod tests {
 		let extension = Extension { extensions: vec![] };
 		let path = Resource::from_str("$HOME/Downloads/test.pdf").unwrap();
 		let template_engine = TemplateEngine::default();
-		let variables = vec![];
-		assert!(extension.filter(&path, &template_engine, &variables))
+		assert!(extension.filter(&path, &template_engine))
 	}
 	#[test]
 	fn negative_match() {
@@ -73,8 +72,7 @@ pub mod tests {
 		};
 		let path = Resource::from_str("$HOME/Downloads/test.pdf").unwrap();
 		let template_engine = TemplateEngine::default();
-		let variables = vec![];
-		assert!(!extension.filter(&path, &template_engine, &variables))
+		assert!(!extension.filter(&path, &template_engine))
 	}
 	#[test]
 	fn single_match_pdf() {
@@ -83,8 +81,7 @@ pub mod tests {
 		};
 		let path = Resource::from_str("$HOME/Downloads/test.pdf").unwrap();
 		let template_engine = TemplateEngine::default();
-		let variables = vec![];
-		assert!(extension.filter(&path, &template_engine, &variables))
+		assert!(extension.filter(&path, &template_engine))
 	}
 	#[test]
 	fn multiple_match_pdf() {
@@ -93,8 +90,7 @@ pub mod tests {
 		};
 		let path = Resource::from_str("$HOME/Downloads/test.pdf").unwrap();
 		let template_engine = TemplateEngine::default();
-		let variables = vec![];
-		assert!(extension.filter(&path, &template_engine, &variables))
+		assert!(extension.filter(&path, &template_engine))
 	}
 	#[test]
 	fn multiple_match_negative() {
@@ -103,8 +99,7 @@ pub mod tests {
 		};
 		let path = Resource::from_str("$HOME/Downloads/test.pdf").unwrap();
 		let template_engine = TemplateEngine::default();
-		let variables = vec![];
-		assert!(!extension.filter(&path, &template_engine, &variables))
+		assert!(!extension.filter(&path, &template_engine))
 	}
 
 	#[test]
@@ -114,7 +109,6 @@ pub mod tests {
 		};
 		let path = Resource::from_str("$HOME/Downloads/test.jpg").unwrap();
 		let template_engine = TemplateEngine::default();
-		let variables = vec![];
-		assert!(!extension.filter(&path, &template_engine, &variables))
+		assert!(!extension.filter(&path, &template_engine))
 	}
 }

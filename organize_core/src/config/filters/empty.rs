@@ -1,7 +1,6 @@
 use serde::{Deserialize, Serialize};
 
 use crate::{
-	config::variables::Variable,
 	resource::Resource,
 	templates::{template::Template, TemplateEngine},
 };
@@ -15,7 +14,7 @@ pub struct Empty;
 #[typetag::serde(name = "empty")]
 impl Filter for Empty {
 	#[tracing::instrument(ret, level = "debug")]
-	fn filter(&self, src: &Resource, _: &TemplateEngine, _: &[Box<dyn Variable>]) -> bool {
+	fn filter(&self, src: &Resource, _: &TemplateEngine) -> bool {
 		let path = &src.path;
 		if path.is_file() {
 			std::fs::metadata(path).map(|md| md.len() == 0).unwrap_or(false)
@@ -47,8 +46,7 @@ mod tests {
 		let res = Resource::from(path);
 		let action = Empty;
 		let template_engine = TemplateEngine::default();
-		let variables = vec![];
-		assert!(action.filter(&res, &template_engine, &variables))
+		assert!(action.filter(&res, &template_engine))
 	}
 	#[test]
 	fn test_dir_positive() {
@@ -57,8 +55,7 @@ mod tests {
 		let res = Resource::from(path);
 		let action = Empty;
 		let template_engine = TemplateEngine::default();
-		let variables = vec![];
-		assert!(action.filter(&res, &template_engine, &variables))
+		assert!(action.filter(&res, &template_engine))
 	}
 	#[test]
 	fn test_file_negative() {
@@ -68,8 +65,7 @@ mod tests {
 		let res = Resource::from(path);
 		let action = Empty;
 		let template_engine = TemplateEngine::default();
-		let variables = vec![];
-		assert!(!action.filter(&res, &template_engine, &variables))
+		assert!(!action.filter(&res, &template_engine))
 	}
 	#[test]
 	fn test_dir_negative() {
@@ -78,7 +74,6 @@ mod tests {
 		let res = Resource::from(path);
 		let action = Empty;
 		let template_engine = TemplateEngine::default();
-		let variables = vec![];
-		assert!(!action.filter(&res, &template_engine, &variables))
+		assert!(!action.filter(&res, &template_engine))
 	}
 }

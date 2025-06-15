@@ -13,7 +13,6 @@ use lettre::{SmtpTransport, Transport};
 use serde::{Deserialize, Serialize};
 use std::sync::LazyLock;
 
-use crate::config::variables::Variable;
 use crate::resource::Resource;
 use crate::templates::template::Template;
 use crate::templates::TemplateEngine;
@@ -50,15 +49,15 @@ impl Action for Email {
 		templates
 	}
 
-	#[tracing::instrument(ret(level = "info"), err(Debug), level = "debug", skip(template_engine, variables))]
-	fn execute(&self, res: &Resource, template_engine: &TemplateEngine, variables: &[Box<dyn Variable>], dry_run: bool) -> Result<Option<PathBuf>> {
+	#[tracing::instrument(ret(level = "info"), err(Debug), level = "debug", skip(template_engine))]
+	fn execute(&self, res: &Resource, template_engine: &TemplateEngine, dry_run: bool) -> Result<Option<PathBuf>> {
 		if !dry_run && self.enabled {
 			let mut email = MessageBuilder::new()
 				.from(self.sender.clone())
 				.to(self.recipient.clone())
 				.date_now();
 
-			let context = TemplateEngine::new_context(res, variables);
+			let context = template_engine.new_context(res);
 			if let Some(subject) = &self.subject {
 				let subject = template_engine.render(subject, &context)?;
 				email = email.subject(subject);

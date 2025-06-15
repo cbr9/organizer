@@ -58,15 +58,11 @@ impl Cmd for Run {
 				})
 				.flatten()
 				.into_par_iter()
-				.filter(|res| {
-					rule.filters
-						.iter()
-						.all(|f| f.filter(res, &rule.template_engine, &rule.variables))
-				})
+				.filter(|res| rule.filters.iter().all(|f| f.filter(res, &rule.template_engine)))
 				.collect::<Vec<_>>();
 
 			rule.actions.iter().fold(entries, |current_entries, action| {
-				action.run(current_entries, &rule.template_engine, &rule.variables, self.dry_run)
+				action.run(current_entries, &rule.template_engine, self.dry_run)
 			});
 		}
 		Ok(())

@@ -1,5 +1,5 @@
 use crate::{
-	config::{filters::Filter, variables::Variable},
+	config::filters::Filter,
 	resource::Resource,
 	templates::{template::Template, TemplateEngine},
 };
@@ -30,8 +30,8 @@ impl Filter for Filename {
 		templates
 	}
 
-	#[tracing::instrument(ret, level = "debug", skip(template_engine, variables))]
-	fn filter(&self, res: &Resource, template_engine: &TemplateEngine, variables: &[Box<dyn Variable>]) -> bool {
+	#[tracing::instrument(ret, level = "debug", skip(template_engine))]
+	fn filter(&self, res: &Resource, template_engine: &TemplateEngine) -> bool {
 		let filename = res.path.file_name().unwrap_or_default().to_string_lossy();
 
 		if filename.is_empty() {
@@ -44,7 +44,7 @@ impl Filter for Filename {
 			filename.to_lowercase()
 		};
 
-		let context = TemplateEngine::new_context(res, variables);
+		let context = template_engine.new_context(res);
 
 		let startswith = if self.startswith.is_empty() {
 			true
@@ -133,8 +133,7 @@ mod tests {
 			..Default::default()
 		};
 		let template_engine = TemplateEngine::default();
-		let variables = vec![];
-		assert!(filename.filter(&path, &template_engine, &variables))
+		assert!(filename.filter(&path, &template_engine))
 	}
 
 	#[test]
@@ -145,8 +144,7 @@ mod tests {
 			..Default::default()
 		};
 		let template_engine = TemplateEngine::default();
-		let variables = vec![];
-		assert!(filename.filter(&path, &template_engine, &variables))
+		assert!(filename.filter(&path, &template_engine))
 	}
 
 	#[test]
@@ -157,8 +155,7 @@ mod tests {
 			..Default::default()
 		};
 		let template_engine = TemplateEngine::default();
-		let variables = vec![];
-		assert!(filename.filter(&path, &template_engine, &variables))
+		assert!(filename.filter(&path, &template_engine))
 	}
 
 	#[test]
@@ -170,8 +167,7 @@ mod tests {
 			..Default::default()
 		};
 		let template_engine = TemplateEngine::default();
-		let variables = vec![];
-		assert!(!filename.filter(&path, &template_engine, &variables))
+		assert!(!filename.filter(&path, &template_engine))
 	}
 
 	#[test]
@@ -183,8 +179,7 @@ mod tests {
 			..Default::default()
 		};
 		let template_engine = TemplateEngine::default();
-		let variables = vec![];
-		assert!(!filename.filter(&path, &template_engine, &variables))
+		assert!(!filename.filter(&path, &template_engine))
 	}
 
 	#[test]
@@ -196,8 +191,7 @@ mod tests {
 			..Default::default()
 		};
 		let template_engine = TemplateEngine::default();
-		let variables = vec![];
-		assert!(!filename.filter(&path, &template_engine, &variables))
+		assert!(!filename.filter(&path, &template_engine))
 	}
 	#[test]
 	fn match_containing_case_sensitive() {
@@ -208,8 +202,8 @@ mod tests {
 			..Default::default()
 		};
 		let template_engine = TemplateEngine::default();
-		let variables = vec![];
-		assert!(filename.filter(&path, &template_engine, &variables))
+
+		assert!(filename.filter(&path, &template_engine))
 	}
 	#[test]
 	fn match_multiple_conditions_case_sensitive() {
@@ -221,8 +215,7 @@ mod tests {
 			endswith: vec!["df".into()],
 		};
 		let template_engine = TemplateEngine::default();
-		let variables = vec![];
-		assert!(filename.filter(&path, &template_engine, &variables))
+		assert!(filename.filter(&path, &template_engine))
 	}
 	#[test]
 	fn match_multiple_conditions_some_negative() {
@@ -234,8 +227,7 @@ mod tests {
 			endswith: vec!["!df".into()],
 		};
 		let template_engine = TemplateEngine::default();
-		let variables = vec![];
-		assert!(!filename.filter(&path, &template_engine, &variables))
+		assert!(!filename.filter(&path, &template_engine))
 	}
 	#[test]
 	fn match_multiple_conditions_some_negative_2() {
@@ -247,8 +239,7 @@ mod tests {
 			endswith: vec!["!df".into()],
 		};
 		let template_engine = TemplateEngine::default();
-		let variables = vec![];
-		assert!(!filename.filter(&path, &template_engine, &variables))
+		assert!(!filename.filter(&path, &template_engine))
 	}
 	#[test]
 	fn match_multiple_conditions_some_negative_3() {
@@ -260,7 +251,6 @@ mod tests {
 			endswith: vec!["!df".into()],
 		};
 		let template_engine = TemplateEngine::default();
-		let variables = vec![];
-		assert!(filename.filter(&path, &template_engine, &variables))
+		assert!(filename.filter(&path, &template_engine))
 	}
 }

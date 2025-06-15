@@ -1,5 +1,5 @@
 use crate::{
-	config::{filters::Filter, variables::Variable},
+	config::filters::Filter,
 	resource::Resource,
 	templates::{template::Template, TemplateEngine},
 };
@@ -29,9 +29,9 @@ impl Filter for RegularExpression {
 	fn templates(&self) -> Vec<&Template> {
 		vec![&self.input]
 	}
-	#[tracing::instrument(ret, level = "debug", skip(template_engine, variables))]
-	fn filter(&self, res: &Resource, template_engine: &TemplateEngine, variables: &[Box<dyn Variable>]) -> bool {
-		let context = TemplateEngine::new_context(res, variables);
+	#[tracing::instrument(ret, level = "debug", skip(template_engine))]
+	fn filter(&self, res: &Resource, template_engine: &TemplateEngine) -> bool {
+		let context = template_engine.new_context(res);
 		template_engine.render(&self.input, &context).is_ok_and(|s| {
 			let mut matches = self.pattern.0.is_match(&s);
 			if self.negate {

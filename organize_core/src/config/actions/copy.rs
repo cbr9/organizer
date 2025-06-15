@@ -5,7 +5,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::config::actions::common::enabled;
 use crate::{
-	config::variables::Variable,
 	path::prepare::prepare_target_path,
 	resource::Resource,
 	templates::{template::Template, TemplateEngine},
@@ -43,9 +42,9 @@ impl Action for Copy {
 		vec![&self.to]
 	}
 
-	#[tracing::instrument(ret(level = "info"), err(Debug), level = "debug", skip(template_engine, variables))]
-	fn execute(&self, res: &Resource, template_engine: &TemplateEngine, variables: &[Box<dyn Variable>], dry_run: bool) -> Result<Option<PathBuf>> {
-		match prepare_target_path(&self.if_exists, res, &self.to, true, template_engine, variables)? {
+	#[tracing::instrument(ret(level = "info"), err(Debug), level = "debug", skip(template_engine))]
+	fn execute(&self, res: &Resource, template_engine: &TemplateEngine, dry_run: bool) -> Result<Option<PathBuf>> {
+		match prepare_target_path(&self.if_exists, res, &self.to, true, template_engine)? {
 			Some(dest) => {
 				if !dry_run && self.enabled {
 					if let Some(parent) = dest.parent() {

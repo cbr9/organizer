@@ -31,7 +31,7 @@ pub struct RuleBuilder {
 
 impl RuleBuilder {
 	pub fn build(self, defaults: &OptionsBuilder) -> anyhow::Result<Rule> {
-		let mut template_engine = TemplateEngine::default();
+		let mut template_engine = TemplateEngine::new(&self.variables);
 
 		for action in self.actions.iter() {
 			let templates = action.templates();
@@ -47,7 +47,7 @@ impl RuleBuilder {
 			.folders
 			.clone()
 			.into_iter()
-			.map(|builder| builder.build(defaults, &self.options, &mut template_engine, &self.variables)) // Pass this rule's options builder
+			.map(|builder| builder.build(defaults, &self.options, &mut template_engine)) // Pass this rule's options builder
 			.collect::<anyhow::Result<Vec<Folder>>>()?;
 
 		Ok(Rule {
@@ -57,7 +57,6 @@ impl RuleBuilder {
 			actions: self.actions,
 			filters: self.filters,
 			folders, // Contains fully compiled Folders, each with its own Options
-			variables: self.variables,
 			template_engine,
 		})
 	}
@@ -71,6 +70,5 @@ pub struct Rule {
 	pub actions: Vec<Box<dyn Action>>,
 	pub filters: Vec<Box<dyn Filter>>,
 	pub folders: Vec<Folder>,
-	pub variables: Vec<Box<dyn Variable>>,
 	pub template_engine: TemplateEngine,
 }

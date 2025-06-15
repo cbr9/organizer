@@ -1,7 +1,6 @@
 use std::path::PathBuf;
 
 use crate::{
-	config::variables::Variable,
 	resource::Resource,
 	templates::{template::Template, TemplateEngine},
 };
@@ -23,7 +22,7 @@ impl Action for Delete {
 		vec![]
 	}
 	#[tracing::instrument(ret(level = "info"), err(Debug), level = "debug")]
-	fn execute(&self, res: &Resource, _: &TemplateEngine, _: &[Box<dyn Variable>], dry_run: bool) -> Result<Option<PathBuf>> {
+	fn execute(&self, res: &Resource, _: &TemplateEngine, dry_run: bool) -> Result<Option<PathBuf>> {
 		if !dry_run && self.enabled {
 			if res.path.is_file() {
 				std::fs::remove_file(&res.path).with_context(|| format!("could not delete {}", &res.path.display()))?;
@@ -51,13 +50,12 @@ mod tests {
 		let action = Delete { enabled: true };
 
 		let template_engine = TemplateEngine::default();
-		let variables = vec![];
 
 		std::fs::write(&tmp_file, "").expect("Could not create target file");
 		assert!(tmp_file.exists());
 
 		action
-			.execute(&resource, &template_engine, &variables, false)
+			.execute(&resource, &template_engine, false)
 			.expect("Could not delete target file");
 		assert!(!tmp_file.exists());
 	}

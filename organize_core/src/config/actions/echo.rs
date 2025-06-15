@@ -4,7 +4,6 @@ use crate::config::actions::common::enabled;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-	config::variables::Variable,
 	resource::Resource,
 	templates::{template::Template, TemplateEngine},
 };
@@ -26,10 +25,10 @@ impl Action for Echo {
 		vec![&self.message]
 	}
 
-	#[tracing::instrument(ret(level = "info"), err(Debug), level = "debug", skip(template_engine, variables))]
-	fn execute(&self, res: &Resource, template_engine: &TemplateEngine, variables: &[Box<dyn Variable>], _: bool) -> Result<Option<PathBuf>> {
+	#[tracing::instrument(ret(level = "info"), err(Debug), level = "debug", skip(template_engine))]
+	fn execute(&self, res: &Resource, template_engine: &TemplateEngine, _: bool) -> Result<Option<PathBuf>> {
 		if self.enabled {
-			let context = TemplateEngine::new_context(res, variables);
+			let context = template_engine.new_context(res);
 			let message = template_engine.render(&self.message, &context).map_err(anyhow::Error::msg)?;
 			tracing::info!("{}", message);
 		}

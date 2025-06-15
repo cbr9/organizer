@@ -4,10 +4,7 @@ use std::path::{PathBuf, MAIN_SEPARATOR};
 use anyhow::Result;
 
 use crate::{
-	config::{
-		actions::common::{resolve_naming_conflict, ConflictOption},
-		variables::Variable,
-	},
+	config::actions::common::{resolve_naming_conflict, ConflictOption},
 	resource::Resource,
 	templates::{template::Template, TemplateEngine},
 };
@@ -20,9 +17,8 @@ pub fn prepare_target_path(
 	dest: &Template,
 	with_extension: bool,
 	template_engine: &TemplateEngine,
-	variables: &[Box<dyn Variable>],
 ) -> Result<Option<PathBuf>> {
-	let context = TemplateEngine::new_context(resource, variables);
+	let context = template_engine.new_context(resource);
 	let rendered_dest = template_engine.render(dest, &context)?;
 	let mut to = PathBuf::from(rendered_dest).expand_user().clean();
 

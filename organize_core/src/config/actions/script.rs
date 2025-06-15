@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use tempfile;
 
 use crate::{
-	config::{filters::Filter, variables::Variable},
+	config::filters::Filter,
 	resource::Resource,
 	templates::{template::Template, TemplateEngine},
 };
@@ -44,13 +44,13 @@ impl Action for Script {
 		}
 	}
 
-	#[tracing::instrument(ret(level = "info"), err(Debug), level = "debug", skip(template_engine, variables))]
-	fn execute(&self, res: &Resource, template_engine: &TemplateEngine, variables: &[Box<dyn Variable>], dry_run: bool) -> Result<Option<PathBuf>> {
+	#[tracing::instrument(ret(level = "info"), err(Debug), level = "debug", skip(template_engine))]
+	fn execute(&self, res: &Resource, template_engine: &TemplateEngine, dry_run: bool) -> Result<Option<PathBuf>> {
 		if dry_run {
 			bail!("Cannot run scripted actions during a dry run")
 		}
 		if self.enabled {
-			return self.run_script(res, template_engine, variables).map(|output| {
+			return self.run_script(res, template_engine).map(|output| {
 				let output = String::from_utf8_lossy(&output.stdout);
 				output.lines().last().map(|last| PathBuf::from(&last.trim()))
 			});
@@ -64,8 +64,8 @@ impl Filter for Script {
 	fn templates(&self) -> Vec<&Template> {
 		vec![&self.content]
 	}
-	fn filter(&self, res: &Resource, template_engine: &TemplateEngine, variables: &[Box<dyn Variable>]) -> bool {
-		self.run_script(res, template_engine, variables)
+	fn filter(&self, res: &Resource, template_engine: &TemplateEngine) -> bool {
+		self.run_script(res, template_engine)
 			.map(|output| {
 				// get the last line in stdout and parse it as a boolean
 				// if it can't be parsed, return false
@@ -92,17 +92,17 @@ impl Script {
 		}
 	}
 
-	fn write(&self, res: &Resource, template_engine: &TemplateEngine, variables: &[Box<dyn Variable>]) -> anyhow::Result<PathBuf> {
+	fn write(&self, res: &Resource, template_engine: &TemplateEngine) -> anyhow::Result<PathBuf> {
 		let script = tempfile::NamedTempFile::new()?;
 		let script_path = script.into_temp_path().to_path_buf();
-		let context = TemplateEngine::new_context(res, variables);
+		let context = template_engine.new_context(res);
 		let content = template_engine.render(&self.content, &context)?;
 		std::fs::write(&script_path, content)?;
 		Ok(script_path)
 	}
 
-	fn run_script(&self, res: &Resource, template_engine: &TemplateEngine, variables: &[Box<dyn Variable>]) -> anyhow::Result<Output> {
-		let script = self.write(res, template_engine, variables)?;
+	fn run_script(&self, res: &Resource, template_engine: &TemplateEngine) -> anyhow::Result<Output> {
+		let script = self.write(res, template_engine)?;
 		let output = Command::new(&self.exec)
 			.args(self.args.as_slice())
 			.arg(&script)
@@ -124,13 +124,12 @@ mod tests {
 		let mut script = Script::new("python", content.clone());
 		let mut template_engine = TemplateEngine::default();
 		template_engine.add_templates(&Filter::templates(&script))?;
-		let variables = vec![];
-		script.run_script(&src, &template_engine, &variables).unwrap_or_else(|_| {
+		script.run_script(&src, &template_engine).unwrap_or_else(|_| {
 			// some linux distributions don't have a `python` executable, but a `python3`
 			script = Script::new("python3", content);
-			script.run_script(&src, &template_engine, &variables).unwrap()
+			script.run_script(&src, &template_engine).unwrap()
 		});
-		assert!(script.filter(&src, &template_engine, &variables));
+		assert!(script.filter(&src, &template_engine));
 		Ok(())
 	}
 }

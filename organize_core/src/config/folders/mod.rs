@@ -12,10 +12,7 @@ use crate::{
 	templates::{template::Template, TemplateEngine},
 };
 
-use super::{
-	options::{Options, Target},
-	variables::Variable,
-};
+use super::options::{Options, Target};
 
 #[derive(Deserialize, Serialize, Debug, PartialEq, Clone)]
 #[serde(deny_unknown_fields)]
@@ -26,15 +23,9 @@ pub struct FolderBuilder {
 }
 
 impl FolderBuilder {
-	pub fn build(
-		self,
-		defaults: &OptionsBuilder,
-		rule_options: &OptionsBuilder,
-		template_engine: &mut TemplateEngine,
-		variables: &[Box<dyn Variable>],
-	) -> Result<Folder> {
+	pub fn build(self, defaults: &OptionsBuilder, rule_options: &OptionsBuilder, template_engine: &mut TemplateEngine) -> Result<Folder> {
 		let path = {
-			let context = TemplateEngine::new_empty_context(variables);
+			let context = template_engine.new_empty_context();
 			template_engine
 				.tera
 				.render_str(&self.root.text, &context)

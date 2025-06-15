@@ -18,6 +18,7 @@ pub mod template;
 #[derive(Clone, Debug)]
 pub struct TemplateEngine {
 	pub tera: Tera,
+	pub variables: Vec<Box<dyn Variable>>,
 }
 
 impl PartialEq for TemplateEngine {
@@ -27,38 +28,38 @@ impl PartialEq for TemplateEngine {
 }
 
 impl TemplateEngine {
-	fn get_template_names(&self) -> HashSet<&str> {
-		self.tera.get_template_names().collect()
-	}
-	pub fn new_empty_context(variables: &[Box<dyn Variable>]) -> Context {
-		let mut context = Context::new();
-
-		let mut engine = TemplateEngine::default();
+	pub fn new(variables: &Vec<Box<dyn Variable>>) -> Self {
+		let mut engine = Self::default();
 		for var in variables.iter() {
 			let templates = var.templates();
 			engine.add_templates(&templates).unwrap();
 		}
+		engine.variables = variables.clone();
+		engine
+	}
 
-		for var in variables.iter() {
-			var.register(&engine, &mut context);
+	fn get_template_names(&self) -> HashSet<&str> {
+		self.tera.get_template_names().collect()
+	}
+	pub fn new_empty_context(&self) -> Context {
+		let mut context = Context::new();
+
+		for var in self.variables.iter() {
+			var.register(self, &mut context);
 		}
+
 		context
 	}
 
-	pub fn new_context(resource: &Resource, variables: &[Box<dyn Variable>]) -> Context {
+	pub fn new_context(&self, resource: &Resource) -> Context {
 		let mut context = Context::new();
 		context.insert("path", &resource.path);
 		context.insert("root", &resource.root);
 
-		let mut engine = TemplateEngine::default();
-		for var in variables.iter() {
-			let templates = var.templates();
-			engine.add_templates(&templates).unwrap();
+		for var in self.variables.iter() {
+			var.register(self, &mut context);
 		}
 
-		for var in variables.iter() {
-			var.register(&engine, &mut context);
-		}
 		context
 	}
 	pub fn render(&self, template: &Template, context: &Context) -> tera::Result<String> {
@@ -100,6 +101,6 @@ impl Default for TemplateEngine {
 		tera.register_filter("filesize", size);
 		tera.register_filter("hash", hash);
 		tera.register_filter("filecontent", file_content);
-		Self { tera }
+		Self { tera, variables: vec![] }
 	}
 }

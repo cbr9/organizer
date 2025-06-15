@@ -1,5 +1,5 @@
 use crate::{
-	config::{filters::Filter, variables::Variable},
+	config::filters::Filter,
 	resource::Resource,
 	templates::{template::Template, TemplateEngine},
 };
@@ -91,7 +91,7 @@ impl Filter for Mime {
 		vec![]
 	}
 	#[tracing::instrument(ret, level = "debug")]
-	fn filter(&self, res: &Resource, _: &TemplateEngine, _: &[Box<dyn Variable>]) -> bool {
+	fn filter(&self, res: &Resource, _: &TemplateEngine) -> bool {
 		let guess = mime_guess::from_path(&res.path).first_or_octet_stream();
 		self.types.iter().any(|mime| {
 			let mut matches = match (mime.type_(), mime.subtype()) {
@@ -116,9 +116,8 @@ mod tests {
 		let img = Resource::from_str("test.jpg").unwrap();
 		let audio = Resource::from_str("test.ogg").unwrap();
 		let template_engine = TemplateEngine::default();
-		let variables = vec![];
-		assert!(!types.filter(&img, &template_engine, &variables));
-		assert!(types.filter(&audio, &template_engine, &variables))
+		assert!(!types.filter(&img, &template_engine));
+		assert!(types.filter(&audio, &template_engine))
 	}
 	#[test]
 	fn test_match_negative_one_mime() {
@@ -126,9 +125,8 @@ mod tests {
 		let img = Resource::from_str("test.jpg").unwrap();
 		let audio = Resource::from_str("test.ogg").unwrap();
 		let template_engine = TemplateEngine::default();
-		let variables = vec![];
-		assert!(!types.filter(&img, &template_engine, &variables));
-		assert!(types.filter(&audio, &template_engine, &variables))
+		assert!(!types.filter(&img, &template_engine));
+		assert!(types.filter(&audio, &template_engine))
 	}
 	#[test]
 	fn test_match() {
@@ -136,8 +134,7 @@ mod tests {
 		let img = Resource::from_str("test.jpg").unwrap();
 		let audio = Resource::from_str("test.ogg").unwrap();
 		let template_engine = TemplateEngine::default();
-		let variables = vec![];
-		assert!(types.filter(&img, &template_engine, &variables));
-		assert!(types.filter(&audio, &template_engine, &variables))
+		assert!(types.filter(&img, &template_engine));
+		assert!(types.filter(&audio, &template_engine))
 	}
 }
