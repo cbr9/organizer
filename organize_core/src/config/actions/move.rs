@@ -11,7 +11,7 @@ use crate::{
 	templates::{template::Template, TemplateEngine},
 };
 
-use super::{common::ConflictOption, Action, ActionConfig};
+use super::{common::ConflictOption, Action};
 
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
@@ -27,9 +27,6 @@ pub struct Move {
 impl Action for Move {
 	fn templates(&self) -> Vec<Template> {
 		vec![self.to.clone()]
-	}
-	fn config(&self) -> ActionConfig {
-		ActionConfig { parallelize: true }
 	}
 
 	#[tracing::instrument(ret(level = "info"), err(Debug), level = "debug", skip(template_engine, variables))]

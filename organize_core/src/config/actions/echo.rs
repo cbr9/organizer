@@ -10,7 +10,7 @@ use crate::{
 };
 use anyhow::Result;
 
-use super::{Action, ActionConfig};
+use super::Action;
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default, Eq, PartialEq)]
 #[serde(deny_unknown_fields)]
@@ -22,9 +22,6 @@ pub struct Echo {
 
 #[typetag::serde(name = "echo")]
 impl Action for Echo {
-	fn config(&self) -> ActionConfig {
-		ActionConfig { parallelize: true }
-	}
 	fn templates(&self) -> Vec<Template> {
 		vec![self.message.clone()]
 	}

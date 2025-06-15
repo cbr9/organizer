@@ -18,7 +18,7 @@ use crate::resource::Resource;
 use crate::templates::template::Template;
 use crate::templates::TemplateEngine;
 
-use super::{Action, ActionConfig};
+use super::Action;
 
 static CREDENTIALS: LazyLock<Mutex<HashMap<Mailbox, Credentials>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
 
@@ -39,9 +39,6 @@ pub struct Email {
 
 #[typetag::serde(name = "email")]
 impl Action for Email {
-	fn config(&self) -> ActionConfig {
-		ActionConfig { parallelize: true }
-	}
 	fn templates(&self) -> Vec<Template> {
 		let mut templates = vec![];
 		if let Some(subject) = self.subject.clone() {

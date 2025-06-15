@@ -6,7 +6,7 @@ use crate::{config::variables::Variable, resource::Resource, templates::Template
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
-use super::{Action, ActionConfig};
+use super::Action;
 
 #[derive(Debug, Clone, Serialize, Default, Deserialize, Eq, PartialEq)]
 #[serde(deny_unknown_fields)]
@@ -20,9 +20,7 @@ impl Action for Trash {
 	fn templates(&self) -> Vec<Template> {
 		vec![]
 	}
-	fn config(&self) -> ActionConfig {
-		ActionConfig { parallelize: true }
-	}
+
 	#[tracing::instrument(ret(level = "info"), err(Debug), level = "debug")]
 	fn execute(&self, res: &Resource, _: &TemplateEngine, _: &[Box<dyn Variable>], dry_run: bool) -> Result<Option<PathBuf>> {
 		if !dry_run && self.enabled {

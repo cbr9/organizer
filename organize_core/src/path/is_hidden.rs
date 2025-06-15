@@ -45,8 +45,30 @@ mod tests {
 	#[cfg(target_family = "windows")]
 	#[test]
 	fn not_hidden() {
+		use tempfile::NamedTempFile;
+
 		use super::*;
-		let path = Path::new("/home/user/testfile");
-		assert!(!path.is_hidden().unwrap())
+		let file = NamedTempFile::new().unwrap();
+		let path = file.path();
+		assert!(!path.is_hidden().unwrap());
+	}
+
+	#[test]
+	#[cfg(target_family = "windows")]
+	fn check_hidden() {
+		use tempfile::NamedTempFile;
+
+		use crate::path::is_hidden::IsHidden;
+
+		let file = NamedTempFile::new().unwrap();
+		let path = file.path();
+		// Use the `attrib` command on Windows to set the hidden attribute.
+		let status = std::process::Command::new("attrib")
+			.arg("+h")
+			.arg(path.as_os_str())
+			.status()
+			.expect("failed to execute attrib command");
+		assert!(status.success(), "attrib command failed");
+		assert!(path.is_hidden().unwrap());
 	}
 }

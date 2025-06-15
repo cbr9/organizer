@@ -13,7 +13,7 @@ use crate::{
 	templates::{template::Template, TemplateEngine},
 };
 
-use super::{common::ConflictOption, Action, ActionConfig};
+use super::{common::ConflictOption, Action};
 use crate::config::actions::common::enabled;
 
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]
@@ -30,9 +30,6 @@ pub struct Extract {
 impl Action for Extract {
 	fn templates(&self) -> Vec<Template> {
 		vec![self.to.clone()]
-	}
-	fn config(&self) -> ActionConfig {
-		ActionConfig { parallelize: true }
 	}
 
 	#[tracing::instrument(ret(level = "info"), err(Debug), level = "debug", skip(template_engine, variables))]

@@ -15,7 +15,7 @@ use crate::{
 };
 use anyhow::{bail, Result};
 
-use super::{Action, ActionConfig};
+use super::{Action, ExecutionModel};
 
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
@@ -26,6 +26,8 @@ pub struct Script {
 	content: Template,
 	#[serde(default = "enabled")]
 	enabled: bool,
+	#[serde(default)]
+	parallel: bool,
 }
 
 #[typetag::serde(name = "script")]
@@ -33,8 +35,12 @@ impl Action for Script {
 	fn templates(&self) -> Vec<Template> {
 		vec![self.content.clone()]
 	}
-	fn config(&self) -> ActionConfig {
-		ActionConfig { parallelize: true }
+	fn execution_model(&self) -> ExecutionModel {
+		if self.parallel {
+			ExecutionModel::Parallel
+		} else {
+			ExecutionModel::Linear
+		}
 	}
 
 	#[tracing::instrument(ret(level = "info"), err(Debug), level = "debug", skip(template_engine, variables))]
@@ -81,6 +87,7 @@ impl Script {
 			content: content.into(),
 			args: vec![],
 			enabled: true,
+			parallel: false,
 		}
 	}
 
@@ -109,18 +116,20 @@ impl Script {
 mod tests {
 	use super::*;
 
-	// #[test]
-	// fn test_script_filter() {
-	// 	let src = Resource::new("/home", "/", vec![]);
-	// 	let content = String::from("print('huh')\nprint('{{path}}'.islower())");
-	// 	let mut script = Script::new("python", content.clone());
-	// 	let template_engine = TemplateEngine::default();
-	// 	let variables = vec![];
-	// 	script.run_script(&src, &template_engine, &variables).unwrap_or_else(|_| {
-	// 		// some linux distributions don't have a `python` executable, but a `python3`
-	// 		script = Script::new("python3", content);
-	// 		script.run_script(&src, &template_engine, &variables).unwrap()
-	// 	});
-	// 	assert!(script.filter(&src))
-	// }
+	#[test]
+	fn test_script_filter() -> Result<()> {
+		let src = Resource::new("/home", "/");
+		let content = String::from("print('huh')\nprint('{{path}}'.islower())");
+		let mut script = Script::new("python", content.clone());
+		let mut template_engine = TemplateEngine::default();
+		template_engine.add_templates(&Filter::templates(&script))?;
+		let variables = vec![];
+		script.run_script(&src, &template_engine, &variables).unwrap_or_else(|_| {
+			// some linux distributions don't have a `python` executable, but a `python3`
+			script = Script::new("python3", content);
+			script.run_script(&src, &template_engine, &variables).unwrap()
+		});
+		assert!(script.filter(&src, &template_engine, &variables));
+		Ok(())
+	}
 }

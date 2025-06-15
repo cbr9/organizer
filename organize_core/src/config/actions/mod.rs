@@ -29,16 +29,38 @@ pub mod write;
 dyn_clone::clone_trait_object!(Action);
 dyn_eq::eq_trait_object!(Action);
 
-#[derive(Debug)]
-pub struct ActionConfig {
-	pub parallelize: bool,
+pub enum ExecutionModel {
+	Linear,
+	Parallel,
+	Collection,
 }
 
 #[typetag::serde(tag = "type")]
 pub trait Action: DynEq + DynClone + Sync + Send + Debug {
-	fn config(&self) -> ActionConfig;
+	fn execution_model(&self) -> ExecutionModel {
+		ExecutionModel::Parallel
+	}
 
-	fn execute(&self, src: &Resource, template_engine: &TemplateEngine, variables: &[Box<dyn Variable>], dry_run: bool) -> Result<Option<PathBuf>>;
+	fn execute(
+		&self,
+		_res: &Resource,
+		_template_engine: &TemplateEngine,
+		_variables: &[Box<dyn Variable>],
+		_dry_run: bool,
+	) -> Result<Option<PathBuf>> {
+		unimplemented!("This action has not implemented `execute`.")
+	}
+
+	/// The execution logic for `Collection` actions.
+	fn execute_collection(
+		&self,
+		_resources: Vec<&Resource>,
+		_template_engine: &TemplateEngine,
+		_variables: &[Box<dyn Variable>],
+		_dry_run: bool,
+	) -> Result<Option<Vec<PathBuf>>> {
+		unimplemented!("This action must be run in `Collection` mode and has not implemented `execute_collection`.")
+	}
 
 	fn on_finish(&self, _resources: &[Resource], _dry_run: bool) -> Result<()> {
 		Ok(())
@@ -47,15 +69,9 @@ pub trait Action: DynEq + DynClone + Sync + Send + Debug {
 	fn templates(&self) -> Vec<Template>;
 
 	#[doc(hidden)]
-	fn run(&self, resources: Vec<Resource>, template_engine: &TemplateEngine, variables: &[Box<dyn Variable>], dry_run: bool) -> Vec<Resource> {
-		let config = self.config();
-
+	fn run(&self, mut resources: Vec<Resource>, template_engine: &TemplateEngine, variables: &[Box<dyn Variable>], dry_run: bool) -> Vec<Resource> {
 		let filter_fn = |mut res| {
-			let path = self
-				.execute(&res, template_engine, variables, dry_run)
-				.inspect_err(|e| tracing::error!("{}", e))
-				.ok()
-				.flatten();
+			let path = self.execute(&res, template_engine, variables, dry_run).ok().flatten();
 			if let Some(path) = path {
 				res.set_path(path);
 				Some(res)
@@ -64,10 +80,10 @@ pub trait Action: DynEq + DynClone + Sync + Send + Debug {
 			}
 		};
 
-		let resources: Vec<Resource> = if config.parallelize {
-			resources.into_par_iter().filter_map(filter_fn).collect()
-		} else {
-			resources.into_iter().filter_map(filter_fn).collect()
+		resources = match self.execution_model() {
+			ExecutionModel::Linear => resources.into_iter().filter_map(filter_fn).collect(),
+			ExecutionModel::Parallel => resources.into_par_iter().filter_map(filter_fn).collect(),
+			ExecutionModel::Collection => todo!(),
 		};
 
 		self.on_finish(&resources, dry_run).unwrap();

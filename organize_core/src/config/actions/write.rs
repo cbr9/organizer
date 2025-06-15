@@ -20,7 +20,7 @@ use crate::{
 	templates::{template::Template, TemplateEngine},
 };
 
-use super::{common::ConflictOption, Action, ActionConfig};
+use super::{common::ConflictOption, Action};
 
 static KNOWN_FILES: LazyLock<Mutex<HashMap<PathBuf, Mutex<File>>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
 
@@ -83,9 +83,6 @@ impl Write {
 impl Action for Write {
 	fn templates(&self) -> Vec<Template> {
 		vec![self.text.clone(), self.outfile.clone()]
-	}
-	fn config(&self) -> ActionConfig {
-		ActionConfig { parallelize: true }
 	}
 
 	#[tracing::instrument(ret(level = "info"), err(Debug), level = "debug", skip(template_engine, variables))]

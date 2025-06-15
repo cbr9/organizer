@@ -8,7 +8,7 @@ use crate::{
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 
-use super::{Action, ActionConfig};
+use super::Action;
 use crate::config::actions::common::enabled;
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default, PartialEq, Eq)]
@@ -22,10 +22,6 @@ impl Action for Delete {
 	fn templates(&self) -> Vec<Template> {
 		vec![]
 	}
-	fn config(&self) -> ActionConfig {
-		ActionConfig { parallelize: true }
-	}
-
 	#[tracing::instrument(ret(level = "info"), err(Debug), level = "debug")]
 	fn execute(&self, res: &Resource, _: &TemplateEngine, _: &[Box<dyn Variable>], dry_run: bool) -> Result<Option<PathBuf>> {
 		if !dry_run && self.enabled {

@@ -33,84 +33,86 @@ impl Filter for Filename {
 	#[tracing::instrument(ret, level = "debug", skip(template_engine, variables))]
 	fn filter(&self, res: &Resource, template_engine: &TemplateEngine, variables: &[Box<dyn Variable>]) -> bool {
 		let filename = res.path.file_name().unwrap_or_default().to_string_lossy();
-		let context = TemplateEngine::new_context(res, variables);
 
 		if filename.is_empty() {
 			return false;
 		}
 
+		let filename_cmp = if self.case_sensitive {
+			filename.to_string()
+		} else {
+			filename.to_lowercase()
+		};
+
+		let context = TemplateEngine::new_context(res, variables);
+
 		let startswith = if self.startswith.is_empty() {
 			true
 		} else {
-			self.startswith
-				.iter()
-				.flat_map(|s| {
-					template_engine
-						.render(s, &context)
-						.map(|s| if !self.case_sensitive { s.to_lowercase() } else { s })
-				})
-				.any(|mut s| {
-					let mut negate = false;
-					if s.starts_with('!') {
-						negate = true;
-						s = s.replacen('!', "", 1);
-					}
-					let mut matches = filename.starts_with(&s);
-					if negate {
-						matches = !matches
-					}
+			self.startswith.iter().any(|template| {
+				// The rendered string must also be lowercased for a case-insensitive match.
+				let rendered = template_engine.render(template, &context).unwrap_or(template.text.clone());
+				let pattern = if self.case_sensitive { rendered } else { rendered.to_lowercase() };
+
+				let (pattern, negate) = if let Some(stripped) = pattern.strip_prefix('!') {
+					(stripped, true)
+				} else {
+					(pattern.as_str(), false)
+				};
+
+				let matches = filename_cmp.starts_with(pattern);
+				if negate {
+					!matches
+				} else {
 					matches
-				})
+				}
+			})
 		};
 
 		let endswith = if self.endswith.is_empty() {
 			true
 		} else {
-			self.endswith
-				.iter()
-				.flat_map(|s| {
-					template_engine
-						.render(s, &context)
-						.map(|s| if !self.case_sensitive { s.to_lowercase() } else { s })
-				})
-				.any(|mut s| {
-					let mut negate = false;
-					if s.starts_with('!') {
-						negate = true;
-						s = s.replacen('!', "", 1);
-					}
-					let mut matches = filename.ends_with(&s);
-					if negate {
-						matches = !matches
-					}
+			self.endswith.iter().any(|template| {
+				let rendered = template_engine.render(template, &context).unwrap_or(template.text.clone());
+				let pattern = if self.case_sensitive { rendered } else { rendered.to_lowercase() };
+
+				let (pattern, negate) = if let Some(stripped) = pattern.strip_prefix('!') {
+					(stripped, true)
+				} else {
+					(pattern.as_str(), false)
+				};
+
+				let matches = filename_cmp.ends_with(pattern);
+				if negate {
+					!matches
+				} else {
 					matches
-				})
+				}
+			})
 		};
 
 		let contains = if self.contains.is_empty() {
 			true
 		} else {
-			self.contains
-				.iter()
-				.flat_map(|s| {
-					template_engine
-						.render(s, &context)
-						.map(|s| if !self.case_sensitive { s.to_lowercase() } else { s })
-				})
-				.any(|mut s| {
-					let mut negate = false;
+			self.contains.iter().any(|template| {
+				let rendered = template_engine.render(template, &context).unwrap_or(template.text.clone());
+				let pattern = if self.case_sensitive { rendered } else { rendered.to_lowercase() };
 
-					if s.starts_with('!') {
-						negate = true;
-						s = s.replacen('!', "", 1);
-					}
-					let mut matches = filename.contains(&s);
-					if negate {
-						matches = !matches
-					}
+				let (pattern, negate) = if let Some(stripped) = pattern.strip_prefix('!') {
+					(stripped, true)
+				} else {
+					(pattern.as_str(), false)
+				};
+
+				let matches = filename_cmp.contains(pattern);
+				if negate {
+					!matches
+				} else {
 					matches
-				})
+				}
+			})
 		};
+
 		startswith && endswith && contains
 	}
 }
