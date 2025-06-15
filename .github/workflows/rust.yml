@@ -1,4 +1,5 @@
-name: Rust
+# A more descriptive name for the workflow
+name: Rust CI
 
 on:
   push:
@@ -10,49 +11,63 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  build:
+  # Renamed the job to better reflect its purpose
+  build_and_test:
     strategy:
+      # Recommended for matrix builds to ensure you see the results from all operating systems
+      fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]  # Test on Ubuntu, Windows, and macOS
+        os: [ubuntu-latest, windows-latest, macos-latest]
 
     runs-on: ${{ matrix.os }}
 
     steps:
-    - uses: actions/checkout@v4
+    - name: Checkout repository
+      uses: actions/checkout@v4
 
     - name: Set up Rust (Nightly)
       uses: dtolnay/rust-toolchain@nightly
-
       with:
-        rust-version: nightly  # Use the nightly version of Rust
+        toolchain: nightly
 
-    - name: Install Windows GNU toolchain (only on Windows)
+    - name: Install Windows GNU toolchain
       if: runner.os == 'Windows'
-      run: rustup target add x86_64-pc-windows-gnu  # Add the Windows GNU toolchain
+      run: rustup target add x86_64-pc-windows-gnu
 
-    - name: Install cargo-tarpaulin for code coverage
+    - name: Cache cargo binaries
+      id: cache-cargo-bin
+      uses: actions/cache@v4
+      with:
+        path: ~/.cargo/bin
+        key: ${{ runner.os }}-cargo-bin-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-bin-
+
+    - name: Install cargo-tarpaulin (if not cached)
+      if: steps.cache-cargo-bin.outputs.cache-hit != 'true'
       run: cargo install cargo-tarpaulin
 
-    - name: Build
-      run: |
-        if [ $RUNNER_OS = "Windows" ]; then
-          cargo build --target x86_64-pc-windows-gnu --verbose  # Build for Windows GNU on Windows
-        else
-          cargo build --verbose  # Default build on other OSs
-        fi
+    - name: Build (Windows)
+      if: runner.os == 'Windows'
+      run: cargo build --target x86_64-pc-windows-gnu --verbose
 
-    - name: Run tests
-      run: |
-        if [ $RUNNER_OS = "Windows" ]; then
-          cargo test --target x86_64-pc-windows-gnu --workspace --verbose  # Test for Windows GNU on Windows
-        else
-          cargo test --workspace --verbose  # Default tests on other OSs
-        fi
+    - name: Build (non-Windows)
+      if: runner.os != 'Windows'
+      run: cargo build --verbose
 
+    - name: Run tests (Windows)
+      if: runner.os == 'Windows'
+      run: cargo test --target x86_64-pc-windows-gnu --workspace --verbose
+
+    - name: Run tests (non-Windows)
+      if: runner.os != 'Windows'
+      run: cargo test --workspace --verbose
+
+    # NOTE: cargo-tarpaulin can have platform-specific issues. If you encounter instability,
+    # consider running coverage only on 'ubuntu-latest' by adding `if: runner.os == 'Linux'`
+    # to this step and the subsequent upload step.
     - name: Generate code coverage
-      run: cargo tarpaulin --workspace --all-features --ci --coverage-dir target/coverage
+      run: cargo tarpaulin --workspace --all-features --out Lcov Xml --output-dir target/coverage
 
     - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v5
-      with:
-        file: target/coverage/lcov-report/index.html  # Path to the coverage report
+      uses: codecov/codecov-action@v4
