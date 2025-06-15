@@ -29,8 +29,10 @@ pub mod write;
 dyn_clone::clone_trait_object!(Action);
 dyn_eq::eq_trait_object!(Action);
 
+#[derive(Default)]
 pub enum ExecutionModel {
 	Linear,
+	#[default]
 	Parallel,
 	Collection,
 }
@@ -38,7 +40,7 @@ pub enum ExecutionModel {
 #[typetag::serde(tag = "type")]
 pub trait Action: DynEq + DynClone + Sync + Send + Debug {
 	fn execution_model(&self) -> ExecutionModel {
-		ExecutionModel::Parallel
+		ExecutionModel::default()
 	}
 
 	fn execute(
@@ -51,7 +53,6 @@ pub trait Action: DynEq + DynClone + Sync + Send + Debug {
 		unimplemented!("This action has not implemented `execute`.")
 	}
 
-	/// The execution logic for `Collection` actions.
 	fn execute_collection(
 		&self,
 		_resources: Vec<&Resource>,
@@ -60,10 +61,6 @@ pub trait Action: DynEq + DynClone + Sync + Send + Debug {
 		_dry_run: bool,
 	) -> Result<Option<Vec<PathBuf>>> {
 		unimplemented!("This action must be run in `Collection` mode and has not implemented `execute_collection`.")
-	}
-
-	fn on_finish(&self, _resources: &[Resource], _dry_run: bool) -> Result<()> {
-		Ok(())
 	}
 
 	fn templates(&self) -> Vec<Template>;
@@ -86,7 +83,6 @@ pub trait Action: DynEq + DynClone + Sync + Send + Debug {
 			ExecutionModel::Collection => todo!(),
 		};
 
-		self.on_finish(&resources, dry_run).unwrap();
 		resources
 	}
 }
