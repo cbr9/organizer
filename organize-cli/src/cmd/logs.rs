@@ -2,11 +2,11 @@ use chrono::Local;
 use std::path::Path;
 use tracing::Level;
 use tracing_subscriber::{
+	Layer,
 	filter::LevelFilter,
 	fmt::{self},
 	layer::SubscriberExt,
 	util::SubscriberInitExt,
-	Layer,
 };
 
 /// Initializes the logging system based on command-line arguments and configuration.

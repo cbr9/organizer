@@ -1,0 +1,21 @@
+[package]
+name = "organize-cli"
+version = "0.1.0"
+edition = "2024"
+
+[[bin]]
+name = "organize"
+path = "src/main.rs"
+
+[dependencies]
+chrono.workspace = true
+anyhow.workspace = true
+clap.workspace = true
+colored.workspace = true
+organize-core.workspace = true
+rayon.workspace = true
+serde.workspace = true
+tracing.workspace = true
+tracing-appender.workspace = true
+tracing-subscriber.workspace = true
+
