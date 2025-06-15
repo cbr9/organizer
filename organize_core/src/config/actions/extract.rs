@@ -28,8 +28,8 @@ pub struct Extract {
 
 #[typetag::serde(name = "extract")]
 impl Action for Extract {
-	fn templates(&self) -> Vec<Template> {
-		vec![self.to.clone()]
+	fn templates(&self) -> Vec<&Template> {
+		vec![&self.to]
 	}
 
 	#[tracing::instrument(ret(level = "info"), err(Debug), level = "debug", skip(template_engine, variables))]

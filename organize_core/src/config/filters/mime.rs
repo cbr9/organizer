@@ -87,7 +87,7 @@ impl<T: ToString> TryFrom<Vec<T>> for Mime {
 
 #[typetag::serde(name = "mime")]
 impl Filter for Mime {
-	fn templates(&self) -> Vec<Template> {
+	fn templates(&self) -> Vec<&Template> {
 		vec![]
 	}
 	#[tracing::instrument(ret, level = "debug")]

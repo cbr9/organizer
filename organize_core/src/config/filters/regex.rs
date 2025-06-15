@@ -26,8 +26,8 @@ impl Eq for Regex {}
 
 #[typetag::serde(name = "regex")]
 impl Filter for RegularExpression {
-	fn templates(&self) -> Vec<Template> {
-		vec![self.input.clone()]
+	fn templates(&self) -> Vec<&Template> {
+		vec![&self.input]
 	}
 	#[tracing::instrument(ret, level = "debug", skip(template_engine, variables))]
 	fn filter(&self, res: &Resource, template_engine: &TemplateEngine, variables: &[Box<dyn Variable>]) -> bool {

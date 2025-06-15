@@ -22,11 +22,11 @@ pub struct Filename {
 
 #[typetag::serde(name = "filename")]
 impl Filter for Filename {
-	fn templates(&self) -> Vec<Template> {
+	fn templates(&self) -> Vec<&Template> {
 		let mut templates = vec![];
-		templates.extend(self.startswith.clone());
-		templates.extend(self.endswith.clone());
-		templates.extend(self.contains.clone());
+		templates.extend(self.startswith.iter());
+		templates.extend(self.endswith.iter());
+		templates.extend(self.contains.iter());
 		templates
 	}
 

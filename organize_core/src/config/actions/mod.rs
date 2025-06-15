@@ -63,7 +63,7 @@ pub trait Action: DynEq + DynClone + Sync + Send + Debug {
 		unimplemented!("This action must be run in `Collection` mode and has not implemented `execute_collection`.")
 	}
 
-	fn templates(&self) -> Vec<Template>;
+	fn templates(&self) -> Vec<&Template>;
 
 	#[doc(hidden)]
 	fn run(&self, mut resources: Vec<Resource>, template_engine: &TemplateEngine, variables: &[Box<dyn Variable>], dry_run: bool) -> Vec<Resource> {

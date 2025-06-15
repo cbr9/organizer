@@ -41,8 +41,8 @@ impl Default for ContinueWith {
 
 #[typetag::serde(name = "symlink")]
 impl Action for Symlink {
-	fn templates(&self) -> Vec<Template> {
-		vec![self.to.clone()]
+	fn templates(&self) -> Vec<&Template> {
+		vec![&self.to]
 	}
 	#[tracing::instrument(ret(level = "info"), err(Debug), level = "debug", skip(template_engine, variables))]
 	fn execute(&self, res: &Resource, template_engine: &TemplateEngine, variables: &[Box<dyn Variable>], dry_run: bool) -> Result<Option<PathBuf>> {

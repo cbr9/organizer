@@ -23,7 +23,7 @@ impl Filter for Empty {
 			path.read_dir().map(|mut i| i.next().is_none()).unwrap_or(false)
 		}
 	}
-	fn templates(&self) -> Vec<Template> {
+	fn templates(&self) -> Vec<&Template> {
 		vec![]
 	}
 }

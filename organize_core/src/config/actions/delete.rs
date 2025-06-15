@@ -19,7 +19,7 @@ pub struct Delete {
 
 #[typetag::serde(name = "delete")]
 impl Action for Delete {
-	fn templates(&self) -> Vec<Template> {
+	fn templates(&self) -> Vec<&Template> {
 		vec![]
 	}
 	#[tracing::instrument(ret(level = "info"), err(Debug), level = "debug")]

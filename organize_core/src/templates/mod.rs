@@ -77,7 +77,7 @@ impl TemplateEngine {
 		Ok(())
 	}
 
-	pub fn add_templates(&mut self, templates: &[Template]) -> Result<()> {
+	pub fn add_templates(&mut self, templates: &[&Template]) -> Result<()> {
 		for template in templates.iter() {
 			if !self.get_template_names().contains(template.id.as_str()) {
 				self.tera.add_raw_template(&template.id, &template.text)?;

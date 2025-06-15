@@ -39,8 +39,8 @@ impl Default for ContinueWith {
 
 #[typetag::serde(name = "copy")]
 impl Action for Copy {
-	fn templates(&self) -> Vec<Template> {
-		vec![self.to.clone()]
+	fn templates(&self) -> Vec<&Template> {
+		vec![&self.to]
 	}
 
 	#[tracing::instrument(ret(level = "info"), err(Debug), level = "debug", skip(template_engine, variables))]

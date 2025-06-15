@@ -17,7 +17,7 @@ pub struct Trash {
 
 #[typetag::serde(name = "trash")]
 impl Action for Trash {
-	fn templates(&self) -> Vec<Template> {
+	fn templates(&self) -> Vec<&Template> {
 		vec![]
 	}
 

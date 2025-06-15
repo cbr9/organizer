@@ -17,7 +17,7 @@ pub struct Extension {
 
 #[typetag::serde(name = "extension")]
 impl Filter for Extension {
-	fn templates(&self) -> Vec<Template> {
+	fn templates(&self) -> Vec<&Template> {
 		vec![]
 	}
 

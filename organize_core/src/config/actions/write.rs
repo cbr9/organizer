@@ -54,8 +54,8 @@ pub struct Write {
 
 #[typetag::serde]
 impl Action for Write {
-	fn templates(&self) -> Vec<Template> {
-		vec![self.text.clone(), self.outfile.clone()]
+	fn templates(&self) -> Vec<&Template> {
+		vec![&self.text, &self.outfile]
 	}
 
 	fn execution_model(&self) -> ExecutionModel {

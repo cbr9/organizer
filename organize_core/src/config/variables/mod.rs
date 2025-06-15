@@ -14,5 +14,5 @@ dyn_eq::eq_trait_object!(Variable);
 #[typetag::serde(tag = "type")]
 pub trait Variable: DynEq + DynClone + Sync + Send + Debug {
 	fn register(&self, template_engine: &TemplateEngine, context: &mut Context);
-	fn templates(&self) -> Vec<Template>;
+	fn templates(&self) -> Vec<&Template>;
 }

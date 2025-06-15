@@ -32,9 +32,10 @@ pub struct Script {
 
 #[typetag::serde(name = "script")]
 impl Action for Script {
-	fn templates(&self) -> Vec<Template> {
-		vec![self.content.clone()]
+	fn templates(&self) -> Vec<&Template> {
+		Filter::templates(self)
 	}
+
 	fn execution_model(&self) -> ExecutionModel {
 		if self.parallel {
 			ExecutionModel::Parallel
@@ -60,8 +61,8 @@ impl Action for Script {
 
 #[typetag::serde(name = "script")]
 impl Filter for Script {
-	fn templates(&self) -> Vec<Template> {
-		vec![self.content.clone()]
+	fn templates(&self) -> Vec<&Template> {
+		vec![&self.content]
 	}
 	fn filter(&self, res: &Resource, template_engine: &TemplateEngine, variables: &[Box<dyn Variable>]) -> bool {
 		self.run_script(res, template_engine, variables)

@@ -22,8 +22,8 @@ impl Eq for RegexVariable {}
 
 #[typetag::serde(name = "regex")]
 impl Variable for RegexVariable {
-	fn templates(&self) -> Vec<Template> {
-		vec![self.input.clone()]
+	fn templates(&self) -> Vec<&Template> {
+		vec![&self.input]
 	}
 	fn register(&self, template_engine: &TemplateEngine, context: &mut Context) {
 		let input = template_engine.render(&self.input, context).unwrap();

@@ -22,8 +22,8 @@ pub struct Echo {
 
 #[typetag::serde(name = "echo")]
 impl Action for Echo {
-	fn templates(&self) -> Vec<Template> {
-		vec![self.message.clone()]
+	fn templates(&self) -> Vec<&Template> {
+		vec![&self.message]
 	}
 
 	#[tracing::instrument(ret(level = "info"), err(Debug), level = "debug", skip(template_engine, variables))]

@@ -39,8 +39,8 @@ impl Default for ContinueWith {
 
 #[typetag::serde(name = "hardlink")]
 impl Action for Hardlink {
-	fn templates(&self) -> Vec<Template> {
-		vec![self.to.clone()]
+	fn templates(&self) -> Vec<&Template> {
+		vec![&self.to]
 	}
 
 	#[tracing::instrument(ret(level = "info"), err(Debug), level = "debug", skip(template_engine, variables))]

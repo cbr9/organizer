@@ -39,12 +39,12 @@ pub struct Email {
 
 #[typetag::serde(name = "email")]
 impl Action for Email {
-	fn templates(&self) -> Vec<Template> {
+	fn templates(&self) -> Vec<&Template> {
 		let mut templates = vec![];
-		if let Some(subject) = self.subject.clone() {
+		if let Some(subject) = &self.subject {
 			templates.push(subject);
 		}
-		if let Some(body) = self.body.clone() {
+		if let Some(body) = &self.body {
 			templates.push(body);
 		}
 		templates

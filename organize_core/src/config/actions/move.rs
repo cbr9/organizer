@@ -25,8 +25,8 @@ pub struct Move {
 
 #[typetag::serde(name = "move")]
 impl Action for Move {
-	fn templates(&self) -> Vec<Template> {
-		vec![self.to.clone()]
+	fn templates(&self) -> Vec<&Template> {
+		vec![&self.to]
 	}
 
 	#[tracing::instrument(ret(level = "info"), err(Debug), level = "debug", skip(template_engine, variables))]

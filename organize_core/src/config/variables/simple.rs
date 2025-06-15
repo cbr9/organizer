@@ -12,8 +12,8 @@ pub struct SimpleVariable {
 
 #[typetag::serde(name = "simple")]
 impl Variable for SimpleVariable {
-	fn templates(&self) -> Vec<Template> {
-		vec![self.value.clone()]
+	fn templates(&self) -> Vec<&Template> {
+		vec![&self.value]
 	}
 	fn register(&self, template_engine: &TemplateEngine, context: &mut Context) {
 		let value = template_engine.render(&self.value, context).unwrap();
