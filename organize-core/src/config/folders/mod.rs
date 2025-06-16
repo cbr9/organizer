@@ -17,7 +17,7 @@ use super::options::{Options, Target};
 #[derive(Deserialize, Serialize, Debug, PartialEq, Eq, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct FolderBuilder {
-	root: Template,
+	pub root: Template,
 	#[serde(flatten)]
 	pub options: OptionsBuilder,
 }

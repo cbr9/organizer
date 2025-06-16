@@ -1,5 +1,6 @@
 use dyn_clone::DynClone;
 use dyn_eq::DynEq;
+use itertools::Itertools;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
@@ -10,11 +11,7 @@ pub mod filename;
 pub mod mime;
 pub mod regex;
 
-use crate::{
-	config::context::Context,
-	resource::Resource,
-	templates::template::Template,
-};
+use crate::{config::context::Context, resource::Resource, templates::template::Template};
 
 dyn_clone::clone_trait_object!(Filter);
 dyn_eq::eq_trait_object!(Filter);
@@ -38,7 +35,7 @@ impl Filter for Not {
 	}
 
 	fn templates(&self) -> Vec<&Template> {
-		vec![]
+		self.filter.templates()
 	}
 }
 
@@ -55,7 +52,7 @@ impl Filter for AnyOf {
 	}
 
 	fn templates(&self) -> Vec<&Template> {
-		vec![]
+		self.filters.iter().map(|f| f.templates()).flatten().collect_vec()
 	}
 }
 
@@ -72,7 +69,7 @@ impl Filter for AllOf {
 	}
 
 	fn templates(&self) -> Vec<&Template> {
-		vec![]
+		self.filters.iter().map(|f| f.templates()).flatten().collect_vec()
 	}
 }
 
@@ -89,6 +86,6 @@ impl Filter for NoneOf {
 	}
 
 	fn templates(&self) -> Vec<&Template> {
-		vec![]
+		self.filters.iter().map(|f| f.templates()).flatten().collect_vec()
 	}
 }

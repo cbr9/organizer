@@ -5,11 +5,7 @@ use dyn_clone::DynClone;
 use dyn_eq::DynEq;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 
-use crate::{
-	config::context::Context,
-	resource::Resource,
-	templates::template::Template,
-};
+use crate::{config::context::Context, resource::Resource, templates::template::Template};
 
 pub mod common;
 pub mod copy;

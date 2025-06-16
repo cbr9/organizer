@@ -50,6 +50,9 @@ impl TemplateEngine {
 			for filter in rule.filters.iter() {
 				engine.add_templates(&filter.templates())?;
 			}
+			for folder in rule.folders.iter() {
+				engine.add_template(&folder.root)?;
+			}
 		}
 		Ok(engine)
 	}
