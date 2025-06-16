@@ -1,5 +1,4 @@
-[![codecov](https://codecov.io/github/cbr9/organize/graph/badge.svg?token=9K4VVDHUMH)](https://codecov.io/github/cbr9/organize)
-
+[![codecov](https://codecov.io/github/cbr9/organize/branch/master/graph/badge.svg?token=9K4VVDHUMH)](https://codecov.io/github/cbr9/organize)
 TODO:
 - [ ] implement custom variables
   - [x] regex based (using named capture groups)
