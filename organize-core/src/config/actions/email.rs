@@ -1,8 +1,13 @@
 use itertools::Itertools;
-use std::{collections::HashMap, path::PathBuf, process::Command, sync::Mutex};
+use std::{
+	collections::HashMap,
+	path::PathBuf,
+	process::Command,
+	sync::{Arc, RwLock},
+};
 
 use crate::config::{actions::common::enabled, context::Context};
-use anyhow::Result;
+use anyhow::{bail, Result};
 use lettre::{
 	message::{header::ContentType, Attachment, Mailbox, MessageBuilder, MultiPart, SinglePart},
 	transport::smtp::authentication::Credentials,
@@ -10,16 +15,10 @@ use lettre::{
 	Transport,
 };
 use serde::{Deserialize, Serialize};
-use std::sync::LazyLock;
 
-use crate::{
-	resource::Resource,
-	templates::template::Template,
-};
+use crate::{resource::Resource, templates::template::Template};
 
 use super::Action;
-
-static CREDENTIALS: LazyLock<Mutex<HashMap<Mailbox, Credentials>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
 
 #[derive(Deserialize, Serialize, Eq, PartialEq, Clone, Debug)]
 #[serde(deny_unknown_fields)]
@@ -34,6 +33,38 @@ pub struct Email {
 	attach: bool,
 	#[serde(default = "enabled")]
 	pub enabled: bool,
+}
+
+impl Email {
+	fn get_or_insert_credentials(&self, cache: &Arc<RwLock<HashMap<Mailbox, Credentials>>>) -> anyhow::Result<Credentials> {
+		if let Ok(reader) = cache.read() {
+			if let Some(creds) = reader.get(&self.sender) {
+				return Ok(creds.clone());
+			}
+		}
+
+		if let Ok(mut writer) = cache.write() {
+			// Another thread might have acquired the
+			// write lock and inserted the key while we were waiting.
+			if let Some(creds) = writer.get(&self.sender) {
+				return Ok(creds.clone());
+			}
+			let command_and_args = self.password_cmd.split(" ").collect_vec();
+			let executable = command_and_args[0];
+
+			let args = &command_and_args[1..];
+			let mut command = Command::new(executable);
+			let output = command.args(args).output()?;
+			let password = String::from_utf8(output.stdout)?.trim().to_string();
+			let creds = Credentials::new(self.sender.email.to_string(), password);
+
+			// Insert the new credentials into the cache.
+			writer.insert(self.sender.clone(), creds.clone());
+
+			return Ok(creds);
+		}
+		bail!("Could not acquire email cache")
+	}
 }
 
 #[typetag::serde(name = "email")]
@@ -85,24 +116,7 @@ impl Action for Email {
 
 			let email = email.multipart(multipart)?;
 
-			let creds = {
-				let mut lock = CREDENTIALS.lock().unwrap();
-				if let Some(creds) = lock.get(&self.sender) {
-					creds.clone()
-				} else {
-					let command_and_args = self.password_cmd.split(" ").collect_vec();
-					let executable = command_and_args[0];
-
-					let args = &command_and_args[1..];
-					let mut command = Command::new(executable);
-					let output = command.args(args).output()?;
-					let password = String::from_utf8(output.stdout)?.trim().to_string();
-					let creds = Credentials::new(self.sender.email.to_string(), password);
-					lock.insert(self.sender.clone(), creds.clone());
-					creds
-				}
-			};
-
+			let creds = self.get_or_insert_credentials(&ctx.email_credentials)?;
 			let mailer = SmtpTransport::relay(&self.smtp_server).unwrap().credentials(creds).build();
 
 			match mailer.send(&email) {

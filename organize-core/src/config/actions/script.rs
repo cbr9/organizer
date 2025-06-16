@@ -8,11 +8,7 @@ use crate::config::{actions::common::enabled, context::Context};
 use serde::{Deserialize, Serialize};
 use tempfile;
 
-use crate::{
-	config::filters::Filter,
-	resource::Resource,
-	templates::template::Template,
-};
+use crate::{config::filters::Filter, resource::Resource, templates::template::Template};
 use anyhow::{bail, Result};
 
 use super::{Action, ExecutionModel};
@@ -118,7 +114,7 @@ impl Script {
 
 #[cfg(test)]
 mod tests {
-	use crate::config::context::ContextHarness;
+	use crate::{config::context::ContextHarness, templates::TemplateEngine};
 
 	use super::*;
 

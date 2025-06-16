@@ -1,3 +1,10 @@
+use std::{
+	collections::HashMap,
+	sync::{Arc, RwLock},
+};
+
+use lettre::{message::Mailbox, transport::smtp::authentication::Credentials};
+
 use crate::{
 	config::{folders::Folder, rule::Rule, Config},
 	templates::TemplateEngine,
@@ -12,6 +19,7 @@ pub struct Context<'a> {
 	pub folder: &'a Folder,
 	pub template_engine: &'a TemplateEngine,
 	pub dry_run: bool,
+	pub email_credentials: Arc<RwLock<HashMap<Mailbox, Credentials>>>,
 }
 
 /// A test harness to simplify the creation of a `Context`.
@@ -24,6 +32,7 @@ pub struct ContextHarness {
 	pub folder: Folder,
 	pub dry_run: bool,
 	pub template_engine: TemplateEngine,
+	pub email_credentials: Arc<RwLock<HashMap<Mailbox, Credentials>>>,
 }
 
 #[cfg(test)]
@@ -36,6 +45,7 @@ impl ContextHarness {
 			folder: Folder::default(),
 			template_engine: TemplateEngine::default(),
 			dry_run: false,
+			email_credentials: Arc::new(RwLock::new(HashMap::new())),
 		}
 	}
 
@@ -47,6 +57,7 @@ impl ContextHarness {
 			folder: &self.folder,
 			template_engine: &self.template_engine,
 			dry_run: self.dry_run,
+			email_credentials: self.email_credentials.clone(),
 		}
 	}
 }

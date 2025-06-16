@@ -1,4 +1,8 @@
-use std::path::PathBuf;
+use std::{
+	collections::HashMap,
+	path::PathBuf,
+	sync::{Arc, RwLock},
+};
 
 use anyhow::Result;
 use clap::{Parser, ValueHint};
@@ -38,6 +42,8 @@ impl Cmd for Run {
 		let config = config_builder.build(&mut engine, self.tags, self.ids)?;
 		logs::init(self.verbose, &config.path);
 
+		let email_credentials = Arc::new(RwLock::new(HashMap::new()));
+
 		if self.no_dry_run {
 			self.dry_run = false;
 		}
@@ -63,6 +69,7 @@ impl Cmd for Run {
 					config: &config,
 					rule,
 					folder,
+					email_credentials: email_credentials.clone(),
 					dry_run: self.dry_run,
 				};
 
