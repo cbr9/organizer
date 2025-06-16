@@ -24,17 +24,11 @@ impl From<Template> for String {
 	}
 }
 
-impl From<String> for Template {
-	fn from(val: String) -> Self {
+impl<T: AsRef<str>> From<T> for Template {
+	fn from(val: T) -> Self {
 		Template {
-			text: val,
+			text: val.as_ref().to_string(),
 			id: Uuid::new_v4().to_string(),
 		}
-	}
-}
-
-impl From<&str> for Template {
-	fn from(val: &str) -> Self {
-		Self::from(val.to_string())
 	}
 }

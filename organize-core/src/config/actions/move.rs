@@ -36,7 +36,7 @@ impl Action for Move {
 					if let Some(parent) = dest.parent() {
 						std::fs::create_dir_all(parent).with_context(|| format!("Could not create parent directory for {}", dest.display()))?;
 					}
-					std::fs::rename(&res.path, &dest).with_context(|| format!("Could not move {} -> {}", res.path.display(), dest.display()))?;
+					std::fs::rename(res.path(), &dest).with_context(|| format!("Could not move {} -> {}", res.path().display(), dest.display()))?;
 				}
 				Ok(Some(dest))
 			}

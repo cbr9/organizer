@@ -64,6 +64,7 @@ impl Filter for Script {
 	fn templates(&self) -> Vec<&Template> {
 		vec![&self.content]
 	}
+
 	fn filter(&self, res: &Resource, template_engine: &TemplateEngine) -> bool {
 		self.run_script(res, template_engine)
 			.map(|output| {
@@ -96,8 +97,9 @@ impl Script {
 		let script = tempfile::NamedTempFile::new()?;
 		let script_path = script.into_temp_path().to_path_buf();
 		let context = template_engine.new_context(res);
-		let content = template_engine.render(&self.content, &context)?;
-		std::fs::write(&script_path, content)?;
+		if let Some(content) = template_engine.render(&self.content, &context)? {
+			std::fs::write(&script_path, content)?;
+		}
 		Ok(script_path)
 	}
 
@@ -119,7 +121,7 @@ mod tests {
 
 	#[test]
 	fn test_script_filter() -> Result<()> {
-		let src = Resource::new("/home", "/");
+		let src = Resource::new("/home", "/").unwrap();
 		let content = String::from("print('huh')\nprint('{{path}}'.islower())");
 		let mut script = Script::new("python", content.clone());
 		let mut template_engine = TemplateEngine::default();

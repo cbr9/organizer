@@ -35,9 +35,9 @@ pub fn resolve_naming_conflict<T: AsRef<Path> + std::fmt::Debug>(strategy: &Conf
 			let mut n = 1;
 			while path.exists() {
 				if extension.is_empty() {
-					path.set_file_name(format!("{}{}({:?})", stem, counter_separator, n));
+					path.set_file_name(format!("{stem}{counter_separator}({n:?})"));
 				} else {
-					path.set_file_name(format!("{}{}({:?}).{}", stem, counter_separator, n, extension));
+					path.set_file_name(format!("{stem}{counter_separator}({n:?}).{extension}"));
 				}
 				n += 1;
 			}

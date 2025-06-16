@@ -114,7 +114,7 @@ impl Config {
 
 		for tag in chosen_tags.iter() {
 			if !all_tags.contains(tag) && !all_tags.contains(&tag.replacen('!', "", 1)) {
-				println!("no tag named {}", tag);
+				println!("no tag named {tag}");
 				return vec![];
 			}
 		}
@@ -158,7 +158,7 @@ impl Config {
 
 		for id in chosen_ids.iter() {
 			if !all_ids.contains(id) && !all_ids.contains(&id.replacen('!', "", 1)) {
-				println!("no tag named {}", id);
+				println!("no tag named {id}");
 				return vec![];
 			}
 		}

@@ -1,5 +1,4 @@
-use std::fmt::Debug;
-use std::path::PathBuf;
+use std::{fmt::Debug, path::PathBuf};
 
 use anyhow::Result;
 use dyn_clone::DynClone;
@@ -10,7 +9,6 @@ use crate::{
 	resource::Resource,
 	templates::{template::Template, TemplateEngine},
 };
-
 
 pub mod common;
 pub mod copy;

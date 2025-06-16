@@ -29,9 +29,10 @@ impl Action for Echo {
 	fn execute(&self, res: &Resource, template_engine: &TemplateEngine, _: bool) -> Result<Option<PathBuf>> {
 		if self.enabled {
 			let context = template_engine.new_context(res);
-			let message = template_engine.render(&self.message, &context).map_err(anyhow::Error::msg)?;
-			tracing::info!("{}", message);
+			if let Some(message) = template_engine.render(&self.message, &context).map_err(anyhow::Error::msg)? {
+				tracing::info!("{}", message);
+			}
 		}
-		Ok(Some(res.path.clone()))
+		Ok(Some(res.path().to_path_buf()))
 	}
 }

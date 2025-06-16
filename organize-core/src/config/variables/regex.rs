@@ -25,12 +25,14 @@ impl Variable for RegexVariable {
 	fn templates(&self) -> Vec<&Template> {
 		vec![&self.input]
 	}
+
 	fn register(&self, template_engine: &TemplateEngine, context: &mut Context) {
-		let input = template_engine.render(&self.input, context).unwrap();
-		if let Some(captures) = self.pattern.captures(&input) {
-			for name in self.pattern.capture_names().flatten() {
-				if let Some(r#match) = captures.name(name) {
-					context.insert(name, r#match.as_str());
+		if let Some(input) = template_engine.render(&self.input, context).unwrap_or_default() {
+			if let Some(captures) = self.pattern.captures(&input) {
+				for name in self.pattern.capture_names().flatten() {
+					if let Some(r#match) = captures.name(name) {
+						context.insert(name, r#match.as_str());
+					}
 				}
 			}
 		}

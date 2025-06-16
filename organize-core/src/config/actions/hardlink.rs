@@ -3,8 +3,8 @@ use std::path::PathBuf;
 use anyhow::{Context as ErrorContext, Result};
 use serde::{Deserialize, Serialize};
 
-use crate::config::actions::common::enabled;
 use crate::{
+	config::actions::common::enabled,
 	path::prepare::prepare_target_path,
 	resource::Resource,
 	templates::{template::Template, TemplateEngine},
@@ -50,13 +50,13 @@ impl Action for Hardlink {
 					if let Some(parent) = dest.parent() {
 						std::fs::create_dir_all(parent).with_context(|| format!("Could not create parent directory for {}", dest.display()))?;
 					}
-					std::fs::hard_link(&res.path, &dest)
-						.with_context(|| format!("could not create hardlink ({} -> {})", res.path.display(), dest.display()))?;
+					std::fs::hard_link(res.path(), &dest)
+						.with_context(|| format!("could not create hardlink ({} -> {})", res.path().display(), dest.display()))?;
 				}
 				if self.continue_with == ContinueWith::Link && self.enabled {
 					Ok(Some(dest))
 				} else {
-					Ok(Some(res.path.clone()))
+					Ok(Some(res.path().to_path_buf()))
 				}
 			}
 			None => Ok(None),

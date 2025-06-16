@@ -28,6 +28,7 @@ impl Action for Delete {
 			ExecutionModel::Parallel
 		}
 	}
+
 	fn templates(&self) -> Vec<&Template> {
 		vec![]
 	}
@@ -37,22 +38,22 @@ impl Action for Delete {
 		if !dry_run && self.enabled {
 			if self.confirm {
 				let confirmed = Confirm::with_theme(&ColorfulTheme::default())
-					.with_prompt(format!("Delete {}?", res.path.display()))
+					.with_prompt(format!("Delete {}?", res.path().display()))
 					.default(false)
 					.interact()?;
 
 				if !confirmed {
 					// If the user does not confirm, we pass the resource through to the next action.
-					return Ok(Some(res.path.clone()));
+					return Ok(Some(res.path().to_path_buf()));
 				}
 			}
 
-			if res.path.is_file() {
-				std::fs::remove_file(&res.path).with_context(|| format!("could not delete {}", &res.path.display()))?;
+			if res.path().is_file() {
+				std::fs::remove_file(res.path()).with_context(|| format!("could not delete {}", &res.path().display()))?;
 			}
 
-			if res.path.is_dir() {
-				std::fs::remove_dir_all(&res.path).with_context(|| format!("could not delete {}", &res.path.display()))?;
+			if res.path().is_dir() {
+				std::fs::remove_dir_all(res.path()).with_context(|| format!("could not delete {}", &res.path().display()))?;
 			}
 		}
 		Ok(None)
@@ -69,7 +70,7 @@ mod tests {
 		let tmp_dir = tempfile::tempdir().expect("Couldn't create temporary directory");
 		let tmp_path = tmp_dir.path().to_owned();
 		let tmp_file = tmp_path.join("delete_me.txt");
-		let resource = Resource::new(&tmp_file, tmp_dir.path());
+		let resource = Resource::new(&tmp_file, tmp_dir.path()).unwrap();
 		let action = Delete {
 			enabled: true,
 			confirm: false,

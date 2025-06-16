@@ -1,8 +1,10 @@
 use std::path::PathBuf;
 
-use crate::config::actions::common::enabled;
-use crate::templates::template::Template;
-use crate::{resource::Resource, templates::TemplateEngine};
+use crate::{
+	config::actions::common::enabled,
+	resource::Resource,
+	templates::{template::Template, TemplateEngine},
+};
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
@@ -24,7 +26,7 @@ impl Action for Trash {
 	#[tracing::instrument(ret(level = "info"), err(Debug), level = "debug")]
 	fn execute(&self, res: &Resource, _: &TemplateEngine, dry_run: bool) -> Result<Option<PathBuf>> {
 		if !dry_run && self.enabled {
-			trash::delete(&res.path)?;
+			trash::delete(res.path())?;
 		}
 		Ok(None)
 	}
@@ -39,7 +41,7 @@ mod tests {
 	fn test_trash() {
 		let tmp_file = tempfile::NamedTempFile::new().unwrap();
 		let path = tmp_file.path();
-		let resource = Resource::new(path, path.parent().unwrap());
+		let resource = Resource::new(path, path.parent().unwrap()).unwrap();
 		let action = Trash { enabled: true };
 		let template_engine = TemplateEngine::default();
 

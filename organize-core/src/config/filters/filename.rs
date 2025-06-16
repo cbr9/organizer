@@ -32,7 +32,7 @@ impl Filter for Filename {
 
 	#[tracing::instrument(ret, level = "debug", skip(template_engine))]
 	fn filter(&self, res: &Resource, template_engine: &TemplateEngine) -> bool {
-		let filename = res.path.file_name().unwrap_or_default().to_string_lossy();
+		let filename = res.path().file_name().unwrap_or_default().to_string_lossy();
 
 		if filename.is_empty() {
 			return false;
@@ -51,8 +51,19 @@ impl Filter for Filename {
 		} else {
 			self.startswith.iter().any(|template| {
 				// The rendered string must also be lowercased for a case-insensitive match.
-				let rendered = template_engine.render(template, &context).unwrap_or(template.text.clone());
-				let pattern = if self.case_sensitive { rendered } else { rendered.to_lowercase() };
+				let pattern = {
+					let rendered = if let Some(rendered) = template_engine.render(template, &context).unwrap_or_default() {
+						rendered
+					} else {
+						template.text.clone()
+					};
+
+					if self.case_sensitive {
+						rendered
+					} else {
+						rendered.to_lowercase()
+					}
+				};
 
 				let (pattern, negate) = if let Some(stripped) = pattern.strip_prefix('!') {
 					(stripped, true)
@@ -73,8 +84,19 @@ impl Filter for Filename {
 			true
 		} else {
 			self.endswith.iter().any(|template| {
-				let rendered = template_engine.render(template, &context).unwrap_or(template.text.clone());
-				let pattern = if self.case_sensitive { rendered } else { rendered.to_lowercase() };
+				let pattern = {
+					let rendered = if let Some(rendered) = template_engine.render(template, &context).unwrap_or_default() {
+						rendered
+					} else {
+						template.text.clone()
+					};
+
+					if self.case_sensitive {
+						rendered
+					} else {
+						rendered.to_lowercase()
+					}
+				};
 
 				let (pattern, negate) = if let Some(stripped) = pattern.strip_prefix('!') {
 					(stripped, true)
@@ -95,8 +117,19 @@ impl Filter for Filename {
 			true
 		} else {
 			self.contains.iter().any(|template| {
-				let rendered = template_engine.render(template, &context).unwrap_or(template.text.clone());
-				let pattern = if self.case_sensitive { rendered } else { rendered.to_lowercase() };
+				let pattern = {
+					let rendered = if let Some(rendered) = template_engine.render(template, &context).unwrap_or_default() {
+						rendered
+					} else {
+						template.text.clone()
+					};
+
+					if self.case_sensitive {
+						rendered
+					} else {
+						rendered.to_lowercase()
+					}
+				};
 
 				let (pattern, negate) = if let Some(stripped) = pattern.strip_prefix('!') {
 					(stripped, true)
@@ -119,15 +152,13 @@ impl Filter for Filename {
 
 #[cfg(test)]
 mod tests {
-	use std::str::FromStr;
-
 	use crate::templates::TemplateEngine;
 
 	use super::*;
 
 	#[test]
 	fn match_beginning_case_insensitive() {
-		let path = Resource::from_str("$HOME/Downloads/test.pdf").unwrap();
+		let path = Resource::new("$HOME/Downloads/test.pdf", "").unwrap();
 		let filename = Filename {
 			startswith: vec!["TE".into()],
 			..Default::default()
@@ -138,7 +169,7 @@ mod tests {
 
 	#[test]
 	fn match_ending_case_insensitive() {
-		let path = Resource::from_str("$HOME/Downloads/test.pdf").unwrap();
+		let path = Resource::new("$HOME/Downloads/test.pdf", "").unwrap();
 		let filename = Filename {
 			endswith: vec!["DF".into()],
 			..Default::default()
@@ -149,7 +180,7 @@ mod tests {
 
 	#[test]
 	fn match_containing_case_insensitive() {
-		let path = Resource::from_str("$HOME/Downloads/test.pdf").unwrap();
+		let path = Resource::new("$HOME/Downloads/test.pdf", "").unwrap();
 		let filename = Filename {
 			contains: vec!["ES".into()],
 			..Default::default()
@@ -160,7 +191,7 @@ mod tests {
 
 	#[test]
 	fn no_match_beginning_case_sensitive() {
-		let path = Resource::from_str("$HOME/Downloads/test.pdf").unwrap();
+		let path = Resource::new("$HOME/Downloads/test.pdf", "").unwrap();
 		let filename = Filename {
 			case_sensitive: true,
 			startswith: vec!["TE".into()],
@@ -172,7 +203,7 @@ mod tests {
 
 	#[test]
 	fn no_match_ending_case_sensitive() {
-		let path = Resource::from_str("$HOME/Downloads/test.pdf").unwrap();
+		let path = Resource::new("$HOME/Downloads/test.pdf", "").unwrap();
 		let filename = Filename {
 			case_sensitive: true,
 			startswith: vec!["DF".into()],
@@ -184,7 +215,7 @@ mod tests {
 
 	#[test]
 	fn no_match_containing_case_sensitive() {
-		let path = Resource::from_str("$HOME/Downloads/test.pdf").unwrap();
+		let path = Resource::new("$HOME/Downloads/test.pdf", "").unwrap();
 		let filename = Filename {
 			case_sensitive: true,
 			contains: vec!["ES".into()],
@@ -195,7 +226,7 @@ mod tests {
 	}
 	#[test]
 	fn match_containing_case_sensitive() {
-		let path = Resource::from_str("$HOME/Downloads/tESt.pdf").unwrap();
+		let path = Resource::new("$HOME/Downloads/tESt.pdf", "").unwrap();
 		let filename = Filename {
 			case_sensitive: true,
 			contains: vec!["ES".into()],
@@ -207,7 +238,7 @@ mod tests {
 	}
 	#[test]
 	fn match_multiple_conditions_case_sensitive() {
-		let path = Resource::from_str("$HOME/Downloads/tESt.pdf").unwrap();
+		let path = Resource::new("$HOME/Downloads/tESt.pdf", "").unwrap();
 		let filename = Filename {
 			case_sensitive: true,
 			contains: vec!["ES".into()],
@@ -219,7 +250,7 @@ mod tests {
 	}
 	#[test]
 	fn match_multiple_conditions_some_negative() {
-		let path = Resource::from_str("$HOME/Downloads/tESt.pdf").unwrap();
+		let path = Resource::new("$HOME/Downloads/tESt.pdf", "").unwrap();
 		let filename = Filename {
 			case_sensitive: true,
 			contains: vec!["ES".into()],
@@ -231,7 +262,7 @@ mod tests {
 	}
 	#[test]
 	fn match_multiple_conditions_some_negative_2() {
-		let path = Resource::from_str("$HOME/Downloads/tESt.pdf").unwrap();
+		let path = Resource::new("$HOME/Downloads/tESt.pdf", "").unwrap();
 		let filename = Filename {
 			case_sensitive: true,
 			contains: vec!["!ES".into(), "ES".into()],
@@ -243,7 +274,7 @@ mod tests {
 	}
 	#[test]
 	fn match_multiple_conditions_some_negative_3() {
-		let path = Resource::from_str("$HOME/Downloads/tESt.txt").unwrap();
+		let path = Resource::new("$HOME/Downloads/tESt.txt", "").unwrap();
 		let filename = Filename {
 			case_sensitive: true,
 			contains: vec!["!ES".into(), "ES".into()],

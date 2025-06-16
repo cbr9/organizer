@@ -64,7 +64,7 @@ impl Action for Write {
 	#[tracing::instrument(ret(level = "info"), err(Debug), level = "debug", skip(template_engine))]
 	fn execute_collection(&self, resources: Vec<&Resource>, template_engine: &TemplateEngine, dry_run: bool) -> Result<Option<Vec<PathBuf>>> {
 		if !self.enabled || resources.is_empty() {
-			let paths: Vec<PathBuf> = resources.iter().map(|res| res.path.clone()).collect();
+			let paths: Vec<PathBuf> = resources.iter().map(|res| res.path().to_path_buf()).collect();
 			return Ok(Some(paths));
 		}
 
@@ -72,12 +72,8 @@ impl Action for Write {
 			.par_iter()
 			.filter_map(|res| {
 				let context = template_engine.new_context(res);
-				let outfile_str = template_engine.render(&self.outfile, &context).ok()?;
-				let text = if dry_run {
-					String::new()
-				} else {
-					template_engine.render(&self.text, &context).ok()?
-				};
+				let outfile_str = template_engine.render(&self.outfile, &context).ok()??;
+				let text = template_engine.render(&self.text, &context).ok()??;
 				Some((PathBuf::from(outfile_str), text))
 			})
 			.collect::<Vec<(PathBuf, String)>>() // Collect to un-parallelize before grouping
@@ -122,7 +118,7 @@ impl Action for Write {
 
 		match self.continue_with {
 			ContinueWith::Original => {
-				let paths = resources.iter().map(|res| res.path.clone()).collect();
+				let paths = resources.iter().map(|res| res.path().to_path_buf()).collect();
 				Ok(Some(paths))
 			}
 			ContinueWith::WrittenFile => {

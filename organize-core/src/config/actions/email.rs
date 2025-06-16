@@ -1,21 +1,21 @@
 use itertools::Itertools;
-use std::collections::HashMap;
-use std::path::PathBuf;
-use std::process::Command;
-use std::sync::Mutex;
+use std::{collections::HashMap, path::PathBuf, process::Command, sync::Mutex};
 
 use crate::config::actions::common::enabled;
 use anyhow::Result;
-use lettre::message::header::ContentType;
-use lettre::message::{Attachment, Mailbox, MessageBuilder, MultiPart, SinglePart};
-use lettre::transport::smtp::authentication::Credentials;
-use lettre::{SmtpTransport, Transport};
+use lettre::{
+	message::{header::ContentType, Attachment, Mailbox, MessageBuilder, MultiPart, SinglePart},
+	transport::smtp::authentication::Credentials,
+	SmtpTransport,
+	Transport,
+};
 use serde::{Deserialize, Serialize};
 use std::sync::LazyLock;
 
-use crate::resource::Resource;
-use crate::templates::template::Template;
-use crate::templates::TemplateEngine;
+use crate::{
+	resource::Resource,
+	templates::{template::Template, TemplateEngine},
+};
 
 use super::Action;
 
@@ -59,23 +59,25 @@ impl Action for Email {
 
 			let context = template_engine.new_context(res);
 			if let Some(subject) = &self.subject {
-				let subject = template_engine.render(subject, &context)?;
-				email = email.subject(subject);
+				if let Some(subject) = template_engine.render(subject, &context)? {
+					email = email.subject(subject);
+				}
 			}
 
 			let mut multipart = MultiPart::mixed().build();
 
 			// Add body if it exists
 			if let Some(body) = &self.body {
-				let body = template_engine.render(body, &context)?;
-				multipart = multipart.singlepart(SinglePart::plain(body));
+				if let Some(body) = template_engine.render(body, &context)? {
+					multipart = multipart.singlepart(SinglePart::plain(body));
+				}
 			}
 
 			if self.attach {
-				if let Some(mime) = mime_guess::from_path(&res.path).first() {
-					let content = std::fs::read(&res.path)?;
+				if let Some(mime) = mime_guess::from_path(res.path()).first() {
+					let content = std::fs::read(res.path())?;
 					let content_type = ContentType::from(mime);
-					let attachment = Attachment::new(res.path.file_name().unwrap().to_string_lossy().to_string()).body(content, content_type);
+					let attachment = Attachment::new(res.path().file_name().unwrap().to_string_lossy().to_string()).body(content, content_type);
 
 					multipart = multipart.singlepart(attachment);
 				}
@@ -108,6 +110,6 @@ impl Action for Email {
 				Err(e) => tracing::error!("Could not send email: {:?}", e),
 			};
 		}
-		Ok(Some(res.path.to_path_buf()))
+		Ok(Some(res.path().to_path_buf()))
 	}
 }

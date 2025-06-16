@@ -39,7 +39,7 @@ impl Action for Extract {
 					if let Some(parent) = dest.parent() {
 						std::fs::create_dir_all(parent).with_context(|| format!("Could not create parent directory for {}", dest.display()))?;
 					}
-					let file = File::open(&res.path)?;
+					let file = File::open(res.path())?;
 					let mut archive = zip::ZipArchive::new(file)?;
 					archive.extract(&dest)?;
 

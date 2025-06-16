@@ -60,7 +60,7 @@ impl Folder {
 			.filter_entry(|e| self.prefilter(e.path()))
 			.flatten()
 			.filter(|e| self.postfilter(e.path()))
-			.map(|e| Resource::new(e.path(), &self.path))
+			.flat_map(|e| Resource::new(e.path(), &self.path))
 			.collect();
 
 		Ok(entries)

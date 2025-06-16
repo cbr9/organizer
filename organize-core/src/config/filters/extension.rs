@@ -23,7 +23,7 @@ impl Filter for Extension {
 
 	#[tracing::instrument(ret, level = "debug")]
 	fn filter(&self, res: &Resource, _: &TemplateEngine) -> bool {
-		let extension = res.path.extension().unwrap_or_default().to_string_lossy();
+		let extension = res.path().extension().unwrap_or_default().to_string_lossy();
 		if extension.is_empty() {
 			return false;
 		}
@@ -53,15 +53,13 @@ impl Filter for Extension {
 #[cfg(test)]
 pub mod tests {
 
-	use std::str::FromStr;
-
 	use super::Extension;
 	use crate::{config::filters::Filter, resource::Resource, templates::TemplateEngine};
 
 	#[test]
 	fn empty_list() {
 		let extension = Extension { extensions: vec![] };
-		let path = Resource::from_str("$HOME/Downloads/test.pdf").unwrap();
+		let path = Resource::new("$HOME/Downloads/test.pdf", "").unwrap();
 		let template_engine = TemplateEngine::default();
 		assert!(extension.filter(&path, &template_engine))
 	}
@@ -70,7 +68,7 @@ pub mod tests {
 		let extension = Extension {
 			extensions: vec!["!pdf".into()],
 		};
-		let path = Resource::from_str("$HOME/Downloads/test.pdf").unwrap();
+		let path = Resource::new("$HOME/Downloads/test.pdf", "").unwrap();
 		let template_engine = TemplateEngine::default();
 		assert!(!extension.filter(&path, &template_engine))
 	}
@@ -79,7 +77,7 @@ pub mod tests {
 		let extension = Extension {
 			extensions: vec!["pdf".into()],
 		};
-		let path = Resource::from_str("$HOME/Downloads/test.pdf").unwrap();
+		let path = Resource::new("$HOME/Downloads/test.pdf", "").unwrap();
 		let template_engine = TemplateEngine::default();
 		assert!(extension.filter(&path, &template_engine))
 	}
@@ -88,7 +86,7 @@ pub mod tests {
 		let extension = Extension {
 			extensions: vec!["pdf".into(), "doc".into(), "docx".into()],
 		};
-		let path = Resource::from_str("$HOME/Downloads/test.pdf").unwrap();
+		let path = Resource::new("$HOME/Downloads/test.pdf", "").unwrap();
 		let template_engine = TemplateEngine::default();
 		assert!(extension.filter(&path, &template_engine))
 	}
@@ -97,7 +95,7 @@ pub mod tests {
 		let extension = Extension {
 			extensions: vec!["!pdf".into(), "doc".into(), "docx".into()],
 		};
-		let path = Resource::from_str("$HOME/Downloads/test.pdf").unwrap();
+		let path = Resource::new("$HOME/Downloads/test.pdf", "").unwrap();
 		let template_engine = TemplateEngine::default();
 		assert!(!extension.filter(&path, &template_engine))
 	}
@@ -107,7 +105,7 @@ pub mod tests {
 		let extension = Extension {
 			extensions: vec!["pdf".into(), "doc".into(), "docx".into()],
 		};
-		let path = Resource::from_str("$HOME/Downloads/test.jpg").unwrap();
+		let path = Resource::new("$HOME/Downloads/test.jpg", "").unwrap();
 		let template_engine = TemplateEngine::default();
 		assert!(!extension.filter(&path, &template_engine))
 	}

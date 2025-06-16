@@ -38,9 +38,10 @@ impl TemplateEngine {
 		engine
 	}
 
-	fn get_template_names(&self) -> HashSet<&str> {
+	pub fn get_template_names(&self) -> HashSet<&str> {
 		self.tera.get_template_names().collect()
 	}
+
 	pub fn new_empty_context(&self) -> Context {
 		let mut context = Context::new();
 
@@ -53,8 +54,8 @@ impl TemplateEngine {
 
 	pub fn new_context(&self, resource: &Resource) -> Context {
 		let mut context = Context::new();
-		context.insert("path", &resource.path);
-		context.insert("root", &resource.root);
+		context.insert("path", &resource.path());
+		context.insert("root", &resource.root());
 
 		for var in self.variables.iter() {
 			var.register(self, &mut context);
@@ -62,13 +63,24 @@ impl TemplateEngine {
 
 		context
 	}
-	pub fn render(&self, template: &Template, context: &Context) -> tera::Result<String> {
-		self.tera.render(&template.id, context)
+
+	#[tracing::instrument(err)]
+	pub fn render(&self, template: &Template, context: &Context) -> tera::Result<Option<String>> {
+		match self.tera.render(&template.id, context) {
+			Ok(res) => {
+				if res.is_empty() {
+					return Ok(None);
+				} else {
+					return Ok(Some(res));
+				}
+			}
+			Err(e) => Err(e),
+		}
 	}
 
-	pub fn render_without_context(&self, template: &Template) -> tera::Result<String> {
+	pub fn render_without_context(&self, template: &Template) -> tera::Result<Option<String>> {
 		let context = Context::new();
-		self.tera.render(&template.id, &context)
+		self.render(template, &context)
 	}
 
 	pub fn add_template(&mut self, template: &Template) -> Result<()> {
@@ -102,5 +114,66 @@ impl Default for TemplateEngine {
 		tera.register_filter("hash", hash);
 		tera.register_filter("filecontent", file_content);
 		Self { tera, variables: vec![] }
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+	use crate::config::variables::simple::SimpleVariable;
+
+	#[test]
+	fn render_template_not_present_in_engine() {
+		let engine = TemplateEngine::default();
+		let template = Template::from("Hello, {{ name }}!");
+		let mut context = Context::new();
+		context.insert("name", "Andrés");
+		let rendered = engine.render(&template, &context);
+		assert!(rendered.is_err());
+	}
+
+	#[test]
+	fn render_template_present_in_engine() {
+		let mut engine = TemplateEngine::default();
+		let template = Template::from("This is a stored template.");
+		engine.add_template(&template).unwrap();
+		let context = Context::new();
+		let rendered = engine.render(&template, &context).unwrap();
+		assert_eq!(rendered, Some("This is a stored template.".to_string()));
+	}
+
+	#[test]
+	fn render_with_simple_variable() {
+		let var = SimpleVariable {
+			name: "location".into(),
+			value: "world".into(),
+		};
+		let mut engine = TemplateEngine::new(&vec![Box::new(var)]);
+		let template = Template::from("Hello, {{ location }}!");
+		engine.add_template(&template).unwrap();
+		let context = engine.new_empty_context();
+		let rendered = engine.render(&template, &context).unwrap();
+		assert_eq!(rendered, Some("Hello, world!".to_string()));
+	}
+
+	#[test]
+	fn render_with_path_context() {
+		let mut engine = TemplateEngine::default();
+		let resource = Resource::new_tmp("test.txt");
+		let template = Template::from("The path is {{ path | stem }}");
+		engine.add_template(&template).unwrap();
+		let context = engine.new_context(&resource);
+		let rendered = engine.render(&template, &context).unwrap();
+		assert_eq!(rendered, Some("The path is test".to_string()));
+	}
+
+	#[test]
+	fn render_invalid_template_returns_none() {
+		let engine = TemplateEngine::default();
+		// Invalid syntax: `{%` instead of `{{`
+		let template = Template::from("Hello, {% name }}!");
+		let context = Context::new();
+		let rendered = engine.render(&template, &context);
+		assert!(rendered.is_err());
 	}
 }

@@ -3,8 +3,8 @@ use std::path::{Path, PathBuf};
 use anyhow::{Context as ErrorContext, Result};
 use serde::{Deserialize, Serialize};
 
-use crate::config::actions::common::enabled;
 use crate::{
+	config::actions::common::enabled,
 	path::prepare::prepare_target_path,
 	resource::Resource,
 	templates::{template::Template, TemplateEngine},
@@ -43,6 +43,7 @@ impl Action for Symlink {
 	fn templates(&self) -> Vec<&Template> {
 		vec![&self.to]
 	}
+
 	#[tracing::instrument(ret(level = "info"), err(Debug), level = "debug", skip(template_engine))]
 	fn execute(&self, res: &Resource, template_engine: &TemplateEngine, dry_run: bool) -> Result<Option<PathBuf>> {
 		match prepare_target_path(&self.if_exists, res, &self.to, true, template_engine)? {
@@ -51,12 +52,12 @@ impl Action for Symlink {
 					if let Some(parent) = dest.parent() {
 						std::fs::create_dir_all(parent).with_context(|| format!("Could not create parent directory for {}", dest.display()))?;
 					}
-					Self::atomic(&res.path, &dest).with_context(|| "Failed to symlink file")?;
+					Self::atomic(res.path(), &dest).with_context(|| "Failed to symlink file")?;
 				}
 				if self.continue_with == ContinueWith::Link && self.enabled {
 					Ok(Some(dest))
 				} else {
-					Ok(Some(res.path.clone()))
+					Ok(Some(res.path().to_path_buf()))
 				}
 			}
 			None => Ok(None),
