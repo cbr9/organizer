@@ -45,7 +45,7 @@ jobs:
 
     - name: Install cargo-tarpaulin (if not cached)
       if: steps.cache-cargo-bin.outputs.cache-hit != 'true'
-      run: cargo install cargo-tarpaulin
+      run: cargo install cargo-tarpaulin --force
 
     - name: Build (Windows)
       if: runner.os == 'Windows'
