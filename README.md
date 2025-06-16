@@ -1,5 +1,4 @@
-![Travis (.org)](https://img.shields.io/travis/cbr9/alfred)
-![Codecov](https://img.shields.io/codecov/c/github/cbr9/alfred)
+[![codecov](https://codecov.io/github/cbr9/organize/graph/badge.svg?token=9K4VVDHUMH)](https://codecov.io/github/cbr9/organize)
 
 TODO:
 - [ ] implement custom variables
