@@ -37,6 +37,7 @@ pub struct Email {
 
 impl Email {
 	fn get_or_insert_credentials(&self, cache: &Arc<RwLock<HashMap<Mailbox, Credentials>>>) -> anyhow::Result<Credentials> {
+		tracing::info!("Getting credentials for external tool.");
 		if let Ok(reader) = cache.read() {
 			if let Some(creds) = reader.get(&self.sender) {
 				return Ok(creds.clone());
@@ -119,9 +120,15 @@ impl Action for Email {
 			let creds = self.get_or_insert_credentials(&ctx.email_credentials)?;
 			let mailer = SmtpTransport::relay(&self.smtp_server).unwrap().credentials(creds).build();
 
-			match mailer.send(&email) {
-				Ok(_) => tracing::info!("Email sent successfully!"),
-				Err(e) => tracing::error!("Could not send email: {:?}", e),
+			return match mailer.send(&email) {
+				Ok(_) => {
+					tracing::info!("Email sent successfully!");
+					Ok(Some(res.path().to_path_buf()))
+				}
+				Err(e) => {
+					tracing::error!("Could not send email: {:?}", e);
+					Ok(None)
+				}
 			};
 		}
 		Ok(Some(res.path().to_path_buf()))

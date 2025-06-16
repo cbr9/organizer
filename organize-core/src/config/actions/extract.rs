@@ -6,12 +6,7 @@ use std::{
 	path::PathBuf,
 };
 
-use crate::{
-	config::context::Context,
-	path::prepare::prepare_target_path,
-	resource::Resource,
-	templates::template::Template,
-};
+use crate::{config::context::Context, path::prepare::prepare_target_path, resource::Resource, templates::template::Template};
 
 use super::{common::ConflictOption, Action};
 use crate::config::actions::common::enabled;
