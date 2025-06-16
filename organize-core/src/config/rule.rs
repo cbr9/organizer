@@ -18,8 +18,6 @@ pub struct RuleBuilder {
 	pub id: Option<String>,
 	#[serde(default)]
 	pub tags: HashSet<String>,
-	#[serde(default)]
-	pub r#continue: bool,
 	pub actions: Vec<Box<dyn Action>>,
 	pub filters: Vec<Box<dyn Filter>>,
 	pub folders: Vec<FolderBuilder>,
@@ -53,7 +51,6 @@ impl RuleBuilder {
 		Ok(Rule {
 			id: self.id,
 			tags: self.tags,
-			r#continue: self.r#continue,
 			actions: self.actions,
 			filters: self.filters,
 			folders, // Contains fully compiled Folders, each with its own Options
@@ -66,7 +63,6 @@ impl RuleBuilder {
 pub struct Rule {
 	pub id: Option<String>,
 	pub tags: HashSet<String>,
-	pub r#continue: bool,
 	pub actions: Vec<Box<dyn Action>>,
 	pub filters: Vec<Box<dyn Filter>>,
 	pub folders: Vec<Folder>,
