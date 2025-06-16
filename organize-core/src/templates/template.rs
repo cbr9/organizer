@@ -1,11 +1,19 @@
 use serde::{Deserialize, Deserializer, Serialize};
 use uuid::Uuid;
 
-#[derive(Serialize, Default, Debug, Eq, PartialEq, Clone)]
+#[derive(Serialize, Default, Debug, Clone)]
 pub struct Template {
-	pub text: String,
 	pub id: String,
+	pub text: String,
 }
+
+impl PartialEq for Template {
+	fn eq(&self, other: &Self) -> bool {
+		self.text == other.text
+	}
+}
+
+impl Eq for Template {}
 
 impl<'de> Deserialize<'de> for Template {
 	fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
@@ -30,5 +38,20 @@ impl<T: AsRef<str>> From<T> for Template {
 			text: val.as_ref().to_string(),
 			id: Uuid::new_v4().to_string(),
 		}
+	}
+}
+
+#[cfg(test)]
+mod tests {
+
+	use super::*;
+	use serde_test::{assert_de_tokens, Token};
+
+	#[test]
+	fn test_ser_de_empty() {
+		let string = "{{ root }}";
+		let template = Template::from(string);
+
+		assert_de_tokens(&template, &[Token::String(string)]);
 	}
 }
