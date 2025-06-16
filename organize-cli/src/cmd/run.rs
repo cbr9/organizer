@@ -2,9 +2,13 @@ use std::path::PathBuf;
 
 use anyhow::Result;
 use clap::{Parser, ValueHint};
+use itertools::Itertools;
 use rayon::iter::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
 
-use organize_core::config::Config;
+use organize_core::{
+	config::{Config, ConfigBuilder, context::Context},
+	templates::TemplateEngine,
+};
 
 use crate::Cmd;
 
@@ -29,41 +33,52 @@ pub struct Run {
 impl Cmd for Run {
 	#[tracing::instrument(err)]
 	fn run(mut self) -> Result<()> {
-		let config = Config::new(self.config.clone())?;
+		let config_builder = ConfigBuilder::new(self.config.clone())?;
+		let mut engine = TemplateEngine::from_config(&config_builder)?;
+		let config = config_builder.build(&mut engine, self.tags, self.ids)?;
 		logs::init(self.verbose, &config.path);
-
-		let filtered_rules = config.filter_rules(self.tags.as_ref(), self.ids.as_ref());
 
 		if self.no_dry_run {
 			self.dry_run = false;
 		}
 
-		for (i, rule) in filtered_rules.into_iter().enumerate() {
-			let entries = rule
-				.folders
-				.par_iter()
-				.filter_map(|folder| {
-					folder
-						.get_resources()
-						.inspect_err(|e| {
-							tracing::error!(
-								"Rule [number = {}, id = {}]: Could not read entries from folder '{}'. Error: {}",
-								i,
-								rule.id.as_deref().unwrap_or("untitled"),
-								folder.path.display(),
-								e
-							)
-						})
-						.ok()
-				})
-				.flatten()
-				.into_par_iter()
-				.filter(|res| rule.filters.iter().all(|f| f.filter(res, &rule.template_engine)))
-				.collect::<Vec<_>>();
+		for (i, rule) in config.rules.iter().enumerate() {
+			for folder in rule.folders.iter() {
+				let entries = match folder.get_resources() {
+					Ok(entries) => entries,
+					Err(e) => {
+						tracing::error!(
+							"Rule [number = {}, id = {}]: Could not read entries from folder '{}'. Error: {}",
+							i,
+							rule.id.as_deref().unwrap_or("untitled"),
+							folder.path.display(),
+							e
+						);
+						continue;
+					}
+				};
 
-			rule.actions.iter().fold(entries, |current_entries, action| {
-				action.run(current_entries, &rule.template_engine, self.dry_run)
-			});
+				let context = Context {
+					template_engine: &engine,
+					config: &config,
+					rule,
+					folder,
+					dry_run: self.dry_run,
+				};
+
+				let filtered_entries = entries
+					.into_par_iter()
+					.filter(|res| rule.filters.iter().all(|f| f.filter(res, &context)))
+					.collect::<Vec<_>>();
+
+				if filtered_entries.is_empty() {
+					continue;
+				}
+
+				rule.actions
+					.iter()
+					.fold(filtered_entries, |current_entries, action| action.run(current_entries, &context));
+			}
 		}
 		Ok(())
 	}

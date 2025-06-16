@@ -1,7 +1,7 @@
 use crate::{
-	config::filters::Filter,
+	config::{context::Context, filters::Filter},
 	resource::Resource,
-	templates::{template::Template, TemplateEngine},
+	templates::template::Template,
 };
 use serde::{Deserialize, Serialize};
 
@@ -30,10 +30,10 @@ impl Filter for RegularExpression {
 		vec![&self.input]
 	}
 
-	#[tracing::instrument(ret, level = "debug", skip(template_engine))]
-	fn filter(&self, res: &Resource, template_engine: &TemplateEngine) -> bool {
-		let context = template_engine.new_context(res);
-		template_engine
+	#[tracing::instrument(ret, level = "debug", skip(ctx))]
+	fn filter(&self, res: &Resource, ctx: &Context) -> bool {
+		let context = ctx.template_engine.new_context(res);
+		ctx.template_engine
 			.render(&self.input, &context)
 			.unwrap_or_default()
 			.is_some_and(|s| {

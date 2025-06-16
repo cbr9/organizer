@@ -1553,6 +1553,7 @@ dependencies = [
  "chrono",
  "clap",
  "colored",
+ "itertools",
  "organize-core",
  "rayon",
  "serde",

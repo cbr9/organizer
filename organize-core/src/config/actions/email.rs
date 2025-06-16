@@ -1,7 +1,7 @@
 use itertools::Itertools;
 use std::{collections::HashMap, path::PathBuf, process::Command, sync::Mutex};
 
-use crate::config::actions::common::enabled;
+use crate::config::{actions::common::enabled, context::Context};
 use anyhow::Result;
 use lettre::{
 	message::{header::ContentType, Attachment, Mailbox, MessageBuilder, MultiPart, SinglePart},
@@ -14,7 +14,7 @@ use std::sync::LazyLock;
 
 use crate::{
 	resource::Resource,
-	templates::{template::Template, TemplateEngine},
+	templates::template::Template,
 };
 
 use super::Action;
@@ -49,17 +49,17 @@ impl Action for Email {
 		templates
 	}
 
-	#[tracing::instrument(ret(level = "info"), err(Debug), level = "debug", skip(template_engine))]
-	fn execute(&self, res: &Resource, template_engine: &TemplateEngine, dry_run: bool) -> Result<Option<PathBuf>> {
-		if !dry_run && self.enabled {
+	#[tracing::instrument(ret(level = "info"), err(Debug), level = "debug", skip(ctx))]
+	fn execute(&self, res: &Resource, ctx: &Context) -> Result<Option<PathBuf>> {
+		if !ctx.dry_run && self.enabled {
 			let mut email = MessageBuilder::new()
 				.from(self.sender.clone())
 				.to(self.recipient.clone())
 				.date_now();
 
-			let context = template_engine.new_context(res);
+			let context = ctx.template_engine.new_context(res);
 			if let Some(subject) = &self.subject {
-				if let Some(subject) = template_engine.render(subject, &context)? {
+				if let Some(subject) = ctx.template_engine.render(subject, &context)? {
 					email = email.subject(subject);
 				}
 			}
@@ -68,7 +68,7 @@ impl Action for Email {
 
 			// Add body if it exists
 			if let Some(body) = &self.body {
-				if let Some(body) = template_engine.render(body, &context)? {
+				if let Some(body) = ctx.template_engine.render(body, &context)? {
 					multipart = multipart.singlepart(SinglePart::plain(body));
 				}
 			}

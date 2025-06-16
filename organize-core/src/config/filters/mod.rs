@@ -11,17 +11,17 @@ pub mod mime;
 pub mod regex;
 
 use crate::{
+	config::context::Context,
 	resource::Resource,
-	templates::{template::Template, TemplateEngine},
+	templates::template::Template,
 };
-
 
 dyn_clone::clone_trait_object!(Filter);
 dyn_eq::eq_trait_object!(Filter);
 
 #[typetag::serde(tag = "type")]
 pub trait Filter: DynClone + DynEq + Debug + Send + Sync {
-	fn filter(&self, res: &Resource, template_engine: &TemplateEngine) -> bool;
+	fn filter(&self, res: &Resource, ctx: &Context) -> bool;
 	fn templates(&self) -> Vec<&Template>;
 }
 
@@ -32,10 +32,11 @@ struct Not {
 
 #[typetag::serde(name = "not")]
 impl Filter for Not {
-	#[tracing::instrument(ret, level = "debug", skip(template_engine))]
-	fn filter(&self, res: &Resource, template_engine: &TemplateEngine) -> bool {
-		!self.filter.filter(res, template_engine)
+	#[tracing::instrument(ret, level = "debug", skip(ctx))]
+	fn filter(&self, res: &Resource, ctx: &Context) -> bool {
+		!self.filter.filter(res, ctx)
 	}
+
 	fn templates(&self) -> Vec<&Template> {
 		vec![]
 	}
@@ -48,10 +49,11 @@ struct AnyOf {
 
 #[typetag::serde(name = "any_of")]
 impl Filter for AnyOf {
-	#[tracing::instrument(ret, level = "debug", skip(template_engine))]
-	fn filter(&self, res: &Resource, template_engine: &TemplateEngine) -> bool {
-		self.filters.par_iter().any(|f| f.filter(res, template_engine))
+	#[tracing::instrument(ret, level = "debug", skip(ctx))]
+	fn filter(&self, res: &Resource, ctx: &Context) -> bool {
+		self.filters.par_iter().any(|f| f.filter(res, ctx))
 	}
+
 	fn templates(&self) -> Vec<&Template> {
 		vec![]
 	}
@@ -64,10 +66,11 @@ struct AllOf {
 
 #[typetag::serde(name = "all_of")]
 impl Filter for AllOf {
-	#[tracing::instrument(ret, level = "debug", skip(template_engine))]
-	fn filter(&self, res: &Resource, template_engine: &TemplateEngine) -> bool {
-		self.filters.par_iter().all(|f| f.filter(res, template_engine))
+	#[tracing::instrument(ret, level = "debug", skip(ctx))]
+	fn filter(&self, res: &Resource, ctx: &Context) -> bool {
+		self.filters.par_iter().all(|f| f.filter(res, ctx))
 	}
+
 	fn templates(&self) -> Vec<&Template> {
 		vec![]
 	}
@@ -80,10 +83,11 @@ struct NoneOf {
 
 #[typetag::serde(name = "none_of")]
 impl Filter for NoneOf {
-	#[tracing::instrument(ret, level = "debug", skip(template_engine))]
-	fn filter(&self, res: &Resource, template_engine: &TemplateEngine) -> bool {
-		!self.filters.par_iter().any(|f| f.filter(res, template_engine))
+	#[tracing::instrument(ret, level = "debug", skip(ctx))]
+	fn filter(&self, res: &Resource, ctx: &Context) -> bool {
+		!self.filters.par_iter().any(|f| f.filter(res, ctx))
 	}
+
 	fn templates(&self) -> Vec<&Template> {
 		vec![]
 	}

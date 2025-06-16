@@ -1,10 +1,11 @@
 use std::path::PathBuf;
 
 use crate::{
+	config::context::Context,
 	resource::Resource,
-	templates::{template::Template, TemplateEngine},
+	templates::template::Template,
 };
-use anyhow::{Context, Result};
+use anyhow::{Context as _, Result};
 use dialoguer::{theme::ColorfulTheme, Confirm};
 use serde::{Deserialize, Serialize};
 
@@ -33,9 +34,9 @@ impl Action for Delete {
 		vec![]
 	}
 
-	#[tracing::instrument(ret(level = "info"), err(Debug), level = "debug")]
-	fn execute(&self, res: &Resource, _: &TemplateEngine, dry_run: bool) -> Result<Option<PathBuf>> {
-		if !dry_run && self.enabled {
+	#[tracing::instrument(ret(level = "info"), err(Debug), level = "debug", skip(ctx))]
+	fn execute(&self, res: &Resource, ctx: &Context) -> Result<Option<PathBuf>> {
+		if !ctx.dry_run && self.enabled {
 			if self.confirm {
 				let confirmed = Confirm::with_theme(&ColorfulTheme::default())
 					.with_prompt(format!("Delete {}?", res.path().display()))
@@ -62,6 +63,8 @@ impl Action for Delete {
 
 #[cfg(test)]
 mod tests {
+	use crate::config::context::ContextHarness;
+
 	use super::*;
 	use tempfile;
 
@@ -76,14 +79,13 @@ mod tests {
 			confirm: false,
 		};
 
-		let template_engine = TemplateEngine::default();
+		let harness = ContextHarness::new();
+		let context = harness.context();
 
 		std::fs::write(&tmp_file, "").expect("Could not create target file");
 		assert!(tmp_file.exists());
 
-		action
-			.execute(&resource, &template_engine, false)
-			.expect("Could not delete target file");
+		action.execute(&resource, &context).expect("Could not delete target file");
 		assert!(!tmp_file.exists());
 	}
 }

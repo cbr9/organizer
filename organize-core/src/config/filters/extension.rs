@@ -1,9 +1,9 @@
 use std::borrow::Cow;
 
 use crate::{
-	config::filters::Filter,
+	config::{context::Context, filters::Filter},
 	resource::Resource,
-	templates::{template::Template, TemplateEngine},
+	templates::template::Template,
 };
 use derive_more::Deref;
 use serde::{Deserialize, Serialize};
@@ -22,7 +22,7 @@ impl Filter for Extension {
 	}
 
 	#[tracing::instrument(ret, level = "debug")]
-	fn filter(&self, res: &Resource, _: &TemplateEngine) -> bool {
+	fn filter(&self, res: &Resource, _: &Context) -> bool {
 		let extension = res.path().extension().unwrap_or_default().to_string_lossy();
 		if extension.is_empty() {
 			return false;
@@ -54,14 +54,19 @@ impl Filter for Extension {
 pub mod tests {
 
 	use super::Extension;
-	use crate::{config::filters::Filter, resource::Resource, templates::TemplateEngine};
+	use crate::{
+		config::{context::ContextHarness, filters::Filter},
+		resource::Resource,
+		templates::TemplateEngine,
+	};
 
 	#[test]
 	fn empty_list() {
 		let extension = Extension { extensions: vec![] };
 		let path = Resource::new("$HOME/Downloads/test.pdf", "").unwrap();
-		let template_engine = TemplateEngine::default();
-		assert!(extension.filter(&path, &template_engine))
+		let harness = ContextHarness::new();
+		let context = harness.context();
+		assert!(extension.filter(&path, &context))
 	}
 	#[test]
 	fn negative_match() {
@@ -69,8 +74,9 @@ pub mod tests {
 			extensions: vec!["!pdf".into()],
 		};
 		let path = Resource::new("$HOME/Downloads/test.pdf", "").unwrap();
-		let template_engine = TemplateEngine::default();
-		assert!(!extension.filter(&path, &template_engine))
+		let harness = ContextHarness::new();
+		let context = harness.context();
+		assert!(!extension.filter(&path, &context))
 	}
 	#[test]
 	fn single_match_pdf() {
@@ -78,8 +84,9 @@ pub mod tests {
 			extensions: vec!["pdf".into()],
 		};
 		let path = Resource::new("$HOME/Downloads/test.pdf", "").unwrap();
-		let template_engine = TemplateEngine::default();
-		assert!(extension.filter(&path, &template_engine))
+		let harness = ContextHarness::new();
+		let context = harness.context();
+		assert!(extension.filter(&path, &context))
 	}
 	#[test]
 	fn multiple_match_pdf() {
@@ -87,8 +94,9 @@ pub mod tests {
 			extensions: vec!["pdf".into(), "doc".into(), "docx".into()],
 		};
 		let path = Resource::new("$HOME/Downloads/test.pdf", "").unwrap();
-		let template_engine = TemplateEngine::default();
-		assert!(extension.filter(&path, &template_engine))
+		let harness = ContextHarness::new();
+		let context = harness.context();
+		assert!(extension.filter(&path, &context))
 	}
 	#[test]
 	fn multiple_match_negative() {
@@ -96,8 +104,9 @@ pub mod tests {
 			extensions: vec!["!pdf".into(), "doc".into(), "docx".into()],
 		};
 		let path = Resource::new("$HOME/Downloads/test.pdf", "").unwrap();
-		let template_engine = TemplateEngine::default();
-		assert!(!extension.filter(&path, &template_engine))
+		let harness = ContextHarness::new();
+		let context = harness.context();
+		assert!(!extension.filter(&path, &context))
 	}
 
 	#[test]
@@ -106,7 +115,8 @@ pub mod tests {
 			extensions: vec!["pdf".into(), "doc".into(), "docx".into()],
 		};
 		let path = Resource::new("$HOME/Downloads/test.jpg", "").unwrap();
-		let template_engine = TemplateEngine::default();
-		assert!(!extension.filter(&path, &template_engine))
+		let harness = ContextHarness::new();
+		let context = harness.context();
+		assert!(!extension.filter(&path, &context))
 	}
 }

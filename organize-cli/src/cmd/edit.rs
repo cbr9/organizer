@@ -7,7 +7,7 @@ use std::{
 use anyhow::{Context, Result};
 use clap::Parser;
 
-use organize_core::config::Config;
+use organize_core::config::ConfigBuilder;
 
 use crate::cmd::Cmd;
 
@@ -16,7 +16,7 @@ pub struct Edit;
 
 impl Cmd for Edit {
 	fn run(self) -> Result<()> {
-		Self::edit(Config::resolve_path(None)).map(|_| ())
+		Self::edit(ConfigBuilder::resolve_path(None)).map(|_| ())
 	}
 }
 

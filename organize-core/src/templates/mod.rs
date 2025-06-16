@@ -10,7 +10,10 @@ use filters::{
 use template::Template;
 use tera::{Context, Tera};
 
-use crate::{config::variables::Variable, resource::Resource};
+use crate::{
+	config::{variables::Variable, ConfigBuilder},
+	resource::Resource,
+};
 
 pub mod filters;
 pub mod template;
@@ -36,6 +39,19 @@ impl TemplateEngine {
 		}
 		engine.variables = variables.clone();
 		engine
+	}
+
+	pub fn from_config(config: &ConfigBuilder) -> anyhow::Result<Self> {
+		let mut engine = Self::default();
+		for rule in config.rules.iter() {
+			for action in rule.actions.iter() {
+				engine.add_templates(&action.templates())?;
+			}
+			for filter in rule.filters.iter() {
+				engine.add_templates(&filter.templates())?;
+			}
+		}
+		Ok(engine)
 	}
 
 	pub fn get_template_names(&self) -> HashSet<&str> {

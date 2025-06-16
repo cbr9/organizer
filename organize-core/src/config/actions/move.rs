@@ -1,13 +1,13 @@
 use std::path::PathBuf;
 
-use crate::config::actions::common::enabled;
+use crate::config::{actions::common::enabled, context::Context};
 use anyhow::{Context as ErrorContext, Result};
 use serde::{Deserialize, Serialize};
 
 use crate::{
 	path::prepare::prepare_target_path,
 	resource::Resource,
-	templates::{template::Template, TemplateEngine},
+	templates::template::Template,
 };
 
 use super::{common::ConflictOption, Action};
@@ -28,11 +28,11 @@ impl Action for Move {
 		vec![&self.to]
 	}
 
-	#[tracing::instrument(ret(level = "info"), err(Debug), level = "debug", skip(template_engine))]
-	fn execute(&self, res: &Resource, template_engine: &TemplateEngine, dry_run: bool) -> Result<Option<PathBuf>> {
-		match prepare_target_path(&self.if_exists, res, &self.to, true, template_engine)? {
+	#[tracing::instrument(ret(level = "info"), err(Debug), level = "debug", skip(ctx))]
+	fn execute(&self, res: &Resource, ctx: &Context) -> Result<Option<PathBuf>> {
+		match prepare_target_path(&self.if_exists, res, &self.to, true, ctx.template_engine)? {
 			Some(dest) => {
-				if !dry_run && self.enabled {
+				if !ctx.dry_run && self.enabled {
 					if let Some(parent) = dest.parent() {
 						std::fs::create_dir_all(parent).with_context(|| format!("Could not create parent directory for {}", dest.display()))?;
 					}

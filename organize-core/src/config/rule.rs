@@ -12,7 +12,7 @@ use super::{
 	variables::Variable,
 };
 
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Deserialize, Debug, Clone, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct RuleBuilder {
 	pub id: Option<String>,
@@ -28,24 +28,12 @@ pub struct RuleBuilder {
 }
 
 impl RuleBuilder {
-	pub fn build(self, defaults: &OptionsBuilder) -> anyhow::Result<Rule> {
-		let mut template_engine = TemplateEngine::new(&self.variables);
-
-		for action in self.actions.iter() {
-			let templates = action.templates();
-			template_engine.add_templates(&templates)?;
-		}
-
-		for filter in self.filters.iter() {
-			let templates = filter.templates();
-			template_engine.add_templates(&templates)?;
-		}
-
+	pub fn build(self, defaults: &OptionsBuilder, template_engine: &mut TemplateEngine) -> anyhow::Result<Rule> {
 		let folders = self
 			.folders
 			.clone()
 			.into_iter()
-			.map(|builder| builder.build(defaults, &self.options, &mut template_engine)) // Pass this rule's options builder
+			.map(|builder| builder.build(defaults, &self.options, template_engine)) // Pass this rule's options builder
 			.collect::<anyhow::Result<Vec<Folder>>>()?;
 
 		Ok(Rule {
@@ -54,7 +42,6 @@ impl RuleBuilder {
 			actions: self.actions,
 			filters: self.filters,
 			folders, // Contains fully compiled Folders, each with its own Options
-			template_engine,
 		})
 	}
 }
@@ -66,5 +53,4 @@ pub struct Rule {
 	pub actions: Vec<Box<dyn Action>>,
 	pub filters: Vec<Box<dyn Filter>>,
 	pub folders: Vec<Folder>,
-	pub template_engine: TemplateEngine,
 }

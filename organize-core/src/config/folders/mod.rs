@@ -14,7 +14,7 @@ use crate::{
 
 use super::options::{Options, Target};
 
-#[derive(Deserialize, Serialize, Debug, PartialEq, Clone)]
+#[derive(Deserialize, Serialize, Debug, PartialEq, Eq, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct FolderBuilder {
 	root: Template,
@@ -48,12 +48,14 @@ pub struct Folder {
 impl Folder {
 	pub fn get_resources(&self) -> Result<Vec<Resource>> {
 		let home = &dirs::home_dir().context("unable to find home directory")?;
-		let min_depth = if &self.path == home { 1.0 } else { self.options.min_depth };
-		let max_depth = if &self.path == home { 1.0 } else { self.options.max_depth };
+		let min_depth = {
+			let base = if &self.path == home { 1.0 as usize } else { self.options.min_depth };
+			(base as f64).max(1.0) as usize
+		};
 
-		let walker = WalkDir::new(&self.path)
-			.min_depth(min_depth.max(1.0) as usize)
-			.max_depth(max_depth as usize);
+		let max_depth = if &self.path == home { 1.0 as usize } else { self.options.max_depth };
+
+		let walker = WalkDir::new(&self.path).min_depth(min_depth).max_depth(max_depth);
 
 		let entries = walker
 			.into_iter()

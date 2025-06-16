@@ -1,7 +1,7 @@
 use crate::{
-	config::filters::Filter,
+	config::{context::Context, filters::Filter},
 	resource::Resource,
-	templates::{template::Template, TemplateEngine},
+	templates::template::Template,
 };
 use itertools::Itertools;
 use mime::FromStrError;
@@ -92,7 +92,7 @@ impl Filter for Mime {
 	}
 
 	#[tracing::instrument(ret, level = "debug")]
-	fn filter(&self, res: &Resource, _: &TemplateEngine) -> bool {
+	fn filter(&self, res: &Resource, _: &Context) -> bool {
 		let guess = mime_guess::from_path(res.path()).first_or_octet_stream();
 		self.types.iter().any(|mime| {
 			let mut matches = match (mime.type_(), mime.subtype()) {
@@ -110,34 +110,37 @@ impl Filter for Mime {
 
 #[cfg(test)]
 mod tests {
+	use crate::config::context::ContextHarness;
+
 	use super::*;
 	#[test]
 	fn test_match_negative() {
 		let types = Mime::try_from(vec!["!image/*", "audio/*"]).unwrap();
 		let img = Resource::new_tmp("test.jpg");
 		let audio = Resource::new_tmp("test.ogg");
-		let template_engine = TemplateEngine::default();
-		assert!(!types.filter(&img, &template_engine));
-		assert!(types.filter(&audio, &template_engine))
+		let harness = ContextHarness::new();
+		let context = harness.context();
+		assert!(!types.filter(&img, &context));
+		assert!(types.filter(&audio, &context))
 	}
 	#[test]
 	fn test_match_negative_one_mime() {
 		let types = Mime::try_from(vec!["!image/*"]).unwrap();
 		let img = Resource::new_tmp("test.jpg");
 		let audio = Resource::new_tmp("test.ogg");
-		let template_engine = TemplateEngine::default();
-		dbg!(&img);
-		dbg!(&audio);
-		assert!(!types.filter(&img, &template_engine));
-		assert!(types.filter(&audio, &template_engine))
+		let harness = ContextHarness::new();
+		let context = harness.context();
+		assert!(!types.filter(&img, &context));
+		assert!(types.filter(&audio, &context))
 	}
 	#[test]
 	fn test_match() {
 		let types = Mime::try_from(vec!["image/*", "audio/*"]).unwrap();
 		let img = Resource::new_tmp("test.jpg");
 		let audio = Resource::new_tmp("test.ogg");
-		let template_engine = TemplateEngine::default();
-		assert!(types.filter(&img, &template_engine));
-		assert!(types.filter(&audio, &template_engine))
+		let harness = ContextHarness::new();
+		let context = harness.context();
+		assert!(types.filter(&img, &context));
+		assert!(types.filter(&audio, &context))
 	}
 }

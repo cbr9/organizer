@@ -1,8 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 use crate::{
+	config::context::Context,
 	resource::Resource,
-	templates::{template::Template, TemplateEngine},
+	templates::template::Template,
 };
 
 use super::Filter;
@@ -14,7 +15,7 @@ pub struct Empty;
 #[typetag::serde(name = "empty")]
 impl Filter for Empty {
 	#[tracing::instrument(ret, level = "debug")]
-	fn filter(&self, src: &Resource, _: &TemplateEngine) -> bool {
+	fn filter(&self, src: &Resource, _: &Context) -> bool {
 		let path = &src.path();
 		if path.is_file() {
 			std::fs::metadata(path).map(|md| md.len() == 0).unwrap_or(false)
@@ -35,7 +36,10 @@ mod tests {
 	use tempfile::NamedTempFile;
 
 	use crate::{
-		config::filters::{empty::Empty, Filter},
+		config::{
+			context::ContextHarness,
+			filters::{empty::Empty, Filter},
+		},
 		resource::Resource,
 		templates::TemplateEngine,
 	};
@@ -46,8 +50,9 @@ mod tests {
 		let path = file.path();
 		let res = Resource::new(path, path.parent().unwrap()).unwrap();
 		let action = Empty;
-		let template_engine = TemplateEngine::default();
-		assert!(action.filter(&res, &template_engine))
+		let harness = ContextHarness::new();
+		let context = harness.context();
+		assert!(action.filter(&res, &context))
 	}
 	#[test]
 	fn test_dir_positive() {
@@ -55,8 +60,9 @@ mod tests {
 		let path = dir.path();
 		let res = Resource::new(path, path.parent().unwrap()).unwrap();
 		let action = Empty;
-		let template_engine = TemplateEngine::default();
-		assert!(action.filter(&res, &template_engine))
+		let harness = ContextHarness::new();
+		let context = harness.context();
+		assert!(action.filter(&res, &context))
 	}
 	#[test]
 	fn test_file_negative() {
@@ -65,8 +71,9 @@ mod tests {
 		let path = file.path();
 		let res = Resource::new(path, path.parent().unwrap()).unwrap();
 		let action = Empty;
-		let template_engine = TemplateEngine::default();
-		assert!(!action.filter(&res, &template_engine))
+		let harness = ContextHarness::new();
+		let context = harness.context();
+		assert!(action.filter(&res, &context))
 	}
 	#[test]
 	fn test_dir_negative() {
@@ -74,7 +81,8 @@ mod tests {
 		let path = dir.path().parent().unwrap();
 		let res = Resource::new(path, path.parent().unwrap()).unwrap();
 		let action = Empty;
-		let template_engine = TemplateEngine::default();
-		assert!(!action.filter(&res, &template_engine))
+		let harness = ContextHarness::new();
+		let context = harness.context();
+		assert!(action.filter(&res, &context))
 	}
 }

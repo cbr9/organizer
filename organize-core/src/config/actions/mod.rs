@@ -6,8 +6,9 @@ use dyn_eq::DynEq;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 
 use crate::{
+	config::context::Context,
 	resource::Resource,
-	templates::{template::Template, TemplateEngine},
+	templates::template::Template,
 };
 
 pub mod common;
@@ -40,20 +41,20 @@ pub trait Action: DynEq + DynClone + Sync + Send + Debug {
 		ExecutionModel::default()
 	}
 
-	fn execute(&self, _res: &Resource, _template_engine: &TemplateEngine, _dry_run: bool) -> Result<Option<PathBuf>> {
+	fn execute(&self, _res: &Resource, _ctx: &Context) -> Result<Option<PathBuf>> {
 		unimplemented!("This action has not implemented `execute`.")
 	}
 
-	fn execute_collection(&self, _resources: Vec<&Resource>, _template_engine: &TemplateEngine, _dry_run: bool) -> Result<Option<Vec<PathBuf>>> {
+	fn execute_collection(&self, _resources: Vec<&Resource>, _ctx: &Context) -> Result<Option<Vec<PathBuf>>> {
 		unimplemented!("This action must be run in `Collection` mode and has not implemented `execute_collection`.")
 	}
 
 	fn templates(&self) -> Vec<&Template>;
 
 	#[doc(hidden)]
-	fn run(&self, mut resources: Vec<Resource>, template_engine: &TemplateEngine, dry_run: bool) -> Vec<Resource> {
+	fn run(&self, mut resources: Vec<Resource>, ctx: &Context) -> Vec<Resource> {
 		let filter_fn = |mut res| {
-			let path = self.execute(&res, template_engine, dry_run).ok().flatten();
+			let path = self.execute(&res, ctx).ok().flatten();
 			if let Some(path) = path {
 				res.set_path(path);
 				Some(res)

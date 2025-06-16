@@ -1,21 +1,21 @@
 use serde::{Deserialize, Serialize};
 use std::{fmt::Debug, path::PathBuf};
 
-#[derive(Deserialize, Serialize, Debug, Clone, PartialEq)]
+#[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct OptionsBuilder {
-	pub max_depth: Option<f64>,
-	pub min_depth: Option<f64>,
+	pub max_depth: Option<usize>,
+	pub min_depth: Option<usize>,
 	pub exclude: Option<Vec<PathBuf>>,
 	pub hidden_files: Option<bool>,
 	pub partial_files: Option<bool>,
 	pub target: Option<Target>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Options {
-	pub max_depth: f64,
-	pub min_depth: f64,
+	pub max_depth: usize,
+	pub min_depth: usize,
 	pub exclude: Vec<PathBuf>,
 	pub hidden_files: bool,
 	pub partial_files: bool,
@@ -25,8 +25,8 @@ pub struct Options {
 impl Default for Options {
 	fn default() -> Self {
 		Self {
-			max_depth: 1.0,
-			min_depth: 1.0,
+			max_depth: 1.0 as usize,
+			min_depth: 1.0 as usize,
 			exclude: Vec::new(),
 			hidden_files: false,
 			partial_files: false,
@@ -77,7 +77,7 @@ impl Options {
 	}
 }
 
-#[derive(Debug, Default, Clone, Deserialize, Serialize, PartialEq)]
+#[derive(Debug, Default, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum Target {
 	#[default]

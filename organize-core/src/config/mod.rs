@@ -6,11 +6,12 @@ use std::{collections::HashSet, iter::FromIterator, path::PathBuf};
 use anyhow::{anyhow, Context as ErrorContext, Result};
 use serde::Deserialize;
 
-use crate::PROJECT_NAME;
+use crate::{templates::TemplateEngine, PROJECT_NAME};
 
 use self::options::OptionsBuilder;
 
 pub mod actions;
+pub mod context;
 pub mod filters;
 pub mod folders;
 pub mod options;
@@ -23,42 +24,40 @@ pub struct ConfigBuilder {
 	pub rules: Vec<RuleBuilder>,
 	#[serde(flatten)]
 	pub defaults: OptionsBuilder,
+	#[serde(skip)]
+	path: Option<PathBuf>,
 }
 
 impl ConfigBuilder {
 	/// Consumes the builder and returns a final, validated `Config`.
 	/// The `defaults` are used in the build process but are not stored in the final `Config`.
-	pub fn build(self, path: PathBuf) -> Result<Config> {
+	pub fn build(self, template_engine: &mut TemplateEngine, tags: Option<Vec<String>>, ids: Option<Vec<String>>) -> Result<Config> {
 		let rules = self
-			.rules
-			.clone()
+			.filter_rules(tags, ids)
 			.into_iter()
-			.map(|builder| builder.build(&self.defaults))
+			.cloned()
+			.map(|builder| builder.build(&self.defaults, template_engine))
 			.collect::<Result<Vec<Rule>>>()?;
 
-		Ok(Config { rules, path })
+		Ok(Config {
+			rules,
+			path: self.path.unwrap(),
+		})
 	}
-}
 
-#[derive(Clone, Debug)]
-pub struct Config {
-	pub rules: Vec<Rule>,
-	pub path: PathBuf,
-}
-
-impl Config {
 	pub fn new(path: Option<PathBuf>) -> Result<Self> {
 		let path = Self::resolve_path(path);
 		if !path.exists() {
 			return Err(anyhow!("Configuration file not found at {}", path.display()));
 		}
 
-		let builder = LayeredConfig::builder()
+		let mut builder = LayeredConfig::builder()
 			.add_source(File::from(path.clone()))
 			.build()?
 			.try_deserialize::<ConfigBuilder>()
 			.context("Could not deserialize config")?;
-		builder.build(path)
+		builder.path = Some(path);
+		Ok(builder)
 	}
 
 	pub fn resolve_path(path: Option<PathBuf>) -> PathBuf {
@@ -78,7 +77,7 @@ impl Config {
 		}
 	}
 
-	pub fn filter_rules<I, T>(&self, tags: Option<I>, ids: Option<T>) -> Vec<&Rule>
+	pub fn filter_rules<I, T>(&self, tags: Option<I>, ids: Option<T>) -> Vec<&RuleBuilder>
 	where
 		I: IntoIterator,
 		T: IntoIterator,
@@ -96,7 +95,7 @@ impl Config {
 		self.rules.iter().collect_vec()
 	}
 
-	pub fn filter_rules_by_tag<I>(&self, tags: I) -> Vec<&Rule>
+	pub fn filter_rules_by_tag<I>(&self, tags: I) -> Vec<&RuleBuilder>
 	where
 		I: IntoIterator,
 		I::Item: AsRef<str>,
@@ -145,7 +144,7 @@ impl Config {
 			.collect_vec()
 	}
 
-	pub fn filter_rules_by_id<I>(&self, ids: I) -> Vec<&Rule>
+	pub fn filter_rules_by_id<I>(&self, ids: I) -> Vec<&RuleBuilder>
 	where
 		I: IntoIterator,
 		I::Item: AsRef<str>,
@@ -196,9 +195,19 @@ impl Config {
 	}
 }
 
+#[derive(Clone, Debug)]
+pub struct Config {
+	pub rules: Vec<Rule>,
+	pub path: PathBuf,
+}
+
+impl Config {}
+
 #[cfg(test)]
 mod tests {
 	use std::{path::PathBuf, sync::LazyLock};
+
+	use crate::templates::TemplateEngine;
 
 	use super::{Config, ConfigBuilder};
 	use itertools::Itertools;
@@ -246,10 +255,7 @@ mod tests {
 		}
 	});
 
-	static CONFIG: LazyLock<Config> = LazyLock::new(|| {
-		let builder: ConfigBuilder = toml::from_str(&TOML.to_string()).unwrap();
-		builder.build(PathBuf::new()).unwrap()
-	});
+	static CONFIG: LazyLock<ConfigBuilder> = LazyLock::new(|| toml::from_str(&TOML.to_string()).unwrap());
 
 	#[test]
 	fn filter_rules_by_tag_positive() {

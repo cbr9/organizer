@@ -1,7 +1,7 @@
 use crate::{
-	config::filters::Filter,
+	config::{context::Context, filters::Filter},
 	resource::Resource,
-	templates::{template::Template, TemplateEngine},
+	templates::template::Template,
 };
 use serde::{Deserialize, Serialize};
 
@@ -30,8 +30,8 @@ impl Filter for Filename {
 		templates
 	}
 
-	#[tracing::instrument(ret, level = "debug", skip(template_engine))]
-	fn filter(&self, res: &Resource, template_engine: &TemplateEngine) -> bool {
+	#[tracing::instrument(ret, level = "debug", skip(ctx))]
+	fn filter(&self, res: &Resource, ctx: &Context) -> bool {
 		let filename = res.path().file_name().unwrap_or_default().to_string_lossy();
 
 		if filename.is_empty() {
@@ -44,7 +44,7 @@ impl Filter for Filename {
 			filename.to_lowercase()
 		};
 
-		let context = template_engine.new_context(res);
+		let context = ctx.template_engine.new_context(res);
 
 		let startswith = if self.startswith.is_empty() {
 			true
@@ -52,7 +52,7 @@ impl Filter for Filename {
 			self.startswith.iter().any(|template| {
 				// The rendered string must also be lowercased for a case-insensitive match.
 				let pattern = {
-					let rendered = if let Some(rendered) = template_engine.render(template, &context).unwrap_or_default() {
+					let rendered = if let Some(rendered) = ctx.template_engine.render(template, &context).unwrap_or_default() {
 						rendered
 					} else {
 						template.text.clone()
@@ -85,7 +85,7 @@ impl Filter for Filename {
 		} else {
 			self.endswith.iter().any(|template| {
 				let pattern = {
-					let rendered = if let Some(rendered) = template_engine.render(template, &context).unwrap_or_default() {
+					let rendered = if let Some(rendered) = ctx.template_engine.render(template, &context).unwrap_or_default() {
 						rendered
 					} else {
 						template.text.clone()
@@ -118,7 +118,7 @@ impl Filter for Filename {
 		} else {
 			self.contains.iter().any(|template| {
 				let pattern = {
-					let rendered = if let Some(rendered) = template_engine.render(template, &context).unwrap_or_default() {
+					let rendered = if let Some(rendered) = ctx.template_engine.render(template, &context).unwrap_or_default() {
 						rendered
 					} else {
 						template.text.clone()
@@ -152,7 +152,7 @@ impl Filter for Filename {
 
 #[cfg(test)]
 mod tests {
-	use crate::templates::TemplateEngine;
+	use crate::{config::context::ContextHarness, templates::TemplateEngine};
 
 	use super::*;
 
@@ -163,8 +163,9 @@ mod tests {
 			startswith: vec!["TE".into()],
 			..Default::default()
 		};
-		let template_engine = TemplateEngine::default();
-		assert!(filename.filter(&path, &template_engine))
+		let harness = ContextHarness::new();
+		let context = harness.context();
+		assert!(filename.filter(&path, &context))
 	}
 
 	#[test]
@@ -174,8 +175,9 @@ mod tests {
 			endswith: vec!["DF".into()],
 			..Default::default()
 		};
-		let template_engine = TemplateEngine::default();
-		assert!(filename.filter(&path, &template_engine))
+		let harness = ContextHarness::new();
+		let context = harness.context();
+		assert!(filename.filter(&path, &context))
 	}
 
 	#[test]
@@ -185,8 +187,9 @@ mod tests {
 			contains: vec!["ES".into()],
 			..Default::default()
 		};
-		let template_engine = TemplateEngine::default();
-		assert!(filename.filter(&path, &template_engine))
+		let harness = ContextHarness::new();
+		let context = harness.context();
+		assert!(filename.filter(&path, &context))
 	}
 
 	#[test]
@@ -197,8 +200,9 @@ mod tests {
 			startswith: vec!["TE".into()],
 			..Default::default()
 		};
-		let template_engine = TemplateEngine::default();
-		assert!(!filename.filter(&path, &template_engine))
+		let harness = ContextHarness::new();
+		let context = harness.context();
+		assert!(!filename.filter(&path, &context))
 	}
 
 	#[test]
@@ -209,8 +213,9 @@ mod tests {
 			startswith: vec!["DF".into()],
 			..Default::default()
 		};
-		let template_engine = TemplateEngine::default();
-		assert!(!filename.filter(&path, &template_engine))
+		let harness = ContextHarness::new();
+		let context = harness.context();
+		assert!(!filename.filter(&path, &context))
 	}
 
 	#[test]
@@ -221,8 +226,9 @@ mod tests {
 			contains: vec!["ES".into()],
 			..Default::default()
 		};
-		let template_engine = TemplateEngine::default();
-		assert!(!filename.filter(&path, &template_engine))
+		let harness = ContextHarness::new();
+		let context = harness.context();
+		assert!(!filename.filter(&path, &context))
 	}
 	#[test]
 	fn match_containing_case_sensitive() {
@@ -232,9 +238,9 @@ mod tests {
 			contains: vec!["ES".into()],
 			..Default::default()
 		};
-		let template_engine = TemplateEngine::default();
-
-		assert!(filename.filter(&path, &template_engine))
+		let harness = ContextHarness::new();
+		let context = harness.context();
+		assert!(filename.filter(&path, &context))
 	}
 	#[test]
 	fn match_multiple_conditions_case_sensitive() {
@@ -245,8 +251,9 @@ mod tests {
 			startswith: vec!["t".into()],
 			endswith: vec!["df".into()],
 		};
-		let template_engine = TemplateEngine::default();
-		assert!(filename.filter(&path, &template_engine))
+		let harness = ContextHarness::new();
+		let context = harness.context();
+		assert!(filename.filter(&path, &context))
 	}
 	#[test]
 	fn match_multiple_conditions_some_negative() {
@@ -257,8 +264,9 @@ mod tests {
 			startswith: vec!["t".into()],
 			endswith: vec!["!df".into()],
 		};
-		let template_engine = TemplateEngine::default();
-		assert!(!filename.filter(&path, &template_engine))
+		let harness = ContextHarness::new();
+		let context = harness.context();
+		assert!(!filename.filter(&path, &context))
 	}
 	#[test]
 	fn match_multiple_conditions_some_negative_2() {
@@ -269,8 +277,9 @@ mod tests {
 			startswith: vec!["t".into()],
 			endswith: vec!["!df".into()],
 		};
-		let template_engine = TemplateEngine::default();
-		assert!(!filename.filter(&path, &template_engine))
+		let harness = ContextHarness::new();
+		let context = harness.context();
+		assert!(!filename.filter(&path, &context))
 	}
 	#[test]
 	fn match_multiple_conditions_some_negative_3() {
@@ -281,7 +290,8 @@ mod tests {
 			startswith: vec!["t".into()],
 			endswith: vec!["!df".into()],
 		};
-		let template_engine = TemplateEngine::default();
-		assert!(filename.filter(&path, &template_engine))
+		let harness = ContextHarness::new();
+		let context = harness.context();
+		assert!(filename.filter(&path, &context))
 	}
 }

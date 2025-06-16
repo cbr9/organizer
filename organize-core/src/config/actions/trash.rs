@@ -1,9 +1,9 @@
 use std::path::PathBuf;
 
 use crate::{
-	config::actions::common::enabled,
+	config::{actions::common::enabled, context::Context},
 	resource::Resource,
-	templates::{template::Template, TemplateEngine},
+	templates::template::Template,
 };
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
@@ -23,9 +23,9 @@ impl Action for Trash {
 		vec![]
 	}
 
-	#[tracing::instrument(ret(level = "info"), err(Debug), level = "debug")]
-	fn execute(&self, res: &Resource, _: &TemplateEngine, dry_run: bool) -> Result<Option<PathBuf>> {
-		if !dry_run && self.enabled {
+	#[tracing::instrument(ret(level = "info"), err(Debug), level = "debug", skip(ctx))]
+	fn execute(&self, res: &Resource, ctx: &Context) -> Result<Option<PathBuf>> {
+		if !ctx.dry_run && self.enabled {
 			trash::delete(res.path())?;
 		}
 		Ok(None)
@@ -34,6 +34,8 @@ impl Action for Trash {
 
 #[cfg(test)]
 mod tests {
+	use crate::config::context::ContextHarness;
+
 	use super::*;
 	use tempfile;
 
@@ -43,13 +45,12 @@ mod tests {
 		let path = tmp_file.path();
 		let resource = Resource::new(path, path.parent().unwrap()).unwrap();
 		let action = Trash { enabled: true };
-		let template_engine = TemplateEngine::default();
 
 		assert!(path.exists());
+		let harness = ContextHarness::new();
+		let context = harness.context();
 
-		action
-			.execute(&resource, &template_engine, false)
-			.expect("Could not trash target file");
+		action.execute(&resource, &context).expect("Could not trash target file");
 		assert!(!path.exists());
 	}
 }
