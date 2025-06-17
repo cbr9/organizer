@@ -205,11 +205,9 @@ impl Config {}
 
 #[cfg(test)]
 mod tests {
-	use std::{path::PathBuf, sync::LazyLock};
+	use std::sync::LazyLock;
 
-	use crate::templates::TemplateEngine;
-
-	use super::{Config, ConfigBuilder};
+	use super::ConfigBuilder;
 	use itertools::Itertools;
 	use toml::toml;
 

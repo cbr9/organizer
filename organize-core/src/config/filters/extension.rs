@@ -57,7 +57,6 @@ pub mod tests {
 	use crate::{
 		config::{context::ContextHarness, filters::Filter},
 		resource::Resource,
-		templates::TemplateEngine,
 	};
 
 	#[test]

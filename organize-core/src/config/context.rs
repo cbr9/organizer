@@ -60,7 +60,7 @@ pub struct ContextHarness {
 }
 
 #[cfg(test)]
-impl ContextHarness {
+impl<'a> ContextHarness {
 	/// Creates a new harness with default, dummy data.
 	pub fn new() -> Self {
 		Self {
@@ -72,7 +72,7 @@ impl ContextHarness {
 	}
 
 	/// Returns a valid `ExecutionContext` with references to the harness's data.
-	pub fn context(&self) -> ExecutionContext {
+	pub fn context(&'a self) -> ExecutionContext<'a> {
 		let scope = ExecutionScope {
 			config: &self.config,
 			rule: &self.rule,

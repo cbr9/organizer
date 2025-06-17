@@ -37,7 +37,6 @@ mod tests {
 			filters::{empty::Empty, Filter},
 		},
 		resource::Resource,
-		templates::TemplateEngine,
 	};
 
 	#[test]
