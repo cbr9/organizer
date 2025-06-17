@@ -34,7 +34,7 @@ impl Engine {
 	/// Runs the organization process based on the loaded configuration and
 	/// command-line arguments.
 	pub fn run(&self, dry_run: bool) -> Result<()> {
-		for (i, rule) in self.config.rules.iter().enumerate() {
+		for rule in self.config.rules.iter() {
 			for folder in rule.folders.iter() {
 				let context = ExecutionContext {
 					services: &self.services,
@@ -54,7 +54,7 @@ impl Engine {
 					Err(e) => {
 						tracing::error!(
 							"Rule [number = {}, id = {}]: Could not read entries from folder '{}'. Error: {}",
-							i,
+							rule.index,
 							rule.id.as_deref().unwrap_or("untitled"),
 							folder.path.display(),
 							e

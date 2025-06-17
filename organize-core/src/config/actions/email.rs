@@ -121,7 +121,13 @@ impl Action for Email {
 			let mailer = SmtpTransport::relay(&self.smtp_server).unwrap().credentials(creds).build();
 
 			if let Err(e) = mailer.send(&email) {
-				tracing::error!("Could not send email: {:?}", e);
+				tracing::error!(
+					rule = ctx.scope.rule.id.as_deref().unwrap_or("untitled"),
+					rule_idx = ctx.scope.rule.index,
+					folder_idx = ctx.scope.folder.index,
+					"Could not send email: {:?}",
+					e
+				);
 				return Ok(None);
 			};
 		}

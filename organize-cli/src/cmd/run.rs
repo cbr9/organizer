@@ -27,7 +27,11 @@ pub struct Run {
 
 impl Cmd for Run {
 	#[tracing::instrument(err)]
-	fn run(self) -> Result<()> {
+	fn run(mut self) -> Result<()> {
+		if self.no_dry_run {
+			self.dry_run = false;
+		}
+
 		let engine = Engine::new(self.config, self.tags, self.ids)?;
 		logs::init(self.verbose, &engine.config.path);
 		engine.run(self.dry_run)?;

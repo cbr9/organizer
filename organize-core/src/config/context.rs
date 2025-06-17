@@ -104,6 +104,7 @@ impl Default for Rule {
 	fn default() -> Self {
 		Self {
 			id: None,
+			index: 0,
 			tags: Default::default(),
 			actions: Default::default(),
 			filters: Default::default(),
@@ -120,6 +121,7 @@ impl Default for Folder {
 		use crate::config::options::Options;
 
 		Self {
+			index: 0,
 			path: PathBuf::new(),
 			options: Options::default(),
 		}

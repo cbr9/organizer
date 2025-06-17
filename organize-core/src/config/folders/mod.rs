@@ -23,7 +23,13 @@ pub struct FolderBuilder {
 }
 
 impl FolderBuilder {
-	pub fn build(self, defaults: &OptionsBuilder, rule_options: &OptionsBuilder, template_engine: &mut TemplateEngine) -> Result<Folder> {
+	pub fn build(
+		self,
+		index: usize,
+		defaults: &OptionsBuilder,
+		rule_options: &OptionsBuilder,
+		template_engine: &mut TemplateEngine,
+	) -> Result<Folder> {
 		let path = {
 			let context = template_engine.empty_context();
 			template_engine
@@ -34,13 +40,14 @@ impl FolderBuilder {
 				.map(|p| p.expand_user().clean())?
 		};
 		let options = Options::compile(defaults, rule_options, &self.options);
-		Ok(Folder { path, options })
+		Ok(Folder { path, options, index })
 	}
 }
 
 /// The final, compiled `Folder` object, ready for execution.
 #[derive(Debug, PartialEq, Clone)]
 pub struct Folder {
+	pub index: usize,
 	pub path: PathBuf,
 	pub options: Options,
 }
