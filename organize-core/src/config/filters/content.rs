@@ -1,7 +1,7 @@
 use crate::{
 	config::{
 		context::ExecutionContext,
-		filters::{regex::Regex, Filter},
+		filters::{regex::RegexSet, Filter},
 	},
 	resource::Resource,
 	templates::template::Template,
@@ -17,7 +17,7 @@ pub struct Content {
 	#[serde(default)]
 	contains: Vec<Template>,
 	#[serde(default)]
-	matches: Vec<Regex>,
+	matches: RegexSet,
 }
 
 #[typetag::serde(name = "content")]
@@ -50,7 +50,7 @@ impl Filter for Content {
 					},
 				);
 
-			let regex_match = self.matches.is_empty() || self.matches.iter().any(|pattern| pattern.is_match(&content));
+			let regex_match = self.matches.is_empty() || self.matches.is_match(&content);
 
 			contains_match && regex_match
 		} else {

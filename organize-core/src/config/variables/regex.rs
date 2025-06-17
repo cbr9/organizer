@@ -1,29 +1,14 @@
-use serde::{Deserialize, Serialize};
 use tera::Context;
 
 use crate::{
-	config::filters::regex::Regex,
+	config::filters::regex::RegularExpression,
 	templates::{template::Template, TemplateEngine},
 };
 
 use super::Variable;
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct RegexVariable {
-	pub pattern: Regex,
-	pub input: Template,
-}
-
-impl PartialEq for RegexVariable {
-	fn eq(&self, other: &Self) -> bool {
-		self.pattern.as_str() == other.pattern.as_str() && self.input == other.input
-	}
-}
-
-impl Eq for RegexVariable {}
-
 #[typetag::serde(name = "regex")]
-impl Variable for RegexVariable {
+impl Variable for RegularExpression {
 	fn templates(&self) -> Vec<&Template> {
 		vec![&self.input]
 	}
