@@ -2,7 +2,6 @@ use std::collections::HashSet;
 
 use anyhow::Result;
 use filters::{
-	content::file_content,
 	misc::{hash, mime},
 	path::{extension, filename, parent, stem},
 	size::size,
@@ -131,7 +130,6 @@ impl Default for TemplateEngine {
 		tera.register_filter("mime", mime);
 		tera.register_filter("filesize", size);
 		tera.register_filter("hash", hash);
-		tera.register_filter("content", file_content);
 		Self { tera, variables: vec![] }
 	}
 }
