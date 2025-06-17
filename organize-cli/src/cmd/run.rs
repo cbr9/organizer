@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use anyhow::Result;
 use clap::{Parser, ValueHint};
 
-use organize_core::engine::Engine;
+use organize_core::{config::context::RunSettings, engine::Engine};
 
 use crate::Cmd;
 
@@ -23,6 +23,8 @@ pub struct Run {
 	no_dry_run: bool,
 	#[arg(long, short = 'v')]
 	verbose: bool,
+	#[arg(long, help = "Run all operations sequentially in a single thread.")]
+	no_parallel: bool,
 }
 
 impl Cmd for Run {
@@ -32,9 +34,15 @@ impl Cmd for Run {
 			self.dry_run = false;
 		}
 
-		let engine = Engine::new(self.config, self.tags, self.ids)?;
+		let settings = RunSettings {
+			dry_run: self.dry_run,
+			no_parallel: self.no_parallel,
+		};
+
+		let engine = Engine::new(self.config, settings, self.tags, self.ids)?;
 		logs::init(self.verbose, &engine.config.path);
-		engine.run(self.dry_run)?;
+		engine.run()?;
+
 		Ok(())
 	}
 }

@@ -47,7 +47,8 @@ mod tests {
 		let action = Trash { enabled: true };
 
 		assert!(path.exists());
-		let harness = ContextHarness::new();
+		let mut harness = ContextHarness::new();
+		harness.settings.dry_run = false;
 		let context = harness.context();
 
 		action.execute(&resource, &context).expect("Could not trash target file");

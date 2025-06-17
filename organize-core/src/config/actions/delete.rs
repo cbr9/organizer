@@ -75,7 +75,8 @@ mod tests {
 			confirm: false,
 		};
 
-		let harness = ContextHarness::new();
+		let mut harness = ContextHarness::new();
+		harness.settings.dry_run = false;
 		let context = harness.context();
 
 		std::fs::write(&tmp_file, "").expect("Could not create target file");

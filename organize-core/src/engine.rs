@@ -14,11 +14,12 @@ use std::path::PathBuf;
 /// It owns the compiled configuration and all run-wide services.
 pub struct Engine {
 	pub config: Config,
-	pub services: RunServices,
+	services: RunServices,
+	settings: RunSettings,
 }
 
 impl Engine {
-	pub fn new(path: Option<PathBuf>, tags: Option<Vec<String>>, ids: Option<Vec<String>>) -> Result<Self> {
+	pub fn new(path: Option<PathBuf>, settings: RunSettings, tags: Option<Vec<String>>, ids: Option<Vec<String>>) -> Result<Self> {
 		let config_builder = ConfigBuilder::new(path)?;
 		let mut engine = TemplateEngine::from_config(&config_builder)?;
 		let config = config_builder.build(&mut engine, tags, ids)?;
@@ -28,22 +29,22 @@ impl Engine {
 			credential_cache: Default::default(),
 			content_cache: Default::default(),
 		};
-		Ok(Self { config, services })
+		Ok(Self { config, services, settings })
 	}
 
 	/// Runs the organization process based on the loaded configuration and
 	/// command-line arguments.
-	pub fn run(&self, dry_run: bool) -> Result<()> {
+	pub fn run(&self) -> Result<()> {
 		for rule in self.config.rules.iter() {
 			for folder in rule.folders.iter() {
 				let context = ExecutionContext {
 					services: &self.services,
+					settings: &self.settings,
 					scope: ExecutionScope {
 						config: &self.config,
 						rule,
 						folder,
 					},
-					settings: RunSettings { dry_run },
 				};
 
 				let entries = match folder.get_resources() {

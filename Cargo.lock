@@ -1613,6 +1613,7 @@ dependencies = [
  "serde_regex",
  "serde_test",
  "sha256",
+ "shlex",
  "strum",
  "tempfile",
  "tera",

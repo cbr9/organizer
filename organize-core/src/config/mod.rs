@@ -36,11 +36,9 @@ impl ConfigBuilder {
 		let mut negative_tags = HashSet::new();
 		if let Some(tags) = tags {
 			// Pre-process the tags into positive and negative sets once.
-			positive_tags = tags.iter().cloned().filter(|s| !s.starts_with('!')).collect();
+			positive_tags = tags.iter().filter(|&s| !s.starts_with('!')).cloned().collect();
 			negative_tags = tags
-				.iter()
-				.cloned()
-				.filter(|s| s.starts_with('!'))
+				.iter().filter(|&s| s.starts_with('!')).cloned()
 				.map(|s| s[1..].to_string())
 				.collect();
 		}
@@ -49,11 +47,9 @@ impl ConfigBuilder {
 		let mut negative_ids = HashSet::new();
 		if let Some(ids) = ids {
 			// Pre-process the IDs into positive and negative sets once.
-			positive_ids = ids.iter().cloned().filter(|s| !s.starts_with('!')).collect();
+			positive_ids = ids.iter().filter(|&s| !s.starts_with('!')).cloned().collect();
 			negative_ids = ids
-				.iter()
-				.cloned()
-				.filter(|s| s.starts_with('!'))
+				.iter().filter(|&s| s.starts_with('!')).cloned()
 				.map(|s| s[1..].to_string())
 				.collect();
 		}

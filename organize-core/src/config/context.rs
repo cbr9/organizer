@@ -33,6 +33,7 @@ impl Default for RunServices {
 #[derive(Debug, Clone, Copy)]
 pub struct RunSettings {
 	pub dry_run: bool,
+	pub no_parallel: bool,
 }
 
 /// A read-only "view" into the current position in the configuration tree.
@@ -48,12 +49,13 @@ pub struct ExecutionScope<'a> {
 pub struct ExecutionContext<'a> {
 	pub services: &'a RunServices,
 	pub scope: ExecutionScope<'a>,
-	pub settings: RunSettings,
+	pub settings: &'a RunSettings,
 }
 
 #[cfg(test)]
 pub struct ContextHarness {
 	pub services: RunServices,
+	pub settings: RunSettings,
 	pub config: Config,
 	pub rule: Rule,
 	pub folder: Folder,
@@ -66,6 +68,10 @@ impl<'a> ContextHarness {
 		Self {
 			services: RunServices::default(),
 			config: Config::default(),
+			settings: RunSettings {
+				dry_run: true,
+				no_parallel: true,
+			},
 			rule: Rule::default(),
 			folder: Folder::default(),
 		}
@@ -80,8 +86,8 @@ impl<'a> ContextHarness {
 		};
 		ExecutionContext {
 			services: &self.services,
+			settings: &self.settings,
 			scope,
-			settings: RunSettings { dry_run: false },
 		}
 	}
 }

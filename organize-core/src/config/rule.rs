@@ -72,7 +72,7 @@ impl RuleBuilder {
 
 		// If positive IDs are specified, the rule's ID must be one of them.
 		// If no positive IDs are specified, this condition is met.
-		positive_ids.is_empty() || rule_id.map_or(false, |id| positive_ids.contains(id))
+		positive_ids.is_empty() || rule_id.is_some_and(|id| positive_ids.contains(id))
 	}
 }
 

@@ -1,4 +1,4 @@
-use anyhow::{Context as _, Result};
+use anyhow::Result;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -8,7 +8,7 @@ use std::{
 
 use crate::{config::context::ExecutionContext, path::prepare::prepare_target_path, resource::Resource, templates::template::Template};
 
-use super::{common::ConflictOption, Action};
+use super::{common::ConflictResolution, Action};
 use crate::config::actions::common::enabled;
 
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]
@@ -16,7 +16,7 @@ use crate::config::actions::common::enabled;
 pub struct Extract {
 	pub to: Template,
 	#[serde(default)]
-	pub if_exists: ConflictOption,
+	pub if_exists: ConflictResolution,
 	#[serde(default = "enabled")]
 	enabled: bool,
 }
@@ -29,17 +29,14 @@ impl Action for Extract {
 
 	#[tracing::instrument(ret(level = "info"), err(Debug), level = "debug", skip(ctx))]
 	fn execute(&self, res: &Resource, ctx: &ExecutionContext) -> Result<Option<PathBuf>> {
-		match prepare_target_path(&self.if_exists, res, &self.to, false, &ctx.services.template_engine)? {
-			Some(dest) => {
+		match prepare_target_path(&self.if_exists, res, &self.to, false, ctx)? {
+			Some(reservation) => {
 				if !ctx.settings.dry_run && self.enabled {
-					if let Some(parent) = dest.parent() {
-						std::fs::create_dir_all(parent).with_context(|| format!("Could not create parent directory for {}", dest.display()))?;
-					}
 					let file = File::open(res.path())?;
 					let mut archive = zip::ZipArchive::new(file)?;
-					archive.extract(&dest)?;
+					archive.extract(&reservation.path)?;
 
-					let content = fs::read_dir(&dest)?.flatten().collect_vec();
+					let content = fs::read_dir(&reservation.path)?.flatten().collect_vec();
 					if content.len() == 1 {
 						if let Some(dir) = content.first() {
 							let dir = dir.path();
@@ -48,7 +45,7 @@ impl Action for Extract {
 								let components = dir.components().collect_vec();
 								for entry in inner_content {
 									let mut new_path: PathBuf = entry.path().components().filter(|c| !components.contains(c)).collect();
-									new_path = dest.join(new_path);
+									new_path = reservation.path.join(new_path);
 									std::fs::rename(entry.path(), new_path)?;
 								}
 								std::fs::remove_dir(dir)?;
@@ -56,7 +53,7 @@ impl Action for Extract {
 						}
 					}
 				}
-				Ok(Some(dest))
+				Ok(Some(reservation.path))
 			}
 			None => Ok(None),
 		}

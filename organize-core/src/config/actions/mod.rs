@@ -61,7 +61,13 @@ pub trait Action: DynEq + DynClone + Sync + Send + Debug {
 
 		resources = match self.execution_model() {
 			ExecutionModel::Linear => resources.into_iter().filter_map(filter_fn).collect(),
-			ExecutionModel::Parallel => resources.into_par_iter().filter_map(filter_fn).collect(),
+			ExecutionModel::Parallel => {
+				if ctx.settings.no_parallel {
+					resources.into_iter().filter_map(filter_fn).collect()
+				} else {
+					resources.into_par_iter().filter_map(filter_fn).collect()
+				}
+			}
 			ExecutionModel::Collection => todo!(),
 		};
 

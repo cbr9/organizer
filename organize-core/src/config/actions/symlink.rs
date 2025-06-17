@@ -10,14 +10,14 @@ use crate::{
 	templates::template::Template,
 };
 
-use super::{common::ConflictOption, Action};
+use super::{common::ConflictResolution, Action};
 
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct Symlink {
 	to: Template,
 	#[serde(default)]
-	if_exists: ConflictOption,
+	if_exists: ConflictResolution,
 	#[serde(default)]
 	confirm: bool,
 	#[serde(default)]
@@ -46,16 +46,13 @@ impl Action for Symlink {
 
 	#[tracing::instrument(ret(level = "info"), err(Debug), level = "debug", skip(ctx))]
 	fn execute(&self, res: &Resource, ctx: &ExecutionContext) -> Result<Option<PathBuf>> {
-		match prepare_target_path(&self.if_exists, res, &self.to, true, &ctx.services.template_engine)? {
-			Some(dest) => {
+		match prepare_target_path(&self.if_exists, res, &self.to, true, ctx)? {
+			Some(reservation) => {
 				if !ctx.settings.dry_run && self.enabled {
-					if let Some(parent) = dest.parent() {
-						std::fs::create_dir_all(parent).with_context(|| format!("Could not create parent directory for {}", dest.display()))?;
-					}
-					Self::atomic(res.path(), &dest).with_context(|| "Failed to symlink file")?;
+					Self::atomic(res.path(), &reservation.path).with_context(|| "Failed to symlink file")?;
 				}
 				if self.continue_with == ContinueWith::Link && self.enabled {
-					Ok(Some(dest))
+					Ok(Some(reservation.path))
 				} else {
 					Ok(Some(res.path().to_path_buf()))
 				}

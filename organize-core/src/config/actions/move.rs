@@ -6,14 +6,14 @@ use serde::{Deserialize, Serialize};
 
 use crate::{path::prepare::prepare_target_path, resource::Resource, templates::template::Template};
 
-use super::{common::ConflictOption, Action};
+use super::{common::ConflictResolution, Action};
 
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct Move {
 	pub to: Template,
 	#[serde(default)]
-	pub if_exists: ConflictOption,
+	pub if_exists: ConflictResolution,
 	#[serde(default = "enabled")]
 	enabled: bool,
 }
@@ -26,15 +26,13 @@ impl Action for Move {
 
 	#[tracing::instrument(ret(level = "info"), err(Debug), level = "debug", skip(ctx))]
 	fn execute(&self, res: &Resource, ctx: &ExecutionContext) -> Result<Option<PathBuf>> {
-		match prepare_target_path(&self.if_exists, res, &self.to, true, &ctx.services.template_engine)? {
-			Some(dest) => {
+		match prepare_target_path(&self.if_exists, res, &self.to, true, ctx)? {
+			Some(reservation) => {
 				if !ctx.settings.dry_run && self.enabled {
-					if let Some(parent) = dest.parent() {
-						std::fs::create_dir_all(parent).with_context(|| format!("Could not create parent directory for {}", dest.display()))?;
-					}
-					std::fs::rename(res.path(), &dest).with_context(|| format!("Could not move {} -> {}", res.path().display(), dest.display()))?;
+					std::fs::rename(res.path(), &reservation.path)
+						.with_context(|| format!("Could not move {} -> {}", res.path().display(), reservation.path.display()))?;
 				}
-				Ok(Some(dest))
+				Ok(Some(reservation.path))
 			}
 			None => Ok(None),
 		}

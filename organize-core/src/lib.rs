@@ -1,3 +1,5 @@
+#![feature(file_lock)]
+
 pub const PROJECT_NAME: &str = "organize";
 
 pub mod config;
