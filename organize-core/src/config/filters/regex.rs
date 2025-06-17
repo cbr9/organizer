@@ -8,6 +8,14 @@ use serde::{Deserialize, Serialize};
 #[derive(Deserialize, Debug, Clone, Serialize)]
 pub struct Regex(#[serde(deserialize_with = "serde_regex::deserialize", serialize_with = "serde_regex::serialize")] regex::Regex);
 
+impl std::ops::Deref for Regex {
+	type Target = regex::Regex;
+
+	fn deref(&self) -> &Self::Target {
+		&self.0
+	}
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub struct RegularExpression {
 	pub pattern: Regex,
@@ -18,7 +26,7 @@ pub struct RegularExpression {
 
 impl PartialEq for Regex {
 	fn eq(&self, other: &Self) -> bool {
-		self.0.as_str() == other.0.as_str()
+		self.as_str() == other.as_str()
 	}
 }
 
@@ -32,13 +40,13 @@ impl Filter for RegularExpression {
 
 	#[tracing::instrument(ret, level = "debug", skip(ctx))]
 	fn filter(&self, res: &Resource, ctx: &ExecutionContext) -> bool {
-		let context = ctx.services.template_engine.new_context(res);
+		let context = ctx.services.template_engine.context(res);
 		ctx.services
 			.template_engine
 			.render(&self.input, &context)
 			.unwrap_or_default()
 			.is_some_and(|s| {
-				let mut matches = self.pattern.0.is_match(&s);
+				let mut matches = self.pattern.is_match(&s);
 				if self.negate {
 					matches = !matches;
 				}

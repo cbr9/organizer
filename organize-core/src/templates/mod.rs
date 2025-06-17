@@ -61,7 +61,7 @@ impl TemplateEngine {
 		self.tera.get_template_names().collect()
 	}
 
-	pub fn new_empty_context(&self) -> Context {
+	pub fn empty_context(&self) -> Context {
 		let mut context = Context::new();
 
 		for var in self.variables.iter() {
@@ -71,7 +71,7 @@ impl TemplateEngine {
 		context
 	}
 
-	pub fn new_context(&self, resource: &Resource) -> Context {
+	pub fn context(&self, resource: &Resource) -> Context {
 		let mut context = Context::new();
 		context.insert("path", &resource.path());
 		context.insert("root", &resource.root());
@@ -170,7 +170,7 @@ mod tests {
 		let mut engine = TemplateEngine::new(&vec![Box::new(var)]);
 		let template = Template::from("Hello, {{ location }}!");
 		engine.add_template(&template).unwrap();
-		let context = engine.new_empty_context();
+		let context = engine.empty_context();
 		let rendered = engine.render(&template, &context).unwrap();
 		assert_eq!(rendered, Some("Hello, world!".to_string()));
 	}
@@ -181,7 +181,7 @@ mod tests {
 		let resource = Resource::new_tmp("test.txt");
 		let template = Template::from("The path is {{ path | stem }}");
 		engine.add_template(&template).unwrap();
-		let context = engine.new_context(&resource);
+		let context = engine.context(&resource);
 		let rendered = engine.render(&template, &context).unwrap();
 		assert_eq!(rendered, Some("The path is test".to_string()));
 	}

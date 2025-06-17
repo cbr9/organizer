@@ -1,14 +1,16 @@
 use serde::{Deserialize, Serialize};
 use tera::Context;
 
-use crate::templates::{template::Template, TemplateEngine};
+use crate::{
+	config::filters::regex::Regex,
+	templates::{template::Template, TemplateEngine},
+};
 
 use super::Variable;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct RegexVariable {
-	#[serde(deserialize_with = "serde_regex::deserialize", serialize_with = "serde_regex::serialize")]
-	pub pattern: regex::Regex,
+	pub pattern: Regex,
 	pub input: Template,
 }
 

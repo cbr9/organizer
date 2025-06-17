@@ -25,7 +25,7 @@ pub struct FolderBuilder {
 impl FolderBuilder {
 	pub fn build(self, defaults: &OptionsBuilder, rule_options: &OptionsBuilder, template_engine: &mut TemplateEngine) -> Result<Folder> {
 		let path = {
-			let context = template_engine.new_empty_context();
+			let context = template_engine.empty_context();
 			template_engine
 				.tera
 				.render_str(&self.root.text, &context)

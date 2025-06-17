@@ -18,7 +18,7 @@ pub fn prepare_target_path(
 	with_extension: bool,
 	template_engine: &TemplateEngine,
 ) -> Result<Option<PathBuf>> {
-	let context = template_engine.new_context(resource);
+	let context = template_engine.context(resource);
 	let rendered_dest = template_engine.render(dest, &context)?;
 	if rendered_dest.is_none() {
 		return Ok(None);

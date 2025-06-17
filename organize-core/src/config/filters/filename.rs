@@ -44,7 +44,7 @@ impl Filter for Filename {
 			filename.to_lowercase()
 		};
 
-		let context = ctx.services.template_engine.new_context(res);
+		let context = ctx.services.template_engine.context(res);
 
 		let startswith = if self.startswith.is_empty() {
 			true

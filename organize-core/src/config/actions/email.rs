@@ -89,7 +89,7 @@ impl Action for Email {
 				.to(self.recipient.clone())
 				.date_now();
 
-			let context = ctx.services.template_engine.new_context(res);
+			let context = ctx.services.template_engine.context(res);
 			if let Some(subject) = &self.subject {
 				if let Some(subject) = ctx.services.template_engine.render(subject, &context)? {
 					email = email.subject(subject);
