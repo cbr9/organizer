@@ -68,7 +68,7 @@ mod tests {
 		let action = Empty;
 		let harness = ContextHarness::new();
 		let context = harness.context();
-		assert!(action.filter(&res, &context))
+		assert!(!action.filter(&res, &context))
 	}
 	#[test]
 	fn test_dir_negative() {
@@ -78,6 +78,6 @@ mod tests {
 		let action = Empty;
 		let harness = ContextHarness::new();
 		let context = harness.context();
-		assert!(action.filter(&res, &context))
+		assert!(!action.filter(&res, &context))
 	}
 }
