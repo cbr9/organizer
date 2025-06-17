@@ -6,7 +6,7 @@ use std::{
 	path::PathBuf,
 };
 
-use crate::{config::context::Context, path::prepare::prepare_target_path, resource::Resource, templates::template::Template};
+use crate::{config::context::ExecutionContext, path::prepare::prepare_target_path, resource::Resource, templates::template::Template};
 
 use super::{common::ConflictOption, Action};
 use crate::config::actions::common::enabled;
@@ -28,10 +28,10 @@ impl Action for Extract {
 	}
 
 	#[tracing::instrument(ret(level = "info"), err(Debug), level = "debug", skip(ctx))]
-	fn execute(&self, res: &Resource, ctx: &Context) -> Result<Option<PathBuf>> {
-		match prepare_target_path(&self.if_exists, res, &self.to, false, ctx.template_engine)? {
+	fn execute(&self, res: &Resource, ctx: &ExecutionContext) -> Result<Option<PathBuf>> {
+		match prepare_target_path(&self.if_exists, res, &self.to, false, &ctx.services.template_engine)? {
 			Some(dest) => {
-				if !ctx.dry_run && self.enabled {
+				if !ctx.settings.dry_run && self.enabled {
 					if let Some(parent) = dest.parent() {
 						std::fs::create_dir_all(parent).with_context(|| format!("Could not create parent directory for {}", dest.display()))?;
 					}

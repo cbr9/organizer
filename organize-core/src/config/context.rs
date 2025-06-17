@@ -1,5 +1,7 @@
+use dashmap::DashMap;
 use std::{
 	collections::HashMap,
+	path::PathBuf,
 	sync::{Arc, RwLock},
 };
 
@@ -10,29 +12,51 @@ use crate::{
 	templates::TemplateEngine,
 };
 
-/// A container for all contextual information required for a single operation.
-/// It is generic over a lifetime `'a` to hold references to the configuration tree.
-#[derive(Clone)]
-pub struct Context<'a> {
+#[derive(Debug, Clone)]
+pub struct RunServices {
+	pub template_engine: TemplateEngine,
+	pub credential_cache: Arc<RwLock<HashMap<Mailbox, Credentials>>>,
+	pub content_cache: Arc<DashMap<PathBuf, Arc<String>>>,
+}
+
+impl Default for RunServices {
+	fn default() -> Self {
+		Self {
+			template_engine: TemplateEngine::default(),
+			credential_cache: Arc::new(RwLock::new(HashMap::new())),
+			content_cache: Arc::new(DashMap::new()),
+		}
+	}
+}
+
+/// A container for run-wide operational settings.
+#[derive(Debug, Clone, Copy)]
+pub struct RunSettings {
+	pub dry_run: bool,
+}
+
+/// A read-only "view" into the current position in the configuration tree.
+#[derive(Debug, Clone)]
+pub struct ExecutionScope<'a> {
 	pub config: &'a Config,
 	pub rule: &'a Rule,
 	pub folder: &'a Folder,
-	pub template_engine: &'a TemplateEngine,
-	pub dry_run: bool,
-	pub email_credentials: Arc<RwLock<HashMap<Mailbox, Credentials>>>,
 }
 
-/// A test harness to simplify the creation of a `Context`.
-/// It owns all the necessary data, allowing it to return a context
-/// with valid references.
+/// The top-level context object, composed of the three distinct categories of information.
+#[derive(Clone)]
+pub struct ExecutionContext<'a> {
+	pub services: &'a RunServices,
+	pub scope: ExecutionScope<'a>,
+	pub settings: RunSettings,
+}
+
 #[cfg(test)]
 pub struct ContextHarness {
+	pub services: RunServices,
 	pub config: Config,
 	pub rule: Rule,
 	pub folder: Folder,
-	pub dry_run: bool,
-	pub template_engine: TemplateEngine,
-	pub email_credentials: Arc<RwLock<HashMap<Mailbox, Credentials>>>,
 }
 
 #[cfg(test)]
@@ -40,28 +64,27 @@ impl ContextHarness {
 	/// Creates a new harness with default, dummy data.
 	pub fn new() -> Self {
 		Self {
+			services: RunServices::default(),
 			config: Config::default(),
 			rule: Rule::default(),
 			folder: Folder::default(),
-			template_engine: TemplateEngine::default(),
-			dry_run: false,
-			email_credentials: Arc::new(RwLock::new(HashMap::new())),
 		}
 	}
 
-	/// Returns a valid `Context` with references to the harness's data.
-	pub fn context(&self) -> Context {
-		Context {
+	/// Returns a valid `ExecutionContext` with references to the harness's data.
+	pub fn context(&self) -> ExecutionContext {
+		let scope = ExecutionScope {
 			config: &self.config,
 			rule: &self.rule,
 			folder: &self.folder,
-			template_engine: &self.template_engine,
-			dry_run: self.dry_run,
-			email_credentials: self.email_credentials.clone(),
+		};
+		ExecutionContext {
+			services: &self.services,
+			scope,
+			settings: RunSettings { dry_run: false },
 		}
 	}
 }
-
 // Provide `Default` implementations for the final, compiled structs.
 // These are only compiled for tests and allow for easy instantiation of dummy objects.
 #[cfg(test)]
@@ -79,8 +102,6 @@ impl Default for Config {
 #[cfg(test)]
 impl Default for Rule {
 	fn default() -> Self {
-		use crate::templates::TemplateEngine;
-
 		Self {
 			id: None,
 			tags: Default::default(),

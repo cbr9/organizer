@@ -1,5 +1,5 @@
 use crate::{
-	config::{context::Context, filters::Filter},
+	config::{context::ExecutionContext, filters::Filter},
 	resource::Resource,
 	templates::template::Template,
 };
@@ -31,9 +31,10 @@ impl Filter for RegularExpression {
 	}
 
 	#[tracing::instrument(ret, level = "debug", skip(ctx))]
-	fn filter(&self, res: &Resource, ctx: &Context) -> bool {
-		let context = ctx.template_engine.new_context(res);
-		ctx.template_engine
+	fn filter(&self, res: &Resource, ctx: &ExecutionContext) -> bool {
+		let context = ctx.services.template_engine.new_context(res);
+		ctx.services
+			.template_engine
 			.render(&self.input, &context)
 			.unwrap_or_default()
 			.is_some_and(|s| {

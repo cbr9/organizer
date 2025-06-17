@@ -4,7 +4,7 @@ use anyhow::{Context as _, Result};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-	config::{actions::common::enabled, context::Context},
+	config::{actions::common::enabled, context::ExecutionContext},
 	path::prepare::prepare_target_path,
 	resource::Resource,
 	templates::template::Template,
@@ -43,10 +43,10 @@ impl Action for Copy {
 	}
 
 	#[tracing::instrument(ret(level = "info"), err(Debug), level = "debug", skip(ctx))]
-	fn execute(&self, res: &Resource, ctx: &Context) -> Result<Option<PathBuf>> {
-		match prepare_target_path(&self.if_exists, res, &self.to, true, ctx.template_engine)? {
+	fn execute(&self, res: &Resource, ctx: &ExecutionContext) -> Result<Option<PathBuf>> {
+		match prepare_target_path(&self.if_exists, res, &self.to, true, &ctx.services.template_engine)? {
 			Some(dest) => {
-				if !ctx.dry_run && self.enabled {
+				if !ctx.settings.dry_run && self.enabled {
 					if let Some(parent) = dest.parent() {
 						std::fs::create_dir_all(parent).with_context(|| format!("Could not create parent directory for {}", dest.display()))?;
 					}

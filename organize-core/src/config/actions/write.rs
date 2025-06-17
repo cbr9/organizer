@@ -6,16 +6,13 @@ use std::{
 	path::PathBuf,
 };
 
-use crate::config::{actions::common::enabled, context::Context};
+use crate::config::{actions::common::enabled, context::ExecutionContext};
 use anyhow::Result;
 use itertools::Itertools;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use serde::{Deserialize, Serialize};
 
-use crate::{
-	resource::Resource,
-	templates::template::Template,
-};
+use crate::{resource::Resource, templates::template::Template};
 
 use super::{Action, ExecutionModel};
 
@@ -62,7 +59,7 @@ impl Action for Write {
 	}
 
 	#[tracing::instrument(ret(level = "info"), err(Debug), level = "debug", skip(ctx))]
-	fn execute_collection(&self, resources: Vec<&Resource>, ctx: &Context) -> Result<Option<Vec<PathBuf>>> {
+	fn execute_collection(&self, resources: Vec<&Resource>, ctx: &ExecutionContext) -> Result<Option<Vec<PathBuf>>> {
 		if !self.enabled || resources.is_empty() {
 			let paths: Vec<PathBuf> = resources.iter().map(|res| res.path().to_path_buf()).collect();
 			return Ok(Some(paths));
@@ -71,16 +68,16 @@ impl Action for Write {
 		let mut texts_by_outfile: HashMap<PathBuf, Vec<String>> = resources
 			.par_iter()
 			.filter_map(|res| {
-				let context = ctx.template_engine.new_context(res);
-				let outfile_str = ctx.template_engine.render(&self.outfile, &context).ok()??;
-				let text = ctx.template_engine.render(&self.text, &context).ok()??;
+				let context = ctx.services.template_engine.new_context(res);
+				let outfile_str = ctx.services.template_engine.render(&self.outfile, &context).ok()??;
+				let text = ctx.services.template_engine.render(&self.text, &context).ok()??;
 				Some((PathBuf::from(outfile_str), text))
 			})
 			.collect::<Vec<(PathBuf, String)>>() // Collect to un-parallelize before grouping
 			.into_iter()
 			.into_group_map();
 
-		if !ctx.dry_run {
+		if !ctx.settings.dry_run {
 			for (path, texts) in texts_by_outfile.iter_mut() {
 				if let Some(parent) = path.parent() {
 					std::fs::create_dir_all(parent)?;

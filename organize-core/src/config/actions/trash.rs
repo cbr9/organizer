@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use crate::{
-	config::{actions::common::enabled, context::Context},
+	config::{actions::common::enabled, context::ExecutionContext},
 	resource::Resource,
 	templates::template::Template,
 };
@@ -24,8 +24,8 @@ impl Action for Trash {
 	}
 
 	#[tracing::instrument(ret(level = "info"), err(Debug), level = "debug", skip(ctx))]
-	fn execute(&self, res: &Resource, ctx: &Context) -> Result<Option<PathBuf>> {
-		if !ctx.dry_run && self.enabled {
+	fn execute(&self, res: &Resource, ctx: &ExecutionContext) -> Result<Option<PathBuf>> {
+		if !ctx.settings.dry_run && self.enabled {
 			trash::delete(res.path())?;
 		}
 		Ok(None)

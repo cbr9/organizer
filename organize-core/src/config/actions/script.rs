@@ -4,7 +4,7 @@ use std::{
 	str::FromStr,
 };
 
-use crate::config::{actions::common::enabled, context::Context};
+use crate::config::{actions::common::enabled, context::ExecutionContext};
 use serde::{Deserialize, Serialize};
 use tempfile;
 
@@ -41,8 +41,8 @@ impl Action for Script {
 	}
 
 	#[tracing::instrument(ret(level = "info"), err(Debug), level = "debug", skip(ctx))]
-	fn execute(&self, res: &Resource, ctx: &Context) -> Result<Option<PathBuf>> {
-		if ctx.dry_run {
+	fn execute(&self, res: &Resource, ctx: &ExecutionContext) -> Result<Option<PathBuf>> {
+		if ctx.settings.dry_run {
 			bail!("Cannot run scripted actions during a dry run")
 		}
 		if self.enabled {
@@ -62,7 +62,7 @@ impl Filter for Script {
 	}
 
 	#[tracing::instrument(ret, level = "debug", skip(ctx))]
-	fn filter(&self, res: &Resource, ctx: &Context) -> bool {
+	fn filter(&self, res: &Resource, ctx: &ExecutionContext) -> bool {
 		self.run_script(res, ctx)
 			.map(|output| {
 				// get the last line in stdout and parse it as a boolean
@@ -90,17 +90,17 @@ impl Script {
 		}
 	}
 
-	fn write(&self, res: &Resource, ctx: &Context) -> anyhow::Result<PathBuf> {
+	fn write(&self, res: &Resource, ctx: &ExecutionContext) -> anyhow::Result<PathBuf> {
 		let script = tempfile::NamedTempFile::new()?;
 		let script_path = script.into_temp_path().to_path_buf();
-		let context = ctx.template_engine.new_context(res);
-		if let Some(content) = ctx.template_engine.render(&self.content, &context)? {
+		let context = ctx.services.template_engine.new_context(res);
+		if let Some(content) = ctx.services.template_engine.render(&self.content, &context)? {
 			std::fs::write(&script_path, content)?;
 		}
 		Ok(script_path)
 	}
 
-	fn run_script(&self, res: &Resource, ctx: &Context) -> anyhow::Result<Output> {
+	fn run_script(&self, res: &Resource, ctx: &ExecutionContext) -> anyhow::Result<Output> {
 		let script = self.write(res, ctx)?;
 		let output = Command::new(&self.exec)
 			.args(self.args.as_slice())
@@ -126,7 +126,7 @@ mod tests {
 		let mut template_engine = TemplateEngine::default();
 		template_engine.add_templates(&Filter::templates(&script))?;
 		let mut harness = ContextHarness::new();
-		harness.template_engine = template_engine;
+		harness.services.template_engine = template_engine;
 		let ctx = harness.context();
 
 		script.run_script(&src, &ctx).unwrap_or_else(|_| {

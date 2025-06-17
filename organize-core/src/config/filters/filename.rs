@@ -1,5 +1,5 @@
 use crate::{
-	config::{context::Context, filters::Filter},
+	config::{context::ExecutionContext, filters::Filter},
 	resource::Resource,
 	templates::template::Template,
 };
@@ -31,7 +31,7 @@ impl Filter for Filename {
 	}
 
 	#[tracing::instrument(ret, level = "debug", skip(ctx))]
-	fn filter(&self, res: &Resource, ctx: &Context) -> bool {
+	fn filter(&self, res: &Resource, ctx: &ExecutionContext) -> bool {
 		let filename = res.path().file_name().unwrap_or_default().to_string_lossy();
 
 		if filename.is_empty() {
@@ -44,7 +44,7 @@ impl Filter for Filename {
 			filename.to_lowercase()
 		};
 
-		let context = ctx.template_engine.new_context(res);
+		let context = ctx.services.template_engine.new_context(res);
 
 		let startswith = if self.startswith.is_empty() {
 			true
@@ -52,7 +52,7 @@ impl Filter for Filename {
 			self.startswith.iter().any(|template| {
 				// The rendered string must also be lowercased for a case-insensitive match.
 				let pattern = {
-					let rendered = if let Some(rendered) = ctx.template_engine.render(template, &context).unwrap_or_default() {
+					let rendered = if let Some(rendered) = ctx.services.template_engine.render(template, &context).unwrap_or_default() {
 						rendered
 					} else {
 						template.text.clone()
@@ -85,7 +85,7 @@ impl Filter for Filename {
 		} else {
 			self.endswith.iter().any(|template| {
 				let pattern = {
-					let rendered = if let Some(rendered) = ctx.template_engine.render(template, &context).unwrap_or_default() {
+					let rendered = if let Some(rendered) = ctx.services.template_engine.render(template, &context).unwrap_or_default() {
 						rendered
 					} else {
 						template.text.clone()
@@ -118,7 +118,7 @@ impl Filter for Filename {
 		} else {
 			self.contains.iter().any(|template| {
 				let pattern = {
-					let rendered = if let Some(rendered) = ctx.template_engine.render(template, &context).unwrap_or_default() {
+					let rendered = if let Some(rendered) = ctx.services.template_engine.render(template, &context).unwrap_or_default() {
 						rendered
 					} else {
 						template.text.clone()
@@ -152,7 +152,7 @@ impl Filter for Filename {
 
 #[cfg(test)]
 mod tests {
-	use crate::{config::context::ContextHarness, templates::TemplateEngine};
+	use crate::config::context::ContextHarness;
 
 	use super::*;
 

@@ -1,12 +1,9 @@
 use std::path::PathBuf;
 
-use crate::config::{actions::common::enabled, context::Context};
+use crate::config::{actions::common::enabled, context::ExecutionContext};
 use serde::{Deserialize, Serialize};
 
-use crate::{
-	resource::Resource,
-	templates::template::Template,
-};
+use crate::{resource::Resource, templates::template::Template};
 use anyhow::Result;
 
 use super::Action;
@@ -26,10 +23,11 @@ impl Action for Echo {
 	}
 
 	#[tracing::instrument(ret(level = "info"), err(Debug), level = "debug", skip(ctx))]
-	fn execute(&self, res: &Resource, ctx: &Context) -> Result<Option<PathBuf>> {
+	fn execute(&self, res: &Resource, ctx: &ExecutionContext) -> Result<Option<PathBuf>> {
 		if self.enabled {
-			let context = ctx.template_engine.new_context(res);
+			let context = ctx.services.template_engine.new_context(res);
 			if let Some(message) = ctx
+				.services
 				.template_engine
 				.render(&self.message, &context)
 				.map_err(anyhow::Error::msg)?

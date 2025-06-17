@@ -1,10 +1,6 @@
 use std::path::PathBuf;
 
-use crate::{
-	config::context::Context,
-	resource::Resource,
-	templates::template::Template,
-};
+use crate::{config::context::ExecutionContext, resource::Resource, templates::template::Template};
 use anyhow::{Context as _, Result};
 use dialoguer::{theme::ColorfulTheme, Confirm};
 use serde::{Deserialize, Serialize};
@@ -35,8 +31,8 @@ impl Action for Delete {
 	}
 
 	#[tracing::instrument(ret(level = "info"), err(Debug), level = "debug", skip(ctx))]
-	fn execute(&self, res: &Resource, ctx: &Context) -> Result<Option<PathBuf>> {
-		if !ctx.dry_run && self.enabled {
+	fn execute(&self, res: &Resource, ctx: &ExecutionContext) -> Result<Option<PathBuf>> {
+		if !ctx.settings.dry_run && self.enabled {
 			if self.confirm {
 				let confirmed = Confirm::with_theme(&ColorfulTheme::default())
 					.with_prompt(format!("Delete {}?", res.path().display()))

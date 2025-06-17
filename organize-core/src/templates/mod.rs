@@ -131,7 +131,7 @@ impl Default for TemplateEngine {
 		tera.register_filter("mime", mime);
 		tera.register_filter("filesize", size);
 		tera.register_filter("hash", hash);
-		tera.register_filter("filecontent", file_content);
+		tera.register_filter("content", file_content);
 		Self { tera, variables: vec![] }
 	}
 }

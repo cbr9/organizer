@@ -1,18 +1,9 @@
-use std::{
-	collections::HashMap,
-	path::PathBuf,
-	sync::{Arc, RwLock},
-};
+use std::path::PathBuf;
 
 use anyhow::Result;
 use clap::{Parser, ValueHint};
-use itertools::Itertools;
-use rayon::iter::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
 
-use organize_core::{
-	config::{Config, ConfigBuilder, context::Context},
-	templates::TemplateEngine,
-};
+use organize_core::engine::Engine;
 
 use crate::Cmd;
 
@@ -36,57 +27,10 @@ pub struct Run {
 
 impl Cmd for Run {
 	#[tracing::instrument(err)]
-	fn run(mut self) -> Result<()> {
-		let config_builder = ConfigBuilder::new(self.config.clone())?;
-		let mut engine = TemplateEngine::from_config(&config_builder)?;
-		let config = config_builder.build(&mut engine, self.tags, self.ids)?;
-		logs::init(self.verbose, &config.path);
-
-		let email_credentials = Arc::new(RwLock::new(HashMap::new()));
-
-		if self.no_dry_run {
-			self.dry_run = false;
-		}
-
-		for (i, rule) in config.rules.iter().enumerate() {
-			for folder in rule.folders.iter() {
-				let entries = match folder.get_resources() {
-					Ok(entries) => entries,
-					Err(e) => {
-						tracing::error!(
-							"Rule [number = {}, id = {}]: Could not read entries from folder '{}'. Error: {}",
-							i,
-							rule.id.as_deref().unwrap_or("untitled"),
-							folder.path.display(),
-							e
-						);
-						continue;
-					}
-				};
-
-				let context = Context {
-					template_engine: &engine,
-					config: &config,
-					rule,
-					folder,
-					email_credentials: email_credentials.clone(),
-					dry_run: self.dry_run,
-				};
-
-				let filtered_entries = entries
-					.into_par_iter()
-					.filter(|res| rule.filters.iter().all(|f| f.filter(res, &context)))
-					.collect::<Vec<_>>();
-
-				if filtered_entries.is_empty() {
-					continue;
-				}
-
-				rule.actions
-					.iter()
-					.fold(filtered_entries, |current_entries, action| action.run(current_entries, &context));
-			}
-		}
+	fn run(self) -> Result<()> {
+		let engine = Engine::new(self.config, self.tags, self.ids)?;
+		logs::init(self.verbose, &engine.config.path);
+		engine.run(self.dry_run)?;
 		Ok(())
 	}
 }

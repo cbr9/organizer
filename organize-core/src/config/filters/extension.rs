@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 
 use crate::{
-	config::{context::Context, filters::Filter},
+	config::{context::ExecutionContext, filters::Filter},
 	resource::Resource,
 	templates::template::Template,
 };
@@ -22,7 +22,7 @@ impl Filter for Extension {
 	}
 
 	#[tracing::instrument(ret, level = "debug")]
-	fn filter(&self, res: &Resource, _: &Context) -> bool {
+	fn filter(&self, res: &Resource, _: &ExecutionContext) -> bool {
 		let extension = res.path().extension().unwrap_or_default().to_string_lossy();
 		if extension.is_empty() {
 			return false;

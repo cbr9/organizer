@@ -1,10 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::{
-	config::context::Context,
-	resource::Resource,
-	templates::template::Template,
-};
+use crate::{config::context::ExecutionContext, resource::Resource, templates::template::Template};
 
 use super::Filter;
 
@@ -15,7 +11,7 @@ pub struct Empty;
 #[typetag::serde(name = "empty")]
 impl Filter for Empty {
 	#[tracing::instrument(ret, level = "debug")]
-	fn filter(&self, src: &Resource, _: &Context) -> bool {
+	fn filter(&self, src: &Resource, _: &ExecutionContext) -> bool {
 		let path = &src.path();
 		if path.is_file() {
 			std::fs::metadata(path).map(|md| md.len() == 0).unwrap_or(false)

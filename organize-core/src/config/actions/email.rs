@@ -6,7 +6,7 @@ use std::{
 	sync::{Arc, RwLock},
 };
 
-use crate::config::{actions::common::enabled, context::Context};
+use crate::config::{actions::common::enabled, context::ExecutionContext};
 use anyhow::{bail, Result};
 use lettre::{
 	message::{header::ContentType, Attachment, Mailbox, MessageBuilder, MultiPart, SinglePart},
@@ -82,16 +82,16 @@ impl Action for Email {
 	}
 
 	#[tracing::instrument(ret(level = "info"), err(Debug), level = "debug", skip(ctx))]
-	fn execute(&self, res: &Resource, ctx: &Context) -> Result<Option<PathBuf>> {
-		if !ctx.dry_run && self.enabled {
+	fn execute(&self, res: &Resource, ctx: &ExecutionContext) -> Result<Option<PathBuf>> {
+		if !ctx.settings.dry_run && self.enabled {
 			let mut email = MessageBuilder::new()
 				.from(self.sender.clone())
 				.to(self.recipient.clone())
 				.date_now();
 
-			let context = ctx.template_engine.new_context(res);
+			let context = ctx.services.template_engine.new_context(res);
 			if let Some(subject) = &self.subject {
-				if let Some(subject) = ctx.template_engine.render(subject, &context)? {
+				if let Some(subject) = ctx.services.template_engine.render(subject, &context)? {
 					email = email.subject(subject);
 				}
 			}
@@ -100,7 +100,7 @@ impl Action for Email {
 
 			// Add body if it exists
 			if let Some(body) = &self.body {
-				if let Some(body) = ctx.template_engine.render(body, &context)? {
+				if let Some(body) = ctx.services.template_engine.render(body, &context)? {
 					multipart = multipart.singlepart(SinglePart::plain(body));
 				}
 			}
@@ -117,7 +117,7 @@ impl Action for Email {
 
 			let email = email.multipart(multipart)?;
 
-			let creds = self.get_or_insert_credentials(&ctx.email_credentials)?;
+			let creds = self.get_or_insert_credentials(&ctx.services.credential_cache)?;
 			let mailer = SmtpTransport::relay(&self.smtp_server).unwrap().credentials(creds).build();
 
 			if let Err(e) = mailer.send(&email) {

@@ -1,5 +1,5 @@
 use crate::{
-	config::{context::Context, filters::Filter},
+	config::{context::ExecutionContext, filters::Filter},
 	resource::Resource,
 	templates::template::Template,
 };
@@ -92,7 +92,7 @@ impl Filter for Mime {
 	}
 
 	#[tracing::instrument(ret, level = "debug")]
-	fn filter(&self, res: &Resource, _: &Context) -> bool {
+	fn filter(&self, res: &Resource, _: &ExecutionContext) -> bool {
 		let guess = mime_guess::from_path(res.path()).first_or_octet_stream();
 		self.types.iter().any(|mime| {
 			let mut matches = match (mime.type_(), mime.subtype()) {
