@@ -36,8 +36,8 @@ pub struct Email {
 }
 
 impl Email {
+	#[tracing::instrument(err)]
 	fn get_or_insert_credentials(&self, cache: &Arc<RwLock<HashMap<Mailbox, Credentials>>>) -> anyhow::Result<Credentials> {
-		tracing::info!("Getting credentials for external tool.");
 		if let Ok(reader) = cache.read() {
 			if let Some(creds) = reader.get(&self.sender) {
 				return Ok(creds.clone());
