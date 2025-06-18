@@ -15,12 +15,18 @@ use super::expand::Expand;
 
 pub fn prepare_target_path(
 	on_conflict: &ConflictResolution,
-	resource: &Resource,
+	res: &Resource,
 	dest: &Template,
 	with_extension: bool,
 	ctx: &ExecutionContext,
 ) -> Result<Option<GuardedPath>> {
-	let context = ctx.services.template_engine.context(resource);
+	let context = ctx
+		.services
+		.template_engine
+		.context()
+		.path(res.path())
+		.root(res.root())
+		.build(&ctx.services.template_engine);
 	let rendered_dest = ctx.services.template_engine.render(dest, &context)?;
 	if rendered_dest.is_none() {
 		return Ok(None);
@@ -28,7 +34,7 @@ pub fn prepare_target_path(
 	let rendered_dest = rendered_dest.unwrap();
 	let mut target_path = PathBuf::from(rendered_dest).expand_user();
 
-	let path = &resource.path();
+	let path = &res.path();
 
 	if target_path.is_dir() || target_path.to_string_lossy().ends_with(MAIN_SEPARATOR) || target_path.to_string_lossy().ends_with('/') {
 		if with_extension {

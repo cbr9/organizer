@@ -1,4 +1,5 @@
 #![feature(file_lock)]
+#![feature(path_add_extension)]
 
 pub const PROJECT_NAME: &str = "organize";
 

@@ -93,7 +93,13 @@ impl Script {
 	fn write(&self, res: &Resource, ctx: &ExecutionContext) -> anyhow::Result<PathBuf> {
 		let script = tempfile::NamedTempFile::new()?;
 		let script_path = script.into_temp_path().to_path_buf();
-		let context = ctx.services.template_engine.context(res);
+		let context = ctx
+			.services
+			.template_engine
+			.context()
+			.path(res.path())
+			.root(res.root())
+			.build(&ctx.services.template_engine);
 		if let Some(content) = ctx.services.template_engine.render(&self.content, &context)? {
 			std::fs::write(&script_path, content)?;
 		}

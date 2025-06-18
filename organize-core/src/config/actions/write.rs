@@ -68,7 +68,13 @@ impl Action for Write {
 		let mut texts_by_outfile: HashMap<PathBuf, Vec<String>> = resources
 			.par_iter()
 			.filter_map(|res| {
-				let context = ctx.services.template_engine.context(res);
+				let context = ctx
+					.services
+					.template_engine
+					.context()
+					.path(res.path())
+					.root(res.root())
+					.build(&ctx.services.template_engine);
 				let outfile_str = ctx.services.template_engine.render(&self.outfile, &context).ok()??;
 				let text = ctx.services.template_engine.render(&self.text, &context).ok()??;
 				Some((PathBuf::from(outfile_str), text))

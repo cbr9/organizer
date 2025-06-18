@@ -1,12 +1,15 @@
+use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use std::{fmt::Debug, path::PathBuf};
+
+use crate::templates::{template::Template, TemplateEngine};
 
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct OptionsBuilder {
 	pub max_depth: Option<usize>,
 	pub min_depth: Option<usize>,
-	pub exclude: Option<Vec<PathBuf>>,
+	pub exclude: Option<Vec<Template>>,
 	pub hidden_files: Option<bool>,
 	pub partial_files: Option<bool>,
 	pub target: Option<Target>,
@@ -36,9 +39,16 @@ impl Default for Options {
 }
 
 impl Options {
-	pub fn compile(defaults: &OptionsBuilder, rule: &OptionsBuilder, folder: &OptionsBuilder) -> Self {
+	pub fn compile(
+		defaults: &OptionsBuilder,
+		rule: &OptionsBuilder,
+		folder: &OptionsBuilder,
+		template_engine: &mut TemplateEngine,
+		folder_path: &PathBuf,
+	) -> Self {
 		// Establish the ultimate fallback defaults for any un-defined option
 		let fallback = Self::default();
+		let context = template_engine.context().root(folder_path).build(&template_engine);
 
 		Self {
 			max_depth: folder
@@ -54,8 +64,31 @@ impl Options {
 			exclude: folder
 				.exclude
 				.clone()
-				.or_else(|| rule.exclude.clone())
-				.or_else(|| defaults.exclude.clone())
+				.map(|templates| {
+					templates
+						.into_iter()
+						.filter_map(|t| template_engine.tera.render_str(&t.text, &context).ok())
+						.map(PathBuf::from)
+						.collect_vec()
+				})
+				.or_else(|| {
+					rule.exclude.clone().map(|templates| {
+						templates
+							.into_iter()
+							.filter_map(|t| template_engine.tera.render_str(&t.text, &context).ok())
+							.map(PathBuf::from)
+							.collect_vec()
+					})
+				})
+				.or_else(|| {
+					defaults.exclude.clone().map(|templates| {
+						templates
+							.into_iter()
+							.filter_map(|t| template_engine.tera.render_str(&t.text, &context).ok())
+							.map(PathBuf::from)
+							.collect_vec()
+					})
+				})
 				.unwrap_or(fallback.exclude),
 			hidden_files: folder
 				.hidden_files

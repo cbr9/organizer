@@ -1,4 +1,7 @@
-use std::collections::HashSet;
+use std::{
+	collections::HashSet,
+	path::{Path, PathBuf},
+};
 
 use anyhow::Result;
 use filters::{
@@ -7,12 +10,9 @@ use filters::{
 	size::size,
 };
 use template::Template;
-use tera::{Context, Tera};
+use tera::Tera;
 
-use crate::{
-	config::{variables::Variable, ConfigBuilder},
-	resource::Resource,
-};
+use crate::config::{variables::Variable, ConfigBuilder};
 
 pub mod filters;
 pub mod template;
@@ -21,6 +21,43 @@ pub mod template;
 pub struct TemplateEngine {
 	pub tera: Tera,
 	pub variables: Vec<Box<dyn Variable>>,
+}
+
+pub struct ContextBuilder {
+	root: Option<PathBuf>,
+	path: Option<PathBuf>,
+}
+
+impl ContextBuilder {
+	fn new() -> Self {
+		Self { root: None, path: None }
+	}
+
+	pub fn root<T: AsRef<Path>>(mut self, path: T) -> Self {
+		self.root = Some(path.as_ref().to_path_buf());
+		self
+	}
+
+	pub fn path<T: AsRef<Path>>(mut self, path: T) -> Self {
+		self.path = Some(path.as_ref().to_path_buf());
+		self
+	}
+
+	pub fn build(self, engine: &TemplateEngine) -> tera::Context {
+		let mut context = tera::Context::new();
+		if let Some(path) = self.path {
+			context.insert("path", &path);
+		}
+		if let Some(root) = self.root {
+			context.insert("root", &root);
+		}
+
+		for var in engine.variables.iter() {
+			var.register(engine, &mut context);
+		}
+
+		context
+	}
 }
 
 impl PartialEq for TemplateEngine {
@@ -60,30 +97,12 @@ impl TemplateEngine {
 		self.tera.get_template_names().collect()
 	}
 
-	pub fn empty_context(&self) -> Context {
-		let mut context = Context::new();
-
-		for var in self.variables.iter() {
-			var.register(self, &mut context);
-		}
-
-		context
-	}
-
-	pub fn context(&self, resource: &Resource) -> Context {
-		let mut context = Context::new();
-		context.insert("path", &resource.path());
-		context.insert("root", &resource.root());
-
-		for var in self.variables.iter() {
-			var.register(self, &mut context);
-		}
-
-		context
+	pub fn context(&self) -> ContextBuilder {
+		ContextBuilder::new()
 	}
 
 	#[tracing::instrument(err)]
-	pub fn render(&self, template: &Template, context: &Context) -> tera::Result<Option<String>> {
+	pub fn render(&self, template: &Template, context: &tera::Context) -> tera::Result<Option<String>> {
 		match self.tera.render(&template.id, context) {
 			Ok(res) => {
 				if res.is_empty() {
@@ -94,11 +113,6 @@ impl TemplateEngine {
 			}
 			Err(e) => Err(e),
 		}
-	}
-
-	pub fn render_without_context(&self, template: &Template) -> tera::Result<Option<String>> {
-		let context = Context::new();
-		self.render(template, &context)
 	}
 
 	pub fn add_template(&mut self, template: &Template) -> Result<()> {
@@ -137,13 +151,13 @@ impl Default for TemplateEngine {
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use crate::config::variables::simple::SimpleVariable;
+	use crate::{config::variables::simple::SimpleVariable, resource::Resource};
 
 	#[test]
 	fn render_template_not_present_in_engine() {
 		let engine = TemplateEngine::default();
 		let template = Template::from("Hello, {{ name }}!");
-		let mut context = Context::new();
+		let mut context = engine.context().build(&engine);
 		context.insert("name", "Andrés");
 		let rendered = engine.render(&template, &context);
 		assert!(rendered.is_err());
@@ -154,7 +168,7 @@ mod tests {
 		let mut engine = TemplateEngine::default();
 		let template = Template::from("This is a stored template.");
 		engine.add_template(&template).unwrap();
-		let context = Context::new();
+		let context = engine.context().build(&engine);
 		let rendered = engine.render(&template, &context).unwrap();
 		assert_eq!(rendered, Some("This is a stored template.".to_string()));
 	}
@@ -168,7 +182,7 @@ mod tests {
 		let mut engine = TemplateEngine::new(&vec![Box::new(var)]);
 		let template = Template::from("Hello, {{ location }}!");
 		engine.add_template(&template).unwrap();
-		let context = engine.empty_context();
+		let context = engine.context().build(&engine);
 		let rendered = engine.render(&template, &context).unwrap();
 		assert_eq!(rendered, Some("Hello, world!".to_string()));
 	}
@@ -179,7 +193,7 @@ mod tests {
 		let resource = Resource::new_tmp("test.txt");
 		let template = Template::from("The path is {{ path | stem }}");
 		engine.add_template(&template).unwrap();
-		let context = engine.context(&resource);
+		let context = engine.context().path(resource.path().to_path_buf()).build(&engine);
 		let rendered = engine.render(&template, &context).unwrap();
 		assert_eq!(rendered, Some("The path is test".to_string()));
 	}
@@ -189,7 +203,7 @@ mod tests {
 		let engine = TemplateEngine::default();
 		// Invalid syntax: `{%` instead of `{{`
 		let template = Template::from("Hello, {% name }}!");
-		let context = Context::new();
+		let context = engine.context().build(&engine);
 		let rendered = engine.render(&template, &context);
 		assert!(rendered.is_err());
 	}

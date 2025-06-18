@@ -76,7 +76,13 @@ impl Filter for RegularExpression {
 
 	#[tracing::instrument(ret, level = "debug", skip(ctx))]
 	fn filter(&self, res: &Resource, ctx: &ExecutionContext) -> bool {
-		let context = ctx.services.template_engine.context(res);
+		let context = ctx
+			.services
+			.template_engine
+			.context()
+			.path(res.path())
+			.root(res.root())
+			.build(&ctx.services.template_engine);
 		ctx.services
 			.template_engine
 			.render(&self.input, &context)

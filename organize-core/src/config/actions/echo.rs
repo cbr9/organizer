@@ -25,7 +25,14 @@ impl Action for Echo {
 	#[tracing::instrument(ret(level = "info"), err(Debug), level = "debug", skip(ctx))]
 	fn execute(&self, res: &Resource, ctx: &ExecutionContext) -> Result<Option<PathBuf>> {
 		if self.enabled {
-			let context = ctx.services.template_engine.context(res);
+			let context = ctx
+				.services
+				.template_engine
+				.context()
+				.path(res.path())
+				.root(res.root())
+				.build(&ctx.services.template_engine);
+
 			if let Some(message) = ctx
 				.services
 				.template_engine

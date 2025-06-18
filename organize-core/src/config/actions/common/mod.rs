@@ -3,7 +3,9 @@ use std::{
 	path::{Path, PathBuf},
 };
 
+use path_clean::PathClean;
 use serde::{Deserialize, Serialize};
+use strum::Display;
 /// Represents an exclusive, temporary reservation of a filesystem path.
 /// The OS-level lock is held as long as this struct exists, and it is released when dropped.
 /// This prevents race conditions without creating orphaned placeholder files.
@@ -39,6 +41,23 @@ pub struct Lock {
 	path: PathBuf,
 }
 
+impl std::ops::Deref for Lock {
+	type Target = File;
+
+	fn deref(&self) -> &Self::Target {
+		&self._file
+	}
+}
+
+impl Lock {
+	pub fn new(path: PathBuf) -> anyhow::Result<Self> {
+		Ok(Self {
+			_file: fs::OpenOptions::new().write(true).truncate(true).create(true).open(&path)?,
+			path,
+		})
+	}
+}
+
 impl Drop for Lock {
 	fn drop(&mut self) {
 		let _ = fs::remove_file(&self.path);
@@ -48,8 +67,9 @@ impl Drop for Lock {
 /// Defines the options available to resolve a naming conflict,
 /// i.e. how the application should proceed when a file exists
 /// but it should move/rename/copy some file to that existing path
-#[derive(Eq, PartialEq, Default, Debug, Clone, Deserialize, Serialize)]
+#[derive(Eq, Display, PartialEq, Default, Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all(serialize = "lowercase", deserialize = "lowercase"))]
+#[strum(serialize_all = "snake_case")]
 pub enum ConflictResolution {
 	Overwrite,
 	#[default]
@@ -110,18 +130,17 @@ impl ConflictResolution {
 
 			// 2. ACQUIRE A LOCK FOR THAT SPECIFIC PATH
 			// This is the most critical step. We lock a file corresponding to the path we *intend* to check.
-			let mut lock_path = path_to_try.as_os_str().to_owned();
-			lock_path.push(".lock");
-			let lock_path = PathBuf::from(lock_path);
 
-			if let Some(parent) = lock_path.parent() {
+			if let Some(parent) = path_to_try.parent() {
 				if fs::create_dir_all(parent).is_err() {
 					return None;
 				}
 			}
 
-			let lock = match fs::OpenOptions::new().write(true).truncate(true).create(true).open(&lock_path) {
-				Ok(file) => file,
+			let lock_path = path_to_try.with_added_extension(".lock");
+
+			let lock = match Lock::new(lock_path) {
+				Ok(lock) => lock,
 				Err(_) => return None, // Could not create lock file, abort.
 			};
 
@@ -147,11 +166,8 @@ impl ConflictResolution {
 					ConflictResolution::Overwrite => {
 						// The path exists and we will overwrite it. The reservation is valid.
 						return Some(GuardedPath {
-							path: path_to_try,
-							_lock: Some(Lock {
-								_file: lock,
-								path: lock_path,
-							}),
+							path: path_to_try.clean(),
+							_lock: Some(lock),
 						});
 					}
 					ConflictResolution::Rename => {
@@ -165,11 +181,8 @@ impl ConflictResolution {
 			} else {
 				// The path is free. The reservation is valid.
 				return Some(GuardedPath {
-					path: path_to_try,
-					_lock: Some(Lock {
-						_file: lock,
-						path: lock_path,
-					}),
+					path: path_to_try.clean(),
+					_lock: Some(lock),
 				});
 			}
 		}

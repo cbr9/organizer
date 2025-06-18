@@ -42,10 +42,16 @@ impl Filter for Content {
 
 		if let Some(content) = content_arc {
 			// The filter logic is updated to render each template before checking.
-			let tera_context = ctx.services.template_engine.context(res);
+			let context = ctx
+				.services
+				.template_engine
+				.context()
+				.path(res.path())
+				.root(res.root())
+				.build(&ctx.services.template_engine);
 			let contains_match = self.contains.is_empty()
 				|| self.contains.iter().any(
-					|template| match ctx.services.template_engine.render(template, &tera_context).unwrap_or_default() {
+					|template| match ctx.services.template_engine.render(template, &context).unwrap_or_default() {
 						Some(pattern) => content.contains(&pattern),
 						None => false,
 					},

@@ -26,16 +26,12 @@ pub struct Symlink {
 	enabled: bool,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Deserialize, Default, Serialize, Debug, Clone, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
 enum ContinueWith {
 	Original,
+	#[default]
 	Link,
-}
-
-impl Default for ContinueWith {
-	fn default() -> Self {
-		Self::Original
-	}
 }
 
 #[typetag::serde(name = "symlink")]

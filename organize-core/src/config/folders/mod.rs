@@ -23,23 +23,17 @@ pub struct FolderBuilder {
 }
 
 impl FolderBuilder {
-	pub fn build(
-		self,
-		index: usize,
-		defaults: &OptionsBuilder,
-		rule_options: &OptionsBuilder,
-		template_engine: &mut TemplateEngine,
-	) -> Result<Folder> {
+	pub fn build(self, index: usize, defaults: &OptionsBuilder, rule_options: &OptionsBuilder, mut engine: &mut TemplateEngine) -> Result<Folder> {
 		let path = {
-			let context = template_engine.empty_context();
-			template_engine
+			let context = engine.context().build(engine);
+			engine
 				.tera
 				.render_str(&self.root.text, &context)
 				.with_context(|| "cannot expand folder name")
 				.map(PathBuf::from)
 				.map(|p| p.expand_user().clean())?
 		};
-		let options = Options::compile(defaults, rule_options, &self.options);
+		let options = Options::compile(defaults, rule_options, &self.options, &mut engine, &path);
 		Ok(Folder { path, options, index })
 	}
 }

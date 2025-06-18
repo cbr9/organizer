@@ -24,7 +24,7 @@ impl Action for Move {
 		vec![&self.to]
 	}
 
-	#[tracing::instrument(ret(level = "info"), err(Debug), level = "debug", skip(ctx))]
+	#[tracing::instrument(name = "move", ret(level = "info"), err, level = "debug", skip(self, ctx, res), fields(if_exists = %self.on_conflict, path = %res.path().display()))]
 	fn execute(&self, res: &Resource, ctx: &ExecutionContext) -> Result<Option<PathBuf>> {
 		match prepare_target_path(&self.on_conflict, res, &self.to, true, ctx)? {
 			Some(target) => {
