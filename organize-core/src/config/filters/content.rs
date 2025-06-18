@@ -7,6 +7,7 @@ use crate::{
 	templates::template::Template,
 };
 use anyhow::Result;
+use gag::Gag;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use std::{panic::catch_unwind, path::Path, sync::Arc};
@@ -82,15 +83,15 @@ fn read_text(path: &Path) -> Result<Option<String>> {
 /// Extracts content from PDF files, with panic handling.
 fn read_pdf(path: &Path) -> Result<Option<String>> {
 	let result = catch_unwind(|| {
-		let bytes = std::fs::read(path).ok()?;
-		pdf_extract::extract_text_from_mem(&bytes).ok()
+		let _gag = Gag::stderr().unwrap();
+		pdf_extract::extract_text(&path).ok()
 	});
 
 	match result {
 		Ok(text) => Ok(text),
 		Err(_) => {
-			tracing::error!(
-				"The `pdf-extract` library panicked while processing: {}. The file may be severely malformed.",
+			tracing::warn!(
+				"Could not extract text from {}. The file may be malformed or it may have an unsupported encoding.",
 				path.display()
 			);
 			Ok(None)

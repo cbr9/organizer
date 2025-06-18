@@ -4,7 +4,7 @@ use anyhow::Result;
 
 use crate::{
 	config::{
-		actions::common::{ConflictResolution, PathReservation},
+		actions::common::{ConflictResolution, GuardedPath},
 		context::ExecutionContext,
 	},
 	resource::Resource,
@@ -19,7 +19,7 @@ pub fn prepare_target_path(
 	dest: &Template,
 	with_extension: bool,
 	ctx: &ExecutionContext,
-) -> Result<Option<PathReservation>> {
+) -> Result<Option<GuardedPath>> {
 	let context = ctx.services.template_engine.context(resource);
 	let rendered_dest = ctx.services.template_engine.render(dest, &context)?;
 	if rendered_dest.is_none() {
@@ -60,10 +60,7 @@ pub fn prepare_target_path(
 mod tests {
 	use super::*;
 	use crate::{
-		config::{
-			context::{ContextHarness, ExecutionContext, RunSettings},
-			variables::simple::SimpleVariable,
-		},
+		config::{context::ContextHarness, variables::simple::SimpleVariable},
 		templates::TemplateEngine,
 	};
 	use path_clean::PathClean;
@@ -92,7 +89,7 @@ mod tests {
 
 		let expected_filename = temp_file.path().file_name().unwrap();
 		let expected_path = PathBuf::from("/tmp/test_dir/").join(expected_filename).clean();
-		assert_eq!(result.map(|r| r.path.clean()), Some(expected_path));
+		assert_eq!(result.map(|r| r.as_path().clean()), Some(expected_path));
 	}
 
 	/// Tests the scenario where the destination is a directory and only the file's
@@ -114,7 +111,7 @@ mod tests {
 
 		let expected_filename = temp_file.path().file_stem().unwrap();
 		let expected_path = dest_dir.join(expected_filename);
-		assert_eq!(result.map(|r| r.path), Some(expected_path));
+		assert_eq!(result.map(|r| r.to_path_buf()), Some(expected_path));
 	}
 
 	/// Tests if the function correctly handles a destination path that is rendered
@@ -139,7 +136,7 @@ mod tests {
 
 		let expected_filename = temp_file.path().file_name().unwrap();
 		let expected_path = PathBuf::from("/tmp/rendered_dir").join(expected_filename);
-		assert_eq!(result.map(|r| r.path.clean()), Some(expected_path.clean()));
+		assert_eq!(result.map(|r| r.as_path().clean()), Some(expected_path.clean()));
 	}
 
 	/// Tests the `Skip` conflict resolution strategy.
@@ -174,7 +171,7 @@ mod tests {
 
 		let result = prepare_target_path(&ConflictResolution::Overwrite, &resource, &dest_template, true, &ctx).unwrap();
 
-		assert_eq!(result.map(|r| r.path), Some(temp_file.path().to_path_buf()));
+		assert_eq!(result.map(|r| r.to_path_buf()), Some(temp_file.path().to_path_buf()));
 	}
 
 	/// Tests the `Rename` conflict resolution strategy.
@@ -194,7 +191,7 @@ mod tests {
 		let extension = temp_file.path().extension().unwrap().to_str().unwrap();
 		let expected_path = temp_file.path().with_file_name(format!("{} (1).{}", file_stem, extension));
 
-		assert_eq!(result.map(|r| r.path), Some(expected_path));
+		assert_eq!(result.map(|r| r.to_path_buf()), Some(expected_path));
 	}
 
 	/// Tests the case where the destination is just a filename.
@@ -210,7 +207,7 @@ mod tests {
 
 		let result = prepare_target_path(&ConflictResolution::Skip, &resource, &dest_template, true, &ctx).unwrap();
 
-		assert_eq!(result.map(|r| r.path), Some(PathBuf::from("just_a_filename.txt")));
+		assert_eq!(result.map(|r| r.to_path_buf()), Some(PathBuf::from("just_a_filename.txt")));
 	}
 
 	/// Tests tilde expansion for the user's home directory.
@@ -228,7 +225,7 @@ mod tests {
 
 		let home_dir = dirs::home_dir().unwrap();
 		let expected_path = home_dir.join("test_dir/output.txt");
-		assert_eq!(result.map(|r| r.path), Some(expected_path));
+		assert_eq!(result.map(|r| r.to_path_buf()), Some(expected_path));
 	}
 
 	/// Tests Rename when multiple conflicting files exist.
@@ -248,7 +245,7 @@ mod tests {
 		let result = prepare_target_path(&ConflictResolution::Rename, &resource, &dest_template, true, &ctx).unwrap();
 
 		let expected_path = dir.path().join("file (2).txt");
-		assert_eq!(result.map(|r| r.path), Some(expected_path));
+		assert_eq!(result.map(|r| r.to_path_buf()), Some(expected_path));
 	}
 
 	/// Tests that an empty rendered template results in `None`.

@@ -16,8 +16,8 @@ use super::{common::ConflictResolution, Action};
 #[serde(deny_unknown_fields)]
 pub struct Hardlink {
 	to: Template,
-	#[serde(default)]
-	if_exists: ConflictResolution,
+	#[serde(default, rename = "if_exists")]
+	on_conflict: ConflictResolution,
 	#[serde(default)]
 	continue_with: ContinueWith,
 	#[serde(default = "enabled")]
@@ -44,14 +44,14 @@ impl Action for Hardlink {
 
 	#[tracing::instrument(ret(level = "info"), err(Debug), level = "debug", skip(ctx))]
 	fn execute(&self, res: &Resource, ctx: &ExecutionContext) -> Result<Option<PathBuf>> {
-		match prepare_target_path(&self.if_exists, res, &self.to, true, ctx)? {
-			Some(reservation) => {
+		match prepare_target_path(&self.on_conflict, res, &self.to, true, ctx)? {
+			Some(target) => {
 				if !ctx.settings.dry_run && self.enabled {
-					std::fs::hard_link(res.path(), &reservation.path)
-						.with_context(|| format!("could not create hardlink ({} -> {})", res.path().display(), reservation.path.display()))?;
+					std::fs::hard_link(res.path(), &target)
+						.with_context(|| format!("could not create hardlink ({} -> {})", res.path().display(), target.display()))?;
 				}
 				if self.continue_with == ContinueWith::Link && self.enabled {
-					Ok(Some(reservation.path))
+					Ok(Some(target.to_path_buf()))
 				} else {
 					Ok(Some(res.path().to_path_buf()))
 				}

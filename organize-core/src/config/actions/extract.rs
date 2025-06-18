@@ -15,8 +15,8 @@ use crate::config::actions::common::enabled;
 #[serde(deny_unknown_fields)]
 pub struct Extract {
 	pub to: Template,
-	#[serde(default)]
-	pub if_exists: ConflictResolution,
+	#[serde(default, rename = "if_exists")]
+	pub on_conflict: ConflictResolution,
 	#[serde(default = "enabled")]
 	enabled: bool,
 }
@@ -29,14 +29,14 @@ impl Action for Extract {
 
 	#[tracing::instrument(ret(level = "info"), err(Debug), level = "debug", skip(ctx))]
 	fn execute(&self, res: &Resource, ctx: &ExecutionContext) -> Result<Option<PathBuf>> {
-		match prepare_target_path(&self.if_exists, res, &self.to, false, ctx)? {
-			Some(reservation) => {
+		match prepare_target_path(&self.on_conflict, res, &self.to, false, ctx)? {
+			Some(target) => {
 				if !ctx.settings.dry_run && self.enabled {
 					let file = File::open(res.path())?;
 					let mut archive = zip::ZipArchive::new(file)?;
-					archive.extract(&reservation.path)?;
+					archive.extract(&target)?;
 
-					let content = fs::read_dir(&reservation.path)?.flatten().collect_vec();
+					let content = fs::read_dir(&target)?.flatten().collect_vec();
 					if content.len() == 1 {
 						if let Some(dir) = content.first() {
 							let dir = dir.path();
@@ -45,7 +45,7 @@ impl Action for Extract {
 								let components = dir.components().collect_vec();
 								for entry in inner_content {
 									let mut new_path: PathBuf = entry.path().components().filter(|c| !components.contains(c)).collect();
-									new_path = reservation.path.join(new_path);
+									new_path = target.join(new_path);
 									std::fs::rename(entry.path(), new_path)?;
 								}
 								std::fs::remove_dir(dir)?;
@@ -53,7 +53,7 @@ impl Action for Extract {
 						}
 					}
 				}
-				Ok(Some(reservation.path))
+				Ok(Some(target.to_path_buf()))
 			}
 			None => Ok(None),
 		}

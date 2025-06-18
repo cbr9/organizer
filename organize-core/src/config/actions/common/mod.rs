@@ -8,9 +8,29 @@ use serde::{Deserialize, Serialize};
 /// The OS-level lock is held as long as this struct exists, and it is released when dropped.
 /// This prevents race conditions without creating orphaned placeholder files.
 #[derive(Debug)]
-pub struct PathReservation {
-	pub path: PathBuf,
+pub struct GuardedPath {
+	path: PathBuf,
 	_lock: Option<Lock>, // The locked file handle. Its existence in the struct keeps the lock alive.
+}
+
+impl std::ops::Deref for GuardedPath {
+	type Target = PathBuf;
+
+	fn deref(&self) -> &Self::Target {
+		&self.path
+	}
+}
+
+impl GuardedPath {
+	pub fn to_path_buf(self) -> PathBuf {
+		self.path
+	}
+}
+
+impl AsRef<Path> for GuardedPath {
+	fn as_ref(&self) -> &Path {
+		self.path.as_path()
+	}
 }
 
 #[derive(Debug)]
@@ -64,10 +84,10 @@ impl ConflictResolution {
 	/// Simulates the resolution of a naming conflict without any filesystem side effects.
 	/// This is suitable for a dry run.
 	#[tracing::instrument(ret, level = "debug")]
-	pub fn resolve<T: AsRef<Path> + std::fmt::Debug>(&self, target_path: T) -> Option<PathReservation> {
+	pub fn resolve<T: AsRef<Path> + std::fmt::Debug>(&self, target_path: T) -> Option<GuardedPath> {
 		let path = target_path.as_ref().to_path_buf();
 		if !path.exists() {
-			return Some(PathReservation { path, _lock: None });
+			return Some(GuardedPath { path, _lock: None });
 		}
 
 		let path = match self {
@@ -76,11 +96,11 @@ impl ConflictResolution {
 			ConflictResolution::Rename => get_renamed_path(path),
 		};
 
-		Some(PathReservation { path, _lock: None })
+		Some(GuardedPath { path, _lock: None })
 	}
 
 	#[tracing::instrument(ret, level = "debug")]
-	pub fn resolve_atomic<T: AsRef<Path> + std::fmt::Debug>(&self, target_path: T) -> Option<PathReservation> {
+	pub fn resolve_atomic<T: AsRef<Path> + std::fmt::Debug>(&self, target_path: T) -> Option<GuardedPath> {
 		let mut path_to_try = target_path.as_ref().to_path_buf();
 
 		loop {
@@ -126,7 +146,7 @@ impl ConflictResolution {
 					ConflictResolution::Skip => return None, // Release lock by returning
 					ConflictResolution::Overwrite => {
 						// The path exists and we will overwrite it. The reservation is valid.
-						return Some(PathReservation {
+						return Some(GuardedPath {
 							path: path_to_try,
 							_lock: Some(Lock {
 								_file: lock,
@@ -144,7 +164,7 @@ impl ConflictResolution {
 				}
 			} else {
 				// The path is free. The reservation is valid.
-				return Some(PathReservation {
+				return Some(GuardedPath {
 					path: path_to_try,
 					_lock: Some(Lock {
 						_file: lock,

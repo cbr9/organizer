@@ -16,8 +16,8 @@ use super::{common::ConflictResolution, Action};
 #[serde(deny_unknown_fields)]
 pub struct Symlink {
 	to: Template,
-	#[serde(default)]
-	if_exists: ConflictResolution,
+	#[serde(default, rename = "if_exists")]
+	on_conflict: ConflictResolution,
 	#[serde(default)]
 	confirm: bool,
 	#[serde(default)]
@@ -46,13 +46,13 @@ impl Action for Symlink {
 
 	#[tracing::instrument(ret(level = "info"), err(Debug), level = "debug", skip(ctx))]
 	fn execute(&self, res: &Resource, ctx: &ExecutionContext) -> Result<Option<PathBuf>> {
-		match prepare_target_path(&self.if_exists, res, &self.to, true, ctx)? {
-			Some(reservation) => {
+		match prepare_target_path(&self.on_conflict, res, &self.to, true, ctx)? {
+			Some(target) => {
 				if !ctx.settings.dry_run && self.enabled {
-					Self::atomic(res.path(), &reservation.path).with_context(|| "Failed to symlink file")?;
+					Self::atomic(res.path(), &target).with_context(|| "Failed to symlink file")?;
 				}
 				if self.continue_with == ContinueWith::Link && self.enabled {
-					Ok(Some(reservation.path))
+					Ok(Some(target.to_path_buf()))
 				} else {
 					Ok(Some(res.path().to_path_buf()))
 				}
