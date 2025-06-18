@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::templates::TemplateEngine;
 
@@ -19,6 +19,7 @@ pub struct RuleBuilder {
 	#[serde(default)]
 	pub tags: HashSet<String>,
 	pub actions: Vec<Box<dyn Action>>,
+	#[serde(default)]
 	pub filters: Vec<Box<dyn Filter>>,
 	pub folders: Vec<FolderBuilder>,
 	#[serde(flatten)]
@@ -76,7 +77,7 @@ impl RuleBuilder {
 	}
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, Serialize, PartialEq, Clone)]
 pub struct Rule {
 	pub index: usize,
 	pub id: Option<String>,

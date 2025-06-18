@@ -5,7 +5,7 @@ use dyn_clone::DynClone;
 use dyn_eq::DynEq;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 
-use crate::{config::context::ExecutionContext, resource::Resource, templates::template::Template};
+use crate::{config::context::ExecutionContext, errors::ActionError, resource::Resource, templates::template::Template};
 
 pub mod common;
 pub mod copy;
@@ -37,7 +37,7 @@ pub trait Action: DynEq + DynClone + Sync + Send + Debug {
 		ExecutionModel::default()
 	}
 
-	fn execute(&self, _res: &Resource, _ctx: &ExecutionContext) -> Result<Option<PathBuf>> {
+	fn execute(&self, _res: &Resource, _ctx: &ExecutionContext) -> Result<Option<PathBuf>, ActionError> {
 		unimplemented!("This action has not implemented `execute`.")
 	}
 

@@ -4,12 +4,15 @@ use std::{
 	str::FromStr,
 };
 
-use crate::config::{actions::common::enabled, context::ExecutionContext};
+use crate::{
+	config::{actions::common::enabled, context::ExecutionContext},
+	errors::{ActionError, ErrorContext},
+};
 use serde::{Deserialize, Serialize};
 use tempfile;
 
 use crate::{config::filters::Filter, resource::Resource, templates::template::Template};
-use anyhow::{bail, Result};
+use anyhow::Result;
 
 use super::{Action, ExecutionModel};
 
@@ -41,10 +44,7 @@ impl Action for Script {
 	}
 
 	#[tracing::instrument(ret(level = "info"), err(Debug), level = "debug", skip(ctx))]
-	fn execute(&self, res: &Resource, ctx: &ExecutionContext) -> Result<Option<PathBuf>> {
-		if ctx.settings.dry_run {
-			bail!("Cannot run scripted actions during a dry run")
-		}
+	fn execute(&self, res: &Resource, ctx: &ExecutionContext) -> Result<Option<PathBuf>, ActionError> {
 		if self.enabled {
 			return self.run_script(res, ctx).map(|output| {
 				let output = String::from_utf8_lossy(&output.stdout);
@@ -70,7 +70,9 @@ impl Filter for Script {
 				let out = String::from_utf8_lossy(&output.stdout);
 				out.lines().last().map(|last| {
 					let last = last.trim().to_lowercase();
-					bool::from_str(&last).expect("Filter script did not output a valid boolean to stdout")
+					bool::from_str(&last)
+						.inspect_err(|e| tracing::warn!("Filter script did not output a valid boolean to stdout: {}", e))
+						.unwrap_or(false)
 				})
 			})
 			.ok()
@@ -90,9 +92,16 @@ impl Script {
 		}
 	}
 
-	fn write(&self, res: &Resource, ctx: &ExecutionContext) -> anyhow::Result<PathBuf> {
-		let script = tempfile::NamedTempFile::new()?;
+	fn write(&self, res: &Resource, ctx: &ExecutionContext) -> Result<PathBuf, ActionError> {
+		let script = tempfile::NamedTempFile::new().map_err(|e| ActionError::Io {
+			source: e,
+			path: res.path().to_path_buf(),
+			target: None,
+			context: ErrorContext::from_scope(&ctx.scope),
+		})?;
+
 		let script_path = script.into_temp_path().to_path_buf();
+
 		let context = ctx
 			.services
 			.template_engine
@@ -100,20 +109,46 @@ impl Script {
 			.path(res.path())
 			.root(res.root())
 			.build(&ctx.services.template_engine);
-		if let Some(content) = ctx.services.template_engine.render(&self.content, &context)? {
-			std::fs::write(&script_path, content)?;
+
+		let maybe_rendered = ctx
+			.services
+			.template_engine
+			.render(&self.content, &context)
+			.map_err(|e| ActionError::Template {
+				source: e,
+				template: self.content.clone(),
+				context: ErrorContext::from_scope(&ctx.scope),
+			})?;
+
+		if let Some(content) = maybe_rendered {
+			std::fs::write(&script_path, content).map_err(|e| ActionError::Io {
+				source: e,
+				path: res.path().to_path_buf(),
+				target: None,
+				context: ErrorContext::from_scope(&ctx.scope),
+			})?;
 		}
 		Ok(script_path)
 	}
 
-	fn run_script(&self, res: &Resource, ctx: &ExecutionContext) -> anyhow::Result<Output> {
+	fn run_script(&self, res: &Resource, ctx: &ExecutionContext) -> anyhow::Result<Output, ActionError> {
 		let script = self.write(res, ctx)?;
 		let output = Command::new(&self.exec)
 			.args(self.args.as_slice())
 			.arg(&script)
 			.stdout(Stdio::piped())
-			.spawn()?
-			.wait_with_output()?;
+			.spawn()
+			.map_err(|e| ActionError::Script {
+				source: e,
+				script: script.clone(),
+				context: ErrorContext::from_scope(&ctx.scope),
+			})?
+			.wait_with_output()
+			.map_err(|e| ActionError::Script {
+				source: e,
+				script: script.clone(),
+				context: ErrorContext::from_scope(&ctx.scope),
+			})?;
 		Ok(output)
 	}
 }

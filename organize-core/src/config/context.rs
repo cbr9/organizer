@@ -45,7 +45,7 @@ pub struct ExecutionScope<'a> {
 }
 
 /// The top-level context object, composed of the three distinct categories of information.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct ExecutionContext<'a> {
 	pub services: &'a RunServices,
 	pub scope: ExecutionScope<'a>,

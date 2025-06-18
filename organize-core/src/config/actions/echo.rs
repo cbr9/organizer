@@ -1,6 +1,9 @@
 use std::path::PathBuf;
 
-use crate::config::{actions::common::enabled, context::ExecutionContext};
+use crate::{
+	config::{actions::common::enabled, context::ExecutionContext},
+	errors::{ActionError, ErrorContext},
+};
 use serde::{Deserialize, Serialize};
 
 use crate::{resource::Resource, templates::template::Template};
@@ -23,7 +26,7 @@ impl Action for Echo {
 	}
 
 	#[tracing::instrument(ret(level = "info"), err(Debug), level = "debug", skip(ctx))]
-	fn execute(&self, res: &Resource, ctx: &ExecutionContext) -> Result<Option<PathBuf>> {
+	fn execute(&self, res: &Resource, ctx: &ExecutionContext) -> Result<Option<PathBuf>, ActionError> {
 		if self.enabled {
 			let context = ctx
 				.services
@@ -33,14 +36,15 @@ impl Action for Echo {
 				.root(res.root())
 				.build(&ctx.services.template_engine);
 
-			if let Some(message) = ctx
-				.services
+			ctx.services
 				.template_engine
 				.render(&self.message, &context)
-				.map_err(anyhow::Error::msg)?
-			{
-				tracing::info!("{}", message);
-			}
+				.map_err(|e| ActionError::Template {
+					source: e,
+					template: self.message.clone(),
+					context: ErrorContext::from_scope(&ctx.scope),
+				})?
+				.inspect(|message| tracing::info!("{}", message));
 		}
 		Ok(Some(res.path().to_path_buf()))
 	}

@@ -49,7 +49,7 @@ struct AnyOf {
 impl Filter for AnyOf {
 	#[tracing::instrument(ret, level = "debug", skip(ctx))]
 	fn filter(&self, res: &Resource, ctx: &ExecutionContext) -> bool {
-		self.filters.par_iter().any(|f| f.filter(res, ctx))
+		self.filters.iter().any(|f| f.filter(res, ctx))
 	}
 
 	fn templates(&self) -> Vec<&Template> {
@@ -83,7 +83,7 @@ struct NoneOf {
 impl Filter for NoneOf {
 	#[tracing::instrument(ret, level = "debug", skip(ctx))]
 	fn filter(&self, res: &Resource, ctx: &ExecutionContext) -> bool {
-		!self.filters.par_iter().any(|f| f.filter(res, ctx))
+		!self.filters.iter().any(|f| f.filter(res, ctx))
 	}
 
 	fn templates(&self) -> Vec<&Template> {

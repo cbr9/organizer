@@ -1,10 +1,11 @@
 use std::path::PathBuf;
 
-use anyhow::{Context as _, Result};
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
 use crate::{
 	config::{actions::common::enabled, context::ExecutionContext},
+	errors::{ActionError, ErrorContext},
 	path::prepare::prepare_target_path,
 	resource::Resource,
 	templates::template::Template,
@@ -39,12 +40,16 @@ impl Action for Hardlink {
 	}
 
 	#[tracing::instrument(ret(level = "info"), err(Debug), level = "debug", skip(ctx))]
-	fn execute(&self, res: &Resource, ctx: &ExecutionContext) -> Result<Option<PathBuf>> {
+	fn execute(&self, res: &Resource, ctx: &ExecutionContext) -> Result<Option<PathBuf>, ActionError> {
 		match prepare_target_path(&self.on_conflict, res, &self.to, true, ctx)? {
 			Some(target) => {
 				if !ctx.settings.dry_run && self.enabled {
-					std::fs::hard_link(res.path(), &target)
-						.with_context(|| format!("could not create hardlink ({} -> {})", res.path().display(), target.display()))?;
+					std::fs::hard_link(res.path(), &target).map_err(|e| ActionError::Io {
+						source: e,
+						path: res.path().to_path_buf(),
+						target: Some(target.clone().to_path_buf()),
+						context: ErrorContext::from_scope(&ctx.scope),
+					})?;
 				}
 				if self.continue_with == ContinueWith::Link && self.enabled {
 					Ok(Some(target.to_path_buf()))

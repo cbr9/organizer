@@ -1,4 +1,3 @@
-use itertools::Itertools;
 use std::{
 	collections::HashMap,
 	path::PathBuf,
@@ -6,8 +5,11 @@ use std::{
 	sync::{Arc, RwLock},
 };
 
-use crate::config::{actions::common::enabled, context::ExecutionContext};
-use anyhow::{bail, Result};
+use crate::{
+	config::{actions::common::enabled, context::ExecutionContext},
+	errors::{ActionError, ErrorContext},
+};
+use anyhow::Result;
 use lettre::{
 	message::{header::ContentType, Attachment, Mailbox, MessageBuilder, MultiPart, SinglePart},
 	transport::smtp::authentication::Credentials,
@@ -15,6 +17,7 @@ use lettre::{
 	Transport,
 };
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
 
 use crate::{resource::Resource, templates::template::Template};
 
@@ -35,9 +38,31 @@ pub struct Email {
 	pub enabled: bool,
 }
 
+// An error type specific to the Email action
+#[derive(Error, Debug)]
+pub enum EmailError {
+	#[error("SMTP connection failed")]
+	SmtpFailure(#[from] lettre::transport::smtp::Error),
+
+	#[error("Could not get credentials from `password_cmd`")]
+	Credentials(#[from] std::io::Error),
+
+	#[error("Invalid password_cmd: '{0}'")]
+	InvalidPasswordCommand(String),
+
+	#[error("Invalid password: password cannot be empty")]
+	InvalidPassword(#[from] std::string::FromUtf8Error),
+
+	#[error(transparent)]
+	EmailError(#[from] lettre::error::Error),
+
+	#[error("Could not acquire cached credentials")]
+	Cache,
+}
+
 impl Email {
 	#[tracing::instrument(err)]
-	fn get_or_insert_credentials(&self, cache: &Arc<RwLock<HashMap<Mailbox, Credentials>>>) -> anyhow::Result<Credentials> {
+	fn get_or_insert_credentials(&self, cache: &Arc<RwLock<HashMap<Mailbox, Credentials>>>) -> Result<Credentials, EmailError> {
 		if let Ok(reader) = cache.read() {
 			if let Some(creds) = reader.get(&self.sender) {
 				return Ok(creds.clone());
@@ -50,13 +75,17 @@ impl Email {
 			if let Some(creds) = writer.get(&self.sender) {
 				return Ok(creds.clone());
 			}
-			let command_and_args = self.password_cmd.split(" ").collect_vec();
-			let executable = command_and_args[0];
+			let parts = shlex::split(&self.password_cmd).ok_or_else(|| EmailError::InvalidPasswordCommand(self.password_cmd.clone()))?;
 
-			let args = &command_and_args[1..];
-			let mut command = Command::new(executable);
-			let output = command.args(args).output()?;
-			let password = String::from_utf8(output.stdout)?.trim().to_string();
+			if parts.is_empty() {
+				return Err(EmailError::InvalidPasswordCommand("password command cannot be empty".to_string()));
+			}
+
+			let executable = &parts[0];
+			let args = &parts[1..];
+
+			let output = Command::new(executable).args(args).output().map_err(EmailError::Credentials)?;
+			let password = String::from_utf8(output.stdout).map_err(EmailError::InvalidPassword)?;
 			let creds = Credentials::new(self.sender.email.to_string(), password);
 
 			// Insert the new credentials into the cache.
@@ -64,7 +93,8 @@ impl Email {
 
 			return Ok(creds);
 		}
-		bail!("Could not acquire email cache")
+
+		Err(EmailError::Cache)
 	}
 }
 
@@ -82,7 +112,7 @@ impl Action for Email {
 	}
 
 	#[tracing::instrument(ret(level = "info"), err(Debug), level = "debug", skip(ctx))]
-	fn execute(&self, res: &Resource, ctx: &ExecutionContext) -> Result<Option<PathBuf>> {
+	fn execute(&self, res: &Resource, ctx: &ExecutionContext) -> Result<Option<PathBuf>, ActionError> {
 		if !ctx.settings.dry_run && self.enabled {
 			let mut email = MessageBuilder::new()
 				.from(self.sender.clone())
@@ -96,9 +126,20 @@ impl Action for Email {
 				.path(res.path())
 				.root(res.root())
 				.build(&ctx.services.template_engine);
+
 			if let Some(subject) = &self.subject {
-				if let Some(subject) = ctx.services.template_engine.render(subject, &context)? {
-					email = email.subject(subject);
+				let maybe_rendered = ctx
+					.services
+					.template_engine
+					.render(subject, &context)
+					.map_err(|e| ActionError::Template {
+						source: e,
+						template: subject.clone(),
+						context: ErrorContext::from_scope(&ctx.scope),
+					})?;
+
+				if let Some(rendered) = maybe_rendered {
+					email = email.subject(rendered);
 				}
 			}
 
@@ -106,14 +147,29 @@ impl Action for Email {
 
 			// Add body if it exists
 			if let Some(body) = &self.body {
-				if let Some(body) = ctx.services.template_engine.render(body, &context)? {
-					multipart = multipart.singlepart(SinglePart::plain(body));
+				let maybe_rendered = ctx
+					.services
+					.template_engine
+					.render(body, &context)
+					.map_err(|e| ActionError::Template {
+						source: e,
+						template: body.clone(),
+						context: ErrorContext::from_scope(&ctx.scope),
+					})?;
+
+				if let Some(rendered) = maybe_rendered {
+					multipart = multipart.singlepart(SinglePart::plain(rendered));
 				}
 			}
 
 			if self.attach {
 				if let Some(mime) = mime_guess::from_path(res.path()).first() {
-					let content = std::fs::read(res.path())?;
+					let content = std::fs::read(res.path()).map_err(|e| ActionError::Io {
+						source: e,
+						path: res.path().to_path_buf(),
+						target: None,
+						context: ErrorContext::from_scope(&ctx.scope),
+					})?;
 					let content_type = ContentType::from(mime);
 					let attachment = Attachment::new(res.path().file_name().unwrap().to_string_lossy().to_string()).body(content, content_type);
 
@@ -121,22 +177,32 @@ impl Action for Email {
 				}
 			};
 
-			let email = email.multipart(multipart)?;
+			let email = email.multipart(multipart).map_err(|e| ActionError::Email {
+				source: EmailError::EmailError(e),
+				context: ErrorContext::from_scope(&ctx.scope),
+			})?;
 
-			let creds = self.get_or_insert_credentials(&ctx.services.credential_cache)?;
-			let mailer = SmtpTransport::relay(&self.smtp_server).unwrap().credentials(creds).build();
+			let creds = self
+				.get_or_insert_credentials(&ctx.services.credential_cache)
+				.map_err(|e| ActionError::Email {
+					source: e,
+					context: ErrorContext::from_scope(&ctx.scope),
+				})?;
 
-			if let Err(e) = mailer.send(&email) {
-				tracing::error!(
-					rule = ctx.scope.rule.id.as_deref().unwrap_or("untitled"),
-					rule_idx = ctx.scope.rule.index,
-					folder_idx = ctx.scope.folder.index,
-					"Could not send email: {:?}",
-					e
-				);
-				return Ok(None);
-			};
+			let mailer = SmtpTransport::relay(&self.smtp_server)
+				.map_err(|e| ActionError::Email {
+					source: EmailError::SmtpFailure(e),
+					context: ErrorContext::from_scope(&ctx.scope),
+				})?
+				.credentials(creds)
+				.build();
+
+			let _response = mailer.send(&email).map_err(|e| ActionError::Email {
+				source: EmailError::SmtpFailure(e),
+				context: ErrorContext::from_scope(&ctx.scope),
+			})?;
 		}
+
 		Ok(Some(res.path().to_path_buf()))
 	}
 }

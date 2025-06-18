@@ -15,7 +15,7 @@ pub struct OptionsBuilder {
 	pub target: Option<Target>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Serialize, Clone, PartialEq, Eq)]
 pub struct Options {
 	pub max_depth: usize,
 	pub min_depth: usize,

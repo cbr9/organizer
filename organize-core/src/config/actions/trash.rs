@@ -2,6 +2,7 @@ use std::path::PathBuf;
 
 use crate::{
 	config::{actions::common::enabled, context::ExecutionContext},
+	errors::{ActionError, ErrorContext},
 	resource::Resource,
 	templates::template::Template,
 };
@@ -24,9 +25,13 @@ impl Action for Trash {
 	}
 
 	#[tracing::instrument(ret(level = "info"), err(Debug), level = "debug", skip(ctx))]
-	fn execute(&self, res: &Resource, ctx: &ExecutionContext) -> Result<Option<PathBuf>> {
+	fn execute(&self, res: &Resource, ctx: &ExecutionContext) -> Result<Option<PathBuf>, ActionError> {
 		if !ctx.settings.dry_run && self.enabled {
-			trash::delete(res.path())?;
+			trash::delete(res.path()).map_err(|e| ActionError::Trash {
+				source: e,
+				path: res.path().to_path_buf(),
+				context: ErrorContext::from_scope(&ctx.scope),
+			})?;
 		}
 		Ok(None)
 	}

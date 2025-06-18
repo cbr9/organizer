@@ -7,6 +7,7 @@ use crate::{
 		actions::common::{ConflictResolution, GuardedPath},
 		context::ExecutionContext,
 	},
+	errors::{ActionError, ErrorContext},
 	resource::Resource,
 	templates::template::Template,
 };
@@ -19,7 +20,7 @@ pub fn prepare_target_path(
 	dest: &Template,
 	with_extension: bool,
 	ctx: &ExecutionContext,
-) -> Result<Option<GuardedPath>> {
+) -> Result<Option<GuardedPath>, ActionError> {
 	let context = ctx
 		.services
 		.template_engine
@@ -27,12 +28,20 @@ pub fn prepare_target_path(
 		.path(res.path())
 		.root(res.root())
 		.build(&ctx.services.template_engine);
-	let rendered_dest = ctx.services.template_engine.render(dest, &context)?;
-	if rendered_dest.is_none() {
+
+	let Some(mut target_path) = ctx
+		.services
+		.template_engine
+		.render(dest, &context)
+		.map_err(|e| ActionError::Template {
+			source: e,
+			template: dest.clone(),
+			context: ErrorContext::from_scope(&ctx.scope),
+		})?
+		.map(|s| PathBuf::from(s).expand_user())
+	else {
 		return Ok(None);
-	}
-	let rendered_dest = rendered_dest.unwrap();
-	let mut target_path = PathBuf::from(rendered_dest).expand_user();
+	};
 
 	let path = &res.path();
 

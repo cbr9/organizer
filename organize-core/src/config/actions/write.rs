@@ -89,8 +89,12 @@ impl Action for Write {
 					std::fs::create_dir_all(parent)?;
 				}
 
-				let original_content = std::fs::read_to_string(path)?;
-				let mut file = OpenOptions::new().truncate(true).read(true).write(true).open(path)?;
+				let mut file = OpenOptions::new()
+					.create(true)
+					.truncate(true)
+					.read(true)
+					.write(true)
+					.open(path)?;
 
 				if self.sort_lines {
 					texts.sort_by_key(|a| a.to_lowercase());
@@ -102,10 +106,12 @@ impl Action for Write {
 
 				match self.mode {
 					WriteMode::Append => {
+						let original_content = std::fs::read_to_string(path)?;
 						file.write_all(original_content.as_bytes())?;
 						file.write_all(texts.join("\n").as_bytes())?;
 					}
 					WriteMode::Prepend => {
+						let original_content = std::fs::read_to_string(path)?;
 						file.write_all(texts.join("\n").as_bytes())?;
 						if !original_content.is_empty() {
 							file.write_all(b"\n")?;

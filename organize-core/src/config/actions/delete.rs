@@ -1,7 +1,12 @@
 use std::path::PathBuf;
 
-use crate::{config::context::ExecutionContext, resource::Resource, templates::template::Template};
-use anyhow::{Context as _, Result};
+use crate::{
+	config::context::ExecutionContext,
+	errors::{ActionError, ErrorContext},
+	resource::Resource,
+	templates::template::Template,
+};
+use anyhow::Result;
 use dialoguer::{theme::ColorfulTheme, Confirm};
 use serde::{Deserialize, Serialize};
 
@@ -31,13 +36,21 @@ impl Action for Delete {
 	}
 
 	#[tracing::instrument(ret(level = "info"), err(Debug), level = "debug", skip(ctx))]
-	fn execute(&self, res: &Resource, ctx: &ExecutionContext) -> Result<Option<PathBuf>> {
+	fn execute(&self, res: &Resource, ctx: &ExecutionContext) -> Result<Option<PathBuf>, ActionError> {
 		if !ctx.settings.dry_run && self.enabled {
 			if self.confirm {
+				let prompt = format!("Delete {}?", res.path().display());
 				let confirmed = Confirm::with_theme(&ColorfulTheme::default())
-					.with_prompt(format!("Delete {}?", res.path().display()))
+					.with_prompt(&prompt)
 					.default(false)
-					.interact()?;
+					.interact()
+					.map_err(|e| ActionError::Interaction {
+						source: e,
+						prompt: prompt,
+						context: ErrorContext::from_scope(&ctx.scope),
+					})
+					.inspect_err(|e| tracing::error!(error = ?e))
+					.unwrap_or(false);
 
 				if !confirmed {
 					// If the user does not confirm, we pass the resource through to the next action.
@@ -46,11 +59,19 @@ impl Action for Delete {
 			}
 
 			if res.path().is_file() {
-				std::fs::remove_file(res.path()).with_context(|| format!("could not delete {}", &res.path().display()))?;
-			}
-
-			if res.path().is_dir() {
-				std::fs::remove_dir_all(res.path()).with_context(|| format!("could not delete {}", &res.path().display()))?;
+				std::fs::remove_file(res.path()).map_err(|e| ActionError::Io {
+					source: e,
+					path: res.path().to_path_buf(),
+					target: None,
+					context: ErrorContext::from_scope(&ctx.scope),
+				})?;
+			} else {
+				std::fs::remove_dir_all(res.path()).map_err(|e| ActionError::Io {
+					source: e,
+					path: res.path().to_path_buf(),
+					target: None,
+					context: ErrorContext::from_scope(&ctx.scope),
+				})?;
 			}
 		}
 		Ok(None)

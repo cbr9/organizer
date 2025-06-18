@@ -39,7 +39,7 @@ impl FolderBuilder {
 }
 
 /// The final, compiled `Folder` object, ready for execution.
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, Serialize, PartialEq, Clone)]
 pub struct Folder {
 	pub index: usize,
 	pub path: PathBuf,

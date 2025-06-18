@@ -36,7 +36,7 @@ impl AsRef<Path> for GuardedPath {
 }
 
 #[derive(Debug)]
-pub struct Lock {
+struct Lock {
 	_file: File,
 	path: PathBuf,
 }
@@ -50,7 +50,8 @@ impl std::ops::Deref for Lock {
 }
 
 impl Lock {
-	pub fn new(path: PathBuf) -> anyhow::Result<Self> {
+	fn new(path: impl AsRef<Path>) -> anyhow::Result<Self> {
+		let path = path.as_ref().with_added_extension("lock");
 		Ok(Self {
 			_file: fs::OpenOptions::new().write(true).truncate(true).create(true).open(&path)?,
 			path,
@@ -137,12 +138,7 @@ impl ConflictResolution {
 				}
 			}
 
-			let lock_path = path_to_try.with_added_extension(".lock");
-
-			let lock = match Lock::new(lock_path) {
-				Ok(lock) => lock,
-				Err(_) => return None, // Could not create lock file, abort.
-			};
+			let lock = Lock::new(&path_to_try).ok()?;
 
 			if lock.lock().is_err() {
 				// Could not get the lock. This means another thread is currently processing this exact path.
@@ -185,34 +181,6 @@ impl ConflictResolution {
 					_lock: Some(lock),
 				});
 			}
-		}
-	}
-}
-
-#[tracing::instrument(ret, level = "debug")]
-pub fn resolve_naming_conflict<T: AsRef<Path> + std::fmt::Debug>(strategy: &ConflictResolution, target_path: T) -> Option<PathBuf> {
-	use ConflictResolution::*;
-	let mut path = target_path.as_ref().to_path_buf();
-	if !path.exists() {
-		return Some(path);
-	}
-	match strategy {
-		Skip => None,
-		Overwrite => Some(path),
-		Rename => {
-			let counter_separator = " ";
-			let extension = path.extension().unwrap_or_default().to_string_lossy().to_string();
-			let stem = path.file_stem()?.to_string_lossy().to_string();
-			let mut n = 1;
-			while path.exists() {
-				if extension.is_empty() {
-					path.set_file_name(format!("{stem}{counter_separator}({n:?})"));
-				} else {
-					path.set_file_name(format!("{stem}{counter_separator}({n:?}).{extension}"));
-				}
-				n += 1;
-			}
-			Some(path)
 		}
 	}
 }

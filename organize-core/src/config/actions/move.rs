@@ -1,7 +1,10 @@
 use std::path::PathBuf;
 
-use crate::config::{actions::common::enabled, context::ExecutionContext};
-use anyhow::{Context as ErrorContext, Result};
+use crate::{
+	config::{actions::common::enabled, context::ExecutionContext},
+	errors::{ActionError, ErrorContext},
+};
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
 use crate::{path::prepare::prepare_target_path, resource::Resource, templates::template::Template};
@@ -24,13 +27,17 @@ impl Action for Move {
 		vec![&self.to]
 	}
 
-	#[tracing::instrument(name = "move", ret(level = "info"), err, level = "debug", skip(self, ctx, res), fields(if_exists = %self.on_conflict, path = %res.path().display()))]
-	fn execute(&self, res: &Resource, ctx: &ExecutionContext) -> Result<Option<PathBuf>> {
+	#[tracing::instrument(name = "move", ret(level = "info"), err, level = "debug", skip(self, ctx, ), fields(if_exists = %self.on_conflict, path = %res.path().display()))]
+	fn execute(&self, res: &Resource, ctx: &ExecutionContext) -> Result<Option<PathBuf>, ActionError> {
 		match prepare_target_path(&self.on_conflict, res, &self.to, true, ctx)? {
 			Some(target) => {
 				if !ctx.settings.dry_run && self.enabled {
-					std::fs::rename(res.path(), &target)
-						.with_context(|| format!("Could not move {} -> {}", res.path().display(), target.display()))?;
+					std::fs::rename(res.path(), &target).map_err(|e| ActionError::Io {
+						source: e,
+						path: res.path().to_path_buf(),
+						target: Some(target.clone().to_path_buf()),
+						context: ErrorContext::from_scope(&ctx.scope),
+					})?;
 				}
 				Ok(Some(target.to_path_buf()))
 			}
