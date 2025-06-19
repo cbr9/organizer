@@ -3,10 +3,10 @@ use crate::{
 		context::ExecutionContext,
 		filters::{regex::RegexSet, Filter},
 	},
-	resource::Resource,
-	templates::template::Template,
+	templates::{template::Template, Context},
 };
 use anyhow::Result;
+use async_trait::async_trait;
 use gag::Gag;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
@@ -21,21 +21,22 @@ pub struct Content {
 	matches: RegexSet,
 }
 
+#[async_trait]
 #[typetag::serde(name = "content")]
 impl Filter for Content {
 	fn templates(&self) -> Vec<&Template> {
 		self.contains.iter().collect_vec()
 	}
 
-	fn filter(&self, res: &Resource, ctx: &ExecutionContext) -> bool {
+	async fn filter(&self, ctx: &ExecutionContext) -> bool {
 		// Lazily get the content from the cache.
 		let content_arc = ctx
 			.services
 			.blackboard
 			.content
-			.entry(res.path().to_path_buf())
+			.entry(ctx.scope.resource.path().to_path_buf())
 			.or_try_insert_with(|| -> Result<Arc<String>> {
-				let content = extract_content(res.path())?;
+				let content = extract_content(ctx.scope.resource.path())?;
 				Ok(Arc::new(content.unwrap_or_default()))
 			})
 			.ok()
@@ -43,13 +44,7 @@ impl Filter for Content {
 
 		if let Some(content) = content_arc {
 			// The filter logic is updated to render each template before checking.
-			let context = ctx
-				.services
-				.templater
-				.context()
-				.path(res.path())
-				.root(res.root())
-				.build(&ctx.services.templater);
+			let context = Context::new(ctx);
 			let contains_match = self.contains.is_empty()
 				|| self
 					.contains
@@ -92,7 +87,7 @@ fn read_text(path: &Path) -> Result<Option<String>> {
 fn read_pdf(path: &Path) -> Result<Option<String>> {
 	let result = catch_unwind(|| {
 		let _gag = Gag::stderr().unwrap();
-		pdf_extract::extract_text(&path).ok()
+		pdf_extract::extract_text(path).ok()
 	});
 
 	match result {

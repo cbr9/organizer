@@ -1,9 +1,12 @@
-use std::path::PathBuf;
+use std::{cell::LazyCell, path::PathBuf, sync::Arc};
 
 use anyhow::Result;
+use async_trait::async_trait;
 use clap::{Parser, ValueHint};
 
+use lazy_static::lazy_static;
 use organize_core::{config::context::RunSettings, engine::Engine};
+use tokio::sync::OnceCell;
 
 use crate::Cmd;
 
@@ -23,25 +26,21 @@ pub struct Run {
 	no_dry_run: bool,
 	#[arg(long, short = 'v')]
 	verbose: bool,
-	#[arg(long, help = "Run all operations sequentially in a single thread.")]
-	no_parallel: bool,
 }
 
+#[async_trait]
 impl Cmd for Run {
 	#[tracing::instrument(err)]
-	fn run(mut self) -> Result<()> {
+	async fn run(mut self) -> Result<()> {
 		if self.no_dry_run {
 			self.dry_run = false;
 		}
 
-		let settings = RunSettings {
-			dry_run: self.dry_run,
-			no_parallel: self.no_parallel,
-		};
+		let settings = RunSettings { dry_run: self.dry_run };
 
-		let engine = Engine::new(self.config, settings, self.tags, self.ids)?;
+		let engine = Engine::new(&self.config, settings, &self.tags, &self.ids)?;
 		logs::init(self.verbose, &engine.config.path);
-		engine.run()?;
+		engine.run().await?;
 
 		Ok(())
 	}

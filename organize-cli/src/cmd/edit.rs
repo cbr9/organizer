@@ -5,6 +5,7 @@ use std::{
 };
 
 use anyhow::{Context, Result};
+use async_trait::async_trait;
 use clap::Parser;
 
 use organize_core::config::ConfigBuilder;
@@ -14,8 +15,9 @@ use crate::cmd::Cmd;
 #[derive(Parser, Debug)]
 pub struct Edit;
 
+#[async_trait]
 impl Cmd for Edit {
-	fn run(self) -> Result<()> {
+	async fn run(self) -> Result<()> {
 		Self::edit(ConfigBuilder::resolve_path(None)).map(|_| ())
 	}
 }

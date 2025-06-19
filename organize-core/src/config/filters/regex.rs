@@ -1,8 +1,10 @@
+use std::sync::Arc;
+
 use crate::{
 	config::{context::ExecutionContext, filters::Filter},
-	resource::Resource,
-	templates::template::Template,
+	templates::{template::Template, Context},
 };
+use async_trait::async_trait;
 use itertools::Itertools;
 use serde::{ser::SerializeSeq, Deserialize, Serialize, Serializer};
 
@@ -68,21 +70,15 @@ pub struct RegularExpression {
 	pub input: Template,
 }
 
+#[async_trait]
 #[typetag::serde(name = "regex")]
 impl Filter for RegularExpression {
 	fn templates(&self) -> Vec<&Template> {
 		vec![&self.input]
 	}
 
-	#[tracing::instrument(ret, level = "debug", skip(ctx))]
-	fn filter(&self, res: &Resource, ctx: &ExecutionContext) -> bool {
-		let context = ctx
-			.services
-			.templater
-			.context()
-			.path(res.path())
-			.root(res.root())
-			.build(&ctx.services.templater);
+	async fn filter(&self, ctx: &ExecutionContext) -> bool {
+		let context = Context::new(ctx);
 		ctx.services
 			.templater
 			.render(&self.input, &context)

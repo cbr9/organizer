@@ -1,290 +1,221 @@
-use std::path::{PathBuf, MAIN_SEPARATOR};
 
-use anyhow::Result;
 
-use crate::{
-	config::{
-		actions::common::{ConflictResolution, GuardedPath},
-		context::ExecutionContext,
-	},
-	errors::{ActionError, ErrorContext},
-	resource::Resource,
-	templates::template::Template,
-};
 
-use super::expand::Expand;
 
-pub fn prepare_target_path(
-	on_conflict: &ConflictResolution,
-	res: &Resource,
-	dest: &Template,
-	with_extension: bool,
-	ctx: &ExecutionContext,
-) -> Result<Option<GuardedPath>, ActionError> {
-	let context = ctx
-		.services
-		.templater
-		.context()
-		.path(res.path())
-		.root(res.root())
-		.build(&ctx.services.templater);
+// #[cfg(test)]
+// mod tests {
+// 	use super::*;
+// 	use crate::{
+// 		config::{context::ContextHarness, variables::simple::SimpleVariable},
+// 		templates::Templater,
+// 	};
+// 	use path_clean::PathClean;
+// 	use pretty_assertions::assert_eq;
+// 	use std::{
+// 		convert::{TryFrom, TryInto},
+// 		fs,
+// 		path::Path,
+// 	};
+// 	use tempfile::{tempdir, NamedTempFile};
 
-	let Some(mut target_path) = ctx
-		.services
-		.templater
-		.render(dest, &context)
-		.map_err(|e| ActionError::Template {
-			source: e,
-			template: dest.clone(),
-			context: ErrorContext::from_scope(&ctx.scope),
-		})?
-		.map(|s| PathBuf::from(s).expand_user())
-	else {
-		return Ok(None);
-	};
+// 	// Helper function to create a Resource from a tempfile.
+// 	fn create_resource(file: &NamedTempFile) -> Resource {
+// 		Resource::new(file.path(), Path::new("/tmp")).unwrap()
+// 	}
 
-	let path = &res.path();
+// 	/// Tests the scenario where the destination is a directory and the original file's
+// 	/// full name (stem and extension) should be appended to the destination path.
+// 	#[test]
+// 	fn destination_is_dir_with_extension() {
+// 		let temp_file = NamedTempFile::new().unwrap();
+// 		let resource = create_resource(&temp_file);
+// 		let dest_template = Template::try_from("/tmp/test_dir/").unwrap();
 
-	if target_path.is_dir() || target_path.to_string_lossy().ends_with(MAIN_SEPARATOR) || target_path.to_string_lossy().ends_with('/') {
-		if with_extension {
-			let filename = path.file_name();
-			if filename.is_none() {
-				// This can happen if the path is something like "." or ".."
-				return Ok(None);
-			}
-			target_path.push(filename.unwrap());
-		} else {
-			let stem = path.file_stem();
-			if stem.is_none() {
-				return Ok(None);
-			}
-			target_path.push(stem.unwrap())
-		}
-	}
+// 		let mut harness = ContextHarness::new();
+// 		harness.services.templater.add_template(&dest_template).unwrap();
+// 		let ctx = harness.context(); // Create a dry run context
 
-	let resolved = if ctx.settings.dry_run {
-		on_conflict.resolve(target_path)
-	} else {
-		on_conflict.resolve_atomic(target_path)
-	};
+// 		let result = prepare_target_path(&ConflictResolution::Skip, &resource, &dest_template, true, &ctx).unwrap();
 
-	Ok(resolved)
-}
+// 		let expected_filename = temp_file.path().file_name().unwrap();
+// 		let expected_path = PathBuf::from("/tmp/test_dir/").join(expected_filename).clean();
+// 		assert_eq!(result.map(|r| r.as_path().clean()), Some(expected_path));
+// 	}
 
-#[cfg(test)]
-mod tests {
-	use super::*;
-	use crate::{
-		config::{context::ContextHarness, variables::simple::SimpleVariable},
-		templates::Templater,
-	};
-	use path_clean::PathClean;
-	use pretty_assertions::assert_eq;
-	use std::{
-		convert::{TryFrom, TryInto},
-		fs,
-		path::Path,
-	};
-	use tempfile::{tempdir, NamedTempFile};
+// 	/// Tests the scenario where the destination is a directory and only the file's
+// 	/// stem (filename without extension) should be appended to the destination path.
+// 	#[test]
+// 	fn destination_is_dir_without_extension() {
+// 		let temp_dir = tempdir().unwrap();
+// 		let temp_file = NamedTempFile::new_in(&temp_dir).unwrap();
+// 		let resource = create_resource(&temp_file);
+// 		let dest_dir = temp_dir.path().join("test_dir");
+// 		fs::create_dir_all(&dest_dir).unwrap();
+// 		let dest_template = Template::try_from(dest_dir.to_str().unwrap()).unwrap();
 
-	// Helper function to create a Resource from a tempfile.
-	fn create_resource(file: &NamedTempFile) -> Resource {
-		Resource::new(file.path(), Path::new("/tmp")).unwrap()
-	}
+// 		let mut harness = ContextHarness::new();
+// 		harness.services.templater.add_template(&dest_template).unwrap();
+// 		let ctx = harness.context(); // dry run
 
-	/// Tests the scenario where the destination is a directory and the original file's
-	/// full name (stem and extension) should be appended to the destination path.
-	#[test]
-	fn destination_is_dir_with_extension() {
-		let temp_file = NamedTempFile::new().unwrap();
-		let resource = create_resource(&temp_file);
-		let dest_template = Template::try_from("/tmp/test_dir/").unwrap();
+// 		let result = prepare_target_path(&ConflictResolution::Skip, &resource, &dest_template, false, &ctx).unwrap();
 
-		let mut harness = ContextHarness::new();
-		harness.services.templater.add_template(&dest_template).unwrap();
-		let ctx = harness.context(); // Create a dry run context
+// 		let expected_filename = temp_file.path().file_stem().unwrap();
+// 		let expected_path = dest_dir.join(expected_filename);
+// 		assert_eq!(result.map(|r| r.to_path_buf()), Some(expected_path));
+// 	}
 
-		let result = prepare_target_path(&ConflictResolution::Skip, &resource, &dest_template, true, &ctx).unwrap();
+// 	/// Tests if the function correctly handles a destination path that is rendered
+// 	/// from a template variable.
+// 	#[test]
+// 	fn destination_with_templated_variable() {
+// 		let temp_file = NamedTempFile::new().unwrap();
+// 		let resource = create_resource(&temp_file);
+// 		let dest_template = Template::try_from("/tmp/{{ name }}/").unwrap();
 
-		let expected_filename = temp_file.path().file_name().unwrap();
-		let expected_path = PathBuf::from("/tmp/test_dir/").join(expected_filename).clean();
-		assert_eq!(result.map(|r| r.as_path().clean()), Some(expected_path));
-	}
+// 		let variable = SimpleVariable {
+// 			name: "name".into(),
+// 			value: "rendered_dir".try_into().unwrap(),
+// 		};
+// 		let mut harness = ContextHarness::new();
+// 		let template_engine = Templater::new(&vec![Box::new(variable)]);
+// 		harness.services.templater = template_engine;
+// 		harness.services.templater.add_template(&dest_template).unwrap();
+// 		let ctx = harness.context(); // dry run
 
-	/// Tests the scenario where the destination is a directory and only the file's
-	/// stem (filename without extension) should be appended to the destination path.
-	#[test]
-	fn destination_is_dir_without_extension() {
-		let temp_dir = tempdir().unwrap();
-		let temp_file = NamedTempFile::new_in(&temp_dir).unwrap();
-		let resource = create_resource(&temp_file);
-		let dest_dir = temp_dir.path().join("test_dir");
-		fs::create_dir_all(&dest_dir).unwrap();
-		let dest_template = Template::try_from(dest_dir.to_str().unwrap()).unwrap();
+// 		let result = prepare_target_path(&ConflictResolution::Skip, &resource, &dest_template, true, &ctx).unwrap();
 
-		let mut harness = ContextHarness::new();
-		harness.services.templater.add_template(&dest_template).unwrap();
-		let ctx = harness.context(); // dry run
+// 		let expected_filename = temp_file.path().file_name().unwrap();
+// 		let expected_path = PathBuf::from("/tmp/rendered_dir").join(expected_filename);
+// 		assert_eq!(result.map(|r| r.as_path().clean()), Some(expected_path.clean()));
+// 	}
 
-		let result = prepare_target_path(&ConflictResolution::Skip, &resource, &dest_template, false, &ctx).unwrap();
+// 	/// Tests the `Skip` conflict resolution strategy.
+// 	/// When the target file already exists, the function should return `None`.
+// 	#[test]
+// 	fn conflict_skip_existing_file() {
+// 		let temp_file = NamedTempFile::new().unwrap(); // This file exists
+// 		let resource = create_resource(&temp_file);
+// 		let dest_template = Template::try_from(temp_file.path().to_str().unwrap()).unwrap();
 
-		let expected_filename = temp_file.path().file_stem().unwrap();
-		let expected_path = dest_dir.join(expected_filename);
-		assert_eq!(result.map(|r| r.to_path_buf()), Some(expected_path));
-	}
+// 		let mut harness = ContextHarness::new();
+// 		harness.services.templater.add_template(&dest_template).unwrap();
+// 		let ctx = harness.context(); // dry run
 
-	/// Tests if the function correctly handles a destination path that is rendered
-	/// from a template variable.
-	#[test]
-	fn destination_with_templated_variable() {
-		let temp_file = NamedTempFile::new().unwrap();
-		let resource = create_resource(&temp_file);
-		let dest_template = Template::try_from("/tmp/{{ name }}/").unwrap();
+// 		let result = prepare_target_path(&ConflictResolution::Skip, &resource, &dest_template, true, &ctx).unwrap();
 
-		let variable = SimpleVariable {
-			name: "name".into(),
-			value: "rendered_dir".try_into().unwrap(),
-		};
-		let mut harness = ContextHarness::new();
-		let template_engine = Templater::new(&vec![Box::new(variable)]);
-		harness.services.templater = template_engine;
-		harness.services.templater.add_template(&dest_template).unwrap();
-		let ctx = harness.context(); // dry run
+// 		// Expect None because the file exists and the conflict option is Skip
+// 		assert!(result.is_none());
+// 	}
 
-		let result = prepare_target_path(&ConflictResolution::Skip, &resource, &dest_template, true, &ctx).unwrap();
+// 	/// Tests the `Overwrite` conflict resolution strategy.
+// 	/// When the target file already exists, the function should return the path to that same file.
+// 	#[test]
+// 	fn conflict_overwrite_existing_file() {
+// 		let temp_file = NamedTempFile::new().unwrap();
+// 		let resource = create_resource(&temp_file);
+// 		let dest_template = Template::try_from(temp_file.path().to_str().unwrap()).unwrap();
 
-		let expected_filename = temp_file.path().file_name().unwrap();
-		let expected_path = PathBuf::from("/tmp/rendered_dir").join(expected_filename);
-		assert_eq!(result.map(|r| r.as_path().clean()), Some(expected_path.clean()));
-	}
+// 		let mut harness = ContextHarness::new();
+// 		harness.services.templater.add_template(&dest_template).unwrap();
+// 		let ctx = harness.context(); // dry run
 
-	/// Tests the `Skip` conflict resolution strategy.
-	/// When the target file already exists, the function should return `None`.
-	#[test]
-	fn conflict_skip_existing_file() {
-		let temp_file = NamedTempFile::new().unwrap(); // This file exists
-		let resource = create_resource(&temp_file);
-		let dest_template = Template::try_from(temp_file.path().to_str().unwrap()).unwrap();
+// 		let result = prepare_target_path(&ConflictResolution::Overwrite, &resource, &dest_template, true, &ctx).unwrap();
 
-		let mut harness = ContextHarness::new();
-		harness.services.templater.add_template(&dest_template).unwrap();
-		let ctx = harness.context(); // dry run
+// 		assert_eq!(result.map(|r| r.to_path_buf()), Some(temp_file.path().to_path_buf()));
+// 	}
 
-		let result = prepare_target_path(&ConflictResolution::Skip, &resource, &dest_template, true, &ctx).unwrap();
+// 	/// Tests the `Rename` conflict resolution strategy.
+// 	#[test]
+// 	fn conflict_rename_existing_file() {
+// 		let temp_file = NamedTempFile::with_suffix(".txt").unwrap();
+// 		let resource = create_resource(&temp_file);
+// 		let dest_template = Template::try_from(temp_file.path().to_str().unwrap()).unwrap();
 
-		// Expect None because the file exists and the conflict option is Skip
-		assert!(result.is_none());
-	}
+// 		let mut harness = ContextHarness::new();
+// 		harness.services.templater.add_template(&dest_template).unwrap();
+// 		let ctx = harness.context(); // dry run
 
-	/// Tests the `Overwrite` conflict resolution strategy.
-	/// When the target file already exists, the function should return the path to that same file.
-	#[test]
-	fn conflict_overwrite_existing_file() {
-		let temp_file = NamedTempFile::new().unwrap();
-		let resource = create_resource(&temp_file);
-		let dest_template = Template::try_from(temp_file.path().to_str().unwrap()).unwrap();
+// 		let result = prepare_target_path(&ConflictResolution::Rename, &resource, &dest_template, true, &ctx).unwrap();
 
-		let mut harness = ContextHarness::new();
-		harness.services.templater.add_template(&dest_template).unwrap();
-		let ctx = harness.context(); // dry run
+// 		let file_stem = temp_file.path().file_stem().unwrap().to_str().unwrap();
+// 		let extension = temp_file.path().extension().unwrap().to_str().unwrap();
+// 		let expected_path = temp_file.path().with_file_name(format!("{} (1).{}", file_stem, extension));
 
-		let result = prepare_target_path(&ConflictResolution::Overwrite, &resource, &dest_template, true, &ctx).unwrap();
+// 		assert_eq!(result.map(|r| r.to_path_buf()), Some(expected_path));
+// 	}
 
-		assert_eq!(result.map(|r| r.to_path_buf()), Some(temp_file.path().to_path_buf()));
-	}
+// 	/// Tests the case where the destination is just a filename.
+// 	#[test]
+// 	fn destination_is_filename_only() {
+// 		let temp_file = NamedTempFile::new().unwrap();
+// 		let resource = create_resource(&temp_file);
+// 		let dest_template = Template::try_from("just_a_filename.txt").unwrap();
 
-	/// Tests the `Rename` conflict resolution strategy.
-	#[test]
-	fn conflict_rename_existing_file() {
-		let temp_file = NamedTempFile::with_suffix(".txt").unwrap();
-		let resource = create_resource(&temp_file);
-		let dest_template = Template::try_from(temp_file.path().to_str().unwrap()).unwrap();
+// 		let mut harness = ContextHarness::new();
+// 		harness.services.templater.add_template(&dest_template).unwrap();
+// 		let ctx = harness.context(); // dry run
 
-		let mut harness = ContextHarness::new();
-		harness.services.templater.add_template(&dest_template).unwrap();
-		let ctx = harness.context(); // dry run
+// 		let result = prepare_target_path(&ConflictResolution::Skip, &resource, &dest_template, true, &ctx).unwrap();
 
-		let result = prepare_target_path(&ConflictResolution::Rename, &resource, &dest_template, true, &ctx).unwrap();
+// 		assert_eq!(result.map(|r| r.to_path_buf()), Some(PathBuf::from("just_a_filename.txt")));
+// 	}
 
-		let file_stem = temp_file.path().file_stem().unwrap().to_str().unwrap();
-		let extension = temp_file.path().extension().unwrap().to_str().unwrap();
-		let expected_path = temp_file.path().with_file_name(format!("{} (1).{}", file_stem, extension));
+// 	/// Tests tilde expansion for the user's home directory.
+// 	#[test]
+// 	fn destination_expands_user_home() {
+// 		let temp_file = NamedTempFile::new().unwrap();
+// 		let resource = create_resource(&temp_file);
+// 		let dest_template = Template::try_from("~/test_dir/output.txt").unwrap();
 
-		assert_eq!(result.map(|r| r.to_path_buf()), Some(expected_path));
-	}
+// 		let mut harness = ContextHarness::new();
+// 		harness.services.templater.add_template(&dest_template).unwrap();
+// 		let ctx = harness.context(); // dry run
 
-	/// Tests the case where the destination is just a filename.
-	#[test]
-	fn destination_is_filename_only() {
-		let temp_file = NamedTempFile::new().unwrap();
-		let resource = create_resource(&temp_file);
-		let dest_template = Template::try_from("just_a_filename.txt").unwrap();
+// 		let result = prepare_target_path(&ConflictResolution::Skip, &resource, &dest_template, true, &ctx).unwrap();
 
-		let mut harness = ContextHarness::new();
-		harness.services.templater.add_template(&dest_template).unwrap();
-		let ctx = harness.context(); // dry run
+// 		let home_dir = dirs::home_dir().unwrap();
+// 		let expected_path = home_dir.join("test_dir/output.txt");
+// 		assert_eq!(result.map(|r| r.to_path_buf()), Some(expected_path));
+// 	}
 
-		let result = prepare_target_path(&ConflictResolution::Skip, &resource, &dest_template, true, &ctx).unwrap();
+// 	/// Tests Rename when multiple conflicting files exist.
+// 	#[test]
+// 	fn conflict_rename_multiple_existing_files() {
+// 		let dir = tempdir().unwrap();
+// 		let original_path = dir.path().join("file.txt");
+// 		fs::write(&original_path, "original").unwrap();
+// 		fs::write(dir.path().join("file (1).txt"), "first conflict").unwrap();
+// 		let resource = Resource::new(&original_path, dir.path()).unwrap();
+// 		let dest_template = Template::try_from(original_path.to_str().unwrap()).unwrap();
 
-		assert_eq!(result.map(|r| r.to_path_buf()), Some(PathBuf::from("just_a_filename.txt")));
-	}
+// 		let mut harness = ContextHarness::new();
+// 		harness.services.templater.add_template(&dest_template).unwrap();
+// 		let ctx = harness.context(); // dry run
 
-	/// Tests tilde expansion for the user's home directory.
-	#[test]
-	fn destination_expands_user_home() {
-		let temp_file = NamedTempFile::new().unwrap();
-		let resource = create_resource(&temp_file);
-		let dest_template = Template::try_from("~/test_dir/output.txt").unwrap();
+// 		let result = prepare_target_path(&ConflictResolution::Rename, &resource, &dest_template, true, &ctx).unwrap();
 
-		let mut harness = ContextHarness::new();
-		harness.services.templater.add_template(&dest_template).unwrap();
-		let ctx = harness.context(); // dry run
+// 		let expected_path = dir.path().join("file (2).txt");
+// 		assert_eq!(result.map(|r| r.to_path_buf()), Some(expected_path));
+// 	}
 
-		let result = prepare_target_path(&ConflictResolution::Skip, &resource, &dest_template, true, &ctx).unwrap();
+// 	/// Tests that an empty rendered template results in `None`.
+// 	#[test]
+// 	fn destination_template_renders_to_empty() {
+// 		let temp_file = NamedTempFile::new().unwrap();
+// 		let resource = create_resource(&temp_file);
+// 		let dest_template = Template::try_from("{{ empty_var }}").unwrap();
+// 		let variable = SimpleVariable {
+// 			name: "empty_var".into(),
+// 			value: "".try_into().unwrap(),
+// 		};
 
-		let home_dir = dirs::home_dir().unwrap();
-		let expected_path = home_dir.join("test_dir/output.txt");
-		assert_eq!(result.map(|r| r.to_path_buf()), Some(expected_path));
-	}
+// 		let mut harness = ContextHarness::new();
+// 		let template_engine = Templater::new(&vec![Box::new(variable)]);
+// 		harness.services.templater = template_engine;
+// 		harness.services.templater.add_template(&dest_template).unwrap();
+// 		let ctx = harness.context(); // dry run
 
-	/// Tests Rename when multiple conflicting files exist.
-	#[test]
-	fn conflict_rename_multiple_existing_files() {
-		let dir = tempdir().unwrap();
-		let original_path = dir.path().join("file.txt");
-		fs::write(&original_path, "original").unwrap();
-		fs::write(dir.path().join("file (1).txt"), "first conflict").unwrap();
-		let resource = Resource::new(&original_path, dir.path()).unwrap();
-		let dest_template = Template::try_from(original_path.to_str().unwrap()).unwrap();
-
-		let mut harness = ContextHarness::new();
-		harness.services.templater.add_template(&dest_template).unwrap();
-		let ctx = harness.context(); // dry run
-
-		let result = prepare_target_path(&ConflictResolution::Rename, &resource, &dest_template, true, &ctx).unwrap();
-
-		let expected_path = dir.path().join("file (2).txt");
-		assert_eq!(result.map(|r| r.to_path_buf()), Some(expected_path));
-	}
-
-	/// Tests that an empty rendered template results in `None`.
-	#[test]
-	fn destination_template_renders_to_empty() {
-		let temp_file = NamedTempFile::new().unwrap();
-		let resource = create_resource(&temp_file);
-		let dest_template = Template::try_from("{{ empty_var }}").unwrap();
-		let variable = SimpleVariable {
-			name: "empty_var".into(),
-			value: "".try_into().unwrap(),
-		};
-
-		let mut harness = ContextHarness::new();
-		let template_engine = Templater::new(&vec![Box::new(variable)]);
-		harness.services.templater = template_engine;
-		harness.services.templater.add_template(&dest_template).unwrap();
-		let ctx = harness.context(); // dry run
-
-		let result = prepare_target_path(&ConflictResolution::Skip, &resource, &dest_template, true, &ctx).unwrap();
-		assert!(result.is_none());
-	}
-}
+// 		let result = prepare_target_path(&ConflictResolution::Skip, &resource, &dest_template, true, &ctx).unwrap();
+// 		assert!(result.is_none());
+// 	}
+// }

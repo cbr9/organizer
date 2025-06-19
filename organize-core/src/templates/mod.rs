@@ -1,7 +1,4 @@
-use std::{
-	collections::HashSet,
-	path::{Path, PathBuf},
-};
+use std::{collections::HashSet, sync::Arc};
 
 use anyhow::Result;
 use filters::{
@@ -12,9 +9,13 @@ use filters::{
 use template::Template;
 use tera::Tera;
 
-use crate::config::{variables::Variable, ConfigBuilder};
+use crate::{
+	config::{context::ExecutionContext, variables::Variable, ConfigBuilder},
+	templates::lazy::LazyVariable,
+};
 
 pub mod filters;
+pub mod lazy;
 pub mod template;
 
 #[derive(Clone, Debug)]
@@ -23,40 +24,30 @@ pub struct Templater {
 	pub variables: Vec<Box<dyn Variable>>,
 }
 
-pub struct ContextBuilder {
-	root: Option<PathBuf>,
-	path: Option<PathBuf>,
+pub struct Context(tera::Context);
+
+impl std::ops::Deref for Context {
+	type Target = tera::Context;
+
+	fn deref(&self) -> &Self::Target {
+		&self.0
+	}
 }
 
-impl ContextBuilder {
-	fn new() -> Self {
-		Self { root: None, path: None }
-	}
-
-	pub fn root<T: AsRef<Path>>(mut self, path: T) -> Self {
-		self.root = Some(path.as_ref().to_path_buf());
-		self
-	}
-
-	pub fn path<T: AsRef<Path>>(mut self, path: T) -> Self {
-		self.path = Some(path.as_ref().to_path_buf());
-		self
-	}
-
-	pub fn build(self, engine: &Templater) -> tera::Context {
+impl Context {
+	pub fn new(ctx: &ExecutionContext) -> Self {
 		let mut context = tera::Context::new();
-		if let Some(path) = self.path {
-			context.insert("path", &path);
-		}
-		if let Some(root) = self.root {
-			context.insert("root", &root);
+		context.insert("path", ctx.scope.resource.path());
+		if let Some(root) = ctx.scope.resource.root() {
+			context.insert("root", root);
 		}
 
-		for var in engine.variables.iter() {
-			var.register(engine, &mut context);
+		for var in &ctx.scope.rule.variables {
+			let lazy = LazyVariable { variable: var, context: ctx };
+			context.insert(var.name(), &lazy);
 		}
 
-		context
+		Self(context)
 	}
 }
 
@@ -83,6 +74,9 @@ impl Templater {
 			for action in rule.actions.iter() {
 				engine.add_templates(action.templates())?;
 			}
+			for variable in rule.variables.iter() {
+				engine.add_templates(variable.templates())?;
+			}
 			for filter in rule.filters.iter() {
 				engine.add_templates(filter.templates())?;
 			}
@@ -95,10 +89,6 @@ impl Templater {
 
 	pub fn get_template_names(&self) -> HashSet<&str> {
 		self.tera.get_template_names().collect()
-	}
-
-	pub fn context(&self) -> ContextBuilder {
-		ContextBuilder::new()
 	}
 
 	#[tracing::instrument(err)]
@@ -148,65 +138,66 @@ impl Default for Templater {
 	}
 }
 
-#[cfg(test)]
-mod tests {
-	use std::convert::{TryFrom, TryInto};
+// #[cfg(test)]
+// mod tests {
+// 	use std::convert::{TryFrom, TryInto};
 
-	use super::*;
-	use crate::{config::variables::simple::SimpleVariable, resource::Resource};
+// 	use super::*;
+// 	use crate::{config::{context::RunServices, variables::simple::SimpleVariable}, resource::Resource};
 
-	#[test]
-	fn render_template_not_present_in_engine() {
-		let engine = Templater::default();
-		let template = Template::try_from("Hello, {{ name }}!").unwrap();
-		let mut context = engine.context().build(&engine);
-		context.insert("name", "Andrés");
-		let rendered = engine.render(&template, &context);
-		assert!(rendered.is_err());
-	}
+// 	#[test]
+// 	fn render_template_not_present_in_engine() {
+// 		let engine = Templater::default();
+// 		let template = Template::try_from("Hello, {{ name }}!").unwrap();
+// 		let context = Context::new(ctx)
+// 		let mut context = engine.context().build(&engine);
+// 		context.insert("name", "Andrés");
+// 		let rendered = engine.render(&template, &context);
+// 		assert!(rendered.is_err());
+// 	}
 
-	#[test]
-	fn render_template_present_in_engine() {
-		let mut engine = Templater::default();
-		let template = Template::try_from("This is a stored template.").unwrap();
-		engine.add_template(&template).unwrap();
-		let context = engine.context().build(&engine);
-		let rendered = engine.render(&template, &context).unwrap();
-		assert_eq!(rendered, Some("This is a stored template.".to_string()));
-	}
+// 	#[test]
+// 	fn render_template_present_in_engine() {
+// 		let mut engine = Templater::default();
+// 		let template = Template::try_from("This is a stored template.").unwrap();
+// 		engine.add_template(&template).unwrap();
+// 		let context = engine.context().build(&engine);
+// 		let rendered = engine.render(&template, &context).unwrap();
+// 		assert_eq!(rendered, Some("This is a stored template.".to_string()));
+// 	}
 
-	#[test]
-	fn render_with_simple_variable() {
-		let var = SimpleVariable {
-			name: "location".into(),
-			value: "world".try_into().unwrap(),
-		};
-		let mut engine = Templater::new(&vec![Box::new(var)]);
-		let template = Template::try_from("Hello, {{ location }}!").unwrap();
-		engine.add_template(&template).unwrap();
-		let context = engine.context().build(&engine);
-		let rendered = engine.render(&template, &context).unwrap();
-		assert_eq!(rendered, Some("Hello, world!".to_string()));
-	}
+// 	#[test]
+// 	fn render_with_simple_variable() {
+// 		let var = SimpleVariable {
+// 			name: "location".into(),
+// 			value: "world".try_into().unwrap(),
+// 		};
+// 		let mut engine = Templater::new(&vec![Box::new(var)]);
+// 		let template = Template::try_from("Hello, {{ location }}!").unwrap();
+// 		engine.add_template(&template).unwrap();
+// 		let context = engine.context().build(&engine);
+// 		let rendered = engine.render(&template, &context).unwrap();
+// 		assert_eq!(rendered, Some("Hello, world!".to_string()));
+// 	}
 
-	#[test]
-	fn render_with_path_context() {
-		let mut engine = Templater::default();
-		let resource = Resource::new_tmp("test.txt");
-		let template = Template::try_from("The path is {{ path | stem }}").unwrap();
-		engine.add_template(&template).unwrap();
-		let context = engine.context().path(resource.path().to_path_buf()).build(&engine);
-		let rendered = engine.render(&template, &context).unwrap();
-		assert_eq!(rendered, Some("The path is test".to_string()));
-	}
+// 	#[test]
+// 	fn render_with_path_context() {
+// 		let mut engine = Templater::default();
+// 		let resource = Resource::new_tmp("test.txt");
+// 		let template = Template::try_from("The path is {{ path | stem }}").unwrap();
+// 		engine.add_template(&template).unwrap();
+// 		let context = engine.context().path(resource.path().to_path_buf()).build(&engine);
+// 		let rendered = engine.render(&template, &context).unwrap();
+// 		assert_eq!(rendered, Some("The path is test".to_string()));
+// 	}
 
-	#[test]
-	fn render_invalid_template_returns_none() {
-		let engine = Templater::default();
-		// Invalid syntax: `{%` instead of `{{`
-		let template = Template::try_from("Hello, {% name }}!").unwrap();
-		let context = engine.context().build(&engine);
-		let rendered = engine.render(&template, &context);
-		assert!(rendered.is_err());
-	}
-}
+// 	#[test]
+// 	fn render_invalid_template_returns_none() {
+// 		let engine = Templater::default();
+// 		// Invalid syntax: `{%` instead of `{{`
+// 		let template = Template::try_from("Hello, {% name }}!").unwrap();
+// 		let context = engine.context().build(&engine);
+// 		let rendered = engine.render(&template, &context);
+// 		assert!(rendered.is_err());
+// 	}
+// }

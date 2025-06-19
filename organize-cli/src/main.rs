@@ -1,9 +1,11 @@
 use crate::cmd::{App, Cmd};
 use anyhow::Result;
 use clap::Parser;
+use organize_core::{config::context::RunSettings, engine::Engine};
 mod cmd;
 
-fn main() -> Result<()> {
+#[tokio::main]
+async fn main() -> Result<()> {
 	let app: App = App::parse();
-	app.run()
+	app.run().await
 }

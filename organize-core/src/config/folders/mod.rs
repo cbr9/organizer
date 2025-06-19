@@ -23,9 +23,9 @@ pub struct FolderBuilder {
 }
 
 impl FolderBuilder {
-	pub fn build(self, index: usize, defaults: &OptionsBuilder, rule_options: &OptionsBuilder, mut engine: &mut Templater) -> Result<Folder> {
+	pub fn build(self, index: usize, defaults: &OptionsBuilder, rule_options: &OptionsBuilder, engine: &mut Templater) -> Result<Folder> {
 		let path = {
-			let context = engine.context().build(engine);
+			let context = tera::Context::new();
 			engine
 				.tera
 				.render_str(&self.root.input, &context)
@@ -33,7 +33,7 @@ impl FolderBuilder {
 				.map(PathBuf::from)
 				.map(|p| p.expand_user().clean())?
 		};
-		let options = Options::compile(defaults, rule_options, &self.options, &mut engine, &path);
+		let options = Options::compile(defaults, rule_options, &self.options, engine, &path);
 		Ok(Folder { path, options, index })
 	}
 }
@@ -63,7 +63,7 @@ impl Folder {
 			.filter_entry(|e| self.prefilter(e.path()))
 			.flatten()
 			.filter(|e| self.postfilter(e.path()))
-			.flat_map(|e| Resource::new(e.path(), &self.path))
+			.flat_map(|e| Resource::new(e.path(), Some(&self.path)))
 			.collect();
 
 		Ok(entries)

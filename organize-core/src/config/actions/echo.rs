@@ -1,12 +1,16 @@
 use std::path::PathBuf;
 
 use crate::{
-	config::{actions::common::enabled, context::ExecutionContext},
-	errors::{ActionError, ErrorContext},
+	config::{
+		actions::{common::enabled, Output},
+		context::ExecutionContext,
+	},
+	errors::{Error, ErrorContext},
+	templates::Context,
 };
 use serde::{Deserialize, Serialize};
 
-use crate::{resource::Resource, templates::template::Template};
+use crate::templates::template::Template;
 use anyhow::Result;
 
 use super::Action;
@@ -25,27 +29,20 @@ impl Action for Echo {
 		vec![&self.message]
 	}
 
-	#[tracing::instrument(ret(level = "info"), err(Debug), level = "debug", skip(ctx))]
-	fn execute(&self, res: &Resource, ctx: &ExecutionContext) -> Result<Option<PathBuf>, ActionError> {
+	fn execute(&self, ctx: &ExecutionContext) -> Result<Output, Error> {
 		if self.enabled {
-			let context = ctx
-				.services
-				.templater
-				.context()
-				.path(res.path())
-				.root(res.root())
-				.build(&ctx.services.templater);
+			let context = Context::new(ctx);
 
 			ctx.services
 				.templater
 				.render(&self.message, &context)
-				.map_err(|e| ActionError::Template {
+				.map_err(|e| Error::Template {
 					source: e,
 					template: self.message.clone(),
 					context: ErrorContext::from_scope(&ctx.scope),
 				})?
 				.inspect(|message| tracing::info!("{}", message));
 		}
-		Ok(Some(res.path().to_path_buf()))
+		Ok(Output::Continue)
 	}
 }

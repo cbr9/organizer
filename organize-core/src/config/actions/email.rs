@@ -6,8 +6,12 @@ use std::{
 };
 
 use crate::{
-	config::{actions::common::enabled, context::ExecutionContext},
-	errors::{ActionError, ErrorContext},
+	config::{
+		actions::{self, common::enabled, Output},
+		context::ExecutionContext,
+	},
+	errors::{Error, ErrorContext},
+	templates::Context,
 };
 use anyhow::Result;
 use lettre::{
@@ -19,7 +23,7 @@ use lettre::{
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use crate::{resource::Resource, templates::template::Template};
+use crate::templates::template::Template;
 
 use super::Action;
 
@@ -111,32 +115,21 @@ impl Action for Email {
 		templates
 	}
 
-	#[tracing::instrument(ret(level = "info"), err(Debug), level = "debug", skip(ctx))]
-	fn execute(&self, res: &Resource, ctx: &ExecutionContext) -> Result<Option<PathBuf>, ActionError> {
+	fn execute(&self, ctx: &ExecutionContext) -> Result<actions::Output, Error> {
 		if !ctx.settings.dry_run && self.enabled {
 			let mut email = MessageBuilder::new()
 				.from(self.sender.clone())
 				.to(self.recipient.clone())
 				.date_now();
 
-			let context = ctx
-				.services
-				.templater
-				.context()
-				.path(res.path())
-				.root(res.root())
-				.build(&ctx.services.templater);
+			let context = Context::new(ctx);
 
 			if let Some(subject) = &self.subject {
-				let maybe_rendered = ctx
-					.services
-					.templater
-					.render(subject, &context)
-					.map_err(|e| ActionError::Template {
-						source: e,
-						template: subject.clone(),
-						context: ErrorContext::from_scope(&ctx.scope),
-					})?;
+				let maybe_rendered = ctx.services.templater.render(subject, &context).map_err(|e| Error::Template {
+					source: e,
+					template: subject.clone(),
+					context: ErrorContext::from_scope(&ctx.scope),
+				})?;
 
 				if let Some(rendered) = maybe_rendered {
 					email = email.subject(rendered);
@@ -147,15 +140,11 @@ impl Action for Email {
 
 			// Add body if it exists
 			if let Some(body) = &self.body {
-				let maybe_rendered = ctx
-					.services
-					.templater
-					.render(body, &context)
-					.map_err(|e| ActionError::Template {
-						source: e,
-						template: body.clone(),
-						context: ErrorContext::from_scope(&ctx.scope),
-					})?;
+				let maybe_rendered = ctx.services.templater.render(body, &context).map_err(|e| Error::Template {
+					source: e,
+					template: body.clone(),
+					context: ErrorContext::from_scope(&ctx.scope),
+				})?;
 
 				if let Some(rendered) = maybe_rendered {
 					multipart = multipart.singlepart(SinglePart::plain(rendered));
@@ -163,46 +152,47 @@ impl Action for Email {
 			}
 
 			if self.attach {
-				if let Some(mime) = mime_guess::from_path(res.path()).first() {
-					let content = std::fs::read(res.path()).map_err(|e| ActionError::Io {
+				if let Some(mime) = mime_guess::from_path(ctx.scope.resource.path()).first() {
+					let content = std::fs::read(ctx.scope.resource.path()).map_err(|e| Error::Io {
 						source: e,
-						path: res.path().to_path_buf(),
+						path: ctx.scope.resource.path().to_path_buf(),
 						target: None,
 						context: ErrorContext::from_scope(&ctx.scope),
 					})?;
 					let content_type = ContentType::from(mime);
-					let attachment = Attachment::new(res.path().file_name().unwrap().to_string_lossy().to_string()).body(content, content_type);
+					let attachment =
+						Attachment::new(ctx.scope.resource.path().file_name().unwrap().to_string_lossy().to_string()).body(content, content_type);
 
 					multipart = multipart.singlepart(attachment);
 				}
 			};
 
-			let email = email.multipart(multipart).map_err(|e| ActionError::Email {
+			let email = email.multipart(multipart).map_err(|e| Error::Email {
 				source: EmailError::EmailError(e),
 				context: ErrorContext::from_scope(&ctx.scope),
 			})?;
 
 			let creds = self
 				.get_or_insert_credentials(&ctx.services.blackboard.credentials)
-				.map_err(|e| ActionError::Email {
+				.map_err(|e| Error::Email {
 					source: e,
 					context: ErrorContext::from_scope(&ctx.scope),
 				})?;
 
 			let mailer = SmtpTransport::relay(&self.smtp_server)
-				.map_err(|e| ActionError::Email {
+				.map_err(|e| Error::Email {
 					source: EmailError::SmtpFailure(e),
 					context: ErrorContext::from_scope(&ctx.scope),
 				})?
 				.credentials(creds)
 				.build();
 
-			let _response = mailer.send(&email).map_err(|e| ActionError::Email {
+			let _response = mailer.send(&email).map_err(|e| Error::Email {
 				source: EmailError::SmtpFailure(e),
 				context: ErrorContext::from_scope(&ctx.scope),
 			})?;
 		}
 
-		Ok(Some(res.path().to_path_buf()))
+		Ok(Output::Continue)
 	}
 }

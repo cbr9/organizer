@@ -1,14 +1,18 @@
 use crate::{
 	config::{
+		actions::ExecutionModel,
 		context::{Blackboard, ExecutionContext, ExecutionScope, RunServices, RunSettings},
+		rule::Rule,
 		Config,
 		ConfigBuilder,
 	},
+	resource::Resource,
 	templates::Templater,
 };
 use anyhow::Result;
-use rayon::iter::{IntoParallelIterator, ParallelIterator};
-use std::path::PathBuf;
+use futures::{future, stream, StreamExt};
+use itertools::Itertools;
+use std::{path::PathBuf, sync::Arc};
 
 /// The main engine for the application.
 /// It owns the compiled configuration and all run-wide services.
@@ -17,10 +21,11 @@ pub struct Engine {
 	services: RunServices,
 	settings: RunSettings,
 }
+const CONCURRENT_OPERATIONS: usize = 100;
 
 impl Engine {
-	pub fn new(path: Option<PathBuf>, settings: RunSettings, tags: Option<Vec<String>>, ids: Option<Vec<String>>) -> Result<Self> {
-		let config_builder = ConfigBuilder::new(path)?;
+	pub fn new(path: &Option<PathBuf>, settings: RunSettings, tags: &Option<Vec<String>>, ids: &Option<Vec<String>>) -> Result<Arc<Self>> {
+		let config_builder = ConfigBuilder::new(path.clone())?;
 		let mut engine = Templater::from_config(&config_builder)?;
 		let config = config_builder.build(&mut engine, tags, ids)?;
 
@@ -28,44 +33,106 @@ impl Engine {
 			templater: engine,
 			blackboard: Blackboard::default(),
 		};
-		Ok(Self { config, services, settings })
+		Ok(Arc::new(Self { config, services, settings }))
 	}
 
-	/// Runs the organization process based on the loaded configuration and
-	/// command-line arguments.
-	pub fn run(&self) -> Result<()> {
+	// The signature is a simple `async fn` taking `&self`.
+	pub async fn run(self: Arc<Self>) -> Result<()> {
 		for rule in self.config.rules.iter() {
 			for folder in rule.folders.iter() {
-				let context = ExecutionContext {
-					services: &self.services,
-					settings: &self.settings,
-					scope: ExecutionScope {
-						config: &self.config,
-						rule,
-						folder,
-					},
-				};
-
-				let entries = match folder.get_resources() {
-					Ok(entries) => entries
-						.into_par_iter()
-						.filter(|res| rule.filters.iter().all(|f| f.filter(res, &context)))
-						.collect::<Vec<_>>(),
+				let resources = match folder.get_resources() {
+					Ok(resources) => resources,
 					Err(e) => {
-						tracing::error!(
-							"Rule [number = {}, id = {}]: Could not read entries from folder '{}'. Error: {}",
-							rule.index,
-							rule.id.as_deref().unwrap_or("untitled"),
-							folder.path.display(),
-							e
-						);
+						tracing::warn!("Could not get resources from {}: {}", folder.path.display(), e);
 						continue;
 					}
 				};
 
-				rule.actions
-					.iter()
-					.fold(entries, |current_entries, action| action.run(current_entries, &context));
+				// ---- Filtering Stage ----
+				// 1. Create a vector of futures without spawning them.
+				let engine = Arc::clone(&self);
+				let filter_futures = resources
+					.into_iter()
+					.map(|resource| {
+						let engine = engine.clone();
+						let rule = rule.clone();
+						let folder = folder.clone();
+
+						tokio::spawn(async move {
+							let ctx = ExecutionContext {
+								services: &engine.services,
+								settings: &engine.settings,
+								scope: ExecutionScope {
+									config: &engine.config,
+									rule: &rule,
+									folder: &folder,
+									resource,
+									resources: vec![],
+								},
+							};
+							let mut passed_all_filters = true;
+							for filter in &rule.filters {
+								if !filter.filter(&ctx).await {
+									passed_all_filters = false;
+									break;
+								}
+							}
+							if passed_all_filters {
+								Some(ctx.scope.resource)
+							} else {
+								None
+							}
+						})
+					})
+					.collect_vec();
+
+				let mut resources: Vec<Resource> = future::join_all(filter_futures)
+					.await
+					.into_iter()
+					.filter_map(|a| a.ok())
+					.flatten()
+					.collect();
+
+				// ---- Action Stage ----
+				for action in rule.actions.iter() {
+					resources = match action.execution_model() {
+						ExecutionModel::Single => {
+							// 1. Create a vector of action futures.
+							let action_futures = resources.into_iter().map(|resource| {
+								let engine = self.clone();
+								let action = action.clone();
+								let rule = rule.clone();
+								let folder = folder.clone();
+								async move {
+									let ctx = ExecutionContext {
+										services: &engine.services,
+										settings: &engine.settings,
+										scope: ExecutionScope {
+											config: &engine.config,
+											rule: &rule,
+											folder: &folder,
+											resource,
+											resources: vec![],
+										},
+									};
+									// The action is executed, and we await its contract.
+									action.execute(&ctx).await.ok()
+								}
+							});
+
+							stream::iter(action_futures)
+								.buffer_unordered(CONCURRENT_OPERATIONS)
+								.filter_map(|contract| async { contract })
+								.map(|c| stream::iter(c.forward))
+								.flatten()
+								.collect()
+								.await
+						}
+						ExecutionModel::Batch => {
+							todo!()
+						}
+					};
+				}
 			}
 		}
 		Ok(())

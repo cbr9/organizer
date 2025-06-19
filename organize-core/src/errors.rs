@@ -3,7 +3,10 @@ use thiserror::Error;
 use zip::result::ZipError;
 
 use crate::{
-	config::{actions::email::EmailError, context::ExecutionScope},
+	config::{
+		// actions::email::EmailError,
+		context::ExecutionScope,
+	},
 	templates::template::Template,
 };
 
@@ -28,7 +31,7 @@ impl ErrorContext {
 
 /// The primary error type for all actions within the application.
 #[derive(Error, Debug)]
-pub enum ActionError {
+pub enum Error {
 	#[error("I/O error for path: {path:?}")]
 	Io {
 		#[source]
@@ -65,13 +68,12 @@ pub enum ActionError {
 		context: ErrorContext,
 	},
 
-	#[error("Email action failed")]
-	Email {
-		#[source]
-		source: EmailError,
-		context: ErrorContext,
-	},
-
+	// #[error("Email action failed")]
+	// Email {
+	// 	#[source]
+	// 	source: EmailError,
+	// 	context: ErrorContext,
+	// },
 	#[error("Script crashed. Check the final script at {script}")]
 	Script {
 		#[source]
@@ -89,18 +91,18 @@ pub enum ActionError {
 	},
 }
 
-impl ActionError {
+impl Error {
 	/// Helper method to consistently access the context from any error variant.
 	pub fn context(&self) -> &ErrorContext {
 		match self {
-			ActionError::Io { context, .. } => context,
-			ActionError::PathResolution { context, .. } => context,
-			ActionError::Template { context, .. } => context,
-			ActionError::Email { context, .. } => context,
-			ActionError::Extraction { context, .. } => context,
-			ActionError::Interaction { context, .. } => context,
-			ActionError::Script { context, .. } => context,
-			ActionError::Trash { context, .. } => context,
+			Error::Io { context, .. } => context,
+			Error::PathResolution { context, .. } => context,
+			Error::Template { context, .. } => context,
+			// Error::Email { context, .. } => context,
+			Error::Extraction { context, .. } => context,
+			Error::Interaction { context, .. } => context,
+			Error::Script { context, .. } => context,
+			Error::Trash { context, .. } => context,
 		}
 	}
 }

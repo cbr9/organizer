@@ -6,7 +6,10 @@ use std::{
 	path::PathBuf,
 };
 
-use crate::config::{actions::common::enabled, context::ExecutionContext};
+use crate::{
+	config::{actions::common::enabled, context::ExecutionContext},
+	templates::Context,
+};
 use anyhow::Result;
 use itertools::Itertools;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
@@ -58,8 +61,8 @@ impl Action for Write {
 		ExecutionModel::Collection
 	}
 
-	#[tracing::instrument(ret(level = "info"), err(Debug), level = "debug", skip(ctx))]
-	fn execute_collection(&self, resources: Vec<&Resource>, ctx: &ExecutionContext) -> Result<Option<Vec<PathBuf>>> {
+	fn execute(&self, ctx: &ExecutionContext) -> Result<Option<Vec<PathBuf>>> {
+		let resources = ctx.scope.resources;
 		if !self.enabled || resources.is_empty() {
 			let paths: Vec<PathBuf> = resources.iter().map(|res| res.path().to_path_buf()).collect();
 			return Ok(Some(paths));
@@ -68,13 +71,7 @@ impl Action for Write {
 		let mut texts_by_outfile: HashMap<PathBuf, Vec<String>> = resources
 			.par_iter()
 			.filter_map(|res| {
-				let context = ctx
-					.services
-					.templater
-					.context()
-					.path(res.path())
-					.root(res.root())
-					.build(&ctx.services.templater);
+				let context = Context::new(ctx);
 				let outfile_str = ctx.services.templater.render(&self.outfile, &context).ok()??;
 				let text = ctx.services.templater.render(&self.text, &context).ok()??;
 				Some((PathBuf::from(outfile_str), text))

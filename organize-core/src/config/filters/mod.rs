@@ -1,9 +1,10 @@
+use async_trait::async_trait;
 use dyn_clone::DynClone;
 use dyn_eq::DynEq;
+use futures::future;
 use itertools::Itertools;
-use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use serde::{Deserialize, Serialize};
-use std::fmt::Debug;
+use std::{fmt::Debug, sync::Arc};
 
 pub mod content;
 pub mod empty;
@@ -12,14 +13,15 @@ pub mod filename;
 pub mod mime;
 pub mod regex;
 
-use crate::{config::context::ExecutionContext, resource::Resource, templates::template::Template};
+use crate::{config::context::ExecutionContext, templates::template::Template};
 
 dyn_clone::clone_trait_object!(Filter);
 dyn_eq::eq_trait_object!(Filter);
 
+#[async_trait]
 #[typetag::serde(tag = "type")]
 pub trait Filter: DynClone + DynEq + Debug + Send + Sync {
-	fn filter(&self, res: &Resource, ctx: &ExecutionContext) -> bool;
+	async fn filter(&self, ctx: &ExecutionContext) -> bool;
 	fn templates(&self) -> Vec<&Template>;
 }
 
@@ -28,11 +30,12 @@ struct Not {
 	filter: Box<dyn Filter>,
 }
 
+#[async_trait]
 #[typetag::serde(name = "not")]
 impl Filter for Not {
 	#[tracing::instrument(ret, level = "debug", skip(ctx))]
-	fn filter(&self, res: &Resource, ctx: &ExecutionContext) -> bool {
-		!self.filter.filter(res, ctx)
+	async fn filter(&self, ctx: &ExecutionContext) -> bool {
+		!self.filter.filter(ctx).await
 	}
 
 	fn templates(&self) -> Vec<&Template> {
@@ -45,11 +48,14 @@ struct AnyOf {
 	filters: Vec<Box<dyn Filter>>,
 }
 
+#[async_trait]
 #[typetag::serde(name = "any_of")]
 impl Filter for AnyOf {
 	#[tracing::instrument(ret, level = "debug", skip(ctx))]
-	fn filter(&self, res: &Resource, ctx: &ExecutionContext) -> bool {
-		self.filters.iter().any(|f| f.filter(res, ctx))
+	async fn filter(&self, ctx: &ExecutionContext) -> bool {
+		let filter_futures = self.filters.iter().map(|f| f.filter(ctx));
+		let results: Vec<bool> = future::join_all(filter_futures).await;
+		results.iter().any(|&result| result)
 	}
 
 	fn templates(&self) -> Vec<&Template> {
@@ -62,11 +68,14 @@ struct AllOf {
 	filters: Vec<Box<dyn Filter>>,
 }
 
+#[async_trait]
 #[typetag::serde(name = "all_of")]
 impl Filter for AllOf {
 	#[tracing::instrument(ret, level = "debug", skip(ctx))]
-	fn filter(&self, res: &Resource, ctx: &ExecutionContext) -> bool {
-		self.filters.par_iter().all(|f| f.filter(res, ctx))
+	async fn filter(&self, ctx: &ExecutionContext) -> bool {
+		let filter_futures = self.filters.iter().map(|f| f.filter(ctx));
+		let results: Vec<bool> = future::join_all(filter_futures).await;
+		results.iter().all(|&result| result)
 	}
 
 	fn templates(&self) -> Vec<&Template> {
@@ -79,11 +88,14 @@ struct NoneOf {
 	filters: Vec<Box<dyn Filter>>,
 }
 
+#[async_trait]
 #[typetag::serde(name = "none_of")]
 impl Filter for NoneOf {
 	#[tracing::instrument(ret, level = "debug", skip(ctx))]
-	fn filter(&self, res: &Resource, ctx: &ExecutionContext) -> bool {
-		!self.filters.iter().any(|f| f.filter(res, ctx))
+	async fn filter(&self, ctx: &ExecutionContext) -> bool {
+		let filter_futures = self.filters.iter().map(|f| f.filter(ctx));
+		let results: Vec<bool> = future::join_all(filter_futures).await;
+		!results.iter().any(|&result| result)
 	}
 
 	fn templates(&self) -> Vec<&Template> {

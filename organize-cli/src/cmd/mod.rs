@@ -1,4 +1,5 @@
 use crate::cmd::run::Run;
+use async_trait::async_trait;
 use clap::{Parser, Subcommand};
 use edit::Edit;
 
@@ -19,15 +20,17 @@ pub struct App {
 	command: Command,
 }
 
+#[async_trait]
 pub trait Cmd {
-	fn run(self) -> anyhow::Result<()>;
+	async fn run(self) -> anyhow::Result<()>;
 }
 
+#[async_trait]
 impl Cmd for App {
-	fn run(self) -> anyhow::Result<()> {
+	async fn run(self) -> anyhow::Result<()> {
 		match self.command {
-			Command::Run(cmd) => cmd.run(),
-			Command::Edit(edit) => edit.run(),
+			Command::Run(cmd) => cmd.run().await,
+			Command::Edit(edit) => edit.run().await,
 		}
 	}
 }

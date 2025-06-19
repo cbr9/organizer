@@ -48,7 +48,8 @@ impl Options {
 	) -> Self {
 		// Establish the ultimate fallback defaults for any un-defined option
 		let fallback = Self::default();
-		let context = template_engine.context().root(folder_path).build(&template_engine);
+		let mut context = tera::Context::new();
+		context.insert("root", folder_path);
 
 		Self {
 			max_depth: folder

@@ -1,7 +1,7 @@
 use config::{Config as LayeredConfig, File};
 use itertools::Itertools;
 use rule::{Rule, RuleBuilder};
-use std::{collections::HashSet, path::PathBuf};
+use std::{collections::HashSet, path::PathBuf, sync::Arc};
 
 use anyhow::{anyhow, Context as ErrorContext, Result};
 use serde::Deserialize;
@@ -32,7 +32,7 @@ pub struct ConfigBuilder {
 impl ConfigBuilder {
 	/// Consumes the builder and returns a final, validated `Config`.
 	/// The `defaults` are used in the build process but are not stored in the final `Config`.
-	pub fn build(self, template_engine: &mut Templater, tags: Option<Vec<String>>, ids: Option<Vec<String>>) -> Result<Config> {
+	pub fn build(self, template_engine: &mut Templater, tags: &Option<Vec<String>>, ids: &Option<Vec<String>>) -> Result<Config> {
 		let mut positive_tags = HashSet::new();
 		let mut negative_tags = HashSet::new();
 		if let Some(tags) = tags {

@@ -1,4 +1,4 @@
-use dashmap::DashMap;
+use dashmap::{DashMap, DashSet};
 use std::{
 	any::Any,
 	collections::HashMap,
@@ -10,36 +10,38 @@ use lettre::{message::Mailbox, transport::smtp::authentication::Credentials};
 
 use crate::{
 	config::{folders::Folder, rule::Rule, Config},
+	path::locker::Locker,
+	resource::Resource,
 	templates::Templater,
 };
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct RunServices {
 	pub templater: Templater,
 	pub blackboard: Blackboard,
+}
+
+#[derive(PartialEq, Eq, Hash, Clone, Debug)]
+pub struct VariableCacheKey {
+	pub rule_index: usize,
+	pub variable_name: String,
+	pub resource_path: PathBuf,
 }
 
 #[derive(Debug, Default, Clone)]
 pub struct Blackboard {
 	pub credentials: Arc<RwLock<HashMap<Mailbox, Credentials>>>,
 	pub content: Arc<DashMap<PathBuf, Arc<String>>>,
+	pub variables: Arc<DashMap<VariableCacheKey, tera::Value>>,
+	pub locker: Locker,
 	pub scratchpad: Arc<DashMap<String, Box<dyn Any + Send + Sync>>>,
-}
-
-impl Default for RunServices {
-	fn default() -> Self {
-		Self {
-			templater: Templater::default(),
-			blackboard: Blackboard::default(),
-		}
-	}
+	pub simulated_paths: Arc<DashSet<PathBuf>>,
 }
 
 /// A container for run-wide operational settings.
 #[derive(Debug, Clone, Copy)]
 pub struct RunSettings {
 	pub dry_run: bool,
-	pub no_parallel: bool,
 }
 
 /// A read-only "view" into the current position in the configuration tree.
@@ -48,6 +50,8 @@ pub struct ExecutionScope<'a> {
 	pub config: &'a Config,
 	pub rule: &'a Rule,
 	pub folder: &'a Folder,
+	pub resource: Resource,
+	pub resources: Vec<Resource>,
 }
 
 /// The top-level context object, composed of the three distinct categories of information.
@@ -58,45 +62,51 @@ pub struct ExecutionContext<'a> {
 	pub settings: &'a RunSettings,
 }
 
-#[cfg(test)]
-pub struct ContextHarness {
-	pub services: RunServices,
-	pub settings: RunSettings,
-	pub config: Config,
-	pub rule: Rule,
-	pub folder: Folder,
-}
+// #[cfg(test)]
+// pub struct ContextHarness {
+// 	pub services: RunServices,
+// 	pub settings: RunSettings,
+// 	pub config: Config,
+// 	pub rule: Rule,
+// 	pub folder: Folder,
+// 	pub resource: Resource,
+// 	pub resources: Vec<Resource>,
+// }
 
-#[cfg(test)]
-impl<'a> ContextHarness {
-	/// Creates a new harness with default, dummy data.
-	pub fn new() -> Self {
-		Self {
-			services: RunServices::default(),
-			config: Config::default(),
-			settings: RunSettings {
-				dry_run: true,
-				no_parallel: true,
-			},
-			rule: Rule::default(),
-			folder: Folder::default(),
-		}
-	}
+// #[cfg(test)]
+// impl<'a> ContextHarness {
+// 	/// Creates a new harness with default, dummy data.
+// 	pub fn new(resource: Resource, resources: Vec<Resource>) -> Self {
+// 		Self {
+// 			services: RunServices::default(),
+// 			config: Config::default(),
+// 			settings: RunSettings {
+// 				dry_run: true,
+// 				no_parallel: true,
+// 			},
+// 			rule: Rule::default(),
+// 			folder: Folder::default(),
+// 			resource,
+// 			resources,
+// 		}
+// 	}
 
-	/// Returns a valid `ExecutionContext` with references to the harness's data.
-	pub fn context(&'a self) -> ExecutionContext<'a> {
-		let scope = ExecutionScope {
-			config: &self.config,
-			rule: &self.rule,
-			folder: &self.folder,
-		};
-		ExecutionContext {
-			services: &self.services,
-			settings: &self.settings,
-			scope,
-		}
-	}
-}
+// 	/// Returns a valid `ExecutionContext` with references to the harness's data.
+// 	pub fn context(&'a self) -> ExecutionContext<'a> {
+// 		let scope = ExecutionScope {
+// 			config: &self.config,
+// 			rule: &self.rule,
+// 			folder: &self.folder,
+// 			resource: &self.resource,
+// 			resources: &self.resources,
+// 		};
+// 		ExecutionContext {
+// 			services: &self.services,
+// 			settings: &self.settings,
+// 			scope,
+// 		}
+// 	}
+// }
 // Provide `Default` implementations for the final, compiled structs.
 // These are only compiled for tests and allow for easy instantiation of dummy objects.
 #[cfg(test)]
@@ -121,6 +131,7 @@ impl Default for Rule {
 			actions: Default::default(),
 			filters: Default::default(),
 			folders: Default::default(),
+			variables: Default::default(),
 		}
 	}
 }

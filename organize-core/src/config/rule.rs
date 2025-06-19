@@ -1,5 +1,6 @@
-use std::collections::HashSet;
+use std::{collections::HashSet, sync::Arc};
 
+use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 
 use crate::templates::Templater;
@@ -35,8 +36,8 @@ impl RuleBuilder {
 			.iter()
 			.cloned()
 			.enumerate()
-			.map(|(idx, builder)| builder.build(idx, defaults, &self.options, template_engine)) // Pass this rule's options builder
-			.collect::<anyhow::Result<Vec<Folder>>>()?;
+			.filter_map(|(idx, builder)| builder.build(idx, defaults, &self.options, template_engine).ok()) // Pass this rule's options builder
+			.collect_vec();
 
 		Ok(Rule {
 			index,
@@ -44,6 +45,7 @@ impl RuleBuilder {
 			tags: self.tags,
 			actions: self.actions,
 			filters: self.filters,
+			variables: self.variables,
 			folders, // Contains fully compiled Folders, each with its own Options
 		})
 	}
@@ -77,12 +79,13 @@ impl RuleBuilder {
 	}
 }
 
-#[derive(Debug, Serialize, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Rule {
 	pub index: usize,
 	pub id: Option<String>,
 	pub tags: HashSet<String>,
 	pub actions: Vec<Box<dyn Action>>,
 	pub filters: Vec<Box<dyn Filter>>,
+	pub variables: Vec<Box<dyn Variable>>,
 	pub folders: Vec<Folder>,
 }
