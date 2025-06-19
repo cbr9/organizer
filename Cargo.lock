@@ -1636,7 +1636,6 @@ dependencies = [
  "trash",
  "typetag",
  "uuid",
- "valuable",
  "walkdir",
  "zip 2.4.2",
  "zip-extensions",

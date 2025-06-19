@@ -1,10 +1,10 @@
 use crate::{
 	config::{
-		context::{ExecutionContext, ExecutionScope, RunServices, RunSettings},
+		context::{Blackboard, ExecutionContext, ExecutionScope, RunServices, RunSettings},
 		Config,
 		ConfigBuilder,
 	},
-	templates::TemplateEngine,
+	templates::Templater,
 };
 use anyhow::Result;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
@@ -21,13 +21,12 @@ pub struct Engine {
 impl Engine {
 	pub fn new(path: Option<PathBuf>, settings: RunSettings, tags: Option<Vec<String>>, ids: Option<Vec<String>>) -> Result<Self> {
 		let config_builder = ConfigBuilder::new(path)?;
-		let mut engine = TemplateEngine::from_config(&config_builder)?;
+		let mut engine = Templater::from_config(&config_builder)?;
 		let config = config_builder.build(&mut engine, tags, ids)?;
 
 		let services = RunServices {
-			template_engine: engine,
-			credential_cache: Default::default(),
-			content_cache: Default::default(),
+			templater: engine,
+			blackboard: Blackboard::default(),
 		};
 		Ok(Self { config, services, settings })
 	}

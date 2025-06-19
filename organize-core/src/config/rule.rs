@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use serde::{Deserialize, Serialize};
 
-use crate::templates::TemplateEngine;
+use crate::templates::Templater;
 
 use super::{
 	actions::Action,
@@ -29,7 +29,7 @@ pub struct RuleBuilder {
 }
 
 impl RuleBuilder {
-	pub fn build(self, index: usize, defaults: &OptionsBuilder, template_engine: &mut TemplateEngine) -> anyhow::Result<Rule> {
+	pub fn build(self, index: usize, defaults: &OptionsBuilder, template_engine: &mut Templater) -> anyhow::Result<Rule> {
 		let folders = self
 			.folders
 			.iter()

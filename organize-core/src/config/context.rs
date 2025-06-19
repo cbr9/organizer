@@ -1,5 +1,6 @@
 use dashmap::DashMap;
 use std::{
+	any::Any,
 	collections::HashMap,
 	path::PathBuf,
 	sync::{Arc, RwLock},
@@ -9,22 +10,27 @@ use lettre::{message::Mailbox, transport::smtp::authentication::Credentials};
 
 use crate::{
 	config::{folders::Folder, rule::Rule, Config},
-	templates::TemplateEngine,
+	templates::Templater,
 };
 
 #[derive(Debug, Clone)]
 pub struct RunServices {
-	pub template_engine: TemplateEngine,
-	pub credential_cache: Arc<RwLock<HashMap<Mailbox, Credentials>>>,
-	pub content_cache: Arc<DashMap<PathBuf, Arc<String>>>,
+	pub templater: Templater,
+	pub blackboard: Blackboard,
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct Blackboard {
+	pub credentials: Arc<RwLock<HashMap<Mailbox, Credentials>>>,
+	pub content: Arc<DashMap<PathBuf, Arc<String>>>,
+	pub scratchpad: Arc<DashMap<String, Box<dyn Any + Send + Sync>>>,
 }
 
 impl Default for RunServices {
 	fn default() -> Self {
 		Self {
-			template_engine: TemplateEngine::default(),
-			credential_cache: Arc::new(RwLock::new(HashMap::new())),
-			content_cache: Arc::new(DashMap::new()),
+			templater: Templater::default(),
+			blackboard: Blackboard::default(),
 		}
 	}
 }

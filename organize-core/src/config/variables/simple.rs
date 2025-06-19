@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use tera::Context;
 
 use super::Variable;
-use crate::templates::{template::Template, TemplateEngine};
+use crate::templates::{template::Template, Templater};
 
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
 pub struct SimpleVariable {
@@ -16,7 +16,7 @@ impl Variable for SimpleVariable {
 		vec![&self.value]
 	}
 
-	fn register(&self, template_engine: &TemplateEngine, context: &mut Context) {
+	fn register(&self, template_engine: &Templater, context: &mut Context) {
 		let value = template_engine.render(&self.value, context).unwrap();
 		context.insert(&self.name, &value);
 	}

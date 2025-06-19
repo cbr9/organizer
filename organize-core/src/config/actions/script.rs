@@ -1,4 +1,5 @@
 use std::{
+	convert::TryFrom,
 	path::PathBuf,
 	process::{Command, Output, Stdio},
 	str::FromStr,
@@ -82,14 +83,14 @@ impl Filter for Script {
 }
 
 impl Script {
-	pub fn new<T: Into<String>, C: Into<Template>>(exec: T, content: C) -> Self {
-		Self {
-			exec: exec.into(),
-			content: content.into(),
+	pub fn new<T: AsRef<str>, C: AsRef<str>>(exec: T, content: C) -> Result<Self, tera::Error> {
+		Ok(Self {
+			exec: exec.as_ref().to_string(),
+			content: Template::try_from(content.as_ref()).unwrap(),
 			args: vec![],
 			enabled: true,
 			parallel: false,
-		}
+		})
 	}
 
 	fn write(&self, res: &Resource, ctx: &ExecutionContext) -> Result<PathBuf, ActionError> {
@@ -104,15 +105,15 @@ impl Script {
 
 		let context = ctx
 			.services
-			.template_engine
+			.templater
 			.context()
 			.path(res.path())
 			.root(res.root())
-			.build(&ctx.services.template_engine);
+			.build(&ctx.services.templater);
 
 		let maybe_rendered = ctx
 			.services
-			.template_engine
+			.templater
 			.render(&self.content, &context)
 			.map_err(|e| ActionError::Template {
 				source: e,
@@ -155,7 +156,7 @@ impl Script {
 
 #[cfg(test)]
 mod tests {
-	use crate::{config::context::ContextHarness, templates::TemplateEngine};
+	use crate::{config::context::ContextHarness, templates::Templater};
 
 	use super::*;
 
@@ -163,16 +164,16 @@ mod tests {
 	fn test_script_filter() -> Result<()> {
 		let src = Resource::new("/home", "/").unwrap();
 		let content = String::from("print('huh')\nprint('{{path}}'.islower())");
-		let mut script = Script::new("python", content.clone());
-		let mut template_engine = TemplateEngine::default();
-		template_engine.add_templates(&Filter::templates(&script))?;
+		let mut script = Script::new("python", content.clone()).unwrap();
+		let mut template_engine = Templater::default();
+		template_engine.add_templates(Filter::templates(&script))?;
 		let mut harness = ContextHarness::new();
-		harness.services.template_engine = template_engine;
+		harness.services.templater = template_engine;
 		let ctx = harness.context();
 
 		script.run_script(&src, &ctx).unwrap_or_else(|_| {
 			// some linux distributions don't have a `python` executable, but a `python3`
-			script = Script::new("python3", content);
+			script = Script::new("python3", content).unwrap();
 			script.run_script(&src, &ctx).unwrap()
 		});
 		assert!(script.filter(&src, &ctx));

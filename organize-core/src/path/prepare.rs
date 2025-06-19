@@ -23,15 +23,15 @@ pub fn prepare_target_path(
 ) -> Result<Option<GuardedPath>, ActionError> {
 	let context = ctx
 		.services
-		.template_engine
+		.templater
 		.context()
 		.path(res.path())
 		.root(res.root())
-		.build(&ctx.services.template_engine);
+		.build(&ctx.services.templater);
 
 	let Some(mut target_path) = ctx
 		.services
-		.template_engine
+		.templater
 		.render(dest, &context)
 		.map_err(|e| ActionError::Template {
 			source: e,
@@ -76,11 +76,15 @@ mod tests {
 	use super::*;
 	use crate::{
 		config::{context::ContextHarness, variables::simple::SimpleVariable},
-		templates::TemplateEngine,
+		templates::Templater,
 	};
 	use path_clean::PathClean;
 	use pretty_assertions::assert_eq;
-	use std::{fs, path::Path};
+	use std::{
+		convert::{TryFrom, TryInto},
+		fs,
+		path::Path,
+	};
 	use tempfile::{tempdir, NamedTempFile};
 
 	// Helper function to create a Resource from a tempfile.
@@ -94,10 +98,10 @@ mod tests {
 	fn destination_is_dir_with_extension() {
 		let temp_file = NamedTempFile::new().unwrap();
 		let resource = create_resource(&temp_file);
-		let dest_template = Template::from("/tmp/test_dir/");
+		let dest_template = Template::try_from("/tmp/test_dir/").unwrap();
 
 		let mut harness = ContextHarness::new();
-		harness.services.template_engine.add_template(&dest_template).unwrap();
+		harness.services.templater.add_template(&dest_template).unwrap();
 		let ctx = harness.context(); // Create a dry run context
 
 		let result = prepare_target_path(&ConflictResolution::Skip, &resource, &dest_template, true, &ctx).unwrap();
@@ -116,10 +120,10 @@ mod tests {
 		let resource = create_resource(&temp_file);
 		let dest_dir = temp_dir.path().join("test_dir");
 		fs::create_dir_all(&dest_dir).unwrap();
-		let dest_template = Template::from(dest_dir.to_str().unwrap());
+		let dest_template = Template::try_from(dest_dir.to_str().unwrap()).unwrap();
 
 		let mut harness = ContextHarness::new();
-		harness.services.template_engine.add_template(&dest_template).unwrap();
+		harness.services.templater.add_template(&dest_template).unwrap();
 		let ctx = harness.context(); // dry run
 
 		let result = prepare_target_path(&ConflictResolution::Skip, &resource, &dest_template, false, &ctx).unwrap();
@@ -135,16 +139,16 @@ mod tests {
 	fn destination_with_templated_variable() {
 		let temp_file = NamedTempFile::new().unwrap();
 		let resource = create_resource(&temp_file);
-		let dest_template = Template::from("/tmp/{{ name }}/");
+		let dest_template = Template::try_from("/tmp/{{ name }}/").unwrap();
 
 		let variable = SimpleVariable {
 			name: "name".into(),
-			value: "rendered_dir".into(),
+			value: "rendered_dir".try_into().unwrap(),
 		};
 		let mut harness = ContextHarness::new();
-		let template_engine = TemplateEngine::new(&vec![Box::new(variable)]);
-		harness.services.template_engine = template_engine;
-		harness.services.template_engine.add_template(&dest_template).unwrap();
+		let template_engine = Templater::new(&vec![Box::new(variable)]);
+		harness.services.templater = template_engine;
+		harness.services.templater.add_template(&dest_template).unwrap();
 		let ctx = harness.context(); // dry run
 
 		let result = prepare_target_path(&ConflictResolution::Skip, &resource, &dest_template, true, &ctx).unwrap();
@@ -160,10 +164,10 @@ mod tests {
 	fn conflict_skip_existing_file() {
 		let temp_file = NamedTempFile::new().unwrap(); // This file exists
 		let resource = create_resource(&temp_file);
-		let dest_template = Template::from(temp_file.path().to_str().unwrap());
+		let dest_template = Template::try_from(temp_file.path().to_str().unwrap()).unwrap();
 
 		let mut harness = ContextHarness::new();
-		harness.services.template_engine.add_template(&dest_template).unwrap();
+		harness.services.templater.add_template(&dest_template).unwrap();
 		let ctx = harness.context(); // dry run
 
 		let result = prepare_target_path(&ConflictResolution::Skip, &resource, &dest_template, true, &ctx).unwrap();
@@ -178,10 +182,10 @@ mod tests {
 	fn conflict_overwrite_existing_file() {
 		let temp_file = NamedTempFile::new().unwrap();
 		let resource = create_resource(&temp_file);
-		let dest_template = Template::from(temp_file.path().to_str().unwrap());
+		let dest_template = Template::try_from(temp_file.path().to_str().unwrap()).unwrap();
 
 		let mut harness = ContextHarness::new();
-		harness.services.template_engine.add_template(&dest_template).unwrap();
+		harness.services.templater.add_template(&dest_template).unwrap();
 		let ctx = harness.context(); // dry run
 
 		let result = prepare_target_path(&ConflictResolution::Overwrite, &resource, &dest_template, true, &ctx).unwrap();
@@ -194,10 +198,10 @@ mod tests {
 	fn conflict_rename_existing_file() {
 		let temp_file = NamedTempFile::with_suffix(".txt").unwrap();
 		let resource = create_resource(&temp_file);
-		let dest_template = Template::from(temp_file.path().to_str().unwrap());
+		let dest_template = Template::try_from(temp_file.path().to_str().unwrap()).unwrap();
 
 		let mut harness = ContextHarness::new();
-		harness.services.template_engine.add_template(&dest_template).unwrap();
+		harness.services.templater.add_template(&dest_template).unwrap();
 		let ctx = harness.context(); // dry run
 
 		let result = prepare_target_path(&ConflictResolution::Rename, &resource, &dest_template, true, &ctx).unwrap();
@@ -214,10 +218,10 @@ mod tests {
 	fn destination_is_filename_only() {
 		let temp_file = NamedTempFile::new().unwrap();
 		let resource = create_resource(&temp_file);
-		let dest_template = Template::from("just_a_filename.txt");
+		let dest_template = Template::try_from("just_a_filename.txt").unwrap();
 
 		let mut harness = ContextHarness::new();
-		harness.services.template_engine.add_template(&dest_template).unwrap();
+		harness.services.templater.add_template(&dest_template).unwrap();
 		let ctx = harness.context(); // dry run
 
 		let result = prepare_target_path(&ConflictResolution::Skip, &resource, &dest_template, true, &ctx).unwrap();
@@ -230,10 +234,10 @@ mod tests {
 	fn destination_expands_user_home() {
 		let temp_file = NamedTempFile::new().unwrap();
 		let resource = create_resource(&temp_file);
-		let dest_template = Template::from("~/test_dir/output.txt");
+		let dest_template = Template::try_from("~/test_dir/output.txt").unwrap();
 
 		let mut harness = ContextHarness::new();
-		harness.services.template_engine.add_template(&dest_template).unwrap();
+		harness.services.templater.add_template(&dest_template).unwrap();
 		let ctx = harness.context(); // dry run
 
 		let result = prepare_target_path(&ConflictResolution::Skip, &resource, &dest_template, true, &ctx).unwrap();
@@ -251,10 +255,10 @@ mod tests {
 		fs::write(&original_path, "original").unwrap();
 		fs::write(dir.path().join("file (1).txt"), "first conflict").unwrap();
 		let resource = Resource::new(&original_path, dir.path()).unwrap();
-		let dest_template = Template::from(original_path.to_str().unwrap());
+		let dest_template = Template::try_from(original_path.to_str().unwrap()).unwrap();
 
 		let mut harness = ContextHarness::new();
-		harness.services.template_engine.add_template(&dest_template).unwrap();
+		harness.services.templater.add_template(&dest_template).unwrap();
 		let ctx = harness.context(); // dry run
 
 		let result = prepare_target_path(&ConflictResolution::Rename, &resource, &dest_template, true, &ctx).unwrap();
@@ -268,16 +272,16 @@ mod tests {
 	fn destination_template_renders_to_empty() {
 		let temp_file = NamedTempFile::new().unwrap();
 		let resource = create_resource(&temp_file);
-		let dest_template = Template::from("{{ empty_var }}");
+		let dest_template = Template::try_from("{{ empty_var }}").unwrap();
 		let variable = SimpleVariable {
 			name: "empty_var".into(),
-			value: "".into(),
+			value: "".try_into().unwrap(),
 		};
 
 		let mut harness = ContextHarness::new();
-		let template_engine = TemplateEngine::new(&vec![Box::new(variable)]);
-		harness.services.template_engine = template_engine;
-		harness.services.template_engine.add_template(&dest_template).unwrap();
+		let template_engine = Templater::new(&vec![Box::new(variable)]);
+		harness.services.templater = template_engine;
+		harness.services.templater.add_template(&dest_template).unwrap();
 		let ctx = harness.context(); // dry run
 
 		let result = prepare_target_path(&ConflictResolution::Skip, &resource, &dest_template, true, &ctx).unwrap();

@@ -70,13 +70,13 @@ impl Action for Write {
 			.filter_map(|res| {
 				let context = ctx
 					.services
-					.template_engine
+					.templater
 					.context()
 					.path(res.path())
 					.root(res.root())
-					.build(&ctx.services.template_engine);
-				let outfile_str = ctx.services.template_engine.render(&self.outfile, &context).ok()??;
-				let text = ctx.services.template_engine.render(&self.text, &context).ok()??;
+					.build(&ctx.services.templater);
+				let outfile_str = ctx.services.templater.render(&self.outfile, &context).ok()??;
+				let text = ctx.services.templater.render(&self.text, &context).ok()??;
 				Some((PathBuf::from(outfile_str), text))
 			})
 			.collect::<Vec<(PathBuf, String)>>() // Collect to un-parallelize before grouping

@@ -121,16 +121,16 @@ impl Action for Email {
 
 			let context = ctx
 				.services
-				.template_engine
+				.templater
 				.context()
 				.path(res.path())
 				.root(res.root())
-				.build(&ctx.services.template_engine);
+				.build(&ctx.services.templater);
 
 			if let Some(subject) = &self.subject {
 				let maybe_rendered = ctx
 					.services
-					.template_engine
+					.templater
 					.render(subject, &context)
 					.map_err(|e| ActionError::Template {
 						source: e,
@@ -149,7 +149,7 @@ impl Action for Email {
 			if let Some(body) = &self.body {
 				let maybe_rendered = ctx
 					.services
-					.template_engine
+					.templater
 					.render(body, &context)
 					.map_err(|e| ActionError::Template {
 						source: e,
@@ -183,7 +183,7 @@ impl Action for Email {
 			})?;
 
 			let creds = self
-				.get_or_insert_credentials(&ctx.services.credential_cache)
+				.get_or_insert_credentials(&ctx.services.blackboard.credentials)
 				.map_err(|e| ActionError::Email {
 					source: e,
 					context: ErrorContext::from_scope(&ctx.scope),

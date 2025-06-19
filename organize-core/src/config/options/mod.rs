@@ -2,7 +2,7 @@ use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use std::{fmt::Debug, path::PathBuf};
 
-use crate::templates::{template::Template, TemplateEngine};
+use crate::templates::{template::Template, Templater};
 
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
@@ -43,7 +43,7 @@ impl Options {
 		defaults: &OptionsBuilder,
 		rule: &OptionsBuilder,
 		folder: &OptionsBuilder,
-		template_engine: &mut TemplateEngine,
+		template_engine: &mut Templater,
 		folder_path: &PathBuf,
 	) -> Self {
 		// Establish the ultimate fallback defaults for any un-defined option
@@ -67,7 +67,7 @@ impl Options {
 				.map(|templates| {
 					templates
 						.into_iter()
-						.filter_map(|t| template_engine.tera.render_str(&t.text, &context).ok())
+						.filter_map(|t| template_engine.tera.render_str(&t.input, &context).ok())
 						.map(PathBuf::from)
 						.collect_vec()
 				})
@@ -75,7 +75,7 @@ impl Options {
 					rule.exclude.clone().map(|templates| {
 						templates
 							.into_iter()
-							.filter_map(|t| template_engine.tera.render_str(&t.text, &context).ok())
+							.filter_map(|t| template_engine.tera.render_str(&t.input, &context).ok())
 							.map(PathBuf::from)
 							.collect_vec()
 					})
@@ -84,7 +84,7 @@ impl Options {
 					defaults.exclude.clone().map(|templates| {
 						templates
 							.into_iter()
-							.filter_map(|t| template_engine.tera.render_str(&t.text, &context).ok())
+							.filter_map(|t| template_engine.tera.render_str(&t.input, &context).ok())
 							.map(PathBuf::from)
 							.collect_vec()
 					})

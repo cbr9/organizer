@@ -4,12 +4,12 @@ use uuid::Uuid;
 #[derive(Serialize, Default, Debug, Clone)]
 pub struct Template {
 	pub id: String,
-	pub text: String,
+	pub input: String,
 }
 
 impl PartialEq for Template {
 	fn eq(&self, other: &Self) -> bool {
-		self.text == other.text
+		self.input == other.input
 	}
 }
 
@@ -28,14 +28,14 @@ impl<'de> Deserialize<'de> for Template {
 
 impl From<Template> for String {
 	fn from(val: Template) -> Self {
-		val.text
+		val.input
 	}
 }
 
 impl<T: AsRef<str>> From<T> for Template {
 	fn from(val: T) -> Self {
 		Template {
-			text: val.as_ref().to_string(),
+			input: val.as_ref().to_string(),
 			id: Uuid::new_v4().to_string(),
 		}
 	}

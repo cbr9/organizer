@@ -30,14 +30,14 @@ impl Action for Echo {
 		if self.enabled {
 			let context = ctx
 				.services
-				.template_engine
+				.templater
 				.context()
 				.path(res.path())
 				.root(res.root())
-				.build(&ctx.services.template_engine);
+				.build(&ctx.services.templater);
 
 			ctx.services
-				.template_engine
+				.templater
 				.render(&self.message, &context)
 				.map_err(|e| ActionError::Template {
 					source: e,

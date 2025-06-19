@@ -29,19 +29,18 @@ impl Action for Move {
 
 	#[tracing::instrument(name = "move", ret(level = "info"), err, level = "debug", skip(self, ctx, ), fields(if_exists = %self.on_conflict, path = %res.path().display()))]
 	fn execute(&self, res: &Resource, ctx: &ExecutionContext) -> Result<Option<PathBuf>, ActionError> {
-		match prepare_target_path(&self.on_conflict, res, &self.to, true, ctx)? {
-			Some(target) => {
-				if !ctx.settings.dry_run && self.enabled {
-					std::fs::rename(res.path(), &target).map_err(|e| ActionError::Io {
-						source: e,
-						path: res.path().to_path_buf(),
-						target: Some(target.clone().to_path_buf()),
-						context: ErrorContext::from_scope(&ctx.scope),
-					})?;
-				}
-				Ok(Some(target.to_path_buf()))
-			}
-			None => Ok(None),
+		let Some(target) = prepare_target_path(&self.on_conflict, res, &self.to, true, ctx)? else {
+			return Ok(None);
+		};
+
+		if !ctx.settings.dry_run && self.enabled {
+			std::fs::rename(res.path(), &target).map_err(|e| ActionError::Io {
+				source: e,
+				path: res.path().to_path_buf(),
+				target: Some(target.clone().to_path_buf()),
+				context: ErrorContext::from_scope(&ctx.scope),
+			})?;
 		}
+		Ok(Some(target.to_path_buf()))
 	}
 }

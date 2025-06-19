@@ -46,11 +46,11 @@ impl Filter for Filename {
 
 		let context = ctx
 			.services
-			.template_engine
+			.templater
 			.context()
 			.path(res.path())
 			.root(res.root())
-			.build(&ctx.services.template_engine);
+			.build(&ctx.services.templater);
 
 		let startswith = if self.startswith.is_empty() {
 			true
@@ -58,10 +58,10 @@ impl Filter for Filename {
 			self.startswith.iter().any(|template| {
 				// The rendered string must also be lowercased for a case-insensitive match.
 				let pattern = {
-					let rendered = if let Some(rendered) = ctx.services.template_engine.render(template, &context).unwrap_or_default() {
+					let rendered = if let Some(rendered) = ctx.services.templater.render(template, &context).unwrap_or_default() {
 						rendered
 					} else {
-						template.text.clone()
+						template.input.clone()
 					};
 
 					if self.case_sensitive {
@@ -91,10 +91,10 @@ impl Filter for Filename {
 		} else {
 			self.endswith.iter().any(|template| {
 				let pattern = {
-					let rendered = if let Some(rendered) = ctx.services.template_engine.render(template, &context).unwrap_or_default() {
+					let rendered = if let Some(rendered) = ctx.services.templater.render(template, &context).unwrap_or_default() {
 						rendered
 					} else {
-						template.text.clone()
+						template.input.clone()
 					};
 
 					if self.case_sensitive {
@@ -124,10 +124,10 @@ impl Filter for Filename {
 		} else {
 			self.contains.iter().any(|template| {
 				let pattern = {
-					let rendered = if let Some(rendered) = ctx.services.template_engine.render(template, &context).unwrap_or_default() {
+					let rendered = if let Some(rendered) = ctx.services.templater.render(template, &context).unwrap_or_default() {
 						rendered
 					} else {
-						template.text.clone()
+						template.input.clone()
 					};
 
 					if self.case_sensitive {
@@ -158,6 +158,8 @@ impl Filter for Filename {
 
 #[cfg(test)]
 mod tests {
+	use std::convert::TryInto;
+
 	use crate::config::context::ContextHarness;
 
 	use super::*;
@@ -166,7 +168,7 @@ mod tests {
 	fn match_beginning_case_insensitive() {
 		let path = Resource::new("$HOME/Downloads/test.pdf", "").unwrap();
 		let filename = Filename {
-			startswith: vec!["TE".into()],
+			startswith: vec!["TE".try_into().unwrap()],
 			..Default::default()
 		};
 		let harness = ContextHarness::new();
@@ -178,7 +180,7 @@ mod tests {
 	fn match_ending_case_insensitive() {
 		let path = Resource::new("$HOME/Downloads/test.pdf", "").unwrap();
 		let filename = Filename {
-			endswith: vec!["DF".into()],
+			endswith: vec!["DF".try_into().unwrap()],
 			..Default::default()
 		};
 		let harness = ContextHarness::new();
@@ -190,7 +192,7 @@ mod tests {
 	fn match_containing_case_insensitive() {
 		let path = Resource::new("$HOME/Downloads/test.pdf", "").unwrap();
 		let filename = Filename {
-			contains: vec!["ES".into()],
+			contains: vec!["ES".try_into().unwrap()],
 			..Default::default()
 		};
 		let harness = ContextHarness::new();
@@ -203,7 +205,7 @@ mod tests {
 		let path = Resource::new("$HOME/Downloads/test.pdf", "").unwrap();
 		let filename = Filename {
 			case_sensitive: true,
-			startswith: vec!["TE".into()],
+			startswith: vec!["TE".try_into().unwrap()],
 			..Default::default()
 		};
 		let harness = ContextHarness::new();
@@ -216,7 +218,7 @@ mod tests {
 		let path = Resource::new("$HOME/Downloads/test.pdf", "").unwrap();
 		let filename = Filename {
 			case_sensitive: true,
-			startswith: vec!["DF".into()],
+			startswith: vec!["DF".try_into().unwrap()],
 			..Default::default()
 		};
 		let harness = ContextHarness::new();
@@ -229,7 +231,7 @@ mod tests {
 		let path = Resource::new("$HOME/Downloads/test.pdf", "").unwrap();
 		let filename = Filename {
 			case_sensitive: true,
-			contains: vec!["ES".into()],
+			contains: vec!["ES".try_into().unwrap()],
 			..Default::default()
 		};
 		let harness = ContextHarness::new();
@@ -241,7 +243,7 @@ mod tests {
 		let path = Resource::new("$HOME/Downloads/tESt.pdf", "").unwrap();
 		let filename = Filename {
 			case_sensitive: true,
-			contains: vec!["ES".into()],
+			contains: vec!["ES".try_into().unwrap()],
 			..Default::default()
 		};
 		let harness = ContextHarness::new();
@@ -253,9 +255,9 @@ mod tests {
 		let path = Resource::new("$HOME/Downloads/tESt.pdf", "").unwrap();
 		let filename = Filename {
 			case_sensitive: true,
-			contains: vec!["ES".into()],
-			startswith: vec!["t".into()],
-			endswith: vec!["df".into()],
+			contains: vec!["ES".try_into().unwrap()],
+			startswith: vec!["t".try_into().unwrap()],
+			endswith: vec!["df".try_into().unwrap()],
 		};
 		let harness = ContextHarness::new();
 		let context = harness.context();
@@ -266,9 +268,9 @@ mod tests {
 		let path = Resource::new("$HOME/Downloads/tESt.pdf", "").unwrap();
 		let filename = Filename {
 			case_sensitive: true,
-			contains: vec!["ES".into()],
-			startswith: vec!["t".into()],
-			endswith: vec!["!df".into()],
+			contains: vec!["ES".try_into().unwrap()],
+			startswith: vec!["t".try_into().unwrap()],
+			endswith: vec!["!df".try_into().unwrap()],
 		};
 		let harness = ContextHarness::new();
 		let context = harness.context();
@@ -279,9 +281,9 @@ mod tests {
 		let path = Resource::new("$HOME/Downloads/tESt.pdf", "").unwrap();
 		let filename = Filename {
 			case_sensitive: true,
-			contains: vec!["!ES".into(), "ES".into()],
-			startswith: vec!["t".into()],
-			endswith: vec!["!df".into()],
+			contains: vec!["!ES".try_into().unwrap(), "ES".try_into().unwrap()],
+			startswith: vec!["t".try_into().unwrap()],
+			endswith: vec!["!df".try_into().unwrap()],
 		};
 		let harness = ContextHarness::new();
 		let context = harness.context();
@@ -292,9 +294,9 @@ mod tests {
 		let path = Resource::new("$HOME/Downloads/tESt.txt", "").unwrap();
 		let filename = Filename {
 			case_sensitive: true,
-			contains: vec!["!ES".into(), "ES".into()],
-			startswith: vec!["t".into()],
-			endswith: vec!["!df".into()],
+			contains: vec!["!ES".try_into().unwrap(), "ES".try_into().unwrap()],
+			startswith: vec!["t".try_into().unwrap()],
+			endswith: vec!["!df".try_into().unwrap()],
 		};
 		let harness = ContextHarness::new();
 		let context = harness.context();

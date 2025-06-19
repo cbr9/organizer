@@ -6,7 +6,7 @@ use std::{collections::HashSet, path::PathBuf};
 use anyhow::{anyhow, Context as ErrorContext, Result};
 use serde::Deserialize;
 
-use crate::{templates::TemplateEngine, PROJECT_NAME};
+use crate::{templates::Templater, PROJECT_NAME};
 
 use self::options::OptionsBuilder;
 
@@ -14,6 +14,7 @@ pub mod actions;
 pub mod context;
 pub mod filters;
 pub mod folders;
+pub mod hooks;
 pub mod options;
 pub mod rule;
 pub mod variables;
@@ -31,14 +32,16 @@ pub struct ConfigBuilder {
 impl ConfigBuilder {
 	/// Consumes the builder and returns a final, validated `Config`.
 	/// The `defaults` are used in the build process but are not stored in the final `Config`.
-	pub fn build(self, template_engine: &mut TemplateEngine, tags: Option<Vec<String>>, ids: Option<Vec<String>>) -> Result<Config> {
+	pub fn build(self, template_engine: &mut Templater, tags: Option<Vec<String>>, ids: Option<Vec<String>>) -> Result<Config> {
 		let mut positive_tags = HashSet::new();
 		let mut negative_tags = HashSet::new();
 		if let Some(tags) = tags {
 			// Pre-process the tags into positive and negative sets once.
 			positive_tags = tags.iter().filter(|&s| !s.starts_with('!')).cloned().collect();
 			negative_tags = tags
-				.iter().filter(|&s| s.starts_with('!')).cloned()
+				.iter()
+				.filter(|&s| s.starts_with('!'))
+				.cloned()
 				.map(|s| s[1..].to_string())
 				.collect();
 		}
@@ -49,7 +52,9 @@ impl ConfigBuilder {
 			// Pre-process the IDs into positive and negative sets once.
 			positive_ids = ids.iter().filter(|&s| !s.starts_with('!')).cloned().collect();
 			negative_ids = ids
-				.iter().filter(|&s| s.starts_with('!')).cloned()
+				.iter()
+				.filter(|&s| s.starts_with('!'))
+				.cloned()
 				.map(|s| s[1..].to_string())
 				.collect();
 		}

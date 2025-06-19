@@ -9,7 +9,7 @@ use crate::{
 	config::options::OptionsBuilder,
 	path::{expand::Expand, is_hidden::IsHidden},
 	resource::Resource,
-	templates::{template::Template, TemplateEngine},
+	templates::{template::Template, Templater},
 };
 
 use super::options::{Options, Target};
@@ -23,12 +23,12 @@ pub struct FolderBuilder {
 }
 
 impl FolderBuilder {
-	pub fn build(self, index: usize, defaults: &OptionsBuilder, rule_options: &OptionsBuilder, mut engine: &mut TemplateEngine) -> Result<Folder> {
+	pub fn build(self, index: usize, defaults: &OptionsBuilder, rule_options: &OptionsBuilder, mut engine: &mut Templater) -> Result<Folder> {
 		let path = {
 			let context = engine.context().build(engine);
 			engine
 				.tera
-				.render_str(&self.root.text, &context)
+				.render_str(&self.root.input, &context)
 				.with_context(|| "cannot expand folder name")
 				.map(PathBuf::from)
 				.map(|p| p.expand_user().clean())?

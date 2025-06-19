@@ -2,7 +2,7 @@ use tera::Context;
 
 use crate::{
 	config::filters::regex::RegularExpression,
-	templates::{template::Template, TemplateEngine},
+	templates::{template::Template, Templater},
 };
 
 use super::Variable;
@@ -13,7 +13,7 @@ impl Variable for RegularExpression {
 		vec![&self.input]
 	}
 
-	fn register(&self, template_engine: &TemplateEngine, context: &mut Context) {
+	fn register(&self, template_engine: &Templater, context: &mut Context) {
 		if let Some(input) = template_engine.render(&self.input, context).unwrap_or_default() {
 			if let Some(captures) = self.pattern.captures(&input) {
 				for name in self.pattern.capture_names().flatten() {

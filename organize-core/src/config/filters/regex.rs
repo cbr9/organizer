@@ -78,13 +78,13 @@ impl Filter for RegularExpression {
 	fn filter(&self, res: &Resource, ctx: &ExecutionContext) -> bool {
 		let context = ctx
 			.services
-			.template_engine
+			.templater
 			.context()
 			.path(res.path())
 			.root(res.root())
-			.build(&ctx.services.template_engine);
+			.build(&ctx.services.templater);
 		ctx.services
-			.template_engine
+			.templater
 			.render(&self.input, &context)
 			.unwrap_or_default()
 			.is_some_and(|s| self.pattern.is_match(&s))

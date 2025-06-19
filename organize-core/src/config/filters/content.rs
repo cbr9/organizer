@@ -31,7 +31,8 @@ impl Filter for Content {
 		// Lazily get the content from the cache.
 		let content_arc = ctx
 			.services
-			.content_cache
+			.blackboard
+			.content
 			.entry(res.path().to_path_buf())
 			.or_try_insert_with(|| -> Result<Arc<String>> {
 				let content = extract_content(res.path())?;
@@ -44,18 +45,19 @@ impl Filter for Content {
 			// The filter logic is updated to render each template before checking.
 			let context = ctx
 				.services
-				.template_engine
+				.templater
 				.context()
 				.path(res.path())
 				.root(res.root())
-				.build(&ctx.services.template_engine);
+				.build(&ctx.services.templater);
 			let contains_match = self.contains.is_empty()
-				|| self.contains.iter().any(
-					|template| match ctx.services.template_engine.render(template, &context).unwrap_or_default() {
+				|| self
+					.contains
+					.iter()
+					.any(|template| match ctx.services.templater.render(template, &context).unwrap_or_default() {
 						Some(pattern) => content.contains(&pattern),
 						None => false,
-					},
-				);
+					});
 
 			let regex_match = self.matches.is_empty() || self.matches.is_match(&content);
 
