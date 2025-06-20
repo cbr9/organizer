@@ -49,8 +49,9 @@ impl Action for Move {
 			let target_path = target.to_path_buf();
 
 			Ok(Contract {
-				forward: vec![ctx.scope.resource.with_new_path(target_path.clone()).into()],
-				backward: vec![Box::new(UndoMove {
+				created: vec![ctx.scope.resource.with_new_path(target_path.clone()).into()],
+				deleted: vec![ctx.scope.resource.clone()],
+				undo: vec![Box::new(UndoMove {
 					original: ctx.scope.resource.path().to_path_buf(),
 					new: target_path,
 				})],

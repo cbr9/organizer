@@ -40,6 +40,7 @@ impl Locker {
 		F: FnOnce(PathBuf) -> Fut,
 		Fut: Future<Output = Result<T, Error>>,
 	{
+		// ... (resolver and path initialization logic remains the same) ...
 		let resolver = PathResolver::new(destination, strategy, extension, ctx);
 		let Some(mut path) = resolver.resolve().await.map_err(|_| Error::PathResolution {
 			template: destination.input.to_string(),
@@ -51,9 +52,8 @@ impl Locker {
 
 		let mut n = 1;
 		let reserved_path = loop {
-			// 1. First-pass check: Is another task already working on this exact path?
-			// The API changes from `contains_key` to `contains`.
 			if self.active_paths.contains(&path) {
+				// ... (conflict resolution logic remains the same) ...
 				match strategy {
 					ConflictResolution::Skip | ConflictResolution::Overwrite => return Ok(None),
 					ConflictResolution::Rename => {
@@ -71,15 +71,17 @@ impl Locker {
 				}
 			}
 
-			let exists_on_fs = tokio::fs::try_exists(&path).await.unwrap_or(false);
-			if exists_on_fs {
+			let exists = if ctx.settings.dry_run {
+				ctx.services.blackboard.simulated_paths.contains(&path)
+			} else {
+				tokio::fs::try_exists(&path).await.unwrap_or(false)
+			};
+
+			if exists {
 				match strategy {
 					ConflictResolution::Skip => return Ok(None),
 					ConflictResolution::Overwrite => {
-						// `insert` on a DashSet returns `true` if the item was newly inserted.
 						if !self.active_paths.insert(path.clone()) {
-							// If it returns false, the path was already in the set.
-							// This means a race occurred, so we must skip.
 							return Ok(None);
 						}
 						break Some(path);
@@ -99,17 +101,12 @@ impl Locker {
 				}
 			}
 
-			// 3. Final Reservation: Path is free on disk.
-			// `insert` returns true if the reservation was successful.
 			if !self.active_paths.insert(path.clone()) {
-				// A race occurred: another task reserved this path. We must retry.
 				continue;
 			}
-
-			// We successfully reserved the path.
 			break Some(path);
 		};
-
+		// ... (action execution and release logic remains the same) ...
 		if let Some(target_path) = reserved_path {
 			ensure_parent_dir_exists(&target_path).await.map_err(|e| Error::Io {
 				source: e,
@@ -120,7 +117,6 @@ impl Locker {
 
 			let result = action(target_path.clone()).await?;
 
-			// `remove` on a DashSet is the equivalent operation.
 			self.active_paths.remove(&target_path);
 
 			Ok(Some(result))

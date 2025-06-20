@@ -29,8 +29,9 @@ pub enum ExecutionModel {
 
 #[derive(Debug, Clone, Default)]
 pub struct Contract {
-	pub forward: Vec<Resource>,
-	pub backward: Vec<Box<dyn Undo>>,
+	pub created: Vec<Resource>,
+	pub deleted: Vec<Resource>,
+	pub undo: Vec<Box<dyn Undo>>,
 }
 
 dyn_clone::clone_trait_object!(Undo);

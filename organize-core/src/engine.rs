@@ -1,6 +1,6 @@
 use crate::{
 	config::{
-		actions::ExecutionModel,
+		actions::{Contract, ExecutionModel},
 		context::{Blackboard, ExecutionContext, ExecutionScope, RunServices, RunSettings},
 		rule::Rule,
 		Config,
@@ -120,13 +120,26 @@ impl Engine {
 								}
 							});
 
-							stream::iter(action_futures)
+							let contracts: Vec<Contract> = stream::iter(action_futures)
 								.buffer_unordered(CONCURRENT_OPERATIONS)
 								.filter_map(|contract| async { contract })
-								.map(|c| stream::iter(c.forward))
-								.flatten()
 								.collect()
-								.await
+								.await;
+
+							let mut next_resources = vec![];
+
+							for contract in contracts {
+								if self.settings.dry_run {
+									for resource in &contract.created {
+										self.services.blackboard.simulated_paths.insert(resource.path().to_path_buf());
+									}
+									for resource in &contract.deleted {
+										self.services.blackboard.simulated_paths.remove(resource.path());
+									}
+								}
+								next_resources.extend(contract.created);
+							}
+							next_resources
 						}
 						ExecutionModel::Batch => {
 							todo!()
