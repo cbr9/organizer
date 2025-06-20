@@ -33,7 +33,6 @@ impl Action for Move {
 		vec![&self.destination]
 	}
 
-	#[tracing::instrument(ret)]
 	async fn execute(&self, ctx: &ExecutionContext<'_>) -> Result<Contract, Error> {
 		let logic = |target: PathBuf| async move {
 			if !ctx.settings.dry_run && self.enabled {

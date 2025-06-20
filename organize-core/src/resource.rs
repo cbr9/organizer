@@ -18,7 +18,6 @@ impl Hash for Resource {
 }
 
 impl Resource {
-	#[tracing::instrument(err)]
 	pub fn new<T: AsRef<Path> + Debug, P: AsRef<Path> + Debug>(path: T, root: Option<P>) -> anyhow::Result<Self> {
 		let path = path.as_ref().to_path_buf();
 		if path.parent().is_none_or(|p| p.to_string_lossy() == "") {

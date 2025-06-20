@@ -65,7 +65,6 @@ pub enum EmailError {
 }
 
 impl Email {
-	#[tracing::instrument(err)]
 	fn get_or_insert_credentials(&self, cache: &Arc<RwLock<HashMap<Mailbox, Credentials>>>) -> Result<Credentials, EmailError> {
 		if let Ok(reader) = cache.read() {
 			if let Some(creds) = reader.get(&self.sender) {

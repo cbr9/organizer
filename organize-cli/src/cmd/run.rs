@@ -30,7 +30,6 @@ pub struct Run {
 
 #[async_trait]
 impl Cmd for Run {
-	#[tracing::instrument(err)]
 	async fn run(mut self) -> Result<()> {
 		if self.no_dry_run {
 			self.dry_run = false;

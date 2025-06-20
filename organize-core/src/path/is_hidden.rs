@@ -23,7 +23,6 @@ impl IsHidden for Path {
 impl IsHidden for Path {
 	type Err = std::io::Error;
 
-	#[tracing::instrument(err)]
 	fn is_hidden(&self) -> Result<bool, Self::Err> {
 		use std::{fs, os::windows::prelude::*};
 		let metadata = fs::metadata(self)?;

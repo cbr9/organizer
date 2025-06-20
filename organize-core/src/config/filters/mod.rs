@@ -33,7 +33,6 @@ struct Not {
 #[async_trait]
 #[typetag::serde(name = "not")]
 impl Filter for Not {
-	#[tracing::instrument(ret, level = "debug", skip(ctx))]
 	async fn filter(&self, ctx: &ExecutionContext) -> bool {
 		!self.filter.filter(ctx).await
 	}
@@ -51,7 +50,6 @@ struct AnyOf {
 #[async_trait]
 #[typetag::serde(name = "any_of")]
 impl Filter for AnyOf {
-	#[tracing::instrument(ret, level = "debug", skip(ctx))]
 	async fn filter(&self, ctx: &ExecutionContext) -> bool {
 		let filter_futures = self.filters.iter().map(|f| f.filter(ctx));
 		let results: Vec<bool> = future::join_all(filter_futures).await;
@@ -71,7 +69,6 @@ struct AllOf {
 #[async_trait]
 #[typetag::serde(name = "all_of")]
 impl Filter for AllOf {
-	#[tracing::instrument(ret, level = "debug", skip(ctx))]
 	async fn filter(&self, ctx: &ExecutionContext) -> bool {
 		let filter_futures = self.filters.iter().map(|f| f.filter(ctx));
 		let results: Vec<bool> = future::join_all(filter_futures).await;
@@ -91,7 +88,6 @@ struct NoneOf {
 #[async_trait]
 #[typetag::serde(name = "none_of")]
 impl Filter for NoneOf {
-	#[tracing::instrument(ret, level = "debug", skip(ctx))]
 	async fn filter(&self, ctx: &ExecutionContext) -> bool {
 		let filter_futures = self.filters.iter().map(|f| f.filter(ctx));
 		let results: Vec<bool> = future::join_all(filter_futures).await;

@@ -37,6 +37,7 @@ pub fn init<T: AsRef<Path>>(verbose: bool, config_path: T) {
 	let file_layer = fmt::layer()
 		.with_writer(non_blocking_writer)
 		.with_ansi(false) // No colors in the log file
+		.pretty()
 		.with_filter(LevelFilter::DEBUG);
 
 	// The STDOUT layer:

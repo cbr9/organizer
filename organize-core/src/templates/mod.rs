@@ -91,7 +91,6 @@ impl Templater {
 		self.tera.get_template_names().collect()
 	}
 
-	#[tracing::instrument(err)]
 	pub fn render(&self, template: &Template, context: &tera::Context) -> tera::Result<Option<String>> {
 		match self.tera.render(&template.id, context) {
 			Ok(res) => {

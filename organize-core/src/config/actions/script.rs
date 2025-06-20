@@ -73,7 +73,6 @@ impl Filter for Script {
 		vec![&self.content]
 	}
 
-	#[tracing::instrument(ret, level = "debug", skip(ctx))]
 	fn filter(&self, ctx: &ExecutionContext) -> bool {
 		self.run_script(ctx)
 			.map(|output| {

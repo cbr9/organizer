@@ -92,7 +92,6 @@ impl Filter for Mime {
 		vec![]
 	}
 
-	#[tracing::instrument(ret, level = "debug")]
 	async fn filter(&self, ctx: &ExecutionContext) -> bool {
 		let guess = mime_guess::from_path(ctx.scope.resource.path()).first_or_octet_stream();
 		self.types.iter().any(|mime| {
