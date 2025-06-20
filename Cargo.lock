@@ -1683,6 +1683,7 @@ dependencies = [
  "gag",
  "itertools",
  "lettre",
+ "libc",
  "log",
  "mime",
  "mime_guess",

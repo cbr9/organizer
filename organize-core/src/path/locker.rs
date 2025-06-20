@@ -3,24 +3,15 @@ use crate::{
 	errors::{Error, ErrorContext},
 	path::resolver::PathResolver,
 	templates::template::Template,
+	utils::fs::ensure_parent_dir_exists,
 };
 use anyhow::Result;
-use dashmap::{DashMap, DashSet};
+use dashmap::DashSet;
 use std::{
 	future::Future,
-	path::{Path, PathBuf},
+	path::PathBuf,
 	sync::Arc,
 };
-use tokio::sync::Mutex;
-
-pub async fn ensure_parent_dir_exists(path: &Path) -> std::io::Result<()> {
-	if let Some(parent) = path.parent() {
-		if !tokio::fs::try_exists(parent).await.unwrap_or(false) {
-			tokio::fs::create_dir_all(parent).await?;
-		}
-	}
-	Ok(())
-}
 
 #[derive(Debug, Clone, Default)]
 pub struct Locker {
@@ -60,9 +51,9 @@ impl Locker {
 						let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or_default();
 						let ext = path.extension().and_then(|s| s.to_str()).unwrap_or_default();
 						let new_name = if ext.is_empty() {
-							format!("{} ({})", stem, n)
+							format!("{stem} ({n})")
 						} else {
-							format!("{} ({}).{}", stem, n, ext)
+							format!("{stem} ({n}).{ext}")
 						};
 						path.set_file_name(new_name);
 						n += 1;
@@ -72,7 +63,7 @@ impl Locker {
 			}
 
 			let exists = if ctx.settings.dry_run {
-				ctx.services.blackboard.simulated_paths.contains(&path)
+				ctx.services.blackboard.known_paths.contains(&path)
 			} else {
 				tokio::fs::try_exists(&path).await.unwrap_or(false)
 			};
@@ -90,9 +81,9 @@ impl Locker {
 						let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or_default();
 						let ext = path.extension().and_then(|s| s.to_str()).unwrap_or_default();
 						let new_name = if ext.is_empty() {
-							format!("{} ({})", stem, n)
+							format!("{stem} ({n})")
 						} else {
-							format!("{} ({}).{}", stem, n, ext)
+							format!("{stem} ({n}).{ext}")
 						};
 						path.set_file_name(new_name);
 						n += 1;

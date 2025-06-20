@@ -9,7 +9,7 @@ use std::{
 use lettre::{message::Mailbox, transport::smtp::authentication::Credentials};
 
 use crate::{
-	config::{folders::Folder, rule::Rule, Config},
+	config::{actions::Undo, folders::Folder, rule::Rule, Config},
 	path::locker::Locker,
 	resource::Resource,
 	templates::Templater,
@@ -35,7 +35,8 @@ pub struct Blackboard {
 	pub variables: Arc<DashMap<VariableCacheKey, tera::Value>>,
 	pub locker: Locker,
 	pub scratchpad: Arc<DashMap<String, Box<dyn Any + Send + Sync>>>,
-	pub simulated_paths: Arc<DashSet<PathBuf>>,
+	pub known_paths: Arc<DashSet<PathBuf>>,
+	pub journal: Arc<DashMap<Resource, Vec<Box<dyn Undo>>>>,
 }
 
 /// A container for run-wide operational settings.
@@ -50,8 +51,7 @@ pub struct ExecutionScope<'a> {
 	pub config: &'a Config,
 	pub rule: &'a Rule,
 	pub folder: &'a Folder,
-	pub resource: Resource,
-	pub resources: Vec<Resource>,
+	pub resource: &'a Resource,
 }
 
 /// The top-level context object, composed of the three distinct categories of information.

@@ -1,7 +1,7 @@
 use config::{Config as LayeredConfig, File};
 use itertools::Itertools;
 use rule::{Rule, RuleBuilder};
-use std::{collections::HashSet, path::PathBuf, sync::Arc};
+use std::{collections::HashSet, path::PathBuf};
 
 use anyhow::{anyhow, Context as ErrorContext, Result};
 use serde::Deserialize;

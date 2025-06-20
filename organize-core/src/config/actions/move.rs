@@ -1,11 +1,12 @@
-use std::{path::PathBuf, sync::Arc};
+use std::path::PathBuf;
 
 use crate::{
 	config::{
 		actions::{common::enabled, Contract, Undo},
 		context::ExecutionContext,
 	},
-	errors::{Error, ErrorContext},
+	errors::Error,
+	utils::{backup::Backup, fs::move_safely},
 };
 use anyhow::Result;
 use async_trait::async_trait;
@@ -34,34 +35,30 @@ impl Action for Move {
 	}
 
 	async fn execute(&self, ctx: &ExecutionContext<'_>) -> Result<Contract, Error> {
-		let logic = |target: PathBuf| async move {
-			if !ctx.settings.dry_run && self.enabled {
-				tokio::fs::rename(ctx.scope.resource.path(), &target)
-					.await
-					.map_err(|e| Error::Io {
-						source: e,
-						path: ctx.scope.resource.path().to_path_buf(),
-						target: Some(target.clone().to_path_buf()),
-						context: ErrorContext::from_scope(&ctx.scope),
-					})?;
-			}
-			let target_path = target.to_path_buf();
-
-			Ok(Contract {
-				created: vec![ctx.scope.resource.with_new_path(target_path.clone()).into()],
-				deleted: vec![ctx.scope.resource.clone()],
-				undo: vec![Box::new(UndoMove {
-					original: ctx.scope.resource.path().to_path_buf(),
-					new: target_path,
-				})],
-			})
-		};
-
 		let receipt = ctx
 			.services
 			.blackboard
 			.locker
-			.with_locked_destination(&ctx, &self.destination, &self.strategy, true, logic)
+			.with_locked_destination(ctx, &self.destination, &self.strategy, true, |target: PathBuf| async move {
+				let source = ctx.scope.resource.path();
+				let backup = Backup::new(source, ctx).await?;
+				if !ctx.settings.dry_run && self.enabled {
+					move_safely(source, &target, ctx).await?;
+				}
+
+				let target = ctx.scope.resource.with_new_path(target);
+
+				Ok(Contract {
+					created: vec![target.clone()],
+					deleted: vec![ctx.scope.resource.clone()],
+					current: vec![target.clone()],
+					undo: vec![Box::new(UndoMove {
+						original: ctx.scope.resource.path().to_path_buf(),
+						new: target.path().to_path_buf(),
+						backup,
+					})],
+				})
+			})
 			.await?
 			.unwrap_or(Contract::default());
 
@@ -73,6 +70,7 @@ impl Action for Move {
 pub struct UndoMove {
 	pub original: PathBuf,
 	pub new: PathBuf,
+	pub backup: Backup,
 }
 
 #[typetag::serde(name = "undo_move")]
@@ -81,7 +79,7 @@ impl Undo for UndoMove {
 		Ok(std::fs::rename(&self.new, &self.original)?)
 	}
 
-	fn describe(&self) -> String {
-		todo!()
+	fn backup(&self) -> Option<&Backup> {
+		Some(&self.backup)
 	}
 }

@@ -6,7 +6,7 @@ use async_trait::async_trait;
 use itertools::Itertools;
 use mime::FromStrError;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use std::{convert::TryFrom, ops::Deref, str::FromStr, sync::Arc};
+use std::{convert::TryFrom, ops::Deref, str::FromStr};
 
 impl FromStr for Mime {
 	type Err = FromStrError;

@@ -1,11 +1,11 @@
 use async_trait::async_trait;
-use std::{fmt::Debug, sync::Arc};
+use std::fmt::Debug;
 
 use anyhow::Result;
 use dyn_clone::DynClone;
 use dyn_eq::DynEq;
 
-use crate::{config::context::ExecutionContext, errors::Error, resource::Resource, templates::template::Template};
+use crate::{config::context::ExecutionContext, errors::Error, resource::Resource, templates::template::Template, utils::backup::Backup};
 
 pub mod common;
 // pub mod copy;
@@ -31,6 +31,7 @@ pub enum ExecutionModel {
 pub struct Contract {
 	pub created: Vec<Resource>,
 	pub deleted: Vec<Resource>,
+	pub current: Vec<Resource>,
 	pub undo: Vec<Box<dyn Undo>>,
 }
 
@@ -42,8 +43,9 @@ pub trait Undo: Debug + DynEq + DynClone + Send + Sync {
 	/// Executes the reverse operation.
 	fn undo(&self) -> Result<()>;
 
-	/// Provides a human-readable description for logging.
-	fn describe(&self) -> String;
+	fn backup(&self) -> Option<&Backup> {
+		None
+	}
 }
 
 dyn_clone::clone_trait_object!(Action);

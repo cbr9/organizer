@@ -41,6 +41,14 @@ pub enum Error {
 		context: ErrorContext,
 	},
 
+	#[error("Could not create backup for: {path:?}")]
+	Backup {
+		#[source]
+		source: std::io::Error,
+		path: PathBuf,
+		context: ErrorContext,
+	},
+
 	#[error("Could not extract {path:?}")]
 	Extraction {
 		#[source]
@@ -89,20 +97,4 @@ pub enum Error {
 		path: PathBuf,
 		context: ErrorContext,
 	},
-}
-
-impl Error {
-	/// Helper method to consistently access the context from any error variant.
-	pub fn context(&self) -> &ErrorContext {
-		match self {
-			Error::Io { context, .. } => context,
-			Error::PathResolution { context, .. } => context,
-			Error::Template { context, .. } => context,
-			// Error::Email { context, .. } => context,
-			Error::Extraction { context, .. } => context,
-			Error::Interaction { context, .. } => context,
-			Error::Script { context, .. } => context,
-			Error::Trash { context, .. } => context,
-		}
-	}
 }

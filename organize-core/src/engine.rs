@@ -1,8 +1,7 @@
 use crate::{
 	config::{
-		actions::{Contract, ExecutionModel},
+		actions::ExecutionModel,
 		context::{Blackboard, ExecutionContext, ExecutionScope, RunServices, RunSettings},
-		rule::Rule,
 		Config,
 		ConfigBuilder,
 	},
@@ -66,8 +65,7 @@ impl Engine {
 									config: &engine.config,
 									rule: &rule,
 									folder: &folder,
-									resource,
-									resources: vec![],
+									resource: &resource,
 								},
 							};
 							let mut passed_all_filters = true;
@@ -78,7 +76,7 @@ impl Engine {
 								}
 							}
 							if passed_all_filters {
-								Some(ctx.scope.resource)
+								Some(resource)
 							} else {
 								None
 							}
@@ -103,7 +101,8 @@ impl Engine {
 								let action = action.clone();
 								let rule = rule.clone();
 								let folder = folder.clone();
-								async move {
+
+								tokio::spawn(async move {
 									let ctx = ExecutionContext {
 										services: &engine.services,
 										settings: &engine.settings,
@@ -111,35 +110,51 @@ impl Engine {
 											config: &engine.config,
 											rule: &rule,
 											folder: &folder,
-											resource,
-											resources: vec![],
+											resource: &resource, // Use the resource for this specific action
 										},
 									};
-									// The action is executed, and we await its contract.
-									action.execute(&ctx).await.ok()
-								}
+
+									let blackboard = &engine.services.blackboard;
+
+									let contract = action.execute(&ctx).await?;
+									let mut entry = blackboard.journal.entry(resource.clone()).or_default();
+									for undo_op in contract.undo.into_iter() {
+										entry.value_mut().push(undo_op);
+									}
+
+									// Simulate dry run effects (created/deleted paths and backups)
+									if engine.settings.dry_run {
+										for created_res in &contract.created {
+											blackboard.known_paths.insert(created_res.path().to_path_buf());
+										}
+										for deleted_res in &contract.deleted {
+											blackboard.known_paths.remove(deleted_res.path());
+										}
+										for undo_op_ref in entry.value().iter() {
+											// Iterate over the accumulated undo chain
+											if let Some(backup_path) = undo_op_ref.backup() {
+												blackboard.known_paths.insert(backup_path.path.to_path_buf());
+											}
+										}
+									}
+
+									Ok(contract.current)
+								})
 							});
 
-							let contracts: Vec<Contract> = stream::iter(action_futures)
+							stream::iter(action_futures)
 								.buffer_unordered(CONCURRENT_OPERATIONS)
-								.filter_map(|contract| async { contract })
-								.collect()
-								.await;
-
-							let mut next_resources = vec![];
-
-							for contract in contracts {
-								if self.settings.dry_run {
-									for resource in &contract.created {
-										self.services.blackboard.simulated_paths.insert(resource.path().to_path_buf());
-									}
-									for resource in &contract.deleted {
-										self.services.blackboard.simulated_paths.remove(resource.path());
-									}
-								}
-								next_resources.extend(contract.created);
-							}
-							next_resources
+								.filter_map(|join_handle_result| async move {
+									join_handle_result
+										.ok()
+										.and_then(|action_execution_result: Result<Vec<Resource>>| action_execution_result.ok())
+								})
+								.fold(Vec::new(), |mut acc, resources_vec| async move {
+									// For each Vec<Resource> that comes from the stream, extend the accumulator.
+									acc.extend(resources_vec);
+									acc
+								})
+								.await
 						}
 						ExecutionModel::Batch => {
 							todo!()

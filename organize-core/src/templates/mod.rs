@@ -1,4 +1,4 @@
-use std::{collections::HashSet, sync::Arc};
+use std::collections::HashSet;
 
 use anyhow::Result;
 use filters::{
@@ -95,9 +95,9 @@ impl Templater {
 		match self.tera.render(&template.id, context) {
 			Ok(res) => {
 				if res.is_empty() {
-					return Ok(None);
+					Ok(None)
 				} else {
-					return Ok(Some(res));
+					Ok(Some(res))
 				}
 			}
 			Err(e) => Err(e),

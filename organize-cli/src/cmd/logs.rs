@@ -24,7 +24,7 @@ pub fn init<T: AsRef<Path>>(verbose: bool, config_path: T) {
 	// 2. Create a non-blocking file appender for the current run.
 	//    The log file will be named with the current timestamp.
 	let timestamp = Local::now().format("%Y-%m-%d-%H-%M-%S");
-	let log_file = logs_dir.join(format!("{}.log", timestamp));
+	let log_file = logs_dir.join(format!("{timestamp}.log"));
 	let file_appender = tracing_appender::rolling::never(&logs_dir, log_file);
 	let (non_blocking_writer, _guard) = tracing_appender::non_blocking(file_appender);
 

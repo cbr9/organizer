@@ -1,12 +1,10 @@
-use std::{cell::LazyCell, path::PathBuf, sync::Arc};
+use std::path::PathBuf;
 
 use anyhow::Result;
 use async_trait::async_trait;
 use clap::{Parser, ValueHint};
 
-use lazy_static::lazy_static;
 use organize_core::{config::context::RunSettings, engine::Engine};
-use tokio::sync::OnceCell;
 
 use crate::Cmd;
 

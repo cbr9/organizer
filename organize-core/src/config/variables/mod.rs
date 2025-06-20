@@ -1,6 +1,6 @@
 use dyn_clone::DynClone;
 use dyn_eq::DynEq;
-use std::{fmt::Debug, sync::Arc};
+use std::fmt::Debug;
 
 use crate::{config::context::ExecutionContext, templates::template::Template};
 

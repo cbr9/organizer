@@ -1,4 +1,3 @@
-use std::sync::Arc;
 
 use crate::config::{
 	context::{ExecutionContext, VariableCacheKey},
@@ -31,7 +30,7 @@ impl<'a> Serialize for LazyVariable<'a> {
 			return cached_value.serialize(serializer);
 		}
 
-		let computed_value = match self.variable.compute(&self.context) {
+		let computed_value = match self.variable.compute(self.context) {
 			Ok(val) => val,
 			Err(e) => return Err(S::Error::custom(e.to_string())),
 		};

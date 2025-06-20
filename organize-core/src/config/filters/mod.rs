@@ -4,7 +4,7 @@ use dyn_eq::DynEq;
 use futures::future;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
-use std::{fmt::Debug, sync::Arc};
+use std::fmt::Debug;
 
 pub mod content;
 pub mod empty;

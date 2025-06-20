@@ -10,3 +10,4 @@ pub mod errors;
 pub mod path;
 pub mod resource;
 pub mod templates;
+pub mod utils;
