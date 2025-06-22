@@ -19,7 +19,7 @@ use super::options::{Options, Target};
 pub struct FolderBuilder {
 	pub root: Template,
 	#[serde(flatten)]
-	pub options: OptionsBuilder,
+	pub settings: OptionsBuilder,
 }
 
 impl FolderBuilder {
@@ -33,28 +33,32 @@ impl FolderBuilder {
 				.map(PathBuf::from)
 				.map(|p| p.expand_user().clean())?
 		};
-		let options = Options::compile(defaults, rule_options, &self.options, engine, &path);
-		Ok(Folder { path, options, index })
+		let options = Options::compile(defaults, rule_options, &self.settings, engine, &path);
+		Ok(Folder {
+			path,
+			settings: options,
+			index,
+		})
 	}
 }
 
 /// The final, compiled `Folder` object, ready for execution.
-#[derive(Debug, Serialize, PartialEq, Clone)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
 pub struct Folder {
 	pub index: usize,
 	pub path: PathBuf,
-	pub options: Options,
+	pub settings: Options,
 }
 
 impl Folder {
 	pub fn get_resources(&self) -> Result<Vec<Resource>> {
 		let home = &dirs::home_dir().context("unable to find home directory")?;
 		let min_depth = {
-			let base = if &self.path == home { 1.0 as usize } else { self.options.min_depth };
+			let base = if &self.path == home { 1.0 as usize } else { self.settings.min_depth };
 			(base as f64).max(1.0) as usize
 		};
 
-		let max_depth = if &self.path == home { 1.0 as usize } else { self.options.max_depth };
+		let max_depth = if &self.path == home { 1.0 as usize } else { self.settings.max_depth };
 
 		let walker = WalkDir::new(&self.path).min_depth(min_depth).max_depth(max_depth);
 
@@ -63,17 +67,17 @@ impl Folder {
 			.filter_entry(|e| self.prefilter(e.path()))
 			.flatten()
 			.filter(|e| self.postfilter(e.path()))
-			.flat_map(|e| Resource::new(e.path(), Some(&self.path)))
+			.map(|e| Resource::new(e.path()))
 			.collect();
 
 		Ok(entries)
 	}
 
 	fn prefilter(&self, path: &Path) -> bool {
-		if self.options.exclude.is_empty() {
+		if self.settings.exclude.is_empty() {
 			return true;
 		}
-		!self.options.exclude.iter().any(|dir| {
+		!self.settings.exclude.iter().any(|dir| {
 			if dir.file_name().is_none() || path.file_name().is_none() {
 				return false;
 			}
@@ -83,21 +87,21 @@ impl Folder {
 
 	/// Postfilter applied to each individual entry after it's been discovered.
 	fn postfilter(&self, path: &Path) -> bool {
-		if path.is_file() && self.options.target == Target::Folders {
+		if path.is_file() && self.settings.target == Target::Folders {
 			return false;
 		}
-		if path.is_dir() && self.options.target == Target::Files {
+		if path.is_dir() && self.settings.target == Target::Files {
 			return false;
 		}
 
 		if path.is_file() {
 			if let Some(extension) = path.extension() {
 				let partial_extensions = &["crdownload", "part", "download"];
-				if partial_extensions.contains(&&*extension.to_string_lossy()) && !self.options.partial_files {
+				if partial_extensions.contains(&&*extension.to_string_lossy()) && !self.settings.partial_files {
 					return false;
 				}
 			}
-			if path.is_hidden().unwrap_or(false) && !self.options.hidden_files {
+			if path.is_hidden().unwrap_or(false) && !self.settings.hidden_files {
 				return false;
 			}
 		}

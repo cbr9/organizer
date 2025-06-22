@@ -1,11 +1,12 @@
-use std::path::PathBuf;
+use std::{collections::HashMap, path::PathBuf};
 
 use crate::{
 	config::{
-		actions::{common::enabled, Contract, Undo},
+		actions::{common::enabled, Input, Output, Receipt, Undo},
 		context::ExecutionContext,
 	},
 	errors::Error,
+	resource::Resource,
 	utils::{backup::Backup, fs::move_safely},
 };
 use anyhow::Result;
@@ -34,33 +35,44 @@ impl Action for Move {
 		vec![&self.destination]
 	}
 
-	async fn execute(&self, ctx: &ExecutionContext<'_>) -> Result<Contract, Error> {
+	async fn commit(&self, ctx: &ExecutionContext<'_>) -> Result<Receipt, Error> {
 		let receipt = ctx
 			.services
-			.blackboard
 			.locker
-			.with_locked_destination(ctx, &self.destination, &self.strategy, true, |target: PathBuf| async move {
-				let source = ctx.scope.resource.path();
-				let backup = Backup::new(source, ctx).await?;
-				if !ctx.settings.dry_run && self.enabled {
-					move_safely(source, &target, ctx).await?;
-				}
+			.with_locked_destination(ctx, &self.destination, &self.strategy, true, |target| async move {
+				let source = ctx.scope.resource;
 
-				let target = ctx.scope.resource.with_new_path(target);
+				let backup: Option<Backup> = if !ctx.settings.dry_run && self.enabled {
+					async {
+						let backup_opt = if ctx.scope.folder.settings.backup {
+							let b = Backup::new(ctx).await?;
+							b.persist(ctx.scope.resource.clone(), ctx).await?;
+							Some(b)
+						} else {
+							None
+						};
 
-				Ok(Contract {
-					created: vec![target.clone()],
-					deleted: vec![ctx.scope.resource.clone()],
-					current: vec![target.clone()],
+						move_safely(source, &target, ctx).await?;
+						Ok(backup_opt)
+					}
+					.await?
+				} else {
+					None
+				};
+				Ok(Receipt {
+					inputs: vec![Input::Processed(ctx.scope.resource.clone())],
+					outputs: vec![Output::Created(target.clone()), Output::Deleted(ctx.scope.resource.clone())],
+					next: vec![target.clone()],
 					undo: vec![Box::new(UndoMove {
-						original: ctx.scope.resource.path().to_path_buf(),
-						new: target.path().to_path_buf(),
+						original: ctx.scope.resource.clone(),
+						new: target,
 						backup,
 					})],
+					metadata: HashMap::new(),
 				})
 			})
 			.await?
-			.unwrap_or(Contract::default());
+			.unwrap_or(Receipt::default());
 
 		Ok(receipt)
 	}
@@ -68,9 +80,9 @@ impl Action for Move {
 
 #[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq)]
 pub struct UndoMove {
-	pub original: PathBuf,
-	pub new: PathBuf,
-	pub backup: Backup,
+	pub original: Resource,
+	pub new: Resource,
+	pub backup: Option<Backup>,
 }
 
 #[typetag::serde(name = "undo_move")]
@@ -80,6 +92,6 @@ impl Undo for UndoMove {
 	}
 
 	fn backup(&self) -> Option<&Backup> {
-		Some(&self.backup)
+		self.backup.as_ref()
 	}
 }

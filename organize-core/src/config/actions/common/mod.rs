@@ -1,8 +1,12 @@
 use anyhow::anyhow;
-use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 use strum::Display;
+
+use crate::{
+	config::context::ExecutionContext,
+	resource::Resource,
+};
 
 /// Represents an exclusive, temporary reservation of a filesystem path.
 /// The OS-level lock is held as long as this struct exists, and it is released when dropped.
@@ -30,22 +34,21 @@ impl ConflictResolution {
 	/// This will check if the given path exists on the filesystem and,
 	/// depending on the variant, will either return a new, non-conflicting
 	/// path, `None` (to signal a skip), or the original path (for overwrite).
-	pub async fn resolve(&self, path: &Path) -> anyhow::Result<Option<PathBuf>> {
+	pub async fn resolve(&self, mut path: Resource, ctx: &ExecutionContext<'_>) -> anyhow::Result<Option<Resource>> {
 		// Use the non-blocking `try_exists` and .await the result.
-		if !tokio::fs::try_exists(path).await? {
+		if !path.try_exists(ctx).await? {
 			// If the path doesn't exist, there is no conflict.
-			return Ok(Some(path.to_path_buf()));
+			return Ok(Some(path.clone()));
 		}
 
 		match self {
-			ConflictResolution::Overwrite => Ok(Some(path.to_path_buf())),
+			ConflictResolution::Overwrite => Ok(Some(path.clone())),
 			ConflictResolution::Skip => Ok(None),
 			ConflictResolution::Rename => {
-				let mut new_path = path.to_path_buf();
 				let mut n = 1;
 
 				// The loop condition now uses the async `try_exists`.
-				while tokio::fs::try_exists(&new_path).await? {
+				while path.try_exists(ctx).await? {
 					// This logic is made more robust to handle files without stems or extensions.
 					let stem = path
 						.file_stem()
@@ -57,10 +60,10 @@ impl ConflictResolution {
 						None => format!("{stem} ({n})"),
 					};
 
-					new_path.set_file_name(new_name);
+					path = path.with_file_name(new_name).into();
 					n += 1;
 				}
-				Ok(Some(new_path))
+				Ok(Some(path))
 			}
 		}
 	}

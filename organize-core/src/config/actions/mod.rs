@@ -1,16 +1,18 @@
 use async_trait::async_trait;
-use std::fmt::Debug;
+use serde::{Deserialize, Serialize};
+use std::{collections::HashMap, fmt::Debug};
 
 use anyhow::Result;
 use dyn_clone::DynClone;
 use dyn_eq::DynEq;
+use strum_macros::{self, Display};
 
 use crate::{config::context::ExecutionContext, errors::Error, resource::Resource, templates::template::Template, utils::backup::Backup};
 
 pub mod common;
 // pub mod copy;
 // pub mod delete;
-// pub mod echo;
+pub mod echo;
 // pub mod email;
 // pub mod extract;
 // pub mod hardlink;
@@ -27,12 +29,28 @@ pub enum ExecutionModel {
 	Batch,
 }
 
-#[derive(Debug, Clone, Default)]
-pub struct Contract {
-	pub created: Vec<Resource>,
-	pub deleted: Vec<Resource>,
-	pub current: Vec<Resource>,
+#[derive(Debug, Serialize, Deserialize, Clone, Display)]
+#[strum(serialize_all = "lowercase")]
+pub enum Input {
+	Processed(Resource),
+	Skipped(Resource),
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Display)]
+#[strum(serialize_all = "lowercase")]
+pub enum Output {
+	Created(Resource),
+	Deleted(Resource),
+	Modified(Resource),
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+pub struct Receipt {
+	pub inputs: Vec<Input>,
+	pub outputs: Vec<Output>,
+	pub next: Vec<Resource>,
 	pub undo: Vec<Box<dyn Undo>>,
+	pub metadata: HashMap<String, serde_json::Value>,
 }
 
 dyn_clone::clone_trait_object!(Undo);
@@ -57,6 +75,6 @@ pub trait Action: DynEq + DynClone + Sync + Send + Debug {
 	fn execution_model(&self) -> ExecutionModel {
 		ExecutionModel::default()
 	}
-	async fn execute(&self, _ctx: &ExecutionContext<'_>) -> Result<Contract, Error>;
+	async fn commit(&self, _ctx: &ExecutionContext<'_>) -> Result<Receipt, Error>;
 	fn templates(&self) -> Vec<&Template>;
 }

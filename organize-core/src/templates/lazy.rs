@@ -1,4 +1,3 @@
-
 use crate::config::{
 	context::{ExecutionContext, VariableCacheKey},
 	variables::Variable,
@@ -21,19 +20,21 @@ impl<'a> Serialize for LazyVariable<'a> {
 	{
 		let var_cache = &self.context.services.blackboard.variables;
 		let cache_key = VariableCacheKey {
-			variable_name: self.variable.name().to_string(),
+			variable: self.variable.name().to_string(),
 			rule_index: self.context.scope.rule.index,
-			resource_path: self.context.scope.resource.path().to_path_buf(),
+			resource: self.context.scope.resource.clone(),
 		};
 
 		if let Some(cached_value) = var_cache.get(&cache_key) {
 			return cached_value.serialize(serializer);
 		}
 
+		println!("computing!!");
 		let computed_value = match self.variable.compute(self.context) {
 			Ok(val) => val,
 			Err(e) => return Err(S::Error::custom(e.to_string())),
 		};
+		dbg!(&computed_value);
 
 		var_cache.insert(cache_key, computed_value.clone());
 		computed_value.serialize(serializer)

@@ -4,7 +4,7 @@ use rule::{Rule, RuleBuilder};
 use std::{collections::HashSet, path::PathBuf};
 
 use anyhow::{anyhow, Context as ErrorContext, Result};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::{templates::Templater, PROJECT_NAME};
 
@@ -108,7 +108,7 @@ impl ConfigBuilder {
 	}
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Config {
 	pub rules: Vec<Rule>,
 	pub path: PathBuf,

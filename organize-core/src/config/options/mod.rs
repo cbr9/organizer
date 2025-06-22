@@ -13,9 +13,10 @@ pub struct OptionsBuilder {
 	pub hidden_files: Option<bool>,
 	pub partial_files: Option<bool>,
 	pub target: Option<Target>,
+	pub backup: Option<bool>,
 }
 
-#[derive(Debug, Serialize, Clone, PartialEq, Eq)]
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq)]
 pub struct Options {
 	pub max_depth: usize,
 	pub min_depth: usize,
@@ -23,6 +24,7 @@ pub struct Options {
 	pub hidden_files: bool,
 	pub partial_files: bool,
 	pub target: Target,
+	pub backup: bool,
 }
 
 impl Default for Options {
@@ -34,6 +36,7 @@ impl Default for Options {
 			hidden_files: false,
 			partial_files: false,
 			target: Target::default(),
+			backup: false,
 		}
 	}
 }
@@ -52,6 +55,7 @@ impl Options {
 		context.insert("root", folder_path);
 
 		Self {
+			backup: folder.backup.or(rule.backup).or(defaults.backup).unwrap_or(fallback.backup),
 			max_depth: folder
 				.max_depth
 				.or(rule.max_depth)

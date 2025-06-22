@@ -9,6 +9,7 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
+  DATABASE_URL: sqlite:organize-ci.db
 
 jobs:
   # Renamed the job to better reflect its purpose
@@ -33,6 +34,14 @@ jobs:
     - name: Install Windows GNU toolchain
       if: runner.os == 'Windows'
       run: rustup target add x86_64-pc-windows-gnu
+
+    - name: Install sqlx-cli
+      run: cargo install sqlx-cli
+
+    - name: Setup database
+      run: |
+        sqlx database create
+        sqlx migrate run
 
     - name: Cache cargo binaries
       id: cache-cargo-bin

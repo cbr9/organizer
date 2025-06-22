@@ -4,3 +4,6 @@ Dockerfile
 .idea/
 /.run
 .direnv/
+organize.db
+organize.db-shm
+organize.db-wal

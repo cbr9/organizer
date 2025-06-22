@@ -2,13 +2,7 @@ use std::path::PathBuf;
 use thiserror::Error;
 use zip::result::ZipError;
 
-use crate::{
-	config::{
-		// actions::email::EmailError,
-		context::ExecutionScope,
-	},
-	templates::template::Template,
-};
+use crate::{config::context::ExecutionScope, resource::Resource, templates::template::Template};
 
 /// A self-contained, owned snapshot of the execution context at the time of an error.
 /// It has no lifetimes, so it can be freely passed around.
@@ -36,8 +30,8 @@ pub enum Error {
 	Io {
 		#[source]
 		source: std::io::Error,
-		path: PathBuf,
-		target: Option<PathBuf>,
+		path: Resource,
+		target: Option<Resource>,
 		context: ErrorContext,
 	},
 

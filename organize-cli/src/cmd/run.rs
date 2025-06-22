@@ -35,7 +35,7 @@ impl Cmd for Run {
 
 		let settings = RunSettings { dry_run: self.dry_run };
 
-		let engine = Engine::new(&self.config, settings, &self.tags, &self.ids)?;
+		let engine = Engine::new(&self.config, settings, &self.tags, &self.ids).await?;
 		logs::init(self.verbose, &engine.config.path);
 		engine.run().await?;
 

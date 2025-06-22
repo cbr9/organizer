@@ -10,32 +10,40 @@ use lettre::{message::Mailbox, transport::smtp::authentication::Credentials};
 
 use crate::{
 	config::{actions::Undo, folders::Folder, rule::Rule, Config},
+	journal::Journal,
 	path::locker::Locker,
 	resource::Resource,
 	templates::Templater,
 };
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct RunServices {
 	pub templater: Templater,
 	pub blackboard: Blackboard,
+	pub locker: Locker,
+	pub journal: Arc<Journal>,
 }
 
 #[derive(PartialEq, Eq, Hash, Clone, Debug)]
 pub struct VariableCacheKey {
 	pub rule_index: usize,
-	pub variable_name: String,
-	pub resource_path: PathBuf,
+	pub variable: String,
+	pub resource: Resource,
+}
+
+#[derive(Debug, Clone)]
+pub enum FileState {
+	Exists,
+	Deleted,
 }
 
 #[derive(Debug, Default, Clone)]
 pub struct Blackboard {
-	pub credentials: Arc<RwLock<HashMap<Mailbox, Credentials>>>,
+	pub credentials: Arc<RwLock<HashMap<Mailbox, Credentials>>>, // TODO: store in OS keychain
 	pub content: Arc<DashMap<PathBuf, Arc<String>>>,
 	pub variables: Arc<DashMap<VariableCacheKey, tera::Value>>,
-	pub locker: Locker,
 	pub scratchpad: Arc<DashMap<String, Box<dyn Any + Send + Sync>>>,
-	pub known_paths: Arc<DashSet<PathBuf>>,
+	pub known_paths: Arc<DashMap<Resource, FileState>>,
 	pub journal: Arc<DashMap<Resource, Vec<Box<dyn Undo>>>>,
 }
 
@@ -146,7 +154,7 @@ impl Default for Folder {
 		Self {
 			index: 0,
 			path: PathBuf::new(),
-			options: Options::default(),
+			settings: Options::default(),
 		}
 	}
 }

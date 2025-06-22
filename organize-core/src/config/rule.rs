@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
 use itertools::Itertools;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::templates::Templater;
 
@@ -79,7 +79,7 @@ impl RuleBuilder {
 	}
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
 pub struct Rule {
 	pub index: usize,
 	pub id: Option<String>,

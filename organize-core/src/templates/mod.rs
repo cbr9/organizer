@@ -37,12 +37,11 @@ impl std::ops::Deref for Context {
 impl Context {
 	pub fn new(ctx: &ExecutionContext) -> Self {
 		let mut context = tera::Context::new();
-		context.insert("path", ctx.scope.resource.path());
-		if let Some(root) = ctx.scope.resource.root() {
-			context.insert("root", root);
-		}
+		context.insert("path", ctx.scope.resource);
+		context.insert("root", &ctx.scope.folder.path);
 
 		for var in &ctx.scope.rule.variables {
+			println!("{}", var.typetag_name());
 			let lazy = LazyVariable { variable: var, context: ctx };
 			context.insert(var.name(), &lazy);
 		}

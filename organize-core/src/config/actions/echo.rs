@@ -2,12 +2,13 @@ use std::path::PathBuf;
 
 use crate::{
 	config::{
-		actions::{common::enabled, Output},
+		actions::{common::enabled, Output, Receipt},
 		context::ExecutionContext,
 	},
 	errors::{Error, ErrorContext},
 	templates::Context,
 };
+use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
 use crate::templates::template::Template;
@@ -23,13 +24,14 @@ pub struct Echo {
 	pub enabled: bool,
 }
 
+#[async_trait]
 #[typetag::serde(name = "echo")]
 impl Action for Echo {
 	fn templates(&self) -> Vec<&Template> {
 		vec![&self.message]
 	}
 
-	fn execute(&self, ctx: &ExecutionContext) -> Result<Output, Error> {
+	async fn commit(&self, ctx: &ExecutionContext<'_>) -> Result<Receipt, Error> {
 		if self.enabled {
 			let context = Context::new(ctx);
 
@@ -43,6 +45,9 @@ impl Action for Echo {
 				})?
 				.inspect(|message| tracing::info!("{}", message));
 		}
-		Ok(Output::Continue)
+		Ok(Receipt {
+			next: vec![ctx.scope.resource.clone()],
+			..Default::default()
+		})
 	}
 }

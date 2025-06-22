@@ -1,4 +1,3 @@
-
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
@@ -14,7 +13,7 @@ pub struct Empty;
 #[typetag::serde(name = "empty")]
 impl Filter for Empty {
 	async fn filter(&self, ctx: &ExecutionContext) -> bool {
-		let path = &ctx.scope.resource.path();
+		let path = ctx.scope.resource.as_path();
 		let Ok(metadata) = tokio::fs::metadata(path).await else {
 			return false;
 		};

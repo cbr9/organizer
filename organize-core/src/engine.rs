@@ -1,10 +1,12 @@
 use crate::{
 	config::{
-		actions::ExecutionModel,
-		context::{Blackboard, ExecutionContext, ExecutionScope, RunServices, RunSettings},
+		actions::{ExecutionModel, Output},
+		context::{Blackboard, ExecutionContext, ExecutionScope, FileState, RunServices, RunSettings},
 		Config,
 		ConfigBuilder,
 	},
+	journal::Journal,
+	path::locker::Locker,
 	resource::Resource,
 	templates::Templater,
 };
@@ -23,22 +25,27 @@ pub struct Engine {
 const CONCURRENT_OPERATIONS: usize = 100;
 
 impl Engine {
-	pub fn new(path: &Option<PathBuf>, settings: RunSettings, tags: &Option<Vec<String>>, ids: &Option<Vec<String>>) -> Result<Arc<Self>> {
+	pub async fn new(path: &Option<PathBuf>, settings: RunSettings, tags: &Option<Vec<String>>, ids: &Option<Vec<String>>) -> Result<Arc<Self>> {
 		let config_builder = ConfigBuilder::new(path.clone())?;
 		let mut engine = Templater::from_config(&config_builder)?;
 		let config = config_builder.build(&mut engine, tags, ids)?;
 
+		let journal = Arc::new(Journal::new(&settings).await?);
 		let services = RunServices {
 			templater: engine,
 			blackboard: Blackboard::default(),
+			locker: Locker::default(),
+			journal,
 		};
 		Ok(Arc::new(Self { config, services, settings }))
 	}
 
 	// The signature is a simple `async fn` taking `&self`.
 	pub async fn run(self: Arc<Self>) -> Result<()> {
+		let session_id = self.services.journal.start_session(&self.config).await?;
 		for rule in self.config.rules.iter() {
 			for folder in rule.folders.iter() {
+				let engine = Arc::clone(&self);
 				let resources = match folder.get_resources() {
 					Ok(resources) => resources,
 					Err(e) => {
@@ -47,9 +54,17 @@ impl Engine {
 					}
 				};
 
+				for res in &resources {
+					engine
+						.services
+						.blackboard
+						.known_paths
+						.entry(res.clone())
+						.insert(FileState::Exists);
+				}
+
 				// ---- Filtering Stage ----
 				// 1. Create a vector of futures without spawning them.
-				let engine = Arc::clone(&self);
 				let filter_futures = resources
 					.into_iter()
 					.map(|resource| {
@@ -115,30 +130,35 @@ impl Engine {
 									};
 
 									let blackboard = &engine.services.blackboard;
+									let receipt = action.commit(&ctx).await?;
 
-									let contract = action.execute(&ctx).await?;
-									let mut entry = blackboard.journal.entry(resource.clone()).or_default();
-									for undo_op in contract.undo.into_iter() {
-										entry.value_mut().push(undo_op);
-									}
+									engine
+										.services
+										.journal
+										.record_transaction(session_id, &action, &receipt)
+										.await?;
 
 									// Simulate dry run effects (created/deleted paths and backups)
 									if engine.settings.dry_run {
-										for created_res in &contract.created {
-											blackboard.known_paths.insert(created_res.path().to_path_buf());
+										for output in &receipt.outputs {
+											match output {
+												Output::Created(resource) => {
+													blackboard.known_paths.entry(resource.clone()).insert(FileState::Exists);
+												}
+												Output::Deleted(resource) => {
+													blackboard.known_paths.entry(resource.clone()).insert(FileState::Deleted);
+												}
+												Output::Modified(_resource) => {}
+											};
 										}
-										for deleted_res in &contract.deleted {
-											blackboard.known_paths.remove(deleted_res.path());
-										}
-										for undo_op_ref in entry.value().iter() {
-											// Iterate over the accumulated undo chain
-											if let Some(backup_path) = undo_op_ref.backup() {
-												blackboard.known_paths.insert(backup_path.path.to_path_buf());
+										for undo_op in receipt.undo.iter() {
+											if let Some(backup_path) = undo_op.backup() {
+												blackboard.known_paths.entry(backup_path.0.clone()).insert(FileState::Exists);
 											}
 										}
 									}
 
-									Ok(contract.current)
+									Ok(receipt.next)
 								})
 							});
 

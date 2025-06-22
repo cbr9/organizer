@@ -2,20 +2,17 @@ use crate::{
 	config::{actions::common::ConflictResolution, context::ExecutionContext},
 	errors::{Error, ErrorContext},
 	path::resolver::PathResolver,
+	resource::Resource,
 	templates::template::Template,
 	utils::fs::ensure_parent_dir_exists,
 };
 use anyhow::Result;
 use dashmap::DashSet;
-use std::{
-	future::Future,
-	path::PathBuf,
-	sync::Arc,
-};
+use std::{future::Future, sync::Arc};
 
 #[derive(Debug, Clone, Default)]
 pub struct Locker {
-	active_paths: Arc<DashSet<PathBuf>>,
+	active_paths: Arc<DashSet<Resource>>,
 }
 
 impl Locker {
@@ -28,7 +25,7 @@ impl Locker {
 		action: F,
 	) -> Result<Option<T>, Error>
 	where
-		F: FnOnce(PathBuf) -> Fut,
+		F: FnOnce(Resource) -> Fut,
 		Fut: Future<Output = Result<T, Error>>,
 	{
 		// ... (resolver and path initialization logic remains the same) ...
@@ -42,9 +39,8 @@ impl Locker {
 		};
 
 		let mut n = 1;
-		let reserved_path = loop {
+		let reserved = loop {
 			if self.active_paths.contains(&path) {
-				// ... (conflict resolution logic remains the same) ...
 				match strategy {
 					ConflictResolution::Skip | ConflictResolution::Overwrite => return Ok(None),
 					ConflictResolution::Rename => {
@@ -55,20 +51,14 @@ impl Locker {
 						} else {
 							format!("{stem} ({n}).{ext}")
 						};
-						path.set_file_name(new_name);
+						path = path.with_file_name(new_name).into();
 						n += 1;
 						continue;
 					}
 				}
 			}
 
-			let exists = if ctx.settings.dry_run {
-				ctx.services.blackboard.known_paths.contains(&path)
-			} else {
-				tokio::fs::try_exists(&path).await.unwrap_or(false)
-			};
-
-			if exists {
+			if path.try_exists(ctx).await? {
 				match strategy {
 					ConflictResolution::Skip => return Ok(None),
 					ConflictResolution::Overwrite => {
@@ -85,7 +75,7 @@ impl Locker {
 						} else {
 							format!("{stem} ({n}).{ext}")
 						};
-						path.set_file_name(new_name);
+						path = path.with_file_name(new_name).into();
 						n += 1;
 						continue;
 					}
@@ -98,17 +88,17 @@ impl Locker {
 			break Some(path);
 		};
 		// ... (action execution and release logic remains the same) ...
-		if let Some(target_path) = reserved_path {
-			ensure_parent_dir_exists(&target_path).await.map_err(|e| Error::Io {
+		if let Some(target) = reserved {
+			ensure_parent_dir_exists(&target).await.map_err(|e| Error::Io {
 				source: e,
-				path: ctx.scope.resource.path().to_path_buf(),
-				target: Some(target_path.clone()),
+				path: ctx.scope.resource.clone(),
+				target: Some(target.clone()),
 				context: ErrorContext::from_scope(&ctx.scope),
 			})?;
 
-			let result = action(target_path.clone()).await?;
+			let result = action(target.clone()).await?;
 
-			self.active_paths.remove(&target_path);
+			self.active_paths.remove(&target);
 
 			Ok(Some(result))
 		} else {

@@ -13,3 +13,12 @@ TODO:
 - [x] create a resource struct that represents a file and holds a context for that specific file, so operations can be parallelized without affecting the Tera context; get rid of global context. Take the list of rule variables in constructor
 - [ ] look for configs at git repo root
 - [ ] TESTS!!
+
+---
+
+
+# Planned Features
+- A watch command
+  - A corresponding file watcher synchronization service that keeps the known_files cache in sync with the fs
+- Undo capabilities
+- backups

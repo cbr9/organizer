@@ -1,55 +1,58 @@
-use anyhow::bail;
+use serde::{Deserialize, Serialize};
 use std::{
 	fmt::Debug,
 	hash::Hash,
 	path::{Path, PathBuf},
+	sync::Arc,
 };
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Resource {
-	path: PathBuf,
-	root: Option<PathBuf>,
-}
+use serde::Serializer;
 
-impl Hash for Resource {
-	fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-		self.path.hash(state)
+use crate::{
+	config::context::{ExecutionContext, FileState},
+	errors::{Error, ErrorContext},
+};
+#[derive(Debug, Deserialize, Hash, Clone, PartialEq, Eq)]
+pub struct Resource(Arc<PathBuf>);
+
+impl From<&Path> for Resource {
+	fn from(value: &Path) -> Self {
+		Self(Arc::new(value.to_path_buf()))
 	}
 }
 
+impl From<PathBuf> for Resource {
+	fn from(value: PathBuf) -> Self {
+		Self(Arc::new(value.to_path_buf()))
+	}
+}
+
+impl std::ops::Deref for Resource {
+	type Target = Arc<PathBuf>;
+
+	fn deref(&self) -> &Self::Target {
+		&self.0
+	}
+}
+
+impl AsRef<Path> for Resource {
+	fn as_ref(&self) -> &Path {
+		self.0.as_path()
+	}
+}
+
+impl Serialize for Resource {
+	fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+	where
+		S: Serializer,
+	{
+		// Serialize the PathBuf that the Arc points to.
+		self.0.serialize(serializer)
+	}
+}
 impl Resource {
-	pub fn new<T: AsRef<Path> + Debug, P: AsRef<Path> + Debug>(path: T, root: Option<P>) -> anyhow::Result<Self> {
-		let path = path.as_ref().to_path_buf();
-		if path.parent().is_none_or(|p| p.to_string_lossy() == "") {
-			bail!(
-				"Cannot create a Resource from path '{}' because it has no parent directory.",
-				path.display()
-			);
-		}
-
-		Ok(Self {
-			path,
-			root: root.map(|p| p.as_ref().to_path_buf()),
-		})
-	}
-
-	pub fn with_new_path(&self, path: PathBuf) -> Self {
-		Self {
-			path,
-			root: self.root.clone(),
-		}
-	}
-
-	pub fn path(&self) -> &Path {
-		self.path.as_path()
-	}
-
-	pub fn root(&self) -> Option<&Path> {
-		self.root.as_deref()
-	}
-
-	pub fn set_path<T: AsRef<Path>>(&mut self, path: T) {
-		self.path = path.as_ref().into();
+	pub fn new<T: Into<PathBuf> + Debug>(path: T) -> Self {
+		Self(Arc::new(path.into()))
 	}
 
 	#[cfg(test)]
@@ -57,10 +60,26 @@ impl Resource {
 		use tempfile::tempdir;
 		let dir = tempdir().unwrap();
 		let path = dir.path().join(filename);
-		Self {
-			path: path.to_path_buf(),
-			root: Some(dir.path().to_path_buf()),
+		Self(Arc::new(path))
+	}
+
+	pub async fn try_exists(&self, ctx: &ExecutionContext<'_>) -> Result<bool, Error> {
+		if ctx.settings.dry_run {
+			if let Some(entry) = ctx.services.blackboard.known_paths.get(self) {
+				return match entry.value() {
+					FileState::Exists => Ok(true),
+					FileState::Deleted => Ok(false),
+				};
+			}
 		}
+
+		// Otherwise, check the physical filesystem using the resource's path.
+		tokio::fs::try_exists(self.as_path()).await.map_err(|e| Error::Io {
+			source: e,
+			path: self.clone(),
+			target: None,
+			context: ErrorContext::from_scope(&ctx.scope),
+		})
 	}
 }
 

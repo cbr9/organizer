@@ -1,5 +1,6 @@
 use crate::{
 	config::{actions::common::ConflictResolution, context::ExecutionContext},
+	resource::Resource,
 	templates::{template::Template, Context},
 };
 use anyhow::Result;
@@ -24,7 +25,7 @@ impl<'a> PathResolver<'a> {
 		}
 	}
 
-	pub async fn resolve(&self) -> Result<Option<PathBuf>> {
+	pub async fn resolve(&self) -> Result<Option<Resource>> {
 		let context = Context::new(self.ctx);
 		let templater = &self.ctx.services.templater;
 		let Some(mut path) = templater.render(self.template, &context)?.map(PathBuf::from) else {
@@ -33,22 +34,19 @@ impl<'a> PathResolver<'a> {
 
 		if path.is_dir() || path.to_string_lossy().ends_with(MAIN_SEPARATOR) || path.to_string_lossy().ends_with('/') {
 			if self.extension {
-				if let Some(filename) = self.ctx.scope.resource.path().file_name() {
+				if let Some(filename) = self.ctx.scope.resource.file_name() {
 					path.push(filename);
 				} else {
 					return Ok(None); // Cannot move a file that has no name (e.g., "/")
 				}
-			} else if let Some(stem) = self.ctx.scope.resource.path().file_stem() {
+			} else if let Some(stem) = self.ctx.scope.resource.file_stem() {
 				path.push(stem);
 			} else {
 				return Ok(None);
 			}
 		}
 
-		if tokio::fs::try_exists(&path).await? {
-			// This helper would also need to be async
-			return self.strategy.resolve(&path).await;
-		}
-		Ok(Some(path))
+		let path = Resource::new(path);
+		return self.strategy.resolve(path, self.ctx).await;
 	}
 }

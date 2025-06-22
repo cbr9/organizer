@@ -3,6 +3,7 @@
 use crate::{
 	config::context::ExecutionContext,
 	errors::{Error, ErrorContext},
+	resource::Resource,
 };
 use anyhow::Result;
 use std::path::Path; // Assuming this is needed for dry_run and context
@@ -17,8 +18,8 @@ pub async fn ensure_parent_dir_exists(path: &Path) -> std::io::Result<()> {
 }
 
 pub async fn move_safely(
-	source: &Path,
-	destination: &Path,
+	source: &Resource,
+	destination: &Resource,
 	ctx: &ExecutionContext<'_>, // Pass context for error reporting and dry_run
 ) -> Result<(), Error> {
 	// Attempt a direct rename first
@@ -35,23 +36,23 @@ pub async fn move_safely(
 
 			ensure_parent_dir_exists(destination).await.map_err(|e| Error::Io {
 				source: e,
-				path: source.to_path_buf(),
-				target: Some(destination.to_path_buf()),
+				path: source.clone(),
+				target: Some(destination.clone()),
 				context: ErrorContext::from_scope(&ctx.scope),
 			})?;
 
 			// Perform copy
 			tokio::fs::copy(source, destination).await.map_err(|io_err| Error::Io {
 				source: io_err,
-				path: source.to_path_buf(),
-				target: Some(destination.to_path_buf()),
+				path: source.clone(),
+				target: Some(destination.clone()),
 				context: ErrorContext::from_scope(&ctx.scope),
 			})?;
 
 			// If copy is successful, delete the original
 			tokio::fs::remove_file(source).await.map_err(|io_err| Error::Io {
 				source: io_err,
-				path: source.to_path_buf(),
+				path: source.clone(),
 				target: None,
 				context: ErrorContext::from_scope(&ctx.scope),
 			})
@@ -60,28 +61,10 @@ pub async fn move_safely(
 			// Other I/O errors
 			Err(Error::Io {
 				source: e,
-				path: source.to_path_buf(),
-				target: Some(destination.to_path_buf()),
+				path: source.clone(),
+				target: Some(destination.clone()),
 				context: ErrorContext::from_scope(&ctx.scope),
 			})
 		}
-	}
-}
-
-/// Checks whether a file exists asynchronously.
-/// If in dry_run mode, it checks the simulated paths in the blackboard.
-/// Otherwise, it performs an actual file system check.
-pub async fn try_exists(path: &Path, ctx: &ExecutionContext<'_>) -> Result<bool, Error> {
-	if ctx.settings.dry_run {
-		// In dry_run mode, check against the set of simulated paths
-		Ok(ctx.services.blackboard.known_paths.contains(path))
-	} else {
-		// In actual run mode, perform a real file system check
-		tokio::fs::try_exists(path).await.map_err(|e| Error::Io {
-			source: e,
-			path: path.to_path_buf(),
-			target: None,
-			context: ErrorContext::from_scope(&ctx.scope),
-		})
 	}
 }
