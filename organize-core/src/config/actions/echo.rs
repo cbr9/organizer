@@ -1,12 +1,10 @@
-use std::path::PathBuf;
 
 use crate::{
 	config::{
-		actions::{common::enabled, Output, Receipt},
+		actions::{common::enabled, Receipt},
 		context::ExecutionContext,
 	},
 	errors::{Error, ErrorContext},
-	templates::Context,
 };
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
@@ -33,11 +31,10 @@ impl Action for Echo {
 
 	async fn commit(&self, ctx: &ExecutionContext<'_>) -> Result<Receipt, Error> {
 		if self.enabled {
-			let context = Context::new(ctx);
-
 			ctx.services
 				.templater
-				.render(&self.message, &context)
+				.render(&self.message, ctx)
+				.await
 				.map_err(|e| Error::Template {
 					source: e,
 					template: self.message.clone(),

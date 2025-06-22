@@ -1,7 +1,7 @@
 use crate::{
 	config::{actions::common::ConflictResolution, context::ExecutionContext},
 	resource::Resource,
-	templates::{template::Template, Context},
+	templates::template::Template,
 };
 use anyhow::Result;
 use std::path::{PathBuf, MAIN_SEPARATOR};
@@ -26,9 +26,8 @@ impl<'a> PathResolver<'a> {
 	}
 
 	pub async fn resolve(&self) -> Result<Option<Resource>> {
-		let context = Context::new(self.ctx);
 		let templater = &self.ctx.services.templater;
-		let Some(mut path) = templater.render(self.template, &context)?.map(PathBuf::from) else {
+		let Some(mut path) = templater.render(self.template, self.ctx).await?.map(PathBuf::from) else {
 			return Ok(None);
 		};
 

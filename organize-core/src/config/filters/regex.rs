@@ -1,7 +1,6 @@
-
 use crate::{
 	config::{context::ExecutionContext, filters::Filter},
-	templates::{template::Template, Context},
+	templates::template::Template,
 };
 use async_trait::async_trait;
 use itertools::Itertools;
@@ -77,10 +76,10 @@ impl Filter for RegularExpression {
 	}
 
 	async fn filter(&self, ctx: &ExecutionContext) -> bool {
-		let context = Context::new(ctx);
 		ctx.services
 			.templater
-			.render(&self.input, &context)
+			.render(&self.input, ctx)
+			.await
 			.unwrap_or_default()
 			.is_some_and(|s| self.pattern.is_match(&s))
 	}

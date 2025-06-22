@@ -5,11 +5,10 @@ use crate::{
 	errors::{Error, ErrorContext},
 	resource::Resource,
 };
-use crate::{utils, PROJECT_NAME}; // Import PROJECT_NAME from lib.rs
+use crate::PROJECT_NAME; // Import PROJECT_NAME from lib.rs
 use anyhow::Result;
 use dirs;
 use serde::{Deserialize, Serialize}; // Import the dirs crate
-use std::path::{Path, PathBuf};
 use tokio::fs;
 use uuid::Uuid; // Import Uuid for generating unique IDs // Import chrono for timestamps (already in Cargo.toml)
 

@@ -11,7 +11,7 @@ pub mod empty;
 // pub mod extension;
 // pub mod filename;
 // pub mod mime;
-// pub mod regex;
+pub mod regex;
 
 use crate::{config::context::ExecutionContext, templates::template::Template};
 

@@ -1,18 +1,11 @@
-use crate::{
-	config::{
-		actions::{Action, Receipt},
-		context::RunSettings,
-		Config,
-	},
-	resource::Resource,
+use crate::config::{
+	actions::{Action, Receipt},
+	context::RunSettings,
+	Config,
 };
 use anyhow::Result;
-use serde::{Deserialize, Serialize};
 use sqlx::{sqlite::SqlitePoolOptions, FromRow, SqlitePool};
-use std::{
-	path::Path,
-	time::{SystemTime, UNIX_EPOCH},
-};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 /// The Journal service, responsible for all database interactions.
 #[derive(Debug, Clone)]
@@ -70,6 +63,7 @@ impl Journal {
 		Ok(record.last_insert_rowid())
 	}
 
+	#[allow(clippy::borrowed_box)]
 	pub async fn record_transaction(&self, session_id: i64, action: &Box<dyn Action>, receipt: &Receipt) -> Result<()> {
 		if receipt.undo.is_empty() {
 			return Ok(());

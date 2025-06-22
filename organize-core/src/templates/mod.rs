@@ -2,52 +2,26 @@ use std::collections::HashSet;
 
 use anyhow::Result;
 use filters::{
-	misc::{hash, mime},
+	misc::mime,
 	path::{extension, filename, parent, stem},
 	size::size,
 };
 use template::Template;
 use tera::Tera;
 
-use crate::{
-	config::{context::ExecutionContext, variables::Variable, ConfigBuilder},
-	templates::lazy::LazyVariable,
+use crate::config::{
+	context::ExecutionContext,
+	variables::{builtins, Variable},
+	ConfigBuilder,
 };
 
 pub mod filters;
-pub mod lazy;
 pub mod template;
 
 #[derive(Clone, Debug)]
 pub struct Templater {
 	pub tera: Tera,
 	pub variables: Vec<Box<dyn Variable>>,
-}
-
-pub struct Context(tera::Context);
-
-impl std::ops::Deref for Context {
-	type Target = tera::Context;
-
-	fn deref(&self) -> &Self::Target {
-		&self.0
-	}
-}
-
-impl Context {
-	pub fn new(ctx: &ExecutionContext) -> Self {
-		let mut context = tera::Context::new();
-		context.insert("path", ctx.scope.resource);
-		context.insert("root", &ctx.scope.folder.path);
-
-		for var in &ctx.scope.rule.variables {
-			println!("{}", var.typetag_name());
-			let lazy = LazyVariable { variable: var, context: ctx };
-			context.insert(var.name(), &lazy);
-		}
-
-		Self(context)
-	}
 }
 
 impl PartialEq for Templater {
@@ -57,48 +31,60 @@ impl PartialEq for Templater {
 }
 
 impl Templater {
-	pub fn new(variables: &Vec<Box<dyn Variable>>) -> Self {
-		let mut engine = Self::default();
-		for var in variables.iter() {
-			let templates = var.templates();
-			engine.add_templates(templates).unwrap();
-		}
-		engine.variables = variables.clone();
-		engine
-	}
-
 	pub fn from_config(config: &ConfigBuilder) -> anyhow::Result<Self> {
-		let mut engine = Self::default();
+		let mut templater = Self::default();
+
 		for rule in config.rules.iter() {
 			for action in rule.actions.iter() {
-				engine.add_templates(action.templates())?;
-			}
-			for variable in rule.variables.iter() {
-				engine.add_templates(variable.templates())?;
+				templater.add_templates(action.templates())?;
 			}
 			for filter in rule.filters.iter() {
-				engine.add_templates(filter.templates())?;
+				templater.add_templates(filter.templates())?;
 			}
 			for folder in rule.folders.iter() {
-				engine.add_template(&folder.root)?;
+				templater.add_template(&folder.root)?;
+			}
+
+			for variable in rule.variables.iter() {
+				templater.add_templates(variable.templates())?;
+				templater.variables.push(variable.clone());
 			}
 		}
-		Ok(engine)
+
+		Ok(templater)
 	}
 
 	pub fn get_template_names(&self) -> HashSet<&str> {
 		self.tera.get_template_names().collect()
 	}
 
-	pub fn render(&self, template: &Template, context: &tera::Context) -> tera::Result<Option<String>> {
-		match self.tera.render(&template.id, context) {
-			Ok(res) => {
-				if res.is_empty() {
-					Ok(None)
-				} else {
-					Ok(Some(res))
-				}
+	pub async fn render(&self, template: &Template, ctx: &ExecutionContext<'_>) -> tera::Result<Option<String>> {
+		let dependencies = &template.dependencies;
+		dbg!(&dependencies);
+		let mut context = tera::Context::new();
+		let available_variable_names: HashSet<&str> = self.variables.iter().map(|v| v.name().unwrap_or(v.typetag_name())).collect();
+		let needed_variables = dependencies
+			.iter()
+			.map(String::as_str)
+			.filter(|&s| available_variable_names.contains(s));
+
+		for var_name in needed_variables {
+			if let Some(var) = self.variables.iter().find(|v| v.name().unwrap_or(v.typetag_name()) == var_name) {
+				let value = var.compute(ctx).await.map_err(|e| {
+					tera::Error::msg(format!(
+						"Failed to compute variable '{}': {}",
+						var.name().unwrap_or(var.typetag_name()),
+						e
+					))
+				})?;
+				context.insert(var.name().unwrap_or(var.typetag_name()), &value);
 			}
+		}
+
+		// 6. Render the template with the lean, just-in-time context.
+		match self.tera.render(&template.id, &context) {
+			Ok(res) if res.is_empty() => Ok(None),
+			Ok(res) => Ok(Some(res)),
 			Err(e) => Err(e),
 		}
 	}
@@ -121,8 +107,7 @@ impl Templater {
 }
 
 impl Default for Templater {
-	/// Creates a new, empty engine. This is primarily for convenience.
-	/// The actual populated engine is created in `ConfigBuilder`.
+	/// Creates a new Templater with all built-in filters and lazy variables.
 	fn default() -> Self {
 		let mut tera = Tera::default();
 		tera.register_filter("parent", parent);
@@ -131,11 +116,18 @@ impl Default for Templater {
 		tera.register_filter("extension", extension);
 		tera.register_filter("mime", mime);
 		tera.register_filter("filesize", size);
-		tera.register_filter("hash", hash);
-		Self { tera, variables: vec![] }
+
+		// Initialize the templater with the complete set of built-in lazy variables
+		let variables: Vec<Box<dyn Variable>> = vec![
+			Box::new(builtins::Path),
+			Box::new(builtins::Root),
+			Box::new(builtins::Metadata::new()),
+			Box::new(builtins::Hash::new()),
+		];
+
+		Self { tera, variables }
 	}
 }
-
 // #[cfg(test)]
 // mod tests {
 // 	use std::convert::{TryFrom, TryInto};
