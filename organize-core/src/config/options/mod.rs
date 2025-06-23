@@ -2,7 +2,10 @@ use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use std::{fmt::Debug, path::PathBuf};
 
-use crate::templates::{template::Template, Templater};
+use crate::{
+	templates::{template::Template, Templater},
+	utils::backup::BackupLocation,
+};
 
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
@@ -13,7 +16,7 @@ pub struct OptionsBuilder {
 	pub hidden_files: Option<bool>,
 	pub partial_files: Option<bool>,
 	pub target: Option<Target>,
-	pub backup: Option<bool>,
+	pub backup_location: Option<BackupLocation>,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq)]
@@ -24,7 +27,7 @@ pub struct Options {
 	pub hidden_files: bool,
 	pub partial_files: bool,
 	pub target: Target,
-	pub backup: bool,
+	pub backup_location: BackupLocation,
 }
 
 impl Default for Options {
@@ -32,11 +35,11 @@ impl Default for Options {
 		Self {
 			max_depth: 1.0 as usize,
 			min_depth: 1.0 as usize,
-			exclude: Vec::new(),
-			hidden_files: false,
-			partial_files: false,
+			exclude: Vec::default(),
+			hidden_files: bool::default(),
+			partial_files: bool::default(),
 			target: Target::default(),
-			backup: false,
+			backup_location: BackupLocation::default(),
 		}
 	}
 }
@@ -55,7 +58,12 @@ impl Options {
 		context.insert("root", folder_path);
 
 		Self {
-			backup: folder.backup.or(rule.backup).or(defaults.backup).unwrap_or(fallback.backup),
+			backup_location: folder
+				.backup_location
+				.clone()
+				.or(rule.backup_location.clone())
+				.or(defaults.backup_location.clone())
+				.unwrap_or(fallback.backup_location),
 			max_depth: folder
 				.max_depth
 				.or(rule.max_depth)

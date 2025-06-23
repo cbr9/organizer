@@ -7,7 +7,7 @@ use crate::{
 	},
 	errors::Error,
 	resource::Resource,
-	utils::{backup::Backup, fs::move_safely},
+	utils::{self, backup::Backup, fs::r#move},
 };
 use anyhow::Result;
 use async_trait::async_trait;
@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::templates::template::Template;
 
-use super::{common::ConflictResolution, Action};
+use super::{common::ConflictResolution, Action, UndoConflict, UndoError, UndoSettings};
 
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
@@ -42,23 +42,15 @@ impl Action for Move {
 			.with_locked_destination(ctx, &self.destination, &self.strategy, true, |target| async move {
 				let source = ctx.scope.resource;
 
-				let backup: Option<Backup> = if !ctx.settings.dry_run && self.enabled {
-					async {
-						let backup_opt = if ctx.scope.folder.settings.backup {
-							let b = Backup::new(ctx).await?;
-							b.persist(ctx.scope.resource.clone(), ctx).await?;
-							Some(b)
-						} else {
-							None
-						};
-
-						move_safely(source, &target, ctx).await?;
-						Ok(backup_opt)
-					}
-					.await?
+				let backup = if !ctx.settings.dry_run && self.enabled {
+					let backup = Backup::new(ctx).await?;
+					backup.persist(ctx).await?;
+					r#move(source, &target, ctx).await?;
+					Some(backup)
 				} else {
 					None
 				};
+
 				Ok(Receipt {
 					inputs: vec![Input::Processed(ctx.scope.resource.clone())],
 					outputs: vec![Output::Created(target.clone()), Output::Deleted(ctx.scope.resource.clone())],
@@ -85,13 +77,55 @@ pub struct UndoMove {
 	pub backup: Option<Backup>,
 }
 
+#[async_trait]
 #[typetag::serde(name = "undo_move")]
 impl Undo for UndoMove {
-	fn undo(&self) -> Result<()> {
-		Ok(std::fs::rename(&self.new, &self.original)?)
+	async fn undo(&self, settings: &UndoSettings) -> Result<(), UndoError> {
+		let original = if tokio::fs::try_exists(&self.original).await? {
+			if settings.interactive {
+				UndoConflict::resolve(self.original.clone()).await
+			} else {
+				settings.on_conflict.handle(self.original.clone()).await
+			}
+		} else {
+			Ok(Some(self.original.clone()))
+		}?;
+
+		if let Some(original) = original {
+			if tokio::fs::try_exists(&self.new).await.unwrap_or(false) {
+				utils::fs::move_file(&self.new, &original).await?;
+				return Ok(());
+			}
+			if let Some(backup) = &self.backup {
+				if tokio::fs::try_exists(backup.as_path()).await.unwrap_or(false) {
+					utils::fs::move_file(backup, &original).await?;
+					return Ok(());
+				}
+			}
+		}
+
+		Ok(())
 	}
 
 	fn backup(&self) -> Option<&Backup> {
 		self.backup.as_ref()
+	}
+
+	async fn verify(&self) -> Result<(), UndoError> {
+		let backup_exists = if let Some(backup) = &self.backup {
+			tokio::fs::try_exists(backup.as_path())
+				.await
+				.map_err(|_e| UndoError::BackupMissing(backup.0.clone()))?
+		} else {
+			false
+		};
+
+		let new_exists = tokio::fs::try_exists(&self.new).await.unwrap_or(false);
+
+		if !new_exists && !backup_exists {
+			return Err(UndoError::PathNotFound(self.new.clone()));
+		}
+
+		Ok(())
 	}
 }

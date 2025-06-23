@@ -4,7 +4,7 @@ use crate::config::{
 	Config,
 };
 use anyhow::Result;
-use sqlx::{sqlite::SqlitePoolOptions, FromRow, SqlitePool};
+use sqlx::{sqlite::SqlitePoolOptions, SqlitePool};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 /// The Journal service, responsible for all database interactions.
@@ -13,18 +13,10 @@ pub struct Journal {
 	pool: SqlitePool,
 }
 
-/// Represents a fully hydrated transaction, retrieved from the database.
 #[derive(Debug)]
 pub struct Transaction {
 	pub id: i64,
 	pub receipt: Receipt,
-}
-
-/// A helper struct to map directly from a `transactions` table row.
-#[derive(FromRow, Debug)]
-struct TransactionRow {
-	id: i64,
-	contract_data: String,
 }
 
 impl Journal {
@@ -92,6 +84,25 @@ impl Journal {
 		Ok(())
 	}
 
+	pub async fn get_pending_transactions_for_session(&self, session_id: i64) -> Result<Vec<Transaction>> {
+		let transactions = sqlx::query_as!(
+			Transaction,
+			"SELECT id, receipt FROM transactions WHERE session_id = ? AND undo_status = 'PENDING' ORDER BY timestamp DESC",
+			session_id
+		)
+		.fetch_all(&self.pool)
+		.await?;
+
+		Ok(transactions)
+	}
+
+	pub async fn update_transaction_undo_status(&self, transaction_id: i64, status: &str) -> Result<()> {
+		sqlx::query!("UPDATE transactions SET undo_status = ? WHERE id = ?", status, transaction_id)
+			.execute(&self.pool)
+			.await?;
+		Ok(())
+	}
+
 	/// Marks a session as completed with a final status.
 	pub async fn end_session(&self, session_id: i64, status: &str) -> Result<()> {
 		let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs() as i64;
@@ -99,5 +110,12 @@ impl Journal {
 			.execute(&self.pool)
 			.await?;
 		Ok(())
+	}
+
+	pub async fn get_last_session_id(&self) -> Result<Option<i64>> {
+		let result = sqlx::query!("SELECT id FROM sessions ORDER BY start_time DESC LIMIT 1")
+			.fetch_optional(&self.pool)
+			.await?;
+		Ok(result.map(|row| row.id))
 	}
 }

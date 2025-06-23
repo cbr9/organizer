@@ -1,6 +1,3 @@
--- This is the complete and final SQL migration for the journal database.
-
--- The `sessions` table tracks each individual execution of `organize run`.
 CREATE TABLE IF NOT EXISTS sessions (
     id              INTEGER PRIMARY KEY,
     start_time      INTEGER NOT NULL,
@@ -9,7 +6,6 @@ CREATE TABLE IF NOT EXISTS sessions (
     status          TEXT NOT NULL
 );
 
--- The `transactions` table records every undoable action performed during a session.
 CREATE TABLE IF NOT EXISTS transactions (
     id              INTEGER PRIMARY KEY,
     session_id      INTEGER NOT NULL,
@@ -17,6 +13,7 @@ CREATE TABLE IF NOT EXISTS transactions (
     action             TEXT NOT NULL,
     receipt            TEXT NOT NULL, 
     timestamp       INTEGER NOT NULL,
+    undo_status TEXT NOT NULL DEFAULT "PENDING",
     FOREIGN KEY(session_id) REFERENCES sessions(id)
 );
 

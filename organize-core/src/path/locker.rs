@@ -28,7 +28,6 @@ impl Locker {
 		F: FnOnce(Resource) -> Fut,
 		Fut: Future<Output = Result<T, Error>>,
 	{
-		// ... (resolver and path initialization logic remains the same) ...
 		let resolver = PathResolver::new(destination, strategy, extension, ctx);
 		let Some(mut path) = resolver.resolve().await.map_err(|_| Error::PathResolution {
 			template: destination.input.to_string(),
@@ -87,7 +86,7 @@ impl Locker {
 			}
 			break Some(path);
 		};
-		// ... (action execution and release logic remains the same) ...
+
 		if let Some(target) = reserved {
 			ensure_parent_dir_exists(&target).await.map_err(|e| Error::Io {
 				source: e,

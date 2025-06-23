@@ -1,3 +1,4 @@
+use path_clean::PathClean;
 use serde::{Deserialize, Serialize};
 use std::{
 	fmt::Debug,
@@ -17,13 +18,13 @@ pub struct Resource(Arc<PathBuf>);
 
 impl From<&Path> for Resource {
 	fn from(value: &Path) -> Self {
-		Self(Arc::new(value.to_path_buf()))
+		Self(Arc::new(value.to_path_buf().clean()))
 	}
 }
 
 impl From<PathBuf> for Resource {
 	fn from(value: PathBuf) -> Self {
-		Self(Arc::new(value.to_path_buf()))
+		Self(Arc::new(value.to_path_buf().clean()))
 	}
 }
 
@@ -52,7 +53,7 @@ impl Serialize for Resource {
 }
 impl Resource {
 	pub fn new<T: Into<PathBuf> + Debug>(path: T) -> Self {
-		Self(Arc::new(path.into()))
+		Self(Arc::new(path.into().clean()))
 	}
 
 	#[cfg(test)]

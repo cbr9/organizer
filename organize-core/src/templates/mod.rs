@@ -60,7 +60,6 @@ impl Templater {
 
 	pub async fn render(&self, template: &Template, ctx: &ExecutionContext<'_>) -> tera::Result<Option<String>> {
 		let dependencies = &template.dependencies;
-		dbg!(&dependencies);
 		let mut context = tera::Context::new();
 		let available_variable_names: HashSet<&str> = self.variables.iter().map(|v| v.name().unwrap_or(v.typetag_name())).collect();
 		let needed_variables = dependencies

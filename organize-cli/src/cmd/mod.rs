@@ -2,15 +2,18 @@ use crate::cmd::run::Run;
 use async_trait::async_trait;
 use clap::{Parser, Subcommand};
 use edit::Edit;
+use undo::Undo;
 
 mod edit;
 mod logs;
 mod run;
+mod undo;
 
 #[derive(Subcommand)]
 enum Command {
 	Run(Run),
 	Edit(Edit),
+	Undo(Undo),
 }
 
 #[derive(Parser)]
@@ -31,6 +34,7 @@ impl Cmd for App {
 		match self.command {
 			Command::Run(cmd) => cmd.run().await,
 			Command::Edit(edit) => edit.run().await,
+			Command::Undo(undo) => undo.run().await,
 		}
 	}
 }

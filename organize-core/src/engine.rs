@@ -183,6 +183,7 @@ impl Engine {
 				}
 			}
 		}
+		self.services.journal.end_session(session_id, "success").await?;
 		Ok(())
 	}
 }

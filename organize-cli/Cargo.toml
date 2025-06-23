@@ -19,4 +19,5 @@ tracing-subscriber.workspace = true
 async-trait = "0.1.88"
 tokio = { version = "1.45.1", features = ["full"] }
 lazy_static = "1.5.0"
+dialoguer.workspace = true
 
