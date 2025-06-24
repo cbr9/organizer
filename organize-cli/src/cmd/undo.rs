@@ -79,7 +79,8 @@ impl Cmd for Undo {
 
 								eprintln!(
 									"There was a conflict undoing transaction {}.\nOne of the following files may already exist: \n - {}\nAborting \
-									 undo process. Run in interactive mode or choose a default conflict resolution strategy. You can also move the file manually.",
+									 undo process. Run in interactive mode or choose a default conflict resolution strategy. You can also move the \
+									 file manually.",
 									transaction.id, inputs
 								);
 								return Ok(());

@@ -1,10 +1,9 @@
-
 use crate::{
 	config::{
 		actions::{common::enabled, Receipt},
 		context::ExecutionContext,
 	},
-	errors::{Error, ErrorContext},
+	errors::Error,
 };
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
@@ -34,12 +33,7 @@ impl Action for Echo {
 			ctx.services
 				.templater
 				.render(&self.message, ctx)
-				.await
-				.map_err(|e| Error::Template {
-					source: e,
-					template: self.message.clone(),
-					context: ErrorContext::from_scope(&ctx.scope),
-				})?
+				.await?
 				.inspect(|message| tracing::info!("{}", message));
 		}
 		Ok(Receipt {

@@ -2,6 +2,7 @@ use config::{Config as LayeredConfig, File};
 use itertools::Itertools;
 use rule::{Rule, RuleBuilder};
 use std::{collections::HashSet, path::PathBuf};
+use variables::Variable;
 
 use anyhow::{anyhow, Context as ErrorContext, Result};
 use serde::{Deserialize, Serialize};
@@ -22,6 +23,8 @@ pub mod variables;
 #[derive(Deserialize, Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct ConfigBuilder {
+	#[serde(default)]
+	pub variables: Vec<Box<dyn Variable>>,
 	pub rules: Vec<RuleBuilder>,
 	#[serde(flatten)]
 	pub defaults: OptionsBuilder,

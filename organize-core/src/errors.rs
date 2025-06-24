@@ -2,7 +2,7 @@ use std::path::PathBuf;
 use thiserror::Error;
 use zip::result::ZipError;
 
-use crate::{config::context::ExecutionScope, resource::Resource, templates::template::Template};
+use crate::{config::context::ExecutionScope, resource::Resource, templates::TemplateError};
 
 /// A self-contained, owned snapshot of the execution context at the time of an error.
 /// It has no lifetimes, so it can be freely passed around.
@@ -63,19 +63,8 @@ pub enum Error {
 	},
 
 	#[error("Could not render template")]
-	Template {
-		#[source]
-		source: tera::Error,
-		template: Template,
-		context: ErrorContext,
-	},
+	TemplateError(#[from] TemplateError),
 
-	// #[error("Email action failed")]
-	// Email {
-	// 	#[source]
-	// 	source: EmailError,
-	// 	context: ErrorContext,
-	// },
 	#[error("Script crashed. Check the final script at {script}")]
 	Script {
 		#[source]

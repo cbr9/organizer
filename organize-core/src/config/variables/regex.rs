@@ -18,8 +18,8 @@ pub struct RegularExpression {
 #[async_trait]
 #[typetag::serde(name = "regex")]
 impl Variable for RegularExpression {
-	fn name(&self) -> Option<&str> {
-		Some(&self.name)
+	fn name(&self) -> String {
+		self.name.clone()
 	}
 
 	fn templates(&self) -> Vec<&Template> {

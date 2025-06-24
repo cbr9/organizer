@@ -4,14 +4,14 @@ use anyhow::Result;
 use filters::{
 	misc::mime,
 	path::{extension, filename, parent, stem},
-	size::size,
 };
 use template::Template;
 use tera::Tera;
+use thiserror::Error;
 
 use crate::config::{
 	context::ExecutionContext,
-	variables::{builtins, Variable},
+	variables::{self, Variable},
 	ConfigBuilder,
 };
 
@@ -30,6 +30,14 @@ impl PartialEq for Templater {
 	}
 }
 
+#[derive(Error, Debug)]
+pub enum TemplateError {
+	#[error("This name of this rule's variable is not unique with respect to other builtin variables and other globally defined variables")]
+	NonUniqueNames { name: String, rule_index: usize },
+	#[error("Tera engine error")]
+	Tera(#[from] tera::Error),
+}
+
 impl Templater {
 	pub fn from_config(config: &ConfigBuilder) -> anyhow::Result<Self> {
 		let mut templater = Self::default();
@@ -45,7 +53,7 @@ impl Templater {
 				templater.add_template(&folder.root)?;
 			}
 
-			for variable in rule.variables.iter() {
+			for variable in config.variables.iter() {
 				templater.add_templates(variable.templates())?;
 				templater.variables.push(variable.clone());
 			}
@@ -58,25 +66,23 @@ impl Templater {
 		self.tera.get_template_names().collect()
 	}
 
-	pub async fn render(&self, template: &Template, ctx: &ExecutionContext<'_>) -> tera::Result<Option<String>> {
+	pub async fn render(&self, template: &Template, ctx: &ExecutionContext<'_>) -> Result<Option<String>, TemplateError> {
+		let mut variables = self.variables.clone();
+		for variable in &ctx.scope.rule.variables {
+			variables.push(variable.clone());
+		}
 		let dependencies = &template.dependencies;
+		let variable_names: HashSet<String> = variables.iter().map(|v| v.name()).collect();
+		let needed_variables = dependencies.iter().map(String::as_str).filter(|&s| variable_names.contains(s));
 		let mut context = tera::Context::new();
-		let available_variable_names: HashSet<&str> = self.variables.iter().map(|v| v.name().unwrap_or(v.typetag_name())).collect();
-		let needed_variables = dependencies
-			.iter()
-			.map(String::as_str)
-			.filter(|&s| available_variable_names.contains(s));
 
 		for var_name in needed_variables {
-			if let Some(var) = self.variables.iter().find(|v| v.name().unwrap_or(v.typetag_name()) == var_name) {
-				let value = var.compute(ctx).await.map_err(|e| {
-					tera::Error::msg(format!(
-						"Failed to compute variable '{}': {}",
-						var.name().unwrap_or(var.typetag_name()),
-						e
-					))
-				})?;
-				context.insert(var.name().unwrap_or(var.typetag_name()), &value);
+			if let Some(var) = self.variables.iter().find(|v| v.name() == var_name) {
+				let value = var
+					.compute(ctx)
+					.await
+					.map_err(|e| tera::Error::msg(format!("Failed to compute variable '{}': {}", var.name(), e)))?;
+				context.insert(var.name(), &value);
 			}
 		}
 
@@ -84,7 +90,7 @@ impl Templater {
 		match self.tera.render(&template.id, &context) {
 			Ok(res) if res.is_empty() => Ok(None),
 			Ok(res) => Ok(Some(res)),
-			Err(e) => Err(e),
+			Err(e) => Err(e.into()),
 		}
 	}
 
@@ -114,14 +120,14 @@ impl Default for Templater {
 		tera.register_filter("filename", filename);
 		tera.register_filter("extension", extension);
 		tera.register_filter("mime", mime);
-		tera.register_filter("filesize", size);
 
 		// Initialize the templater with the complete set of built-in lazy variables
 		let variables: Vec<Box<dyn Variable>> = vec![
-			Box::new(builtins::Path),
-			Box::new(builtins::Root),
-			Box::new(builtins::Metadata::new()),
-			Box::new(builtins::Hash::new()),
+			Box::new(variables::path::Path),
+			Box::new(variables::root::Root),
+			Box::new(variables::metadata::Metadata::new()),
+			Box::new(variables::hash::Hash::default()),
+			Box::new(variables::size::Size::default()),
 		];
 
 		Self { tera, variables }

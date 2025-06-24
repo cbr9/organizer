@@ -8,20 +8,20 @@ use crate::{
 };
 
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
-pub struct SimpleVariable {
+pub struct TemplateVariable {
 	pub name: String,
 	pub value: Template,
 }
 
 #[async_trait]
-#[typetag::serde(name = "simple")]
-impl Variable for SimpleVariable {
+#[typetag::serde(name = "template")]
+impl Variable for TemplateVariable {
 	fn templates(&self) -> Vec<&Template> {
 		vec![&self.value]
 	}
 
-	fn name(&self) -> Option<&str> {
-		Some(&self.name)
+	fn name(&self) -> &str {
+		&self.name
 	}
 
 	async fn compute(&self, ctx: &ExecutionContext<'_>) -> Result<tera::Value> {

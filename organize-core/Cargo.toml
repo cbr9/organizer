@@ -51,6 +51,7 @@ sqlx = { version = "0.8.6", features = [ "runtime-tokio", "sqlite", "derive", "m
 dotenvy = "0.15.7"
 strum_macros = "0.27.1"
 clap = { workspace = true, features = ["derive"] }
+moka = { version = "0.12.10", features = ["future"] }
 
 [dev-dependencies]
 pretty_assertions = "1.3.0"
