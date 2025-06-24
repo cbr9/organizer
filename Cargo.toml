@@ -8,7 +8,7 @@ repository = "https://github.com/cbr9/organize"
 
 [workspace]
 resolver = "2"
-members = [ "organize-core", "organize-cli" ]
+members = [ "organize-core", "organize-cli", "organize-pipe", "organize-sdk" ]
 default-members = ["organize-cli"]
 
 [workspace.dependencies]

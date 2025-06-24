@@ -1,0 +1,35 @@
+[package]
+name = "organize-sdk"
+# It's good practice to inherit the version, authors, etc., from the workspace
+# to keep everything consistent.
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+description = "Shared types and traits for the organize application and engine."
+repository.workspace = true
+
+[dependencies]
+# Use workspace dependencies where available for consistency
+anyhow.workspace = true
+serde = { workspace = true, features = ["derive"] }
+serde_json = "1.0" # Not in workspace deps, so specify version
+tokio = { version = "1", features = ["fs"] } # For async file I/O if needed in traits
+log.workspace = true
+
+# For the async traits (Variable, Record, etc.)
+async-trait = "0.1.80"
+
+# For making trait objects cloneable (used by Variable trait)
+dyn-clone = "1.0.17"
+
+# For downcasting trait objects (can be useful for concrete type access)
+downcast-rs = "0.1.1"
+
+# For cheap, reference-counted pointers (used in Resource)
+# This is part of the standard library, but listed for clarity.
+
+# For concurrent, thread-safe hashmaps (used in caches)
+dashmap = "5.5.3"
+
+# For the high-performance async cache
+moka = { version = "0.12", features = ["future"] }
