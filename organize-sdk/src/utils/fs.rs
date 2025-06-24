@@ -1,5 +1,3 @@
-// organize-core/src/utils/fs_ops.rs (new file)
-
 use crate::{
 	config::context::ExecutionContext,
 	errors::{Error, ErrorContext},

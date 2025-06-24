@@ -4,7 +4,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 use clap::{Parser, ValueHint};
 
-use organize_core::{config::context::RunSettings, engine::Engine};
+use organize_lib::{config::context::RunSettings, engine::Engine};
 
 use crate::Cmd;
 

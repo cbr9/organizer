@@ -1,6 +1,5 @@
-use std::collections::HashSet;
-
 use serde::{Deserialize, Deserializer, Serialize};
+use std::collections::HashSet;
 use tera::ast::{Expr, ExprVal, FunctionCall, Node};
 use uuid::Uuid;
 

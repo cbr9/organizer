@@ -8,7 +8,7 @@ repository = "https://github.com/cbr9/organize"
 
 [workspace]
 resolver = "2"
-members = [ "organize-core", "organize-cli", "organize-pipe", "organize-sdk" ]
+members = [ "organize-lib", "organize-cli", "organize-pipe", "organize-sdk" , "organize-stdx"]
 default-members = ["organize-cli"]
 
 [workspace.dependencies]
@@ -28,7 +28,9 @@ log = "0.4"
 mime = "0.3.17"
 mime_guess = "2.0.4"
 num-traits = "0.2.15"
-organize-core = { path = "./organize-core" }
+organize-lib = { path = "./organize-lib" }
+organize-sdk = { path = "./organize-sdk" }
+organize-pipe = { path = "./organize-pipe" }
 path-clean = "1.0.1"
 pdf-extract = "0.7.7"
 rayon = "1.10.0"

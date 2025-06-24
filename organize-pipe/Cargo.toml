@@ -1,13 +1,17 @@
 [package]
 name = "organize-pipe"
-version = "0.1.0"
-edition = "2021"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+description.workspace = true
+repository.workspace = true
 
 [dependencies]
-# Add the dependencies for your new engine here
-# For example:
-# logos = "0.14.0"
-# chumsky = "1.0.0-alpha.6"
-# anyhow = "1.0"
-# serde_json = "1.0"
-# async-trait = "0.1"
+anyhow.workspace = true
+ariadne = "0.5.1"
+async-trait = "0.1.88"
+chumsky = "0.10.1"
+logos = "0.15.0"
+regex.workspace = true
+serde_json = "1.0.140"
+thiserror = "2.0.12"
