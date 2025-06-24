@@ -10,7 +10,7 @@ pub enum ParseError {
 	#[error("Could not parse expression: '{{ {content} }}'")]
 	InvalidExpression { content: String },
 
-	#[error("Lexing error")]
+	#[error(transparent)]
 	LexingError(#[from] LexingError),
 }
 

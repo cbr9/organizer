@@ -2063,6 +2063,7 @@ dependencies = [
  "ariadne",
  "async-trait",
  "chumsky 0.10.1",
+ "itertools",
  "logos",
  "regex",
  "serde_json",

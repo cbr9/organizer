@@ -1,5 +1,6 @@
 use std::{char::ParseCharError, convert::Infallible, str::FromStr};
 
+use anyhow::Result;
 use logos::{Lexer, Logos};
 use thiserror::Error;
 
@@ -8,23 +9,12 @@ pub enum LexingError {
 	#[error("Invalid identifier: {0}")]
 	InvalidIdentifier(String),
 	#[default]
-	#[error("Other error")]
+	#[error("Unknown lexing error")]
 	Other,
 }
 
-impl From<anyhow::Error> for LexingError {
-	fn from(value: anyhow::Error) -> Self {
-		LexingError::InvalidIdentifier(value.to_string())
-	}
-}
-impl From<&str> for LexingError {
-	fn from(value: &str) -> Self {
-		LexingError::InvalidIdentifier(value.to_string())
-	}
-}
-
 #[derive(Logos, Debug, PartialEq, Clone)]
-#[logos(skip r"[ \t\f\n]+", error = LexingError)]
+#[logos(skip r"[ \t\f\n]+", error = LexingError, extras = (usize, usize))]
 pub enum Token<'a> {
 	#[token("{{")]
 	OpenDelim,
@@ -32,29 +22,10 @@ pub enum Token<'a> {
 	CloseDelim,
 	#[token(".")]
 	Dot,
-	#[regex(r"[a-zA-Z_][a-zA-Z0-9_]*", check_valid_ident)]
+	#[regex(r"[a-zA-Z_][a-zA-Z0-9_]*")]
 	Identifier(&'a str),
-}
-
-fn check_valid_ident<'a>(lex: &mut logos::Lexer<'a, Token<'a>>) -> Result<&'a str, anyhow::Error> {
-	let regex = regex::Regex::new(r"[a-zA-Z_][a-zA-Z0-9_]*").unwrap();
-	let input = lex.slice();
-	if regex.is_match(input) {
-		Ok(input)
-	} else {
-		Err(anyhow::Error::msg(input.to_string()))
-	}
-}
-
-impl<'a> std::fmt::Display for Token<'a> {
-	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-		match self {
-			Self::OpenDelim => write!(f, "{{"),
-			Self::CloseDelim => write!(f, "}}"),
-			Self::Dot => write!(f, "."),
-			Self::Identifier(word) => write!(f, "{word}"),
-		}
-	}
+	#[regex(".",  |lex| Err(LexingError::InvalidIdentifier(lex.slice().to_string())), priority = 1)]
+	InvalidToken(LexingError),
 }
 
 #[cfg(test)]
@@ -97,7 +68,6 @@ mod tests {
 		// Let's assume we modify the lexer slightly to capture errors.
 		// For now, this test shows that it simply ignores non-defined tokens.
 		let tokens = lex("{{ user.name! }}");
-		dbg!(&tokens);
 		assert_eq!(tokens, vec![
 			Ok(Token::OpenDelim),
 			Ok(Token::Identifier("user".into())),
@@ -110,12 +80,11 @@ mod tests {
 
 	#[test]
 	fn lexer_handles_invalid_character_within_expression() {
-		// Logos will produce an Error token for characters it doesn't recognize
-		// In our current lexer, most symbols would be skipped or cause an error.
-		// Let's assume we modify the lexer slightly to capture errors.
-		// For now, this test shows that it simply ignores non-defined tokens.
+		// 	// Logos will produce an Error token for characters it doesn't recognize
+		// 	// In our current lexer, most symbols would be skipped or cause an error.
+		// 	// Let's assume we modify the lexer slightly to capture errors.
+		// 	// For now, this test shows that it simply ignores non-defined tokens.
 		let tokens = lex("{{ path! }}");
-		dbg!(&tokens);
 		assert_eq!(tokens, vec![
 			Ok(Token::OpenDelim),
 			Ok(Token::Identifier("path".into())),

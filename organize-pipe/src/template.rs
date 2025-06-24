@@ -10,6 +10,7 @@ use crate::{
 	parser::parser,
 };
 
+#[derive(Debug, PartialEq, Clone)]
 struct Template {
 	text: String,
 	ast: AST,
@@ -35,9 +36,7 @@ impl Template {
 					let expression_content = &input[expr_content_start..expr_content_end];
 
 					// Lex and parse the content inside the delimiters
-					let tokens = Token::lexer(expression_content).collect::<Vec<Result<Token, LexingError>>>();
-					let tokens = tokens
-						.into_iter()
+					let tokens = Token::lexer(expression_content)
 						.collect::<Result<Vec<Token>, LexingError>>()
 						.map_err(|e| ParseError::LexingError(e))?;
 
@@ -171,5 +170,11 @@ mod tests {
 	fn test_mismatched_delimiters() {
 		let result = Template::from_str("{{ user.name");
 		assert!(result.is_err_and(|x| x.is_mismatched_delimiters()));
+	}
+	#[test]
+	fn test_lexing_error() {
+		let result = Template::from_str("{{ user.@name }}");
+		dbg!(&result);
+		assert!(result.is_err_and(|x| x.is_lexing_error()));
 	}
 }
