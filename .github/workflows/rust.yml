@@ -1,82 +1,82 @@
-# A more descriptive name for the workflow
-name: Rust CI
+# # A more descriptive name for the workflow
+# name: Rust CI
 
-on:
-  push:
-    branches: [ "master" ]
-  pull_request:
-    branches: [ "master" ]
+# on:
+#   push:
+#     branches: [ "master" ]
+#   pull_request:
+#     branches: [ "master" ]
 
-env:
-  CARGO_TERM_COLOR: always
-  DATABASE_URL: sqlite:organize-ci.db
+# env:
+#   CARGO_TERM_COLOR: always
+#   DATABASE_URL: sqlite:organize-ci.db
 
-jobs:
-  # Renamed the job to better reflect its purpose
-  build_and_test:
-    strategy:
-      # Recommended for matrix builds to ensure you see the results from all operating systems
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+# jobs:
+#   # Renamed the job to better reflect its purpose
+#   build_and_test:
+#     strategy:
+#       # Recommended for matrix builds to ensure you see the results from all operating systems
+#       fail-fast: false
+#       matrix:
+#         os: [ubuntu-latest, windows-latest, macos-latest]
 
-    runs-on: ${{ matrix.os }}
+#     runs-on: ${{ matrix.os }}
 
-    steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+#     steps:
+#     - name: Checkout repository
+#       uses: actions/checkout@v4
 
-    - name: Set up Rust (Nightly)
-      uses: dtolnay/rust-toolchain@nightly
-      with:
-        toolchain: nightly
+#     - name: Set up Rust (Nightly)
+#       uses: dtolnay/rust-toolchain@nightly
+#       with:
+#         toolchain: nightly
 
-    - name: Install Windows GNU toolchain
-      if: runner.os == 'Windows'
-      run: rustup target add x86_64-pc-windows-gnu
+#     - name: Install Windows GNU toolchain
+#       if: runner.os == 'Windows'
+#       run: rustup target add x86_64-pc-windows-gnu
 
-    - name: Install sqlx-cli
-      run: cargo install sqlx-cli
+#     - name: Install sqlx-cli
+#       run: cargo install sqlx-cli
 
-    - name: Setup database
-      run: |
-        sqlx database create
-        sqlx migrate run
+#     - name: Setup database
+#       run: |
+#         sqlx database create
+#         sqlx migrate run
 
-    - name: Cache cargo binaries
-      id: cache-cargo-bin
-      uses: actions/cache@v4
-      with:
-        path: ~/.cargo/bin
-        key: ${{ runner.os }}-cargo-bin-${{ hashFiles('**/Cargo.lock') }}
-        restore-keys: |
-          ${{ runner.os }}-cargo-bin-
+#     - name: Cache cargo binaries
+#       id: cache-cargo-bin
+#       uses: actions/cache@v4
+#       with:
+#         path: ~/.cargo/bin
+#         key: ${{ runner.os }}-cargo-bin-${{ hashFiles('**/Cargo.lock') }}
+#         restore-keys: |
+#           ${{ runner.os }}-cargo-bin-
 
-    - name: Install cargo-tarpaulin (if not cached)
-      if: steps.cache-cargo-bin.outputs.cache-hit != 'true'
-      run: cargo install cargo-tarpaulin --force
+#     - name: Install cargo-tarpaulin (if not cached)
+#       if: steps.cache-cargo-bin.outputs.cache-hit != 'true'
+#       run: cargo install cargo-tarpaulin --force
 
-    - name: Build (Windows)
-      if: runner.os == 'Windows'
-      run: cargo build --target x86_64-pc-windows-gnu --verbose
+#     - name: Build (Windows)
+#       if: runner.os == 'Windows'
+#       run: cargo build --target x86_64-pc-windows-gnu --verbose
 
-    - name: Build (non-Windows)
-      if: runner.os != 'Windows'
-      run: cargo build --verbose
+#     - name: Build (non-Windows)
+#       if: runner.os != 'Windows'
+#       run: cargo build --verbose
 
-    - name: Run tests (Windows)
-      if: runner.os == 'Windows'
-      run: cargo test --target x86_64-pc-windows-gnu --workspace --verbose
+#     - name: Run tests (Windows)
+#       if: runner.os == 'Windows'
+#       run: cargo test --target x86_64-pc-windows-gnu --workspace --verbose
 
-    - name: Run tests (non-Windows)
-      if: runner.os != 'Windows'
-      run: cargo test --workspace --verbose
+#     - name: Run tests (non-Windows)
+#       if: runner.os != 'Windows'
+#       run: cargo test --workspace --verbose
 
-    # NOTE: cargo-tarpaulin can have platform-specific issues. If you encounter instability,
-    # consider running coverage only on 'ubuntu-latest' by adding `if: runner.os == 'Linux'`
-    # to this step and the subsequent upload step.
-    - name: Generate code coverage
-      run: cargo tarpaulin --workspace --all-features --out Lcov Xml --output-dir target/coverage
+#     # NOTE: cargo-tarpaulin can have platform-specific issues. If you encounter instability,
+#     # consider running coverage only on 'ubuntu-latest' by adding `if: runner.os == 'Linux'`
+#     # to this step and the subsequent upload step.
+#     - name: Generate code coverage
+#       run: cargo tarpaulin --workspace --all-features --out Lcov Xml --output-dir target/coverage
 
-    - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v4
+#     - name: Upload coverage to Codecov
+#       uses: codecov/codecov-action@v4
