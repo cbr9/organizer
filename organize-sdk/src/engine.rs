@@ -15,6 +15,23 @@ use futures::{future, stream, StreamExt};
 use itertools::Itertools;
 use std::{path::PathBuf, sync::Arc};
 
+#[derive(Default)]
+pub enum ExecutionModel {
+	#[default]
+	Single,
+	Batch,
+}
+
+#[derive(Eq, Display, PartialEq, Default, Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all(serialize = "lowercase", deserialize = "lowercase"))]
+#[strum(serialize_all = "snake_case")]
+pub enum ConflictResolution {
+	Overwrite,
+	#[default]
+	Skip,
+	Rename,
+}
+
 /// The main engine for the application.
 /// It owns the compiled configuration and all run-wide services.
 pub struct Engine {

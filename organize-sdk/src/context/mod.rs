@@ -1,4 +1,6 @@
 use dashmap::DashMap;
+use moka::future::Cache;
+use services::fs::locker::Locker;
 use std::{
 	any::Any,
 	collections::HashMap,
@@ -6,19 +8,17 @@ use std::{
 	sync::{Arc, RwLock},
 };
 
-use lettre::{message::Mailbox, transport::smtp::authentication::Credentials};
+pub mod services;
 
 use crate::{
 	config::{actions::Undo, folders::Folder, rule::Rule, Config},
-	journal::Journal,
-	path::locker::Locker,
+	context::services::history::Journal,
 	resource::Resource,
-	templates::Templater,
 };
 
 #[derive(Debug, Clone)]
 pub struct RunServices {
-	pub templater: Templater,
+	// pub templater: Templater,
 	pub blackboard: Blackboard,
 	pub locker: Locker,
 	pub journal: Arc<Journal>,
@@ -31,20 +31,11 @@ pub struct VariableCacheKey {
 	pub resource: Resource,
 }
 
-#[derive(Debug, Clone)]
-pub enum FileState {
-	Exists,
-	Deleted,
-}
-
 #[derive(Debug, Default, Clone)]
 pub struct Blackboard {
-	pub credentials: Arc<RwLock<HashMap<Mailbox, Credentials>>>, // TODO: store in OS keychain
 	pub content: Arc<DashMap<PathBuf, Arc<String>>>,
-	pub variables: Arc<DashMap<VariableCacheKey, tera::Value>>,
 	pub scratchpad: Arc<DashMap<String, Box<dyn Any + Send + Sync>>>,
-	pub known_paths: Arc<DashMap<Resource, FileState>>,
-	pub journal: Arc<DashMap<Resource, Vec<Box<dyn Undo>>>>,
+	pub resources: Cache<PathBuf, Resource>,
 }
 
 /// A container for run-wide operational settings.

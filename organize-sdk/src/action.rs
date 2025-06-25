@@ -13,26 +13,6 @@ use thiserror::Error;
 
 use crate::{config::context::ExecutionContext, errors::Error, resource::Resource, templates::template::Template, utils::backup::Backup};
 
-pub mod common;
-// pub mod copy;
-// pub mod delete;
-pub mod echo;
-// pub mod email;
-// pub mod extract;
-// pub mod hardlink;
-pub mod r#move;
-// pub mod script;
-// pub mod symlink;
-// pub mod trash;
-// pub mod write;
-
-#[derive(Default)]
-pub enum ExecutionModel {
-	#[default]
-	Single,
-	Batch,
-}
-
 #[derive(Debug, Serialize, Deserialize, Clone, Display)]
 #[serde(rename_all = "lowercase")]
 pub enum Input {

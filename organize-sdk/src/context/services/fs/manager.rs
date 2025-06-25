@@ -6,6 +6,16 @@ use crate::{
 use anyhow::Result;
 use std::path::Path; // Assuming this is needed for dry_run and context
 
+#[derive(Deserialize, Serialize, Clone, Debug)]
+struct Destination {
+	folder: PathBuf,
+	filename: Option<PathBuf>,
+}
+
+pub struct FileSystemManager {
+	locker: Locker,
+}
+
 pub async fn ensure_parent_dir_exists(path: &Path) -> std::io::Result<()> {
 	if let Some(parent) = path.parent() {
 		if !tokio::fs::try_exists(parent).await.unwrap_or(false) {
@@ -15,7 +25,7 @@ pub async fn ensure_parent_dir_exists(path: &Path) -> std::io::Result<()> {
 	Ok(())
 }
 
-pub async fn move_file(source: &Resource, destination: &Resource) -> std::io::Result<()> {
+pub async fn move_file(source: &Resource, destination: &Destination) -> std::io::Result<()> {
 	ensure_parent_dir_exists(destination).await?;
 	match tokio::fs::rename(source, destination).await {
 		Err(e) if e.raw_os_error() == Some(libc::EXDEV) || e.kind() == std::io::ErrorKind::CrossesDevices => {

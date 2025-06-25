@@ -1,10 +1,14 @@
 use path_clean::PathClean;
 use serde::{Deserialize, Serialize};
 use std::{
+	any::Any,
+	cell::LazyCell,
+	collections::HashMap,
 	fmt::Debug,
+	fs::Metadata,
 	hash::Hash,
 	path::{Path, PathBuf},
-	sync::Arc,
+	sync::{Arc, LazyLock},
 };
 
 use serde::Serializer;
@@ -13,12 +17,36 @@ use crate::{
 	config::context::{ExecutionContext, FileState},
 	errors::{Error, ErrorContext},
 };
+
+#[derive(Debug, Default, Clone)]
+pub enum FileState {
+	#[default]
+	Exists,
+	Deleted,
+}
+
 #[derive(Debug, Deserialize, Hash, Clone, PartialEq, Eq)]
-pub struct Resource(Arc<PathBuf>);
+pub struct Resource {
+	path: Arc<PathBuf>,
+	state: FileState,
+	mime: LazyLock<String>,
+	content: LazyLock<Vec<u8>>,
+	hash: LazyLock<String>,
+	metadata: LazyLock<Metadata>,
+	extras: HashMap<String, Box<dyn Any + Send + Sync>>,
+}
 
 impl From<&Path> for Resource {
 	fn from(value: &Path) -> Self {
-		Self(Arc::new(value.to_path_buf().clean()))
+		Self {
+			path: Arc::new(value.to_path_buf().clean()),
+			state: FileState::Exists,
+			mime: LazyLock::new(|| String::new()),
+			content: LazyLock::new(|| vec![]),
+			hash: LazyLock::new(|| String::new()),
+			metadata: LazyLock::new(|| std::fs::metadata(&value)),
+			extras: HashMap::new(),
+		}
 	}
 }
 

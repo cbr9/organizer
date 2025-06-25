@@ -7,3 +7,19 @@ description.workspace = true
 repository.workspace = true
 
 [dependencies]
+anyhow.workspace = true
+async-trait = "0.1.88"
+clap.workspace = true
+dashmap = "6.1.0"
+dialoguer.workspace = true
+dotenvy = "0.15.7"
+dyn-clone.workspace = true
+dyn-eq.workspace = true
+moka = { version = "0.12.10", features = ["future"] }
+path-clean.workspace = true
+serde.workspace = true
+serde_json = "1.0.140"
+serde_yaml = "0.9.34"
+sqlx = { version = "0.8.6", features = ["chrono", "sqlite"] }
+strum.workspace = true
+thiserror = "2.0.12"
