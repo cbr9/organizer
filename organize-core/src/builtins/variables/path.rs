@@ -1,4 +1,4 @@
-use crate::{builtins::variables::hash::Hash, context::ExecutionContext, templates::prelude::*};
+use crate::{builtins::variables::hash::Hash, context::ExecutionContext, errors::Error, templates::prelude::*};
 use anyhow::Result;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
@@ -13,14 +13,15 @@ impl Variable for Path {
 		self.typetag_name().to_string()
 	}
 
-	async fn compute(&self, parts: &[String], ctx: &ExecutionContext<'_>) -> Result<VariableOutput, TemplateError> {
+	async fn compute(&self, parts: &[String], ctx: &ExecutionContext<'_>) -> Result<VariableOutput, Error> {
+		let resource = ctx.scope.resource()?;
 		if let Some(next) = parts.iter().next() {
 			match next.as_str() {
 				"hash" => Ok(VariableOutput::Lazy(Box::new(Hash))),
-				_ => Err(TemplateError::UnknownVariable),
+				other => Err(TemplateError::UnknownVariable(other.into()))?,
 			}
 		} else {
-			Ok(VariableOutput::Value(serde_json::to_value(ctx.scope.resource.as_path())?))
+			Ok(VariableOutput::Value(serde_json::to_value(resource.as_path())?))
 		}
 	}
 }

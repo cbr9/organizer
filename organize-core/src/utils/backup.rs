@@ -1,11 +1,6 @@
 use std::sync::Arc;
 
-use crate::{
-	context::ExecutionContext,
-	errors::{Error, ErrorContext},
-	resource::Resource,
-	stdx::path::PathExt,
-};
+use crate::{context::ExecutionContext, errors::Error, resource::Resource, stdx::path::PathExt};
 use anyhow::Result;
 use dirs;
 use serde::{Deserialize, Serialize}; // Import the dirs crate
@@ -15,15 +10,15 @@ use uuid::Uuid; // Import Uuid for generating unique IDs // Import chrono for ti
 /// Determines the base directory for all backups.
 /// This will be inside the platform-specific local data directory,
 /// in a subdirectory named after the project, and then a "backups" folder.
-fn get_backup_base_dir(ctx: &ExecutionContext) -> Resource {
-	match &ctx.scope.folder.settings.backup_location {
+fn get_backup_base_dir(ctx: &ExecutionContext) -> Result<Resource, Error> {
+	match &ctx.scope.folder()?.settings.backup_location {
 		BackupLocation::System => {
 			let project_name = env!("CARGO_PKG_NAME");
 			let base_dir = dirs::data_local_dir().expect("Could not determine platform-specific local data directory for backups.");
-			base_dir.join(project_name).join("backups").into()
+			Ok(base_dir.join(project_name).join("backups").into())
 		}
-		BackupLocation::Root => ctx.scope.folder.path.join(".organize").join("backups").into(),
-		BackupLocation::Custom(path) => *path.clone(),
+		BackupLocation::Root => Ok(ctx.scope.folder()?.path.join(".organize").join("backups").into()),
+		BackupLocation::Custom(path) => Ok(*path.clone()),
 	}
 }
 
@@ -49,7 +44,7 @@ impl std::ops::Deref for Backup {
 
 impl Backup {
 	pub async fn new(ctx: &ExecutionContext<'_>) -> Result<Self, Error> {
-		let dir = get_backup_base_dir(ctx);
+		let dir = get_backup_base_dir(ctx)?;
 
 		// Loop until a unique UUID is found for the backup filename
 		let path = loop {
@@ -65,39 +60,23 @@ impl Backup {
 
 	pub async fn persist(&self, ctx: &ExecutionContext<'_>) -> Result<(), Error> {
 		let parent = self.0.parent().unwrap().as_resource(ctx).await;
-		fs::create_dir_all(parent.as_path()).await.map_err(|e| Error::Io {
-			source: e,
-			path: parent,
-			target: None,
-			context: ErrorContext::from_scope(&ctx.scope),
-		})?;
+		fs::create_dir_all(parent.as_path()).await?;
+		let source = ctx.scope.resource()?;
 
-		match fs::hard_link(ctx.scope.resource.as_path(), self.0.as_path()).await {
+		match fs::hard_link(source.as_path(), self.0.as_path()).await {
 			Ok(()) => {
-				tracing::debug!("Created hard link backup for {}", ctx.scope.resource.display());
+				tracing::debug!("Created hard link backup for {}", source.display());
 				Ok(())
 			}
 			Err(e) if e.raw_os_error() == Some(libc::EXDEV) || e.kind() == std::io::ErrorKind::CrossesDevices => {
 				tracing::warn!(
 					"Backup for {} is on a different filesystem. Falling back to a full copy.",
-					ctx.scope.resource.display()
+					ctx.scope.resource()?.display()
 				);
-				fs::copy(ctx.scope.resource.as_path(), self.0.as_path())
-					.await
-					.map_err(|e| Error::Io {
-						source: e,
-						path: ctx.scope.resource.clone(),
-						target: Some(self.0.clone()),
-						context: ErrorContext::from_scope(&ctx.scope),
-					})?;
+				fs::copy(ctx.scope.resource()?.as_path(), self.0.as_path()).await?;
 				Ok(())
 			}
-			Err(e) => Err(Error::Io {
-				source: e,
-				path: ctx.scope.resource.clone(),
-				target: Some(self.0.clone()),
-				context: ErrorContext::from_scope(&ctx.scope),
-			}),
+			Err(e) => Err(Error::Io(e)),
 		}
 	}
 }

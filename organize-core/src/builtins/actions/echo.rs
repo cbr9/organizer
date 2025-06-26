@@ -30,7 +30,7 @@ impl Action for Echo {
 				.inspect(|message| tracing::info!("{}", message))?;
 		}
 		Ok(Receipt {
-			next: vec![ctx.scope.resource.clone()],
+			next: vec![ctx.scope.resource()?],
 			..Default::default()
 		})
 	}

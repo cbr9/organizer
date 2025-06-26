@@ -1,61 +1,43 @@
-use std::{path::PathBuf, sync::Arc};
+use std::path::PathBuf;
 use thiserror::Error;
 
-use crate::{context::ExecutionScope, resource::Resource, templates::engine::TemplateError};
-
-/// A self-contained, owned snapshot of the execution context at the time of an error.
-/// It has no lifetimes, so it can be freely passed around.
-#[derive(Debug, Clone)]
-pub struct ErrorContext {
-	pub rule_id: Option<String>,
-	pub rule_index: usize,
-	pub folder_path: PathBuf,
-}
-
-impl ErrorContext {
-	pub fn from_scope(scope: &ExecutionScope) -> Self {
-		Self {
-			rule_id: scope.rule.id.clone(),
-			rule_index: scope.rule.index,
-			folder_path: scope.folder.path.clone(),
-		}
-	}
-}
+use crate::{action::UndoError, templates::engine::TemplateError};
 
 /// The primary error type for all actions within the application.
 #[derive(Error, Debug)]
 pub enum Error {
-	#[error("I/O error for path: {path:?}")]
-	Io {
-		#[source]
-		source: std::io::Error,
-		path: Arc<Resource>,
-		target: Option<Arc<Resource>>,
-		context: ErrorContext,
-	},
+	#[error("Error converting to value")]
+	Json(#[from] serde_json::Error),
+
+	#[error(transparent)]
+	Io(#[from] std::io::Error),
 
 	#[error("Could not create backup for: {path:?}")]
 	Backup {
 		#[source]
 		source: std::io::Error,
 		path: PathBuf,
-		context: ErrorContext,
 	},
 
 	#[error("invalid path")]
 	InvalidPath { path: PathBuf },
 
 	#[error("Could not resolve path from template: '{template}'")]
-	PathResolution { template: String, context: ErrorContext },
+	PathResolution { template: String },
 
 	#[error("Error in prompt")]
 	Interaction {
 		#[source]
 		source: std::io::Error,
 		prompt: String,
-		context: ErrorContext,
 	},
 
 	#[error("Could not render template")]
 	TemplateError(#[from] TemplateError),
+
+	#[error("Tried to retrieve `{0}` from the scope but it is not defined")]
+	ScopeError(String),
+
+	#[error(transparent)]
+	UndoError(#[from] UndoError),
 }

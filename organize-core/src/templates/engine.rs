@@ -7,6 +7,7 @@ use crate::{
 	builtins::variables,
 	config::Config,
 	context::ExecutionContext,
+	errors::Error,
 	parser::ast::{Expression, Segment, VariablePath},
 	templates::{
 		template::Template,
@@ -28,10 +29,10 @@ pub enum TemplateError {
 	EmptyTemplate,
 	#[error("Unexpected error")]
 	Other,
-	#[error("Unknown variable")]
-	UnknownVariable,
-	#[error("Error converting to value")]
-	Json(#[from] serde_json::Error),
+	#[error("Unknown variable {0}")]
+	UnknownVariable(String),
+	#[error("Invalid variable ({variable}): it requires {missing_piece} to be in scope")]
+	InvalidContext { missing_piece: String, variable: String },
 }
 
 impl Templater {
@@ -53,9 +54,9 @@ impl Templater {
 		variable: &Box<dyn Variable>,
 		parts: &[String],
 		ctx: &ExecutionContext<'_>,
-	) -> Result<Pin<Box<VariableOutput>>, TemplateError> {
+	) -> Result<Pin<Box<VariableOutput>>, Error> {
 		if parts.is_empty() {
-			return Err(TemplateError::EmptyTemplate);
+			return Err(Error::TemplateError(TemplateError::EmptyTemplate));
 		}
 		let parts = &parts[1..];
 		match variable.compute(parts, ctx).await? {
@@ -64,24 +65,24 @@ impl Templater {
 		}
 	}
 
-	pub async fn resolve_variable_path(&self, var_path: &VariablePath, ctx: &ExecutionContext<'_>) -> Result<serde_json::Value, TemplateError> {
+	pub async fn resolve_variable_path(&self, var_path: &VariablePath, ctx: &ExecutionContext<'_>) -> Result<serde_json::Value, Error> {
 		let parts = &var_path.parts;
 		let var_name = &parts[0];
 
 		let Some(variable) = (match self.global_variables.get(var_name) {
 			Some(var) => Some(var),
-			None => self.rule_variables.get(&(ctx.scope.rule.index, var_name.clone())),
+			None => self.rule_variables.get(&(ctx.scope.rule()?.index, var_name.clone())),
 		}) else {
-			return Err(TemplateError::UnknownVariable);
+			return Err(Error::TemplateError(TemplateError::UnknownVariable(var_name.to_string())));
 		};
 
 		match &*self.resolve_sub_variable(variable, parts, ctx).await? {
 			VariableOutput::Value(value) => Ok(value.clone()),
-			VariableOutput::Lazy(_variable) => Err(TemplateError::Other),
+			VariableOutput::Lazy(_variable) => Err(Error::TemplateError(TemplateError::Other)),
 		}
 	}
 
-	pub async fn render(&self, template: &Template, ctx: &ExecutionContext<'_>) -> Result<String, TemplateError> {
+	pub async fn render(&self, template: &Template, ctx: &ExecutionContext<'_>) -> Result<String, Error> {
 		let mut rendered = String::new();
 		for segment in template.ast.segments.iter() {
 			match segment {
@@ -98,7 +99,7 @@ impl Templater {
 		}
 
 		if rendered.is_empty() {
-			return Err(TemplateError::EmptyTemplate);
+			return Err(Error::TemplateError(TemplateError::EmptyTemplate));
 		}
 
 		Ok(rendered.replace("\"", ""))

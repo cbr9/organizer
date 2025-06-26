@@ -75,26 +75,18 @@ impl Engine {
 				// ---- Filtering Stage ----
 				// 1. Create a vector of futures without spawning them.
 				let filter_futures = resources
-					.clone()
 					.into_iter()
 					.map(|resource| {
 						let engine = engine.clone();
 						let rule = rule.clone();
 						let folder = folder.clone();
-						let resources = resources.clone();
 
 						tokio::spawn(async move {
 							let resource = resource.clone();
 							let ctx = ExecutionContext {
 								services: &engine.services,
 								settings: &engine.settings,
-								scope: ExecutionScope {
-									config: &engine.config,
-									rule: &rule,
-									folder: &folder,
-									resource: resource.clone(),
-									resources: resources.clone(),
-								},
+								scope: ExecutionScope::new_resource_scope(&engine.config, &rule, &folder, resource.clone()),
 							};
 							let mut passed_all_filters = true;
 							for filter in &rule.filters {
@@ -124,8 +116,7 @@ impl Engine {
 					resources = match action.execution_model() {
 						ExecutionModel::Single => {
 							// 1. Create a vector of action futures.
-							let action_futures = resources.clone().into_iter().map(|resource| {
-								let resources = resources.clone();
+							let action_futures = resources.into_iter().map(|resource| {
 								let engine = self.clone();
 								let action = action.clone();
 								let rule = rule.clone();
@@ -135,13 +126,7 @@ impl Engine {
 									let ctx = ExecutionContext {
 										services: &engine.services,
 										settings: &engine.settings,
-										scope: ExecutionScope {
-											config: &engine.config,
-											rule: &rule,
-											folder: &folder,
-											resource, // Use the resource for this specific action
-											resources,
-										},
+										scope: ExecutionScope::new_resource_scope(&engine.config, &rule, &folder, resource),
 									};
 
 									let receipt = action.commit(&ctx).await?;

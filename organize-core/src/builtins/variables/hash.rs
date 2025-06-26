@@ -1,9 +1,7 @@
 use crate::{
 	context::ExecutionContext,
-	templates::{
-		engine::TemplateError,
-		variable::{Variable, VariableOutput},
-	},
+	errors::Error,
+	templates::variable::{Variable, VariableOutput},
 };
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
@@ -19,8 +17,8 @@ impl Variable for Hash {
 		self.typetag_name().to_string()
 	}
 
-	async fn compute(&self, _parts: &[String], ctx: &ExecutionContext<'_>) -> Result<VariableOutput, TemplateError> {
-		let resource = &ctx.scope.resource;
+	async fn compute(&self, _parts: &[String], ctx: &ExecutionContext<'_>) -> Result<VariableOutput, Error> {
+		let resource = ctx.scope.resource()?;
 		let hash = resource.get_hash().await;
 		Ok(VariableOutput::Value(serde_json::to_value(hash)?))
 	}

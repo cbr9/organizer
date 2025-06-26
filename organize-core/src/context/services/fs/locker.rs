@@ -1,7 +1,7 @@
 use crate::{
 	context::{services::fs::manager::Destination, ExecutionContext},
 	engine::ConflictResolution,
-	errors::{Error, ErrorContext},
+	errors::Error,
 	resource::Resource,
 	stdx::path::PathExt,
 };
@@ -29,9 +29,6 @@ impl Locker {
 		let mut path = destination.get_final_path(ctx).await?.as_resource(ctx).await;
 		let mut n = 1;
 
-		dbg!(&self.active_paths);
-		dbg!(&path.path.display());
-		dbg!(&strategy);
 		let reserved = loop {
 			if self.active_paths.contains(&path.to_path_buf()) {
 				match strategy {
@@ -75,25 +72,15 @@ impl Locker {
 				}
 			}
 
-			dbg!(&self.active_paths);
 			if !self.active_paths.insert(path.to_path_buf()) {
 				println!("MMM");
 				continue;
 			}
-			println!("{}", path.path.display());
 			break Some(path);
 		};
 
-		dbg!(&reserved);
-
 		if let Some(target) = reserved {
-			ctx.services.fs.ensure_parent_dir_exists(&target).await.map_err(|e| Error::Io {
-				source: e,
-				path: ctx.scope.resource.clone(),
-				target: Some(target.clone()),
-				context: ErrorContext::from_scope(&ctx.scope),
-			})?;
-
+			ctx.services.fs.ensure_parent_dir_exists(&target).await?;
 			let result = action(target.clone()).await?;
 
 			self.active_paths.remove(&target.to_path_buf());

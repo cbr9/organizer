@@ -4,10 +4,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
 	context::ExecutionContext,
-	templates::{
-		engine::TemplateError,
-		prelude::{Variable, VariableOutput},
-	},
+	errors::Error,
+	templates::prelude::{Variable, VariableOutput},
 };
 
 #[derive(Debug, Clone, Deserialize, Serialize, Copy, Default, PartialEq, Eq)]
@@ -20,7 +18,8 @@ impl Variable for Root {
 		self.typetag_name().to_string()
 	}
 
-	async fn compute(&self, _parts: &[String], ctx: &ExecutionContext<'_>) -> Result<VariableOutput, TemplateError> {
-		Ok(VariableOutput::Value(serde_json::to_value(&ctx.scope.folder.path)?))
+	async fn compute(&self, _parts: &[String], ctx: &ExecutionContext<'_>) -> Result<VariableOutput, Error> {
+		let folder = ctx.scope.folder()?;
+		Ok(VariableOutput::Value(serde_json::to_value(&folder.path)?))
 	}
 }

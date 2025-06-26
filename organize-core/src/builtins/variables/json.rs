@@ -4,10 +4,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
 	context::ExecutionContext,
-	templates::{
-		engine::TemplateError,
-		prelude::{Template, Variable, VariableOutput},
-	},
+	errors::Error,
+	templates::prelude::{Template, Variable, VariableOutput},
 };
 
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
@@ -23,7 +21,7 @@ impl Variable for TeraVariable {
 		self.name.clone()
 	}
 
-	async fn compute(&self, _parts: &[String], ctx: &ExecutionContext<'_>) -> Result<VariableOutput, TemplateError> {
+	async fn compute(&self, _parts: &[String], ctx: &ExecutionContext<'_>) -> Result<VariableOutput, Error> {
 		let value = ctx.services.templater.render(&self.value, ctx).await?;
 		Ok(VariableOutput::Value(serde_json::to_value(value)?))
 	}

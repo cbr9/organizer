@@ -11,13 +11,7 @@ use dyn_eq::DynEq;
 use std::path::PathBuf;
 use thiserror::Error;
 
-use crate::{
-	context::ExecutionContext,
-	engine::ExecutionModel,
-	errors::Error,
-	resource::Resource,
-	utils::backup::Backup,
-};
+use crate::{context::ExecutionContext, engine::ExecutionModel, errors::Error, resource::Resource, utils::backup::Backup};
 
 #[derive(Debug, Serialize, Deserialize, Clone, Display)]
 #[serde(rename_all = "lowercase")]
@@ -79,13 +73,13 @@ pub enum UndoError {
 #[async_trait]
 #[typetag::serde(tag = "type")]
 pub trait Undo: Debug + DynEq + DynClone + Send + Sync {
-	async fn undo(&self, settings: &UndoSettings) -> Result<(), UndoError>;
+	async fn undo(&self, settings: &UndoSettings) -> Result<(), Error>;
 
 	fn backup(&self) -> Option<&Backup> {
 		None
 	}
 
-	async fn verify(&self) -> Result<(), UndoError>;
+	async fn verify(&self) -> Result<(), Error>;
 }
 
 pub struct UndoSettings {

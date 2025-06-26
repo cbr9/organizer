@@ -4,7 +4,7 @@ use dyn_clone::DynClone;
 use dyn_eq::DynEq;
 use std::fmt::Debug;
 
-use crate::{context::ExecutionContext, templates::engine::TemplateError};
+use crate::{context::ExecutionContext, errors::Error};
 
 // This enum represents the two possible outcomes of computing a variable.
 #[derive(Debug)]
@@ -22,5 +22,5 @@ dyn_eq::eq_trait_object!(Variable);
 #[typetag::serde(tag = "type")]
 pub trait Variable: DynEq + DynClone + Sync + Send + Debug {
 	fn name(&self) -> String;
-	async fn compute(&self, parts: &[String], ctx: &ExecutionContext<'_>) -> Result<VariableOutput, TemplateError>;
+	async fn compute(&self, parts: &[String], ctx: &ExecutionContext<'_>) -> Result<VariableOutput, Error>;
 }

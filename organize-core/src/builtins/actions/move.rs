@@ -36,23 +36,23 @@ impl Action for Move {
 			.fs
 			.locker
 			.with_locked_destination(ctx, &self.destination, &self.strategy, |target| async move {
-				let source = ctx.scope.resource.clone();
+				let source = ctx.scope.resource()?.clone();
 
 				let backup = if !ctx.settings.dry_run && self.enabled {
 					let backup = Backup::new(ctx).await?;
 					backup.persist(ctx).await?;
-					ctx.services.fs.r#move(source, target.clone(), ctx).await?;
+					ctx.services.fs.r#move(source.clone(), target.clone()).await?;
 					Some(backup)
 				} else {
 					None
 				};
 
 				Ok(Receipt {
-					inputs: vec![Input::Processed(ctx.scope.resource.clone())],
-					outputs: vec![Output::Created(target.clone()), Output::Deleted(ctx.scope.resource.clone())],
+					inputs: vec![Input::Processed(source.clone())],
+					outputs: vec![Output::Created(target.clone()), Output::Deleted(source.clone())],
 					next: vec![target.clone()],
 					undo: vec![Box::new(UndoMove {
-						original: ctx.scope.resource.clone(),
+						original: source.clone(),
 						new: target,
 						backup,
 					})],
@@ -76,7 +76,7 @@ pub struct UndoMove {
 #[async_trait]
 #[typetag::serde(name = "undo_move")]
 impl Undo for UndoMove {
-	async fn undo(&self, settings: &UndoSettings) -> Result<(), UndoError> {
+	async fn undo(&self, settings: &UndoSettings) -> Result<(), Error> {
 		let original = if tokio::fs::try_exists(&self.original.path).await? {
 			if settings.interactive {
 				UndoConflict::resolve(self.original.clone()).await
@@ -91,12 +91,12 @@ impl Undo for UndoMove {
 
 		if let Some(original) = original {
 			if tokio::fs::try_exists(self.new.as_path()).await.unwrap_or(false) {
-				fs.move_no_ctx(self.new.clone(), original).await?;
+				fs.r#move(self.new.clone(), original).await?;
 				return Ok(());
 			}
 			if let Some(backup) = &self.backup {
 				if tokio::fs::try_exists(backup.as_path()).await.unwrap_or(false) {
-					fs.move_no_ctx(backup.0.clone(), original).await?;
+					fs.r#move(backup.0.clone(), original).await?;
 					return Ok(());
 				}
 			}
@@ -109,7 +109,7 @@ impl Undo for UndoMove {
 		self.backup.as_ref()
 	}
 
-	async fn verify(&self) -> Result<(), UndoError> {
+	async fn verify(&self) -> Result<(), Error> {
 		let backup_exists = if let Some(backup) = &self.backup {
 			tokio::fs::try_exists(backup.as_path())
 				.await
@@ -121,7 +121,7 @@ impl Undo for UndoMove {
 		let new_exists = tokio::fs::try_exists(self.new.as_path()).await.unwrap_or(false);
 
 		if !new_exists && !backup_exists {
-			return Err(UndoError::PathNotFound(self.new.to_path_buf()));
+			return Err(Error::UndoError(UndoError::PathNotFound(self.new.to_path_buf())));
 		}
 
 		Ok(())

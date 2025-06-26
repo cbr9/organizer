@@ -1,3 +1,5 @@
+use std::error::Error;
+
 use anyhow::{Result, anyhow};
 use async_trait::async_trait;
 use clap::Parser;
@@ -62,25 +64,27 @@ impl Cmd for Undo {
 							tracing::info!("Transaction {} undone.", transaction.id);
 						}
 						Err(e) => {
-							if matches!(e, UndoError::Abort) {
-								let inputs = transaction
-									.receipt
-									.inputs
-									.iter()
-									.map(|input: &Input| match input {
-										Input::Processed(resource) => resource.to_string_lossy().to_string(),
-										Input::Skipped(resource) => resource.to_string_lossy().to_string(),
-									})
-									.collect::<Vec<String>>()
-									.join("\n -");
+							if let Some(source) = e.source().map(|s| s.downcast_ref::<UndoError>()).flatten() {
+								if matches!(source, UndoError::Abort) {
+									let inputs = transaction
+										.receipt
+										.inputs
+										.iter()
+										.map(|input: &Input| match input {
+											Input::Processed(resource) => resource.to_string_lossy().to_string(),
+											Input::Skipped(resource) => resource.to_string_lossy().to_string(),
+										})
+										.collect::<Vec<String>>()
+										.join("\n -");
 
-								eprintln!(
-									"There was a conflict undoing transaction {}.\nOne of the following files may already exist: \n - {}\nAborting \
-									 undo process. Run in interactive mode or choose a default conflict resolution strategy. You can also move the \
-									 file manually.",
-									transaction.id, inputs
-								);
-								return Ok(());
+									eprintln!(
+										"There was a conflict undoing transaction {}.\nOne of the following files may already exist: \n - \
+										 {}\nAborting undo process. Run in interactive mode or choose a default conflict resolution strategy. You \
+										 can also move the file manually.",
+										transaction.id, inputs
+									);
+									return Ok(());
+								}
 							}
 
 							eprintln!("Failed to undo transaction {}: {}", transaction.id, e);

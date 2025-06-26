@@ -10,10 +10,7 @@ use std::{
 };
 use tokio::{fs::File, io::AsyncReadExt};
 
-use crate::{
-	context::ExecutionContext,
-	errors::{Error, ErrorContext},
-};
+use crate::{context::ExecutionContext, errors::Error};
 
 #[derive(Debug, Default, Clone)]
 pub enum FileState {
@@ -183,28 +180,12 @@ impl Resource {
 			return match self.state {
 				FileState::Exists => Ok(true),
 				FileState::Deleted => Ok(false),
-				FileState::Unknown => tokio::fs::try_exists(&self.path)
-					.await
-					.map_err(|e| Error::Io {
-						source: e,
-						path: self.clone().into(),
-						target: None,
-						context: ErrorContext::from_scope(&ctx.scope),
-					})
-					.inspect(|v| println!("EXISTS: {}", v)),
+				FileState::Unknown => Ok(tokio::fs::try_exists(&self.path).await?),
 			};
 		}
 
 		// Otherwise, check the physical filesystem using the resource's path.
-		tokio::fs::try_exists(&self.path)
-			.await
-			.map_err(|e| Error::Io {
-				source: e,
-				path: self.clone().into(),
-				target: None,
-				context: ErrorContext::from_scope(&ctx.scope),
-			})
-			.inspect(|v| println!("EXISTS: {}", v))
+		Ok(tokio::fs::try_exists(&self.path).await?)
 	}
 }
 
