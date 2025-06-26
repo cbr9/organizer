@@ -1,9 +1,6 @@
 use chumsky::prelude::*;
 
-use crate::parser::{
-	ast::{Expression, VariablePath},
-	lexer::Token,
-};
+use crate::parser::{ast::Expression, lexer::Token};
 
 pub mod ast;
 pub mod errors;
@@ -18,7 +15,7 @@ pub fn parser<'a>() -> impl Parser<'a, &'a [Token<'a>], Expression, extra::Err<S
 		.separated_by(just(Token::Dot))
 		.at_least(1) // must have at least one part
 		.collect::<Vec<String>>()
-		.map(|parts| VariablePath { parts });
+		.map(|parts| parts);
 
 	var_path.map(Expression::Variable)
 }

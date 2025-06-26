@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 pub struct Hash;
 
 #[async_trait]
-#[typetag::serde(name = "hash")]
+#[typetag::serde]
 impl Variable for Hash {
 	fn name(&self) -> String {
 		self.typetag_name().to_string()

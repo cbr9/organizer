@@ -1,14 +1,8 @@
-// A variable path, like `user.name`, stored as `["user", "name"]`
-#[derive(Debug, PartialEq, Clone, Eq)]
-pub struct VariablePath {
-	pub parts: Vec<String>,
-}
-
 // For now, an Expression is just a VariablePath.
 // We can add Literals here later if needed.
 #[derive(Debug, PartialEq, Clone, Eq)]
 pub enum Expression {
-	Variable(VariablePath),
+	Variable(Vec<String>),
 }
 
 // A full template is a sequence of literal text and expressions.

@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 use thiserror::Error;
 
-use crate::{action::UndoError, templates::engine::TemplateError};
+use crate::{action::UndoError, parser::errors::ParseError, templates::engine::TemplateError};
 
 /// The primary error type for all actions within the application.
 #[derive(Error, Debug)]
@@ -19,6 +19,9 @@ pub enum Error {
 		path: PathBuf,
 	},
 
+	#[error(transparent)]
+	ParseError(#[from] ParseError),
+
 	#[error("invalid path")]
 	InvalidPath { path: PathBuf },
 
@@ -32,7 +35,7 @@ pub enum Error {
 		prompt: String,
 	},
 
-	#[error("Could not render template")]
+	#[error(transparent)]
 	TemplateError(#[from] TemplateError),
 
 	#[error("Tried to retrieve `{0}` from the scope but it is not defined")]

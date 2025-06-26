@@ -8,18 +8,15 @@ use crate::{
 	config::Config,
 	context::ExecutionContext,
 	errors::Error,
-	parser::ast::{Expression, Segment, VariablePath},
+	parser::ast::{Expression, Segment},
 	templates::{
-		template::Template,
+		template::{BuiltSegment, Template},
 		variable::{Variable, VariableOutput},
 	},
 };
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Templater {
-	pub global_variables: HashMap<String, Box<dyn Variable>>,
-	pub rule_variables: HashMap<(usize, String), Box<dyn Variable>>,
-}
+pub struct Templater;
 
 #[derive(Error, Debug)]
 pub enum TemplateError {
@@ -36,65 +33,49 @@ pub enum TemplateError {
 }
 
 impl Templater {
-	pub fn from_config(config: &Config) -> Self {
-		let mut engine = Templater::default();
-		for variable in config.variables.iter() {
-			engine.global_variables.insert(variable.name(), variable.clone());
-		}
-		for (i, rule) in config.rules.iter().enumerate() {
-			for variable in rule.variables.iter() {
-				engine.rule_variables.insert((i, variable.name()), variable.clone());
-			}
-		}
-		engine
+	pub fn new() -> Self {
+		Templater::default()
 	}
 
 	async fn resolve_sub_variable(
 		&self,
 		variable: &Box<dyn Variable>,
-		parts: &[String],
+		parts: &mut Vec<String>,
 		ctx: &ExecutionContext<'_>,
 	) -> Result<Pin<Box<VariableOutput>>, Error> {
-		if parts.is_empty() {
-			return Err(Error::TemplateError(TemplateError::EmptyTemplate));
+		if parts.len() > 0 {
+			parts.remove(0);
 		}
-		let parts = &parts[1..];
 		match variable.compute(parts, ctx).await? {
 			VariableOutput::Value(value) => Ok(Box::pin(VariableOutput::Value(value))),
 			VariableOutput::Lazy(variable) => Box::pin(self.resolve_sub_variable(&variable, parts, ctx)).await,
 		}
 	}
 
-	pub async fn resolve_variable_path(&self, var_path: &VariablePath, ctx: &ExecutionContext<'_>) -> Result<serde_json::Value, Error> {
-		let parts = &var_path.parts;
-		let var_name = &parts[0];
-
-		let Some(variable) = (match self.global_variables.get(var_name) {
-			Some(var) => Some(var),
-			None => self.rule_variables.get(&(ctx.scope.rule()?.index, var_name.clone())),
-		}) else {
-			return Err(Error::TemplateError(TemplateError::UnknownVariable(var_name.to_string())));
-		};
-
-		match &*self.resolve_sub_variable(variable, parts, ctx).await? {
+	pub async fn resolve_variable_path(
+		&self,
+		variable: &Box<dyn Variable>,
+		parts: &Vec<String>,
+		ctx: &ExecutionContext<'_>,
+	) -> Result<serde_json::Value, Error> {
+		let mut parts = parts.clone();
+		match &*self.resolve_sub_variable(variable, &mut parts, ctx).await? {
 			VariableOutput::Value(value) => Ok(value.clone()),
-			VariableOutput::Lazy(_variable) => Err(Error::TemplateError(TemplateError::Other)),
+			VariableOutput::Lazy(_variable) => unreachable!("Template should evaluate fully"),
 		}
 	}
 
 	pub async fn render(&self, template: &Template, ctx: &ExecutionContext<'_>) -> Result<String, Error> {
 		let mut rendered = String::new();
-		for segment in template.ast.segments.iter() {
+		for segment in template.variables.iter() {
 			match segment {
-				Segment::Literal(literal) => {
+				BuiltSegment::Literal(literal) => {
 					rendered += literal;
 				}
-				Segment::Expression(expression) => match expression {
-					Expression::Variable(variable_path) => {
-						let sub_rendered = self.resolve_variable_path(variable_path, ctx).await?;
-						rendered += &serde_json::to_string(&sub_rendered).unwrap();
-					}
-				},
+				BuiltSegment::Expression(variable, parts) => {
+					let value = self.resolve_variable_path(variable, parts, ctx).await?;
+					rendered += &serde_json::to_string_pretty(&value)?;
+				}
 			}
 		}
 
@@ -110,20 +91,7 @@ impl Default for Templater {
 	/// Creates a new Templater with all built-in filters and lazy variables.
 	fn default() -> Self {
 		// Initialize the templater with the complete set of built-in lazy variables
-		let path: Box<dyn Variable> = Box::new(variables::path::Path);
-		let root: Box<dyn Variable> = Box::new(variables::root::Root);
-		let hash: Box<dyn Variable> = Box::new(variables::hash::Hash);
-		let variables = HashMap::from_iter(vec![
-			("path".to_string(), path.clone()),
-			("root".to_string(), root.clone()),
-			("file".to_string(), path),
-			("hash".to_string(), hash),
-		]);
-
-		Self {
-			global_variables: variables,
-			rule_variables: HashMap::new(),
-		}
+		Self {}
 	}
 }
 // #[cfg(test)]
