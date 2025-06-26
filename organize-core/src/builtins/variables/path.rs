@@ -18,6 +18,12 @@ impl Variable for Path {
 		if let Some(next) = parts.iter().next() {
 			match next.as_str() {
 				"hash" => Ok(VariableOutput::Lazy(Box::new(Hash))),
+				"stem" => Ok(VariableOutput::Value(serde_json::to_value(
+					resource.as_path().file_stem().unwrap().to_string_lossy(),
+				)?)),
+				"extension" => Ok(VariableOutput::Value(serde_json::to_value(
+					resource.as_path().extension().unwrap().to_string_lossy(),
+				)?)),
 				other => Err(TemplateError::UnknownVariable(other.into()))?,
 			}
 		} else {

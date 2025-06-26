@@ -64,8 +64,8 @@ impl Cmd for Undo {
 							tracing::info!("Transaction {} undone.", transaction.id);
 						}
 						Err(e) => {
-							if let Some(source) = e.source().map(|s| s.downcast_ref::<UndoError>()).flatten() {
-								if matches!(source, UndoError::Abort) {
+							if let Some(source) = e.source().and_then(|s| s.downcast_ref::<UndoError>())
+								&& matches!(source, UndoError::Abort) {
 									let inputs = transaction
 										.receipt
 										.inputs
@@ -85,7 +85,6 @@ impl Cmd for Undo {
 									);
 									return Ok(());
 								}
-							}
 
 							eprintln!("Failed to undo transaction {}: {}", transaction.id, e);
 							return Err(e.into());

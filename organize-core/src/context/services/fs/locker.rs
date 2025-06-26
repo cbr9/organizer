@@ -3,7 +3,6 @@ use crate::{
 	engine::ConflictResolution,
 	errors::Error,
 	resource::Resource,
-	stdx::path::PathExt,
 };
 use anyhow::Result;
 use dashmap::DashSet;
@@ -26,11 +25,11 @@ impl Locker {
 		F: FnOnce(Arc<Resource>) -> Fut,
 		Fut: Future<Output = Result<T, Error>>,
 	{
-		let mut path = destination.get_final_path(ctx).await?.as_resource(ctx).await;
+		let mut path = destination.get_final_path(ctx).await?;
 		let mut n = 1;
 
 		let reserved = loop {
-			if self.active_paths.contains(&path.to_path_buf()) {
+			if self.active_paths.contains(&path) {
 				match strategy {
 					ConflictResolution::Skip | ConflictResolution::Overwrite => return Ok(None),
 					ConflictResolution::Rename => {
@@ -41,14 +40,14 @@ impl Locker {
 						} else {
 							format!("{stem} ({n}).{ext}")
 						};
-						path = path.with_file_name(new_name).as_resource(ctx).await;
+						path = path.with_file_name(new_name);
 						n += 1;
 						continue;
 					}
 				}
 			}
 
-			if path.try_exists(ctx).await? {
+			if Resource::from(path.clone()).try_exists(ctx).await? {
 				match strategy {
 					ConflictResolution::Skip => return Ok(None),
 					ConflictResolution::Overwrite => {
@@ -65,7 +64,7 @@ impl Locker {
 						} else {
 							format!("{stem} ({n}).{ext}")
 						};
-						path = path.with_file_name(new_name).as_resource(ctx).await;
+						path = path.with_file_name(new_name).into();
 						n += 1;
 						continue;
 					}
@@ -73,7 +72,6 @@ impl Locker {
 			}
 
 			if !self.active_paths.insert(path.to_path_buf()) {
-				println!("MMM");
 				continue;
 			}
 			break Some(path);
@@ -81,7 +79,7 @@ impl Locker {
 
 		if let Some(target) = reserved {
 			ctx.services.fs.ensure_parent_dir_exists(&target).await?;
-			let result = action(target.clone()).await?;
+			let result = action(Arc::new(Resource::from(target.clone()))).await?;
 
 			self.active_paths.remove(&target.to_path_buf());
 

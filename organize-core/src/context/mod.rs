@@ -33,7 +33,7 @@ pub struct VariableCacheKey {
 #[derive(Debug, Clone)]
 pub struct Blackboard {
 	pub scratchpad: Arc<DashMap<String, Box<dyn Any + Send + Sync>>>,
-	pub resources: Cache<PathBuf, Resource>,
+	pub resources: Cache<PathBuf, Arc<Resource>>,
 }
 
 impl Default for Blackboard {

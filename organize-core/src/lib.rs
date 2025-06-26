@@ -2,7 +2,7 @@
 #![feature(path_add_extension)]
 #![feature(lock_value_accessors)]
 
-pub const PROJECT_NAME: &'static str = "organize";
+pub const PROJECT_NAME: &str = "organize";
 
 pub mod action;
 pub mod builtins;

@@ -118,7 +118,7 @@ impl Resource {
 					hasher.update(&buffer[..count]);
 				}
 				let hash = hasher.finalize();
-				let hash_str = format!("{:x}", hash);
+				let hash_str = format!("{hash:x}");
 				self.hash.set(hash_str).unwrap();
 				self.hash.get().unwrap()
 			}

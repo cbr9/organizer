@@ -51,13 +51,13 @@ impl<T: AsRef<Path> + Sync + Send> PathExt for T {
 	}
 
 	async fn as_resource(&self, ctx: &ExecutionContext) -> Arc<Resource> {
-		Arc::new(
-			ctx.services
-				.blackboard
-				.resources
-				.get_with(self.as_ref().to_path_buf(), async move { Resource::from(self.as_ref().to_path_buf()) })
-				.await,
-		)
+		ctx.services
+			.blackboard
+			.resources
+			.get_with(self.as_ref().to_path_buf(), async move {
+				Arc::new(Resource::from(self.as_ref().to_path_buf()))
+			})
+			.await
 	}
 }
 

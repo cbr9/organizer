@@ -1,4 +1,5 @@
 use crate::{
+	action::Output,
 	config::{Config, ConfigBuilder},
 	context::{
 		services::{fs::manager::FileSystemManager, history::Journal},
@@ -64,8 +65,13 @@ impl Engine {
 		for rule in self.config.rules.iter() {
 			for folder in rule.folders.iter() {
 				let engine = Arc::clone(&self);
-				let resources = match folder.get_resources(&self.services).await {
-					Ok(resources) => resources.into_iter().map(Arc::new).collect_vec(),
+				let ctx = ExecutionContext {
+					services: &self.services,
+					settings: &self.settings,
+					scope: ExecutionScope::new_folder_scope(&engine.config, rule, folder),
+				};
+				let resources = match folder.get_resources(&ctx).await {
+					Ok(resources) => resources,
 					Err(e) => {
 						tracing::warn!("Could not get resources from {}: {}", folder.path.display(), e);
 						continue;
@@ -130,6 +136,22 @@ impl Engine {
 									};
 
 									let receipt = action.commit(&ctx).await?;
+
+									for output in &receipt.outputs {
+										match output {
+											Output::Created(resource) => {
+												engine
+													.services
+													.blackboard
+													.resources
+													.insert(resource.to_path_buf(), resource.clone())
+													.await;
+											}
+											Output::Modified(resource) | Output::Deleted(resource) => {
+												engine.services.blackboard.resources.remove(resource.as_path()).await;
+											}
+										};
+									}
 
 									engine
 										.services

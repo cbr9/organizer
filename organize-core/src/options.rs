@@ -1,14 +1,14 @@
 use serde::{Deserialize, Serialize};
-use std::{fmt::Debug, path::PathBuf};
+use std::fmt::Debug;
 
-use crate::utils::backup::BackupLocation;
+use crate::{templates::prelude::Template, utils::backup::BackupLocation};
 
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct OptionsBuilder {
 	pub max_depth: Option<usize>,
 	pub min_depth: Option<usize>,
-	pub exclude: Option<Vec<PathBuf>>,
+	pub exclude: Option<Vec<Template>>,
 	pub hidden_files: Option<bool>,
 	pub partial_files: Option<bool>,
 	pub target: Option<Target>,
@@ -19,7 +19,7 @@ pub struct OptionsBuilder {
 pub struct Options {
 	pub max_depth: usize,
 	pub min_depth: usize,
-	pub exclude: Vec<PathBuf>,
+	pub exclude: Vec<Template>,
 	pub hidden_files: bool,
 	pub partial_files: bool,
 	pub target: Target,
@@ -41,13 +41,16 @@ impl Default for Options {
 }
 
 impl Options {
-	pub fn compile(defaults: &OptionsBuilder, rule: &OptionsBuilder, folder: &OptionsBuilder, folder_path: &PathBuf) -> Self {
-		// Establish the ultimate fallback defaults for any un-defined option
+	pub fn compile(defaults: &OptionsBuilder, rule: &OptionsBuilder, folder: &OptionsBuilder) -> Self {
 		let fallback = Self::default();
-		let mut context = tera::Context::new();
-		context.insert("root", folder_path);
 
 		Self {
+			exclude: folder
+				.exclude
+				.clone()
+				.or_else(|| rule.exclude.clone())
+				.or_else(|| defaults.exclude.clone())
+				.unwrap_or_default(),
 			backup_location: folder
 				.backup_location
 				.clone()
@@ -64,12 +67,6 @@ impl Options {
 				.or(rule.min_depth)
 				.or(defaults.min_depth)
 				.unwrap_or(fallback.min_depth),
-			exclude: folder
-				.exclude
-				.clone()
-				.or_else(|| rule.exclude.clone())
-				.or_else(|| defaults.exclude.clone())
-				.unwrap_or(fallback.exclude),
 			hidden_files: folder
 				.hidden_files
 				.or(rule.hidden_files)
