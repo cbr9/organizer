@@ -3,8 +3,7 @@ use std::path::PathBuf;
 use anyhow::Result;
 use async_trait::async_trait;
 use clap::{Parser, ValueHint};
-
-use organize_lib::{config::context::RunSettings, engine::Engine};
+use organize_core::{context::RunSettings, engine::Engine};
 
 use crate::Cmd;
 

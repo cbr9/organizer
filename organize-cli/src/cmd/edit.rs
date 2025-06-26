@@ -7,8 +7,7 @@ use std::{
 use anyhow::{Context, Result};
 use async_trait::async_trait;
 use clap::Parser;
-
-use organize_lib::config::ConfigBuilder;
+use organize_core::config::ConfigBuilder;
 
 use crate::cmd::Cmd;
 

@@ -1,12 +1,9 @@
 use anyhow::{Result, anyhow};
 use async_trait::async_trait;
 use clap::Parser;
-use organize_lib::{
-	config::{
-		actions::{Input, UndoConflict, UndoError, UndoSettings},
-		context::RunSettings,
-	},
-	journal::Journal,
+use organize_core::{
+	action::{Input, UndoConflict, UndoError, UndoSettings},
+	context::{RunSettings, services::history::Journal},
 };
 
 use super::Cmd;

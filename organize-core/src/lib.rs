@@ -1,0 +1,24 @@
+#![feature(file_lock)]
+#![feature(path_add_extension)]
+#![feature(lock_value_accessors)]
+
+pub const PROJECT_NAME: &'static str = "organize";
+
+pub mod action;
+pub mod builtins;
+pub mod common;
+pub mod config;
+pub mod context;
+pub mod engine;
+pub mod errors;
+pub mod filter;
+pub mod folder;
+pub mod hook;
+pub mod options;
+pub mod parser;
+pub mod resolver;
+pub mod resource;
+pub mod rule;
+pub mod stdx;
+pub mod templates;
+pub mod utils;
