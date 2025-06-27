@@ -16,7 +16,6 @@ pub mod folder;
 pub mod hook;
 pub mod options;
 pub mod parser;
-pub mod resolver;
 pub mod resource;
 pub mod rule;
 pub mod stdx;

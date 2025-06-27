@@ -1,18 +1,12 @@
-use std::{collections::HashMap, iter::FromIterator, pin::Pin};
+use std::env::VarError;
 
 use anyhow::Result;
 use thiserror::Error;
 
 use crate::{
-	builtins::variables,
-	config::Config,
 	context::ExecutionContext,
 	errors::Error,
-	parser::ast::{Expression, Segment},
-	templates::{
-		template::{BuiltSegment, Template},
-		variable::{Variable, VariableOutput},
-	},
+	templates::template::{Piece, Template},
 };
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -20,16 +14,37 @@ pub struct Templater;
 
 #[derive(Error, Debug)]
 pub enum TemplateError {
-	#[error("This name of this rule's variable is not unique with respect to other builtin variables and other globally defined variables")]
-	NonUniqueNames { name: String, rule_index: usize },
-	#[error("Empty template")]
+	#[error("variable '{variable}' (fields={fields:?}) cannot be resolved.")]
+	UndefinedVariable {
+		variable: String,
+		fields: Vec<String>,
+		#[source]
+		source: VarError,
+	},
+
+	#[error("empty template")]
 	EmptyTemplate,
-	#[error("Unexpected error")]
-	Other,
-	#[error("Unknown variable {0}")]
-	UnknownVariable(String),
-	#[error("Invalid variable ({variable}): it requires {missing_piece} to be in scope")]
+
+	#[error(transparent)]
+	Other(#[from] serde_json::Error),
+
+	#[error("variable {variable} does not accept any fields, but received {fields:?}")]
+	FieldsNotSupported { variable: String, fields: Vec<String> },
+
+	#[error("invalid variable ({variable}): it requires {missing_piece} to be in scope")]
 	InvalidContext { missing_piece: String, variable: String },
+
+	#[error("variable '{variable}' does not support a '{field}' subfield")]
+	InvalidField { variable: String, field: String },
+
+	#[error("variable '{variable}' requires a field (one of: {fields})")]
+	MissingField { variable: String, fields: String },
+
+	#[error("unknown variable '{{{{ {0} }}}}'")]
+	UnknownVariable(String),
+
+	#[error("variable '{variable}' requires one of the following fields: {fields:?}")]
+	RequiredField { variable: String, fields: Vec<String> },
 }
 
 impl Templater {
@@ -37,44 +52,19 @@ impl Templater {
 		Templater::default()
 	}
 
-	async fn resolve_sub_variable(
-		&self,
-		variable: &Box<dyn Variable>,
-		parts: &mut Vec<String>,
-		ctx: &ExecutionContext<'_>,
-	) -> Result<Pin<Box<VariableOutput>>, Error> {
-		if parts.len() > 0 {
-			parts.remove(0);
-		}
-		match variable.compute(parts, ctx).await? {
-			VariableOutput::Value(value) => Ok(Box::pin(VariableOutput::Value(value))),
-			VariableOutput::Lazy(variable) => Box::pin(self.resolve_sub_variable(&variable, parts, ctx)).await,
-		}
-	}
-
-	pub async fn resolve_variable_path(
-		&self,
-		variable: &Box<dyn Variable>,
-		parts: &Vec<String>,
-		ctx: &ExecutionContext<'_>,
-	) -> Result<serde_json::Value, Error> {
-		let mut parts = parts.clone();
-		match &*self.resolve_sub_variable(variable, &mut parts, ctx).await? {
-			VariableOutput::Value(value) => Ok(value.clone()),
-			VariableOutput::Lazy(_variable) => unreachable!("Template should evaluate fully"),
-		}
-	}
-
 	pub async fn render(&self, template: &Template, ctx: &ExecutionContext<'_>) -> Result<String, Error> {
-		let mut rendered = String::new();
-		for segment in template.variables.iter() {
-			match segment {
-				BuiltSegment::Literal(literal) => {
-					rendered += literal;
+		let mut rendered = vec![];
+		for piece in template.iter() {
+			match piece {
+				Piece::Literal(literal) => {
+					rendered.push(literal.clone());
 				}
-				BuiltSegment::Expression(variable, parts) => {
-					let value = self.resolve_variable_path(variable, parts, ctx).await?;
-					rendered += &serde_json::to_string_pretty(&value)?;
+				Piece::Variable(variable) => {
+					let value = variable
+						.compute(ctx)
+						.await
+						.inspect_err(|e| tracing::error!("{}", e.to_string()))?;
+					rendered.push(value.as_str().expect("variables should return strings").to_string());
 				}
 			}
 		}
@@ -83,7 +73,7 @@ impl Templater {
 			return Err(Error::TemplateError(TemplateError::EmptyTemplate));
 		}
 
-		Ok(rendered.replace("\"", ""))
+		Ok(rendered.join(""))
 	}
 }
 

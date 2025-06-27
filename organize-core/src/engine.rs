@@ -49,7 +49,6 @@ impl Engine {
 	pub async fn new(path: &Option<PathBuf>, settings: RunSettings, tags: &Option<Vec<String>>, ids: &Option<Vec<String>>) -> Result<Arc<Self>> {
 		let config = ConfigBuilder::new(path.clone())?.build(tags, ids)?;
 		let engine = Templater::new();
-		dbg!(&config);
 
 		let services = RunServices {
 			templater: engine,

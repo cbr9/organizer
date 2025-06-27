@@ -1,9 +1,9 @@
-use std::str::FromStr;
+use std::{collections::HashMap, str::FromStr};
 
 use chumsky::prelude::*;
 use logos::Logos;
 use serde::{Deserialize, Deserializer, Serialize};
-use serde_json::json;
+use serde_json::{error::Category, json}; // Import serde_json::Value and Map
 
 use crate::{
 	errors::Error,
@@ -17,18 +17,24 @@ use crate::{
 };
 
 #[derive(Debug, PartialEq, Clone, Eq)]
-pub enum BuiltSegment {
+pub enum Piece {
 	Literal(String),
-	Expression(Box<dyn Variable>, Vec<String>),
+	Variable(Box<dyn Variable>),
 }
 
 #[derive(Debug, Serialize, Eq, PartialEq, Clone)]
 pub struct Template {
 	pub text: String,
 	#[serde(skip)]
-	ast: AST,
-	#[serde(skip)]
-	pub variables: Vec<BuiltSegment>,
+	pub pieces: Vec<Piece>,
+}
+
+impl std::ops::Deref for Template {
+	type Target = Vec<Piece>;
+
+	fn deref(&self) -> &Self::Target {
+		&self.pieces
+	}
 }
 
 impl<'de> Deserialize<'de> for Template {
@@ -95,6 +101,42 @@ impl Template {
 	}
 }
 
+#[derive(Debug, Serialize)]
+#[serde(untagged)] // Add the untagged attribute
+enum Value {
+	String(String),
+	Map(HashMap<String, Value>),
+}
+
+// The main conversion function
+fn convert_template_path_to_variable_arg_json(path_segments: &[String]) -> Option<Value> {
+	if path_segments.is_empty() {
+		// No arguments provided (e.g., `{{ sys }}`), so Args should be None.
+		return None;
+	}
+
+	// The first segment is the top-level variant key (e.g., "os", "host", "path").
+	let top_level_key = path_segments[0].clone();
+
+	// Determine the value associated with the top-level key.
+	let inner_value_for_variant = if path_segments.len() > 1 {
+		// If there's a second segment, it's the specific sub-argument (e.g., "name", "uptime").
+		// We assume it's a string representation of an enum variant.
+		Value::String(path_segments[1].clone())
+	} else {
+		// If only one segment (e.g., `["os"]`), it means use the default
+		// for that top-level argument's sub-enum. We represent this as an empty JSON object `{}`.
+		// The custom Deserialize implementation for the specific `Args` enum will then
+		// interpret this empty object as the default variant.
+		Value::Map(HashMap::new())
+	};
+
+	// Construct the JSON object: {"top_level_key": inner_value_for_variant}
+	let mut map = HashMap::new();
+	map.insert(top_level_key, inner_value_for_variant);
+	Some(Value::Map(map.into())) // Convert HashMap to serde_json::Map for Value::Object
+}
+
 impl FromStr for Template {
 	type Err = Error;
 
@@ -107,31 +149,32 @@ impl FromStr for Template {
 		for segment in ast.segments.iter() {
 			match segment {
 				Segment::Literal(literal) => {
-					segments.push(BuiltSegment::Literal(literal.clone()));
+					segments.push(Piece::Literal(literal.clone()));
 				}
 				Segment::Expression(expression) => match expression {
 					Expression::Variable(parts) => {
-						let json_input = json!({
-							"type": &parts[0],
-						});
-						let joined = format!(r#"{{{{ {} }}}}"#, parts.join("."));
-						let variable: Box<dyn Variable> = serde_json::from_value(json_input).map_err(|_| TemplateError::UnknownVariable(joined))?;
 						let mut fields = parts.clone();
-						if parts.len() > 1 {
-							fields.remove(0);
-							segments.push(BuiltSegment::Expression(variable, fields));
-						} else {
-							segments.push(BuiltSegment::Expression(variable, vec![]));
-						}
+						let var_name = fields.remove(0);
+						let maybe_fields = convert_template_path_to_variable_arg_json(fields.as_slice());
+
+						let json_input = json!({
+							"type": var_name,
+							"value": maybe_fields
+						});
+
+						let variable: Box<dyn Variable> = match serde_json::from_value(json_input) {
+							Ok(variable) => variable,
+							Err(e) => {
+								if e.is_data() {}
+								return Err(Error::TemplateError(TemplateError::Other(e)));
+							}
+						};
+						segments.push(Piece::Variable(variable));
 					}
 				},
 			}
 		}
-		Ok(Self {
-			text,
-			ast,
-			variables: segments,
-		})
+		Ok(Self { text, pieces: segments })
 	}
 }
 

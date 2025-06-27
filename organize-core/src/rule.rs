@@ -16,7 +16,7 @@ use crate::{
 pub struct RuleBuilder {
 	pub id: Option<String>,
 	#[serde(default)]
-	pub tags: HashSet<String>,
+	pub tags: Vec<String>,
 	pub actions: Vec<Box<dyn Action>>,
 	#[serde(default)]
 	pub filters: Vec<Box<dyn Filter>>,
@@ -81,7 +81,7 @@ impl RuleBuilder {
 pub struct Rule {
 	pub index: usize,
 	pub id: Option<String>,
-	pub tags: HashSet<String>,
+	pub tags: Vec<String>,
 	pub actions: Vec<Box<dyn Action>>,
 	pub filters: Vec<Box<dyn Filter>>,
 	pub variables: Vec<Box<dyn Variable>>,

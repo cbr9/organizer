@@ -13,8 +13,8 @@ impl Variable for Uuid {
 		self.typetag_name().to_string()
 	}
 
-	async fn compute(&self, _parts: &[String], _ctx: &ExecutionContext<'_>) -> Result<VariableOutput, Error> {
+	async fn compute(&self, _ctx: &ExecutionContext<'_>) -> Result<serde_json::Value, Error> {
 		let id = uuid::Uuid::new_v4().to_string();
-		Ok(VariableOutput::Value(serde_json::to_value(id)?))
+		Ok(serde_json::to_value(id)?)
 	}
 }

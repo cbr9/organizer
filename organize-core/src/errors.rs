@@ -1,4 +1,7 @@
-use std::path::PathBuf;
+use std::{
+	path::PathBuf,
+	sync::{LockResult, RwLockReadGuard},
+};
 use thiserror::Error;
 
 use crate::{action::UndoError, parser::errors::ParseError, templates::engine::TemplateError};
@@ -12,6 +15,9 @@ pub enum Error {
 	#[error(transparent)]
 	Io(#[from] std::io::Error),
 
+	#[error(transparent)]
+	Other(#[from] anyhow::Error),
+
 	#[error("Could not create backup for: {path:?}")]
 	Backup {
 		#[source]
@@ -21,12 +27,6 @@ pub enum Error {
 
 	#[error(transparent)]
 	ParseError(#[from] ParseError),
-
-	#[error("invalid path")]
-	InvalidPath { path: PathBuf },
-
-	#[error("Could not resolve path from template: '{template}'")]
-	PathResolution { template: String },
 
 	#[error("Error in prompt")]
 	Interaction {
@@ -39,7 +39,7 @@ pub enum Error {
 	TemplateError(#[from] TemplateError),
 
 	#[error("Tried to retrieve `{0}` from the scope but it is not defined")]
-	ScopeError(String),
+	OutOfScope(String),
 
 	#[error(transparent)]
 	UndoError(#[from] UndoError),

@@ -1,25 +1,24 @@
 use crate::{
 	context::ExecutionContext,
 	errors::Error,
-	templates::variable::{Variable, VariableOutput},
+	templates::{engine::TemplateError, variable::Variable},
 };
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
-// -- Hash Variable (Stateful with Cache) --------------------------------------
 #[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Hash;
 
 #[async_trait]
-#[typetag::serde]
+#[typetag::serde(name = "hash")]
 impl Variable for Hash {
 	fn name(&self) -> String {
 		self.typetag_name().to_string()
 	}
 
-	async fn compute(&self, _parts: &[String], ctx: &ExecutionContext<'_>) -> Result<VariableOutput, Error> {
+	async fn compute(&self, ctx: &ExecutionContext<'_>) -> Result<serde_json::Value, Error> {
 		let resource = ctx.scope.resource()?;
 		let hash = resource.get_hash().await;
-		Ok(VariableOutput::Value(serde_json::to_value(hash)?))
+		Ok(serde_json::to_value(hash)?)
 	}
 }

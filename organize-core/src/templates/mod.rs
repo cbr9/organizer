@@ -7,6 +7,6 @@ pub mod prelude {
 	pub use super::{
 		engine::{TemplateError, Templater},
 		template::Template,
-		variable::{Variable, VariableOutput},
+		variable::Variable,
 	};
 }

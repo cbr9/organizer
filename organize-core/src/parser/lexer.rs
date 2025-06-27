@@ -19,7 +19,7 @@ pub enum Token<'a> {
 	CloseDelim,
 	#[token(".")]
 	Dot,
-	#[regex(r"[a-zA-Z_][a-zA-Z0-9_]*")]
+	#[regex(r"[a-zA-Z0-9_][a-zA-Z0-9_]*")]
 	Identifier(&'a str),
 	#[regex(".",  |lex| Err(LexingError::InvalidIdentifier(lex.slice().to_string())), priority = 1)]
 	InvalidToken(LexingError),
