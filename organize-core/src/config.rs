@@ -80,8 +80,7 @@ impl ConfigBuilder {
 		let mut builder = LayeredConfig::builder()
 			.add_source(File::from(path.clone()))
 			.build()?
-			.try_deserialize::<ConfigBuilder>()
-			.context("Could not deserialize config")?;
+			.try_deserialize::<ConfigBuilder>()?;
 		builder.path = Some(path);
 		Ok(builder)
 	}

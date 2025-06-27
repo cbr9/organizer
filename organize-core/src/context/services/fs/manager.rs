@@ -20,11 +20,11 @@ pub struct Destination {
 
 impl Destination {
 	pub async fn get_final_path(&self, ctx: &ExecutionContext<'_>) -> Result<PathBuf, Error> {
-		let folder = ctx.services.templater.render(&self.folder, ctx).await?;
+		let folder = self.folder.render(ctx).await?;
 
 		let mut folder = PathBuf::from(folder).clean();
 		let filename = if let Some(filename) = &self.filename {
-			ctx.services.templater.render(filename, ctx).await?
+			filename.render(ctx).await?
 		} else {
 			ctx.scope.resource()?.file_name().unwrap().to_string_lossy().to_string()
 		};

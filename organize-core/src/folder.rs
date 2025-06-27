@@ -131,14 +131,12 @@ impl Folder {
 	async fn get_excluded_paths(&self, ctx: &ExecutionContext<'_>) -> Vec<PathBuf> {
 		let concurrency_limit = 50; // Adjust as needed
 
-		let futures_to_render = self.settings.exclude.clone().into_iter().map(|t| {
-			let templater_ref = &ctx.services.templater;
-			let ctx_ref = ctx; // Capture reference to ctx
-
-			async move {
-				templater_ref.render(&t, ctx_ref).await.ok() // Returns Option<String>
-			}
-		});
+		let futures_to_render = self
+			.settings
+			.exclude
+			.clone()
+			.into_iter()
+			.map(|t| async move { t.render(ctx).await.ok() });
 
 		// 2. Use `StreamExt::buffer_unordered` (or `buffered`) on this iterator of futures.
 		// This takes the iterator of futures and runs `concurrency_limit` of them concurrently.

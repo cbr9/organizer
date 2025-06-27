@@ -12,12 +12,10 @@ use crate::{
 	folder::Folder,
 	resource::Resource,
 	rule::Rule,
-	templates::engine::Templater,
 };
 
 #[derive(Debug, Clone)]
 pub struct RunServices {
-	pub templater: Templater,
 	pub blackboard: Blackboard,
 	pub fs: FileSystemManager,
 	pub journal: Arc<Journal>,
@@ -111,7 +109,7 @@ impl<'a> ExecutionScope<'a> {
 
 	pub fn rule(&self) -> Result<&'a Rule, Error> {
 		match self {
-			ExecutionScope::Config(_scope) => Err(Error::ScopeError("rule".into())),
+			ExecutionScope::Config(_scope) => Err(Error::OutOfScope("rule".into())),
 			ExecutionScope::Rule(scope) => Ok(scope.rule),
 			ExecutionScope::Folder(scope) => Ok(scope.rule),
 			ExecutionScope::Resource(scope) => Ok(scope.rule),
@@ -121,8 +119,8 @@ impl<'a> ExecutionScope<'a> {
 
 	pub fn folder(&self) -> Result<&'a Folder, Error> {
 		match self {
-			ExecutionScope::Config(_scope) => Err(Error::ScopeError("folder".into())),
-			ExecutionScope::Rule(_scope) => Err(Error::ScopeError("folder".into())),
+			ExecutionScope::Config(_scope) => Err(Error::OutOfScope("folder".into())),
+			ExecutionScope::Rule(_scope) => Err(Error::OutOfScope("folder".into())),
 			ExecutionScope::Folder(scope) => Ok(scope.folder),
 			ExecutionScope::Resource(scope) => Ok(scope.folder),
 			ExecutionScope::Batch(scope) => Ok(scope.folder),
@@ -131,20 +129,20 @@ impl<'a> ExecutionScope<'a> {
 
 	pub fn resource(&self) -> Result<Arc<Resource>, Error> {
 		match self {
-			ExecutionScope::Config(_scope) => Err(Error::ScopeError("resource".into())),
-			ExecutionScope::Rule(_scope) => Err(Error::ScopeError("resource".into())),
-			ExecutionScope::Folder(_scope) => Err(Error::ScopeError("resource".into())),
+			ExecutionScope::Config(_scope) => Err(Error::OutOfScope("resource".into())),
+			ExecutionScope::Rule(_scope) => Err(Error::OutOfScope("resource".into())),
+			ExecutionScope::Folder(_scope) => Err(Error::OutOfScope("resource".into())),
 			ExecutionScope::Resource(scope) => Ok(scope.resource.clone()),
-			ExecutionScope::Batch(_scope) => Err(Error::ScopeError("resource".into())),
+			ExecutionScope::Batch(_scope) => Err(Error::OutOfScope("resource".into())),
 		}
 	}
 
 	pub fn batch(&self) -> Result<Vec<Arc<Resource>>, Error> {
 		match self {
-			ExecutionScope::Config(_scope) => Err(Error::ScopeError("batch".into())),
-			ExecutionScope::Rule(_scope) => Err(Error::ScopeError("batch".into())),
-			ExecutionScope::Folder(_scope) => Err(Error::ScopeError("batch".into())),
-			ExecutionScope::Resource(_scope) => Err(Error::ScopeError("batch".into())),
+			ExecutionScope::Config(_scope) => Err(Error::OutOfScope("batch".into())),
+			ExecutionScope::Rule(_scope) => Err(Error::OutOfScope("batch".into())),
+			ExecutionScope::Folder(_scope) => Err(Error::OutOfScope("batch".into())),
+			ExecutionScope::Resource(_scope) => Err(Error::OutOfScope("batch".into())),
 			ExecutionScope::Batch(scope) => Ok(scope.batch.clone()),
 		}
 	}

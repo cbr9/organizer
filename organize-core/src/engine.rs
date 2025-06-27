@@ -48,10 +48,8 @@ const CONCURRENT_OPERATIONS: usize = 100;
 impl Engine {
 	pub async fn new(path: &Option<PathBuf>, settings: RunSettings, tags: &Option<Vec<String>>, ids: &Option<Vec<String>>) -> Result<Arc<Self>> {
 		let config = ConfigBuilder::new(path.clone())?.build(tags, ids)?;
-		let engine = Templater::new();
 
 		let services = RunServices {
-			templater: engine,
 			blackboard: Blackboard::default(),
 			journal: Arc::new(Journal::new(&settings).await?),
 			fs: FileSystemManager::default(),

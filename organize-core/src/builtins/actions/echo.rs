@@ -23,9 +23,8 @@ pub struct Echo {
 impl Action for Echo {
 	async fn commit(&self, ctx: &ExecutionContext<'_>) -> Result<Receipt, Error> {
 		if self.enabled {
-			ctx.services
-				.templater
-				.render(&self.message, ctx)
+			self.message
+				.render(ctx)
 				.await
 				.inspect(|message| tracing::info!("{}", message))?;
 		}

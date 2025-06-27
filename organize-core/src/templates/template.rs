@@ -6,6 +6,7 @@ use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::{error::Category, json}; // Import serde_json::Value and Map
 
 use crate::{
+	context::ExecutionContext,
 	errors::Error,
 	parser::{
 		ast::{Expression, Segment, AST},
@@ -99,6 +100,30 @@ impl Template {
 
 		Ok(AST { segments })
 	}
+
+	pub async fn render(&self, ctx: &ExecutionContext<'_>) -> Result<String, Error> {
+		let mut rendered = vec![];
+		for piece in self.pieces.iter() {
+			match piece {
+				Piece::Literal(literal) => {
+					rendered.push(literal.clone());
+				}
+				Piece::Variable(variable) => {
+					let value = variable
+						.compute(ctx)
+						.await
+						.inspect_err(|e| tracing::error!("{}", e.to_string()))?;
+					rendered.push(value.as_str().expect("variables should return strings").to_string());
+				}
+			}
+		}
+
+		if rendered.is_empty() {
+			return Err(Error::TemplateError(TemplateError::EmptyTemplate));
+		}
+
+		Ok(rendered.join(""))
+	}
 }
 
 #[derive(Debug, Serialize)]
@@ -165,8 +190,11 @@ impl FromStr for Template {
 						let variable: Box<dyn Variable> = match serde_json::from_value(json_input) {
 							Ok(variable) => variable,
 							Err(e) => {
-								if e.is_data() {}
-								return Err(Error::TemplateError(TemplateError::Other(e)));
+								return Err(Error::TemplateError(TemplateError::DeserializationError {
+									source: e,
+									variable: var_name,
+									fields: fields,
+								}))
 							}
 						};
 						segments.push(Piece::Variable(variable));

@@ -25,8 +25,13 @@ pub enum TemplateError {
 	#[error("empty template")]
 	EmptyTemplate,
 
-	#[error(transparent)]
-	Other(#[from] serde_json::Error),
+	#[error("variable '{variable}' could not be deserialized. It may be missing fields or they may be wrong.")]
+	DeserializationError {
+		#[source]
+		source: serde_json::Error,
+		variable: String,
+		fields: Vec<String>,
+	},
 
 	#[error("variable {variable} does not accept any fields, but received {fields:?}")]
 	FieldsNotSupported { variable: String, fields: Vec<String> },
@@ -47,43 +52,6 @@ pub enum TemplateError {
 	RequiredField { variable: String, fields: Vec<String> },
 }
 
-impl Templater {
-	pub fn new() -> Self {
-		Templater::default()
-	}
-
-	pub async fn render(&self, template: &Template, ctx: &ExecutionContext<'_>) -> Result<String, Error> {
-		let mut rendered = vec![];
-		for piece in template.iter() {
-			match piece {
-				Piece::Literal(literal) => {
-					rendered.push(literal.clone());
-				}
-				Piece::Variable(variable) => {
-					let value = variable
-						.compute(ctx)
-						.await
-						.inspect_err(|e| tracing::error!("{}", e.to_string()))?;
-					rendered.push(value.as_str().expect("variables should return strings").to_string());
-				}
-			}
-		}
-
-		if rendered.is_empty() {
-			return Err(Error::TemplateError(TemplateError::EmptyTemplate));
-		}
-
-		Ok(rendered.join(""))
-	}
-}
-
-impl Default for Templater {
-	/// Creates a new Templater with all built-in filters and lazy variables.
-	fn default() -> Self {
-		// Initialize the templater with the complete set of built-in lazy variables
-		Self {}
-	}
-}
 // #[cfg(test)]
 // mod tests {
 // 	use std::convert::{TryFrom, TryInto};
