@@ -1,6 +1,7 @@
 use crate::{
-	action::Output,
-	config::{Config, ConfigBuilder},
+	action::{Action, Output, Receipt},
+	batch::Batch,
+	config::Config,
 	context::{
 		services::{fs::manager::FileSystemManager, history::Journal},
 		Blackboard,
@@ -9,7 +10,11 @@ use crate::{
 		RunServices,
 		RunSettings,
 	},
+	errors::Error,
+	filter::Filter,
+	options::Options,
 	resource::Resource,
+	rule::{Rule, Stage},
 	templates::engine::Templater,
 };
 use anyhow::Result;
@@ -43,11 +48,10 @@ pub struct Engine {
 	services: RunServices,
 	settings: RunSettings,
 }
-const CONCURRENT_OPERATIONS: usize = 100;
 
 impl Engine {
 	pub async fn new(path: &Option<PathBuf>, settings: RunSettings, tags: &Option<Vec<String>>, ids: &Option<Vec<String>>) -> Result<Arc<Self>> {
-		let config = ConfigBuilder::new(path.clone())?.build(tags, ids)?;
+		let config = Config::new(path.clone(), tags, ids)?;
 
 		let services = RunServices {
 			blackboard: Blackboard::default(),
@@ -57,132 +61,198 @@ impl Engine {
 		Ok(Arc::new(Self { config, services, settings }))
 	}
 
-	// The signature is a simple `async fn` taking `&self`.
-	pub async fn run(self: Arc<Self>) -> Result<()> {
-		let session_id = self.services.journal.start_session(&self.config).await?;
-		for rule in self.config.rules.iter() {
-			for folder in rule.folders.iter() {
-				let engine = Arc::clone(&self);
+	pub async fn run(&self) -> Result<()> {
+		for rule in &self.config.rules {
+			self.process_rule(rule).await?;
+		}
+		Ok(())
+	}
+
+	async fn process_rule(&self, rule: &Rule) -> Result<()> {
+		for location in &rule.locations {
+			let ctx = &ExecutionContext {
+				services: &self.services,
+				scope: ExecutionScope::new_location_scope(&self.config, rule, location),
+				settings: &self.settings,
+			};
+			let path = location.partial_path().render(ctx).await.map(PathBuf::from)?;
+			location.initialize_path(path);
+			let final_options = Options::compile(&self.config.defaults, &rule.options, location.partial_options());
+			location.initialize_options(final_options);
+		}
+		let ctx = &ExecutionContext {
+			services: &self.services,
+			scope: ExecutionScope::new_rule_scope(&self.config, rule),
+			settings: &self.settings,
+		};
+		let mut initial_files = Vec::new();
+		for location in &rule.locations {
+			let mut paths_in_folder = location.get_resources(ctx).await?;
+			initial_files.append(&mut paths_in_folder);
+		}
+
+		// 3. INITIALIZE & RUN PIPELINE: Start the pipeline with a single batch.
+		let initial_batch = Batch::initial(initial_files);
+		self.process_pipeline(&rule.pipeline, vec![initial_batch], rule).await?;
+
+		Ok(())
+	}
+
+	async fn execute_filter_stage(&self, filter: &Box<dyn Filter>, batch: &Batch, rule: &Rule) -> Result<Vec<Arc<Resource>>> {
+		let passed = match filter.execution_model() {
+			ExecutionModel::Batch => {
+				let scope = ExecutionScope::new_batch_scope(&self.config, rule, &batch);
 				let ctx = ExecutionContext {
 					services: &self.services,
+					scope,
 					settings: &self.settings,
-					scope: ExecutionScope::new_folder_scope(&engine.config, rule, folder),
 				};
-				let resources = match folder.get_resources(&ctx).await {
-					Ok(resources) => resources,
-					Err(e) => {
-						tracing::warn!("Could not get resources from {}: {}", folder.path.display(), e);
-						continue;
-					}
-				};
+				filter.filter(&ctx).await?
+			}
+			ExecutionModel::Single => {
+				let mut futs = Vec::new();
+				for resource in &batch.files {
+					let resource_clone = resource.clone();
+					// We create a new future for each file using an `async move` block.
+					let fut = async move {
+						// All the data needed is moved into this block.
+						// The scope and context are now created and live only inside this future.
+						let scope = ExecutionScope::new_resource_scope(&self.config, rule, resource_clone);
+						let ctx = ExecutionContext {
+							services: &self.services,
+							scope,
+							settings: &self.settings,
+						};
+						// We await the filter's result *inside* the block.
+						filter.filter(&ctx).await
+					};
+					futs.push(fut);
+				}
 
-				// ---- Filtering Stage ----
-				// 1. Create a vector of futures without spawning them.
-				let filter_futures = resources
+				// `join_all` now runs our self-contained futures.
+				let results: Vec<Result<Vec<Arc<Resource>>, Error>> = future::join_all(futs).await;
+
+				// The rest of the logic for collecting results remains the same.
+				let passed_files = results
 					.into_iter()
-					.map(|resource| {
-						let engine = engine.clone();
-						let rule = rule.clone();
-						let folder = folder.clone();
-
-						tokio::spawn(async move {
-							let resource = resource.clone();
-							let ctx = ExecutionContext {
-								services: &engine.services,
-								settings: &engine.settings,
-								scope: ExecutionScope::new_resource_scope(&engine.config, &rule, &folder, resource.clone()),
-							};
-							let mut passed_all_filters = true;
-							for filter in &rule.filters {
-								if !filter.filter(&ctx).await {
-									passed_all_filters = false;
-									break;
-								}
-							}
-							if passed_all_filters {
-								Some(resource)
-							} else {
-								None
-							}
-						})
+					.filter_map(|res| match res {
+						Ok(filter_result) => Some(filter_result),
+						Err(e) => {
+							eprintln!("Filter error on a file, skipping it: {}", e);
+							None
+						}
 					})
-					.collect_vec();
-
-				let mut resources: Vec<Arc<Resource>> = future::join_all(filter_futures)
-					.await
-					.into_iter()
-					.filter_map(|a| a.ok())
 					.flatten()
 					.collect();
+				passed_files
+			}
+		};
+		Ok(passed)
+	}
 
-				// ---- Action Stage ----
-				for action in rule.actions.iter() {
-					resources = match action.execution_model() {
-						ExecutionModel::Single => {
-							// 1. Create a vector of action futures.
-							let action_futures = resources.into_iter().map(|resource| {
-								let engine = self.clone();
-								let action = action.clone();
-								let rule = rule.clone();
-								let folder = folder.clone();
+	/// Executes an action stage according to its execution model.
+	async fn execute_action_stage(&self, action: &Box<dyn Action>, batch: &Batch, rule: &Rule) -> Result<Receipt, Error> {
+		match action.execution_model() {
+			ExecutionModel::Batch => {
+				let scope = ExecutionScope::new_batch_scope(&self.config, rule, &batch);
+				let ctx = ExecutionContext {
+					services: &self.services,
+					scope,
+					settings: &self.settings,
+				};
+				action.commit(&ctx).await
+			}
+			ExecutionModel::Single => {
+				let mut futs = Vec::new();
+				for resource in &batch.files {
+					// Clone the Arc for the resource and any other needed data.
+					let resource_clone = resource.clone();
 
-								tokio::spawn(async move {
-									let ctx = ExecutionContext {
-										services: &engine.services,
-										settings: &engine.settings,
-										scope: ExecutionScope::new_resource_scope(&engine.config, &rule, &folder, resource),
-									};
-
-									let receipt = action.commit(&ctx).await?;
-
-									for output in &receipt.outputs {
-										match output {
-											Output::Created(resource) => {
-												engine
-													.services
-													.blackboard
-													.resources
-													.insert(resource.to_path_buf(), resource.clone())
-													.await;
-											}
-											Output::Modified(resource) | Output::Deleted(resource) => {
-												engine.services.blackboard.resources.remove(resource.as_path()).await;
-											}
-										};
-									}
-
-									engine
-										.services
-										.journal
-										.record_transaction(session_id, &action, &receipt)
-										.await?;
-
-									Ok(receipt.next)
-								})
-							});
-
-							stream::iter(action_futures)
-								.buffer_unordered(CONCURRENT_OPERATIONS)
-								.filter_map(|join_handle_result| async move {
-									join_handle_result
-										.ok()
-										.and_then(|action_execution_result: Result<Vec<Arc<Resource>>>| action_execution_result.ok())
-								})
-								.fold(Vec::new(), |mut acc, resources_vec| async move {
-									// For each Vec<Resource> that comes from the stream, extend the accumulator.
-									acc.extend(resources_vec);
-									acc
-								})
-								.await
-						}
-						ExecutionModel::Batch => {
-							todo!()
-						}
+					// Create a self-contained future with an `async move` block.
+					let fut = async move {
+						// All context is now created and owned within the future.
+						let scope = ExecutionScope::new_resource_scope(&self.config, rule, resource_clone);
+						let ctx = ExecutionContext {
+							services: &self.services,
+							scope,
+							settings: &self.settings,
+						};
+						action.commit(&ctx).await
 					};
+					futs.push(fut);
 				}
+
+				let results: Vec<Result<Receipt, Error>> = future::join_all(futs).await;
+				let mut combined_receipt = Receipt::default();
+
+				for result in results {
+					match result {
+						Ok(receipt) => {
+							combined_receipt.outputs.extend(receipt.outputs);
+							combined_receipt.inputs.extend(receipt.inputs);
+							combined_receipt.next.extend(receipt.next);
+							combined_receipt.undo.extend(receipt.undo);
+						}
+						Err(e) => {
+							// If any single action fails, we fail the entire batch.
+							// This is a safe default for actions.
+							return Err(e);
+						}
+					}
+				}
+				Ok(combined_receipt)
 			}
 		}
-		self.services.journal.end_session(session_id, "success").await?;
-		Ok(())
+	}
+
+	async fn process_pipeline(&self, pipeline: &[Stage], mut batches: Vec<Batch>, rule: &Rule) -> Result<()> {
+		if pipeline.is_empty() || batches.is_empty() {
+			return Ok(());
+		}
+
+		let (stage, next_pipeline) = pipeline.split_at(1);
+		let stage = &stage[0];
+		let mut next_batches = Vec::new();
+
+		match stage {
+			Stage::Filter(filter) => {
+				for batch in batches {
+					if let Ok(result) = self.execute_filter_stage(filter, &batch, rule).await {
+						if !result.is_empty() {
+							next_batches.push(Batch {
+								files: result,
+								context: batch.context,
+							});
+						}
+					}
+				}
+			}
+			Stage::Action(action) => {
+				for batch in batches {
+					if let Ok(result) = self.execute_action_stage(action, &batch, rule).await {
+						if !result.next.is_empty() {
+							// The action's result forms a new batch, but context is lost unless
+							// we explicitly design the action to pass it through.
+							next_batches.push(Batch::initial(result.next));
+						}
+					}
+				}
+			}
+			Stage::Grouper(grouper) => {
+				for batch in batches {
+					let mut grouped_sub_batches = grouper.group(&batch).await;
+					next_batches.append(&mut grouped_sub_batches);
+				}
+			}
+			Stage::Sorter(sorter) => {
+				for batch in &mut batches {
+					sorter.sort(&mut batch.files).await;
+				}
+				// The `next_batches` are the same batches, just with their internal file lists sorted.
+				next_batches = batches;
+			}
+		}
+
+		Box::pin(self.process_pipeline(next_pipeline, next_batches, rule)).await
 	}
 }

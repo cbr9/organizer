@@ -2,7 +2,14 @@ use async_trait::async_trait;
 use clap::ValueEnum;
 use dialoguer::{theme::ColorfulTheme, Input as RenameInput, Select};
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, ffi::OsStr, fmt::Debug, sync::Arc};
+use std::{
+	collections::HashMap,
+	ffi::OsStr,
+	fmt::Debug,
+	ops::Deref,
+	path::Path,
+	sync::{Arc, RwLock},
+};
 use strum::{Display, EnumIter, IntoEnumIterator};
 
 use anyhow::Result;
@@ -97,15 +104,23 @@ pub enum UndoConflict {
 	Rename,
 }
 
-async fn suggest_new_path(resource: &Resource) -> Result<Arc<Resource>> {
+async fn suggest_new_path(resource: Resource) -> Result<Resource> {
+	let parent = resource.as_path().parent().unwrap_or_else(|| Path::new(""));
+	let stem = resource.as_path().file_stem().unwrap_or_else(|| OsStr::new("file"));
+	let extension = resource.as_path().extension().unwrap_or_else(|| OsStr::new(""));
+
 	let mut count = 1;
 	loop {
-		let stem = resource.path.file_stem().unwrap_or_else(|| OsStr::new("file"));
-		let extension = resource.path.extension().unwrap_or_else(|| OsStr::new(""));
-		let new_name = format!("{} ({}).{}", stem.to_string_lossy(), count, extension.to_string_lossy());
-		let new_path = resource.path.with_file_name(new_name);
+		// 2. Construct the new filename purely from strings and path components.
+		let new_filename_str = format!("{} ({}).{}", stem.to_string_lossy(), count, extension.to_string_lossy());
+
+		// 3. Create a new PathBuf to check for existence. This does not touch the original `resource`.
+		let new_path = parent.join(&new_filename_str);
+
 		if !tokio::fs::try_exists(&new_path).await? {
-			return Ok(Arc::new(new_path.into()));
+			// 4. Once a valid path is found, consume the original `resource` exactly once
+			//    to create the final, evolved struct and return it. The loop is guaranteed to terminate here.
+			return Ok(resource.with_path(new_path));
 		}
 		count += 1;
 	}
@@ -114,7 +129,7 @@ async fn suggest_new_path(resource: &Resource) -> Result<Arc<Resource>> {
 impl UndoConflict {
 	/// This new method encapsulates all the conflict handling logic.
 	/// It takes a mutable reference to the destination to allow the Rename variant to change it.
-	pub async fn resolve(resource: Arc<Resource>) -> Result<Option<Arc<Resource>>, UndoError> {
+	pub async fn resolve(resource: Resource) -> Result<Option<Resource>, UndoError> {
 		let choices: Vec<Self> = Self::iter().collect();
 		let strategy: &UndoConflict = Select::with_theme(&ColorfulTheme::default())
 			.with_prompt(format!("Destination '{}' already exists.", resource.path.display()))
@@ -122,14 +137,14 @@ impl UndoConflict {
 			.interact()
 			.map(|choice| &choices[choice])
 			.expect("Unknown option");
-		strategy.handle(resource.clone()).await
+		strategy.handle(resource).await
 	}
 
-	pub async fn handle(&self, resource: Arc<Resource>) -> Result<Option<Arc<Resource>>, UndoError> {
+	pub async fn handle(&self, resource: Resource) -> Result<Option<Resource>, UndoError> {
 		match self {
 			UndoConflict::Overwrite => {
 				// The logic for overwriting the destination file.
-				if resource.is_file() {
+				if resource.as_path().is_file() {
 					tokio::fs::remove_file(resource.as_path()).await?;
 				} else {
 					tokio::fs::remove_dir_all(resource.as_path()).await?;
@@ -139,15 +154,17 @@ impl UndoConflict {
 			UndoConflict::Rename => {
 				// The logic for prompting the user and renaming the destination.
 				let theme = ColorfulTheme::default();
-				let input: String = RenameInput::with_theme(&theme)
+				let input = RenameInput::<String>::with_theme(&theme)
 					.with_prompt("Enter a new name for the destination")
-					.with_initial_text(format!("{}", resource.file_name().unwrap_or_default().display()))
-					.interact_text()?;
-				Ok(Some(Arc::new(Resource::from(resource.with_file_name(input)))))
+					.with_initial_text(format!("{}", resource.as_path().file_name().unwrap_or_default().display()))
+					.interact_text()
+					.map(PathBuf::from)?;
+				let new = resource.with_path(input);
+				Ok(Some(new))
 			}
 			UndoConflict::Skip => Ok(None),
 			UndoConflict::Abort => Err(UndoError::Abort),
-			UndoConflict::AutoRename => Ok(Some(suggest_new_path(&resource).await?)),
+			UndoConflict::AutoRename => Ok(Some(suggest_new_path(resource).await?)),
 		}
 	}
 }

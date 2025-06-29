@@ -1,53 +1,34 @@
 use std::collections::HashSet;
 
 use itertools::Itertools;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 
 use crate::{
 	action::Action,
+	common::enabled,
 	filter::Filter,
-	folder::{Folder, FolderBuilder},
+	grouper::Grouper,
 	options::OptionsBuilder,
+	sorter::Sorter,
+	storage::Location,
 	templates::prelude::*,
 };
 
-#[derive(Deserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
-pub struct RuleBuilder {
+pub struct Rule {
 	pub id: Option<String>,
 	#[serde(default)]
 	pub tags: Vec<String>,
-	pub actions: Vec<Box<dyn Action>>,
-	#[serde(default)]
-	pub filters: Vec<Box<dyn Filter>>,
-	pub folders: Vec<FolderBuilder>,
+	pub pipeline: Vec<Stage>,
+	pub locations: Vec<Box<dyn Location>>,
 	#[serde(flatten)]
 	pub options: OptionsBuilder,
-	#[serde(default)]
-	pub variables: Vec<Box<dyn Variable>>,
+	#[serde(default = "enabled")]
+	pub enabled: bool,
 }
 
-impl RuleBuilder {
-	pub fn build(self, index: usize, defaults: &OptionsBuilder) -> anyhow::Result<Rule> {
-		let folders = self
-			.folders
-			.iter()
-			.cloned()
-			.enumerate()
-			.filter_map(|(idx, builder)| builder.build(idx, defaults, &self.options).ok()) // Pass this rule's options builder
-			.collect_vec();
-
-		Ok(Rule {
-			index,
-			id: self.id,
-			tags: self.tags,
-			actions: self.actions,
-			filters: self.filters,
-			variables: self.variables,
-			folders, // Contains fully compiled Folders, each with its own Options
-		})
-	}
-
+impl Rule {
 	/// Checks if a single rule should be run based on pre-compiled sets of chosen tags.
 	pub fn matches_tags(&self, positive_tags: &HashSet<String>, negative_tags: &HashSet<String>) -> bool {
 		// Rule is disqualified if it contains any of the negative tags.
@@ -77,13 +58,51 @@ impl RuleBuilder {
 	}
 }
 
-#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
-pub struct Rule {
-	pub index: usize,
-	pub id: Option<String>,
-	pub tags: Vec<String>,
-	pub actions: Vec<Box<dyn Action>>,
-	pub filters: Vec<Box<dyn Filter>>,
-	pub variables: Vec<Box<dyn Variable>>,
-	pub folders: Vec<Folder>,
+#[derive(Debug, Serialize, PartialEq, Eq, Clone)]
+pub enum Stage {
+	Action(Box<dyn Action>),
+	Filter(Box<dyn Filter>),
+	Grouper(Box<dyn Grouper>),
+	Sorter(Box<dyn Sorter>),
+}
+
+impl<'de> Deserialize<'de> for Stage {
+	fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+	where
+		D: Deserializer<'de>,
+	{
+		#[derive(Deserialize, Debug, Default)]
+		#[serde(deny_unknown_fields)]
+		struct StageHelper {
+			#[serde(default, skip_serializing_if = "Option::is_none")]
+			action: Option<Box<dyn Action>>,
+			#[serde(default, skip_serializing_if = "Option::is_none")]
+			filter: Option<Box<dyn Filter>>,
+			#[serde(default, skip_serializing_if = "Option::is_none", rename = "group-by")]
+			grouper: Option<Box<dyn Grouper>>,
+			#[serde(default, skip_serializing_if = "Option::is_none", rename = "sort-by")]
+			sorter: Option<Box<dyn Sorter>>,
+		}
+
+		let helper = StageHelper::deserialize(deserializer)?;
+		let count = helper.action.is_some() as u8 + helper.filter.is_some() as u8 + helper.grouper.is_some() as u8 + helper.sorter.is_some() as u8;
+
+		if count != 1 {
+			return Err(serde::de::Error::custom(
+				"A stage must have exactly one key: 'action', 'filter', 'folders', 'group-by', or 'sort-by'",
+			));
+		}
+
+		if let Some(action) = helper.action {
+			Ok(Stage::Action(action))
+		} else if let Some(filter) = helper.filter {
+			Ok(Stage::Filter(filter))
+		} else if let Some(grouper) = helper.grouper {
+			Ok(Stage::Grouper(grouper))
+		} else if let Some(sorter) = helper.sorter {
+			Ok(Stage::Sorter(sorter))
+		} else {
+			unreachable!();
+		}
+	}
 }

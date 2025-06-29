@@ -6,12 +6,15 @@ use std::{any::Any, path::PathBuf, sync::Arc, time::Duration};
 pub mod services;
 
 use crate::{
+	batch::Batch,
 	config::Config,
 	context::services::{fs::manager::FileSystemManager, history::Journal},
 	errors::Error,
 	folder::Folder,
+	options::Options,
 	resource::Resource,
 	rule::Rule,
+	storage::Location,
 };
 
 #[derive(Debug, Clone)]
@@ -21,23 +24,17 @@ pub struct RunServices {
 	pub journal: Arc<Journal>,
 }
 
-#[derive(PartialEq, Eq, Hash, Clone, Debug)]
-pub struct VariableCacheKey {
-	pub rule_index: usize,
-	pub variable: String,
-	pub resource: Resource,
-}
-
 #[derive(Debug, Clone)]
 pub struct Blackboard {
 	pub scratchpad: Arc<DashMap<String, Box<dyn Any + Send + Sync>>>,
-	pub resources: Cache<PathBuf, Arc<Resource>>,
+	pub shared_context: Arc<DashMap<String, String>>,
 }
 
 impl Default for Blackboard {
 	fn default() -> Self {
 		Self {
 			scratchpad: Arc::new(DashMap::new()),
+			shared_context: Arc::new(DashMap::new()),
 			resources: CacheBuilder::new(1_000_000)
 				.time_to_live(Duration::new(60 * 60 * 24, 0)) // ONE DAY
 				.name("cached_resources")
@@ -66,7 +63,7 @@ pub struct RunSettings {
 pub enum ExecutionScope<'a> {
 	Config(ConfigScope<'a>),
 	Rule(RuleScope<'a>),
-	Folder(FolderScope<'a>),
+	Location(LocationScope<'a>),
 	Resource(ResourceScope<'a>),
 	Batch(BatchScope<'a>),
 }
@@ -80,30 +77,25 @@ impl<'a> ExecutionScope<'a> {
 		ExecutionScope::Rule(RuleScope { config, rule })
 	}
 
-	pub fn new_folder_scope(config: &'a Config, rule: &'a Rule, folder: &'a Folder) -> ExecutionScope<'a> {
-		ExecutionScope::Folder(FolderScope { config, rule, folder })
+	pub fn new_location_scope(config: &'a Config, rule: &'a Rule, location: &'a Box<dyn Location>) -> ExecutionScope<'a> {
+		ExecutionScope::Location(LocationScope { config, rule, location })
 	}
 
-	pub fn new_resource_scope(config: &'a Config, rule: &'a Rule, folder: &'a Folder, resource: Arc<Resource>) -> ExecutionScope<'a> {
-		ExecutionScope::Resource(ResourceScope {
-			config,
-			rule,
-			folder,
-			resource,
-		})
+	pub fn new_resource_scope(config: &'a Config, rule: &'a Rule, resource: Arc<Resource>) -> ExecutionScope<'a> {
+		ExecutionScope::Resource(ResourceScope { config, rule, resource })
 	}
 
-	pub fn new_batch_scope(config: &'a Config, rule: &'a Rule, folder: &'a Folder, batch: Vec<Arc<Resource>>) -> ExecutionScope<'a> {
-		ExecutionScope::Batch(BatchScope { config, rule, folder, batch })
+	pub fn new_batch_scope(config: &'a Config, rule: &'a Rule, batch: &'a Batch) -> ExecutionScope<'a> {
+		ExecutionScope::Batch(BatchScope { config, rule, batch })
 	}
 
 	pub fn config(&self) -> Result<&'a Config, Error> {
 		match self {
 			ExecutionScope::Config(scope) => Ok(scope.config),
 			ExecutionScope::Rule(scope) => Ok(scope.config),
-			ExecutionScope::Folder(scope) => Ok(scope.config),
 			ExecutionScope::Resource(scope) => Ok(scope.config),
 			ExecutionScope::Batch(scope) => Ok(scope.config),
+			ExecutionScope::Location(scope) => Ok(scope.config),
 		}
 	}
 
@@ -111,19 +103,9 @@ impl<'a> ExecutionScope<'a> {
 		match self {
 			ExecutionScope::Config(_scope) => Err(Error::OutOfScope("rule".into())),
 			ExecutionScope::Rule(scope) => Ok(scope.rule),
-			ExecutionScope::Folder(scope) => Ok(scope.rule),
 			ExecutionScope::Resource(scope) => Ok(scope.rule),
 			ExecutionScope::Batch(scope) => Ok(scope.rule),
-		}
-	}
-
-	pub fn folder(&self) -> Result<&'a Folder, Error> {
-		match self {
-			ExecutionScope::Config(_scope) => Err(Error::OutOfScope("folder".into())),
-			ExecutionScope::Rule(_scope) => Err(Error::OutOfScope("folder".into())),
-			ExecutionScope::Folder(scope) => Ok(scope.folder),
-			ExecutionScope::Resource(scope) => Ok(scope.folder),
-			ExecutionScope::Batch(scope) => Ok(scope.folder),
+			ExecutionScope::Location(scope) => Ok(scope.rule),
 		}
 	}
 
@@ -131,19 +113,19 @@ impl<'a> ExecutionScope<'a> {
 		match self {
 			ExecutionScope::Config(_scope) => Err(Error::OutOfScope("resource".into())),
 			ExecutionScope::Rule(_scope) => Err(Error::OutOfScope("resource".into())),
-			ExecutionScope::Folder(_scope) => Err(Error::OutOfScope("resource".into())),
+			ExecutionScope::Location(_scope) => Err(Error::OutOfScope("resource".into())),
 			ExecutionScope::Resource(scope) => Ok(scope.resource.clone()),
 			ExecutionScope::Batch(_scope) => Err(Error::OutOfScope("resource".into())),
 		}
 	}
 
-	pub fn batch(&self) -> Result<Vec<Arc<Resource>>, Error> {
+	pub fn batch(&self) -> Result<&'a Batch, Error> {
 		match self {
 			ExecutionScope::Config(_scope) => Err(Error::OutOfScope("batch".into())),
 			ExecutionScope::Rule(_scope) => Err(Error::OutOfScope("batch".into())),
-			ExecutionScope::Folder(_scope) => Err(Error::OutOfScope("batch".into())),
+			ExecutionScope::Location(_scope) => Err(Error::OutOfScope("batch".into())),
 			ExecutionScope::Resource(_scope) => Err(Error::OutOfScope("batch".into())),
-			ExecutionScope::Batch(scope) => Ok(scope.batch.clone()),
+			ExecutionScope::Batch(scope) => Ok(scope.batch),
 		}
 	}
 }
@@ -158,24 +140,22 @@ pub struct RuleScope<'a> {
 	pub rule: &'a Rule,
 }
 #[derive(Debug, Clone)]
-pub struct FolderScope<'a> {
+pub struct LocationScope<'a> {
 	pub config: &'a Config,
 	pub rule: &'a Rule,
-	pub folder: &'a Folder,
+	pub location: &'a Box<dyn Location>,
 }
 #[derive(Debug, Clone)]
 pub struct ResourceScope<'a> {
 	pub config: &'a Config,
 	pub rule: &'a Rule,
-	pub folder: &'a Folder,
 	pub resource: Arc<Resource>,
 }
 #[derive(Debug, Clone)]
 pub struct BatchScope<'a> {
 	pub config: &'a Config,
 	pub rule: &'a Rule,
-	pub folder: &'a Folder,
-	pub batch: Vec<Arc<Resource>>,
+	pub batch: &'a Batch,
 }
 
 /// The top-level context object, composed of the three distinct categories of information.
@@ -233,45 +213,3 @@ pub struct ExecutionContext<'a> {
 // }
 // Provide `Default` implementations for the final, compiled structs.
 // These are only compiled for tests and allow for easy instantiation of dummy objects.
-#[cfg(test)]
-impl Default for Config {
-	fn default() -> Self {
-		use std::path::PathBuf;
-
-		Self {
-			rules: Vec::new(),
-			path: PathBuf::new(),
-			variables: vec![],
-		}
-	}
-}
-
-#[cfg(test)]
-impl Default for Rule {
-	fn default() -> Self {
-		Self {
-			id: None,
-			index: 0,
-			tags: Default::default(),
-			actions: Default::default(),
-			filters: Default::default(),
-			folders: Default::default(),
-			variables: Default::default(),
-		}
-	}
-}
-
-#[cfg(test)]
-impl Default for Folder {
-	fn default() -> Self {
-		use std::path::PathBuf;
-
-		use crate::options::Options;
-
-		Self {
-			index: 0,
-			path: PathBuf::new(),
-			settings: Options::default(),
-		}
-	}
-}

@@ -134,10 +134,14 @@ enum Value {
 }
 
 // The main conversion function
-fn convert_template_path_to_variable_arg_json(path_segments: &[String]) -> Option<Value> {
+fn convert_template_path_to_variable_arg_json(path_segments: &[String]) -> Option<serde_json::Value> {
 	if path_segments.is_empty() {
 		// No arguments provided (e.g., `{{ sys }}`), so Args should be None.
 		return None;
+	}
+
+	if path_segments.len() == 1 {
+		return Some(serde_json::to_value(&path_segments[0]).unwrap());
 	}
 
 	// The first segment is the top-level variant key (e.g., "os", "host", "path").
@@ -159,7 +163,7 @@ fn convert_template_path_to_variable_arg_json(path_segments: &[String]) -> Optio
 	// Construct the JSON object: {"top_level_key": inner_value_for_variant}
 	let mut map = HashMap::new();
 	map.insert(top_level_key, inner_value_for_variant);
-	Some(Value::Map(map.into())) // Convert HashMap to serde_json::Map for Value::Object
+	Some(serde_json::to_value(map).unwrap()) // Convert HashMap to serde_json::Map for Value::Object
 }
 
 impl FromStr for Template {
@@ -190,11 +194,12 @@ impl FromStr for Template {
 						let variable: Box<dyn Variable> = match serde_json::from_value(json_input) {
 							Ok(variable) => variable,
 							Err(e) => {
+								tracing::error!("{}", e);
 								return Err(Error::TemplateError(TemplateError::DeserializationError {
 									source: e,
 									variable: var_name,
 									fields: fields,
-								}))
+								}));
 							}
 						};
 						segments.push(Piece::Variable(variable));

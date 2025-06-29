@@ -1,33 +1,37 @@
 use config::{Config as LayeredConfig, File};
 use itertools::Itertools;
-use std::{collections::HashSet, path::PathBuf};
+use std::{collections::HashSet, path::PathBuf, sync::OnceLock};
+use tokio::sync::OnceCell;
 
 use anyhow::{anyhow, Context as ErrorContext, Result};
 use serde::{Deserialize, Serialize};
 
-use crate::{
-	options::OptionsBuilder,
-	rule::{Rule, RuleBuilder},
-	templates::variable::Variable,
-	PROJECT_NAME,
-};
+use crate::{options::OptionsBuilder, rule::Rule, templates::variable::Variable, PROJECT_NAME};
 
-#[derive(Deserialize, Clone, Debug)]
+#[derive(Deserialize, Serialize, Clone, Debug)]
 #[serde(deny_unknown_fields)]
-pub struct ConfigBuilder {
-	#[serde(default)]
-	pub variables: Vec<Box<dyn Variable>>,
-	pub rules: Vec<RuleBuilder>,
+pub struct Config {
+	pub rules: Vec<Rule>,
 	#[serde(flatten)]
 	pub defaults: OptionsBuilder,
 	#[serde(skip)]
-	path: Option<PathBuf>,
+	pub path: OnceCell<PathBuf>,
 }
 
-impl ConfigBuilder {
-	/// Consumes the builder and returns a final, validated `Config`.
-	/// The `defaults` are used in the build process but are not stored in the final `Config`.
-	pub fn build(self, tags: &Option<Vec<String>>, ids: &Option<Vec<String>>) -> Result<Config> {
+impl Config {
+	pub fn new(path: Option<PathBuf>, tags: &Option<Vec<String>>, ids: &Option<Vec<String>>) -> Result<Config> {
+		let path = Self::resolve_path(path);
+		if !path.exists() {
+			return Err(anyhow!("Configuration file not found at {}", path.display()));
+		}
+
+		let config = LayeredConfig::builder()
+			.add_source(File::from(path.clone()))
+			.build()?
+			.try_deserialize::<Config>()?;
+
+		config.path.set(path).unwrap();
+
 		let mut positive_tags = HashSet::new();
 		let mut negative_tags = HashSet::new();
 		if let Some(tags) = tags {
@@ -54,35 +58,20 @@ impl ConfigBuilder {
 				.collect();
 		}
 
-		let rules = self
+		let rules = config
 			.rules
 			.iter()
+			.filter(|rule| rule.matches_tags(&positive_tags, &negative_tags))
+			.filter(|rule| rule.matches_ids(&positive_ids, &negative_ids))
+			.filter(|rule| rule.enabled)
 			.cloned()
-			.enumerate()
-			.filter(|(_, rule)| rule.matches_tags(&positive_tags, &negative_tags))
-			.filter(|(_, rule)| rule.matches_ids(&positive_ids, &negative_ids))
-			.filter_map(|(idx, rule)| rule.build(idx, &self.defaults).ok())
 			.collect_vec();
 
 		Ok(Config {
 			rules,
-			path: self.path.unwrap(),
-			variables: self.variables,
+			defaults: config.defaults,
+			path: config.path,
 		})
-	}
-
-	pub fn new(path: Option<PathBuf>) -> Result<Self> {
-		let path = Self::resolve_path(path);
-		if !path.exists() {
-			return Err(anyhow!("Configuration file not found at {}", path.display()));
-		}
-
-		let mut builder = LayeredConfig::builder()
-			.add_source(File::from(path.clone()))
-			.build()?
-			.try_deserialize::<ConfigBuilder>()?;
-		builder.path = Some(path);
-		Ok(builder)
 	}
 
 	pub fn resolve_path(path: Option<PathBuf>) -> PathBuf {
@@ -102,15 +91,6 @@ impl ConfigBuilder {
 		}
 	}
 }
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct Config {
-	pub rules: Vec<Rule>,
-	pub path: PathBuf,
-	pub variables: Vec<Box<dyn Variable>>,
-}
-
-impl Config {}
 
 // #[cfg(test)]
 // mod tests {

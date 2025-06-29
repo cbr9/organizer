@@ -21,8 +21,6 @@ pub struct Run {
 	dry_run: bool,
 	#[arg(long, conflicts_with = "dry_run")]
 	no_dry_run: bool,
-	#[arg(long, short = 'v')]
-	verbose: bool,
 }
 
 #[async_trait]
@@ -31,11 +29,8 @@ impl Cmd for Run {
 		if self.no_dry_run {
 			self.dry_run = false;
 		}
-
 		let settings = RunSettings { dry_run: self.dry_run };
-
 		let engine = Engine::new(&self.config, settings, &self.tags, &self.ids).await?;
-		logs::init(self.verbose, &engine.config.path);
 		engine.run().await?;
 
 		Ok(())

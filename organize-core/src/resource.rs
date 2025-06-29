@@ -6,16 +6,16 @@ use std::{
 	fs::Metadata,
 	hash::Hash,
 	path::{Path, PathBuf},
-	sync::OnceLock,
+	sync::{Arc, OnceLock},
 };
 use tokio::{fs::File, io::AsyncReadExt};
 
-use crate::{context::ExecutionContext, errors::Error};
+use crate::{context::ExecutionContext, errors::Error, folder::Folder, storage::Location};
 
 #[derive(Debug, Default, Clone)]
 pub enum FileState {
-	#[default]
 	Unknown,
+	#[default]
 	Exists,
 	Deleted,
 }
@@ -23,8 +23,7 @@ pub enum FileState {
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Resource {
 	pub path: PathBuf,
-	#[serde(skip)]
-	pub state: FileState,
+	pub location: Arc<dyn Location>,
 	#[serde(skip)]
 	mime: OnceLock<String>,
 	#[serde(skip)]
@@ -33,14 +32,6 @@ pub struct Resource {
 	hash: OnceLock<String>,
 	#[serde(skip)]
 	metadata: OnceLock<Metadata>,
-}
-
-impl std::ops::Deref for Resource {
-	type Target = PathBuf;
-
-	fn deref(&self) -> &Self::Target {
-		&self.path
-	}
 }
 
 impl AsRef<Path> for Resource {
@@ -70,6 +61,32 @@ impl Hash for Resource {
 impl Eq for Resource {}
 
 impl Resource {
+	pub fn as_path(&self) -> &Path {
+		self.path.as_path()
+	}
+
+	pub fn with_filename(self, filename: &str) -> Self {
+		let new_path = self.path.with_file_name(filename);
+		self.with_path(new_path)
+	}
+
+	pub fn with_path(self, new_path: PathBuf) -> Self {
+		Self {
+			path: new_path,
+			location: self.location, // The origin root folder remains the same.
+
+			// The content, hash, and MIME type of a file do not change when it is moved.
+			// We can move these initialized OnceLock fields to the new struct to preserve the cache.
+			content: self.content,
+			hash: self.hash,
+			mime: self.mime,
+
+			// The filesystem metadata (like modification times of parent dirs) IS different
+			// at the new location. We reset this field to force a re-fetch if needed.
+			metadata: OnceLock::new(),
+		}
+	}
+
 	pub fn get_mime(&self) -> &str {
 		match self.mime.get() {
 			Some(mime) => mime.as_str(),
@@ -126,32 +143,6 @@ impl Resource {
 	}
 }
 
-impl From<&Path> for Resource {
-	fn from(value: &Path) -> Self {
-		Self {
-			path: value.to_path_buf().clean(),
-			state: FileState::default(),
-			mime: OnceLock::new(),
-			content: OnceLock::new(),
-			hash: OnceLock::new(),
-			metadata: OnceLock::new(),
-		}
-	}
-}
-
-impl From<PathBuf> for Resource {
-	fn from(value: PathBuf) -> Self {
-		Self {
-			path: value.to_path_buf().clean(),
-			state: FileState::default(),
-			mime: OnceLock::new(),
-			content: OnceLock::new(),
-			hash: OnceLock::new(),
-			metadata: OnceLock::new(),
-		}
-	}
-}
-
 // impl Serialize for Resource {
 // 	fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
 // 	where
@@ -163,21 +154,20 @@ impl From<PathBuf> for Resource {
 // }
 //
 impl Resource {
-	pub fn new(path: &Path) -> Self {
-		Self::from(path)
-	}
-
-	#[cfg(test)]
-	pub fn new_tmp(filename: &str) -> Self {
-		use tempfile::tempdir;
-		let dir = tempdir().unwrap();
-		let path = dir.path().join(filename);
-		Self::from(path)
+	pub fn new(path: &PathBuf, location: Arc<dyn Location>) -> Self {
+		Self {
+			path: path.clone(),
+			location,
+			mime: OnceLock::new(),
+			content: OnceLock::new(),
+			hash: OnceLock::new(),
+			metadata: OnceLock::new(),
+		}
 	}
 
 	pub async fn try_exists(&self, ctx: &ExecutionContext<'_>) -> Result<bool, Error> {
 		if ctx.settings.dry_run {
-			return match self.state {
+			return match ctx.services.fs.tracked_files.get(self.as_path()) {
 				FileState::Exists => Ok(true),
 				FileState::Deleted => Ok(false),
 				FileState::Unknown => Ok(tokio::fs::try_exists(&self.path).await?),

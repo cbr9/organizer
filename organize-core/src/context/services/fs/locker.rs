@@ -22,10 +22,10 @@ impl Locker {
 		action: F,
 	) -> Result<Option<T>, Error>
 	where
-		F: FnOnce(Arc<Resource>) -> Fut,
+		F: FnOnce(PathBuf) -> Fut,
 		Fut: Future<Output = Result<T, Error>>,
 	{
-		let mut path = destination.get_final_path(ctx).await?;
+		let mut path = destination.resolve(ctx).await?;
 		let mut n = 1;
 
 		let reserved = loop {
@@ -47,7 +47,13 @@ impl Locker {
 				}
 			}
 
-			if Resource::from(path.clone()).try_exists(ctx).await? {
+			let exists = if let Some(res) = ctx.services.blackboard.resources.get(&path).await {
+				res.try_exists(ctx).await?
+			} else {
+				tokio::fs::try_exists(&path).await?
+			};
+
+			if exists {
 				match strategy {
 					ConflictResolution::Skip => return Ok(None),
 					ConflictResolution::Overwrite => {
@@ -79,7 +85,7 @@ impl Locker {
 
 		if let Some(target) = reserved {
 			ctx.services.fs.ensure_parent_dir_exists(&target).await?;
-			let result = action(Arc::new(Resource::from(target.clone()))).await?;
+			let result = action(target.clone()).await?;
 
 			self.active_paths.remove(&target.to_path_buf());
 

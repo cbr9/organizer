@@ -28,7 +28,7 @@ impl Variable for Config {
 	async fn compute(&self, ctx: &ExecutionContext<'_>) -> Result<serde_json::Value, Error> {
 		let config = ctx.scope.config()?;
 		match &self.args {
-			Args::Path => Ok(serde_json::to_value(&config.path)?),
+			Args::Path => Ok(serde_json::to_value(&config.path.get().unwrap())?),
 		}
 	}
 }

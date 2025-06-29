@@ -20,7 +20,8 @@ impl Variable for Root {
 	}
 
 	async fn compute(&self, ctx: &ExecutionContext<'_>) -> Result<serde_json::Value, Error> {
-		let folder = ctx.scope.folder()?;
-		Ok(serde_json::to_value(&folder.path.clean())?)
+		let resource = ctx.scope.resource()?;
+		let location = resource.location.path();
+		Ok(serde_json::to_value(&location.clean())?)
 	}
 }

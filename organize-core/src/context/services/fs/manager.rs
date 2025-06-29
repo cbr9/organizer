@@ -19,14 +19,20 @@ pub struct Destination {
 }
 
 impl Destination {
-	pub async fn get_final_path(&self, ctx: &ExecutionContext<'_>) -> Result<PathBuf, Error> {
+	pub async fn resolve(&self, ctx: &ExecutionContext<'_>) -> Result<PathBuf, Error> {
 		let folder = self.folder.render(ctx).await?;
 
 		let mut folder = PathBuf::from(folder).clean();
 		let filename = if let Some(filename) = &self.filename {
 			filename.render(ctx).await?
 		} else {
-			ctx.scope.resource()?.file_name().unwrap().to_string_lossy().to_string()
+			ctx.scope
+				.resource()?
+				.as_path()
+				.file_name()
+				.unwrap()
+				.to_string_lossy()
+				.to_string()
 		};
 
 		let filename = PathBuf::from(filename).clean();
@@ -38,6 +44,8 @@ impl Destination {
 #[derive(Debug, Clone, Default)]
 pub struct FileSystemManager {
 	pub locker: Locker,
+	pub resources: Cache<PathBuf, Arc<Resource>>,
+	pub tracked_files: Cache<PathBuf, FileState>
 }
 
 impl FileSystemManager {
@@ -52,7 +60,7 @@ impl FileSystemManager {
 
 	pub async fn r#move(&self, source: Arc<Resource>, destination: Arc<Resource>) -> Result<(), Error> {
 		// Attempt a direct rename first
-		self.ensure_parent_dir_exists(&destination).await?;
+		self.ensure_parent_dir_exists(destination.as_path()).await?;
 		match tokio::fs::rename(source.as_path(), destination.as_path()).await {
 			Ok(_) => Ok(()),
 			Err(e) if e.raw_os_error() == Some(libc::EXDEV) || e.kind() == std::io::ErrorKind::CrossesDevices => {
@@ -60,8 +68,8 @@ impl FileSystemManager {
 				// This means source and destination are on different file systems.
 				tracing::warn!(
 					"Attempting copy-then-delete for move operation due to cross-device link: {} to {}",
-					source.display(),
-					destination.display()
+					source.as_path().display(),
+					destination.as_path().display()
 				);
 
 				// Perform copy

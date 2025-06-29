@@ -65,26 +65,27 @@ impl Cmd for Undo {
 						}
 						Err(e) => {
 							if let Some(source) = e.source().and_then(|s| s.downcast_ref::<UndoError>())
-								&& matches!(source, UndoError::Abort) {
-									let inputs = transaction
-										.receipt
-										.inputs
-										.iter()
-										.map(|input: &Input| match input {
-											Input::Processed(resource) => resource.to_string_lossy().to_string(),
-											Input::Skipped(resource) => resource.to_string_lossy().to_string(),
-										})
-										.collect::<Vec<String>>()
-										.join("\n -");
+								&& matches!(source, UndoError::Abort)
+							{
+								let inputs = transaction
+									.receipt
+									.inputs
+									.iter()
+									.map(|input: &Input| match input {
+										Input::Processed(resource) => resource.as_path().to_string_lossy().to_string(),
+										Input::Skipped(resource) => resource.as_path().to_string_lossy().to_string(),
+									})
+									.collect::<Vec<String>>()
+									.join("\n -");
 
-									eprintln!(
-										"There was a conflict undoing transaction {}.\nOne of the following files may already exist: \n - \
-										 {}\nAborting undo process. Run in interactive mode or choose a default conflict resolution strategy. You \
-										 can also move the file manually.",
-										transaction.id, inputs
-									);
-									return Ok(());
-								}
+								eprintln!(
+									"There was a conflict undoing transaction {}.\nOne of the following files may already exist: \n - {}\nAborting \
+									 undo process. Run in interactive mode or choose a default conflict resolution strategy. You can also move the \
+									 file manually.",
+									transaction.id, inputs
+								);
+								return Ok(());
+							}
 
 							eprintln!("Failed to undo transaction {}: {}", transaction.id, e);
 							return Err(e.into());

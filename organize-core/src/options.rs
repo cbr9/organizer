@@ -3,7 +3,7 @@ use std::fmt::Debug;
 
 use crate::{templates::prelude::Template, utils::backup::BackupLocation};
 
-#[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Deserialize, Default, Serialize, Debug, Clone, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct OptionsBuilder {
 	pub max_depth: Option<usize>,

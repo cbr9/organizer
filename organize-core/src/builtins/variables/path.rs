@@ -1,3 +1,5 @@
+use std::os::windows::fs::MetadataExt;
+
 use crate::{context::ExecutionContext, errors::Error, templates::prelude::*};
 use anyhow::Result;
 use async_trait::async_trait;
@@ -13,10 +15,11 @@ enum Args {
 	Extension,
 	Name,
 	Path,
+	Metadata,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
-pub struct File(Option<Args>);
+pub struct File(Args);
 
 #[async_trait]
 #[typetag::serde(name = "file")]
@@ -26,18 +29,19 @@ impl Variable for File {
 	}
 
 	async fn compute(&self, ctx: &ExecutionContext<'_>) -> Result<serde_json::Value, Error> {
-		let Some(arg) = &self.0 else {
-			return Err(Error::TemplateError(TemplateError::MissingField {
-				variable: self.name(),
-				fields: Args::iter().join(", "),
-			}));
-		};
+		// let Some(arg) = &self.0 else {
+		// 	return Err(Error::TemplateError(TemplateError::MissingField {
+		// 		variable: self.name(),
+		// 		fields: Args::iter().join(", "),
+		// 	}));
+		// };
 		let resource = ctx.scope.resource()?;
-		match arg {
+		match &self.0 {
 			Args::Stem => Ok(serde_json::to_value(resource.as_path().file_stem().unwrap().to_string_lossy())?),
 			Args::Extension => Ok(serde_json::to_value(resource.as_path().extension().unwrap().to_string_lossy())?),
 			Args::Name => todo!(),
-			Args::Path => todo!(),
+			Args::Path => Ok(serde_json::to_value(resource.as_path())?),
+			Args::Metadata => todo!(),
 		}
 	}
 }
