@@ -3,7 +3,7 @@ use dyn_clone::DynClone;
 use dyn_eq::DynEq;
 use std::{fmt::Debug, sync::Arc};
 
-use crate::{batch::Batch, resource::Resource};
+use crate::resource::Resource;
 
 dyn_clone::clone_trait_object!(Sorter);
 dyn_eq::eq_trait_object!(Sorter);

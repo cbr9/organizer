@@ -1,4 +1,3 @@
-use path_clean::PathClean;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::{
@@ -10,7 +9,7 @@ use std::{
 };
 use tokio::{fs::File, io::AsyncReadExt};
 
-use crate::{context::ExecutionContext, errors::Error, folder::Folder, storage::Location};
+use crate::{context::ExecutionContext, errors::Error, folder::Location};
 
 #[derive(Debug, Default, Clone)]
 pub enum FileState {
@@ -23,11 +22,11 @@ pub enum FileState {
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Resource {
 	pub path: PathBuf,
-	pub location: Arc<dyn Location>,
+	pub location: Arc<Location>,
 	#[serde(skip)]
 	mime: OnceLock<String>,
 	#[serde(skip)]
-	content: OnceLock<Vec<u8>>,
+	bytes: OnceLock<Vec<u8>>,
 	#[serde(skip)]
 	hash: OnceLock<String>,
 	#[serde(skip)]
@@ -77,7 +76,7 @@ impl Resource {
 
 			// The content, hash, and MIME type of a file do not change when it is moved.
 			// We can move these initialized OnceLock fields to the new struct to preserve the cache.
-			content: self.content,
+			bytes: self.bytes,
 			hash: self.hash,
 			mime: self.mime,
 
@@ -109,13 +108,13 @@ impl Resource {
 		}
 	}
 
-	pub async fn get_content(&self) -> &Vec<u8> {
-		match self.content.get() {
+	pub async fn get_bytes(&self) -> &Vec<u8> {
+		match self.bytes.get() {
 			Some(content) => content,
 			None => {
 				let content = tokio::fs::read(&self.path).await.unwrap();
-				self.content.set(content).unwrap();
-				self.content.get().unwrap()
+				self.bytes.set(content).unwrap();
+				self.bytes.get().unwrap()
 			}
 		}
 	}
@@ -154,12 +153,12 @@ impl Resource {
 // }
 //
 impl Resource {
-	pub fn new(path: &PathBuf, location: Arc<dyn Location>) -> Self {
+	pub fn new(path: &PathBuf, location: Arc<Location>) -> Self {
 		Self {
 			path: path.clone(),
 			location,
 			mime: OnceLock::new(),
-			content: OnceLock::new(),
+			bytes: OnceLock::new(),
 			hash: OnceLock::new(),
 			metadata: OnceLock::new(),
 		}
@@ -167,7 +166,14 @@ impl Resource {
 
 	pub async fn try_exists(&self, ctx: &ExecutionContext<'_>) -> Result<bool, Error> {
 		if ctx.settings.dry_run {
-			return match ctx.services.fs.tracked_files.get(self.as_path()) {
+			return match ctx
+				.services
+				.fs
+				.tracked_files
+				.get(self.as_path())
+				.await
+				.unwrap_or(FileState::Unknown)
+			{
 				FileState::Exists => Ok(true),
 				FileState::Deleted => Ok(false),
 				FileState::Unknown => Ok(tokio::fs::try_exists(&self.path).await?),

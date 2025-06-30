@@ -1,7 +1,4 @@
-use std::{
-	path::PathBuf,
-	sync::{LockResult, RwLockReadGuard},
-};
+use std::path::PathBuf;
 use thiserror::Error;
 
 use crate::{action::UndoError, parser::errors::ParseError, templates::engine::TemplateError};

@@ -1,7 +1,6 @@
 use chrono::Local;
 use clap::ValueEnum;
-use organize_core::config::Config;
-use std::path::Path;
+use std::path::PathBuf;
 use tracing::Level;
 use tracing_appender::non_blocking::WorkerGuard; // Import the guard type
 use tracing_subscriber::{
@@ -38,12 +37,12 @@ impl From<LogLevel> for Level {
 /// Initializes the logging system and returns a guard that must be kept in scope.
 pub fn init(level: LogLevel) -> WorkerGuard {
 	// 1. Determine the destination directory for logs.
-	let logs_dir = Config::resolve_path(None).parent().unwrap().join("logs"); // A hidden folder is a common convention
+	let logs_dir = PathBuf::from(".").join("logs"); // A hidden folder is a common convention
 
 	// 2. Create a non-blocking file appender for the current run.
 	// We add milliseconds to the timestamp to increase uniqueness.
 	let timestamp = Local::now().format("%Y-%m-%d-%H-%M-%S%.3f");
-	let log_file = format!("{}.log", timestamp);
+	let log_file = format!("{timestamp}.log");
 	let file_appender = tracing_appender::rolling::never(&logs_dir, log_file);
 	let (non_blocking_writer, guard) = tracing_appender::non_blocking(file_appender);
 

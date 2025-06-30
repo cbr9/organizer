@@ -6,9 +6,8 @@ use std::{
 	collections::HashMap,
 	ffi::OsStr,
 	fmt::Debug,
-	ops::Deref,
 	path::Path,
-	sync::{Arc, RwLock},
+	sync::Arc,
 };
 use strum::{Display, EnumIter, IntoEnumIterator};
 

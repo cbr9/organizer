@@ -1,47 +1,47 @@
+use std::{borrow::Cow, path::PathBuf, sync::Arc};
+
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
-use crate::{config::context::ExecutionContext, templates::template::Template};
-
-use super::Filter;
+use crate::{context::ExecutionContext, errors::Error, filter::Filter, resource::Resource, templates::template::Template};
 
 #[derive(Eq, PartialEq, Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
-pub struct Empty;
+pub struct Empty {
+	path: Option<Template>,
+}
+
+impl Empty {
+	pub async fn is_empty(&self, ctx: &ExecutionContext<'_>) -> Result<bool, Error> {
+		let res = ctx.scope.resource()?;
+		let path_to_check = match &self.path {
+			Some(path) => Cow::Owned(path.render(ctx).await.map(PathBuf::from)?),
+			None => Cow::Borrowed(res.as_path()),
+		};
+		let metadata = ctx.scope.resource()?.location.backend.metadata(&path_to_check).await?;
+		if metadata.is_file() {
+			// A file is empty if its length is 0.
+			Ok(metadata.len() == 0)
+		} else if metadata.is_dir() {
+			// A directory is empty if its `read_dir` iterator has no first entry.
+			let entries = ctx.scope.resource()?.location.backend.read_dir(&path_to_check).await?;
+			Ok(entries.is_empty())
+		} else {
+			// Symlinks, etc., are not considered empty.
+			Ok(false)
+		}
+	}
+}
 
 #[async_trait]
 #[typetag::serde(name = "empty")]
 impl Filter for Empty {
-	async fn filter(&self, ctx: &ExecutionContext) -> bool {
-		let path = ctx.scope.resource.as_path();
-		let Ok(metadata) = tokio::fs::metadata(path).await else {
-			return false;
-		};
-
-		if metadata.is_file() {
-			// If it's a file, check its length from the metadata we already fetched.
-			metadata.len() == 0
-		} else if metadata.is_dir() {
-			// If it's a directory, asynchronously try to read its contents.
-			let Ok(mut dir) = tokio::fs::read_dir(path).await else {
-				return false; // Could not read directory, assume not empty.
-			};
-
-			// Asynchronously try to get the first entry.
-			let Ok(first_entry) = dir.next_entry().await else {
-				return false; // Could not read entry, assume not empty.
-			};
-
-			// If the first entry is `None`, the directory is empty.
-			first_entry.is_none()
+	async fn filter(&self, ctx: &ExecutionContext) -> Result<Vec<Arc<Resource>>, Error> {
+		if self.is_empty(ctx).await.unwrap_or(false) {
+			Ok(vec![ctx.scope.resource()?])
 		} else {
-			// The path is something else (like a symlink) that we don't consider empty.
-			false
+			Ok(vec![])
 		}
-	}
-
-	fn templates(&self) -> Vec<&Template> {
-		vec![]
 	}
 }
 

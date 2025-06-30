@@ -3,7 +3,7 @@ use std::{collections::HashMap, str::FromStr};
 use chumsky::prelude::*;
 use logos::Logos;
 use serde::{Deserialize, Deserializer, Serialize};
-use serde_json::{error::Category, json}; // Import serde_json::Value and Map
+use serde_json::json; // Import serde_json::Value and Map
 
 use crate::{
 	context::ExecutionContext,
@@ -198,7 +198,7 @@ impl FromStr for Template {
 								return Err(Error::TemplateError(TemplateError::DeserializationError {
 									source: e,
 									variable: var_name,
-									fields: fields,
+									fields,
 								}));
 							}
 						};

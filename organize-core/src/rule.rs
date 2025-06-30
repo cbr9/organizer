@@ -1,108 +1,259 @@
-use std::collections::HashSet;
+use std::{path::PathBuf, sync::Arc};
 
 use itertools::Itertools;
 use serde::{Deserialize, Deserializer, Serialize};
 
 use crate::{
 	action::Action,
-	common::enabled,
+	context::ExecutionContext,
 	filter::Filter,
+	folder::{Location, LocationBuilder},
 	grouper::Grouper,
-	options::OptionsBuilder,
 	sorter::Sorter,
-	storage::Location,
 	templates::prelude::*,
 };
 
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]
-#[serde(deny_unknown_fields)]
-pub struct Rule {
-	pub id: Option<String>,
+pub struct RuleMetadata {
+	pub name: Option<String>,
+	pub description: Option<String>,
 	#[serde(default)]
 	pub tags: Vec<String>,
-	pub pipeline: Vec<Stage>,
-	pub locations: Vec<Box<dyn Location>>,
-	#[serde(flatten)]
-	pub options: OptionsBuilder,
-	#[serde(default = "enabled")]
-	pub enabled: bool,
 }
 
-impl Rule {
-	/// Checks if a single rule should be run based on pre-compiled sets of chosen tags.
-	pub fn matches_tags(&self, positive_tags: &HashSet<String>, negative_tags: &HashSet<String>) -> bool {
-		// Rule is disqualified if it contains any of the negative tags.
-		if self.tags.iter().any(|tag| negative_tags.contains(tag.as_str())) {
-			return false;
-		}
+#[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct RuleBuilder {
+	#[serde(flatten)]
+	pub metadata: RuleMetadata,
+	#[serde(rename = "stage")]
+	pub pipeline: Vec<StageBuilder>,
+}
 
-		// If positive tags are specified, the rule must have at least one of them.
-		// If no positive tags are specified, this condition is met.
-		positive_tags.is_empty() || self.tags.iter().any(|tag| positive_tags.contains(tag.as_str()))
-	}
+#[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct Rule {
+	#[serde(flatten)]
+	pub metadata: Arc<RuleMetadata>,
+	pub pipeline: Vec<Stage>,
+}
 
-	/// Checks if a single rule should be run based on pre-compiled sets of chosen IDs.
-	pub fn matches_ids(&self, positive_ids: &HashSet<String>, negative_ids: &HashSet<String>) -> bool {
-		let rule_id = self.id.as_deref();
+async fn load_rule_builder_from_path(path: &std::path::Path) -> Result<RuleBuilder, anyhow::Error> {
+	let content = tokio::fs::read_to_string(path).await?;
+	let builder: RuleBuilder = toml::from_str(&content)?;
+	Ok(builder)
+}
+impl RuleBuilder {
+	pub async fn build(self, ctx: &ExecutionContext<'_>) -> Result<Rule, anyhow::Error> {
+		let mut final_pipeline = Vec::new();
+		let main_meta = Arc::new(self.metadata);
+		let mut processing_stack: Vec<(StageBuilder, Arc<RuleMetadata>)> = self
+			.pipeline
+			.into_iter()
+			.map(|builder| (builder, main_meta.clone()))
+			.rev()
+			.collect();
 
-		// Rule is disqualified if its ID is one of the negative IDs.
-		if let Some(id) = rule_id {
-			if negative_ids.contains(id) {
-				return false;
+		while let Some((builder, meta)) = processing_stack.pop() {
+			match builder {
+				StageBuilder::Compose(path) => {
+					let composed_builder = load_rule_builder_from_path(&path).await?;
+					let composed_meta = Arc::new(composed_builder.metadata);
+					for stage_builder in composed_builder.pipeline.into_iter().rev() {
+						processing_stack.push((stage_builder, composed_meta.clone()));
+					}
+				}
+				// The logic to build the final Stage enum now changes slightly
+				other_builder => {
+					let stage_enum = other_builder.build(ctx, meta).await;
+					final_pipeline.push(stage_enum);
+				}
 			}
 		}
 
-		// If positive IDs are specified, the rule's ID must be one of them.
-		// If no positive IDs are specified, this condition is met.
-		positive_ids.is_empty() || rule_id.is_some_and(|id| positive_ids.contains(id))
+		Ok(Rule {
+			metadata: main_meta.clone(),
+			pipeline: final_pipeline,
+		})
 	}
 }
 
 #[derive(Debug, Serialize, PartialEq, Eq, Clone)]
-pub enum Stage {
+pub enum StageBuilder {
+	Search(LocationBuilder),
+	Compose(PathBuf),
 	Action(Box<dyn Action>),
 	Filter(Box<dyn Filter>),
 	Grouper(Box<dyn Grouper>),
 	Sorter(Box<dyn Sorter>),
 }
 
-impl<'de> Deserialize<'de> for Stage {
+impl StageBuilder {
+	pub async fn build(self, ctx: &ExecutionContext<'_>, source: Arc<RuleMetadata>) -> Stage {
+		match self {
+			StageBuilder::Search(location_builder) => {
+				let stage = location_builder.build(ctx).await.unwrap();
+				Stage::Search { location: stage, source }
+			}
+			StageBuilder::Action(stage) => Stage::Action { action: stage, source },
+			StageBuilder::Filter(stage) => Stage::Filter { filter: stage, source },
+			StageBuilder::Grouper(stage) => Stage::Grouper { grouper: stage, source },
+			StageBuilder::Sorter(stage) => Stage::Sorter { sorter: stage, source },
+			StageBuilder::Compose(_) => unreachable!("Compose stages should be flattened"),
+		}
+	}
+}
+
+#[derive(Debug, Deserialize, Serialize, PartialEq, Eq, Clone)]
+pub enum Stage {
+	Search { location: Location, source: Arc<RuleMetadata> },
+	Action { action: Box<dyn Action>, source: Arc<RuleMetadata> },
+	Filter { filter: Box<dyn Filter>, source: Arc<RuleMetadata> },
+	Grouper { grouper: Box<dyn Grouper>, source: Arc<RuleMetadata> },
+	Sorter { sorter: Box<dyn Sorter>, source: Arc<RuleMetadata> },
+}
+
+// impl<'de> Deserialize<'de> for StageBuilder {
+// 	fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+// 	where
+// 		D: Deserializer<'de>,
+// 	{
+// 		// Deserialize the TOML [[stage]] table into a generic Value.
+// 		let mut map: toml::Value = Deserialize::deserialize(deserializer)?;
+// 		let table = map
+// 			.as_table_mut()
+// 			.ok_or_else(|| serde::de::Error::custom("Expected a table for the stage"))?;
+
+// 		// Find the single key that defines the stage type.
+// 		let key = {
+// 			let keys: Vec<_> = table.keys().cloned().collect();
+// 			if keys.len() != 1 {
+// 				// This handles the case where a stage has multiple primary keys, like both `filter` and `action`.
+// 				// We need to check for this AFTER handling the parameters that live alongside the primary key.
+// 				// We will find the primary key first, and then deserialize the rest.
+// 			}
+
+// 			let possible_keys = ["search", "compose", "action", "filter", "group-by", "sort-by"];
+// 			keys.into_iter().find(|k| possible_keys.contains(&k.as_str())).ok_or_else(|| {
+// 				serde::de::Error::custom("Stage must contain one of: 'search', 'compose', 'action', 'filter', 'group-by', or 'sort-by'")
+// 			})?
+// 		};
+
+// 		// The value associated with the primary key.
+// 		let value = table
+// 			.remove(&key)
+// 			.ok_or_else(|| serde::de::Error::custom(format!("Could not find key '{}'", key)))?;
+
+// 		// The rest of the table contains the parameters.
+// 		let params = toml::Value::Table(table.clone());
+
+// 		match key.as_str() {
+// 			"search" => {
+// 				let path_template = value.try_into::<String>().map_err(serde::de::Error::custom)?;
+// 				let mut builder: LocationBuilder = params.try_into().map_err(serde::de::Error::custom)?;
+// 				builder.path = Template::from_str(&path_template).map_err(serde::de::Error::custom)?; // Set the path from the primary key's value
+// 				Ok(StageBuilder::Search(builder))
+// 			}
+// 			"compose" => {
+// 				let rules_to_compose = value.try_into::<Vec<PathBuf>>().map_err(serde::de::Error::custom)?;
+// 				Ok(StageBuilder::Compose(rules_to_compose))
+// 			}
+// 			"filter" | "action" | "group-by" | "sort-by" => {
+// 				// This handles all the typetag'd trait objects.
+// 				let component_type = value
+// 					.as_str()
+// 					.ok_or_else(|| serde::de::Error::custom(format!("Expected a string for key '{}'", key)))?;
+
+// 				// We inject the `type` field that `typetag` expects into the parameters table.
+// 				let mut component_table = params.try_into::<toml::value::Table>().map_err(serde::de::Error::custom)?;
+// 				component_table.insert("type".to_string(), toml::Value::String(component_type.to_string()));
+// 				let component_value = toml::Value::Table(component_table);
+
+// 				// Now deserialize from this new value into the correct trait object.
+// 				match key.as_str() {
+// 					"filter" => Ok(StageBuilder::Filter(
+// 						Box::<dyn Filter>::deserialize(component_value).map_err(serde::de::Error::custom)?,
+// 					)),
+// 					"action" => Ok(StageBuilder::Action(
+// 						Box::<dyn Action>::deserialize(component_value).map_err(serde::de::Error::custom)?,
+// 					)),
+// 					"group-by" => Ok(StageBuilder::Grouper(
+// 						Box::<dyn Grouper>::deserialize(component_value).map_err(serde::de::Error::custom)?,
+// 					)),
+// 					"sort-by" => Ok(StageBuilder::Sorter(
+// 						Box::<dyn Sorter>::deserialize(component_value).map_err(serde::de::Error::custom)?,
+// 					)),
+// 					_ => unreachable!(),
+// 				}
+// 			}
+// 			other => Err(serde::de::Error::custom(format!("Unknown stage type: '{}'", other))),
+// 		}
+// 	}
+// }
+
+impl<'de> Deserialize<'de> for StageBuilder {
 	fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
 	where
 		D: Deserializer<'de>,
 	{
-		#[derive(Deserialize, Debug, Default)]
-		#[serde(deny_unknown_fields)]
-		struct StageHelper {
-			#[serde(default, skip_serializing_if = "Option::is_none")]
-			action: Option<Box<dyn Action>>,
-			#[serde(default, skip_serializing_if = "Option::is_none")]
-			filter: Option<Box<dyn Filter>>,
-			#[serde(default, skip_serializing_if = "Option::is_none", rename = "group-by")]
-			grouper: Option<Box<dyn Grouper>>,
-			#[serde(default, skip_serializing_if = "Option::is_none", rename = "sort-by")]
-			sorter: Option<Box<dyn Sorter>>,
-		}
+		let mut map: toml::Value = Deserialize::deserialize(deserializer)?;
+		let table = map
+			.as_table_mut()
+			.ok_or_else(|| serde::de::Error::custom("Expected a table for the stage"))?;
 
-		let helper = StageHelper::deserialize(deserializer)?;
-		let count = helper.action.is_some() as u8 + helper.filter.is_some() as u8 + helper.grouper.is_some() as u8 + helper.sorter.is_some() as u8;
+		let key = {
+			let keys: Vec<_> = table.keys().cloned().collect();
+			let possible_keys = ["search", "compose", "action", "filter", "group-by", "sort-by"];
+			keys.into_iter().find(|k| possible_keys.contains(&k.as_str())).ok_or_else(|| {
+				serde::de::Error::custom("Stage must contain one of: 'search', 'compose', 'action', 'filter', 'group-by', or 'sort-by'")
+			})?
+		};
 
-		if count != 1 {
-			return Err(serde::de::Error::custom(
-				"A stage must have exactly one key: 'action', 'filter', 'folders', 'group-by', or 'sort-by'",
-			));
-		}
+		let value = table
+			.remove(&key)
+			.ok_or_else(|| serde::de::Error::custom(format!("Could not find key '{key}'")))?;
 
-		if let Some(action) = helper.action {
-			Ok(Stage::Action(action))
-		} else if let Some(filter) = helper.filter {
-			Ok(Stage::Filter(filter))
-		} else if let Some(grouper) = helper.grouper {
-			Ok(Stage::Grouper(grouper))
-		} else if let Some(sorter) = helper.sorter {
-			Ok(Stage::Sorter(sorter))
-		} else {
-			unreachable!();
+		let params = toml::Value::Table(table.clone());
+
+		match key.as_str() {
+			"search" => {
+				let path_template_str = value.try_into::<String>().map_err(serde::de::Error::custom)?;
+				let mut params = params.as_table().unwrap().clone();
+				params.insert("path".to_string(), path_template_str.into());
+				let builder: LocationBuilder = params.try_into().map_err(serde::de::Error::custom)?;
+
+				Ok(StageBuilder::Search(builder))
+			}
+			"compose" => {
+				let rule_to_compose = value.try_into::<PathBuf>().map_err(serde::de::Error::custom)?;
+				Ok(StageBuilder::Compose(rule_to_compose))
+			}
+			"filter" | "action" | "group-by" | "sort-by" => {
+				let component_type = value
+					.as_str()
+					.ok_or_else(|| serde::de::Error::custom(format!("Expected a string for key '{key}'")))?;
+
+				let mut component_table = params.try_into::<toml::value::Table>().map_err(serde::de::Error::custom)?;
+				component_table.insert("type".to_string(), toml::Value::String(component_type.to_string()));
+				let component_value = toml::Value::Table(component_table);
+
+				match key.as_str() {
+					"filter" => Ok(StageBuilder::Filter(
+						Box::<dyn Filter>::deserialize(component_value).map_err(serde::de::Error::custom)?,
+					)),
+					"action" => Ok(StageBuilder::Action(
+						Box::<dyn Action>::deserialize(component_value).map_err(serde::de::Error::custom)?,
+					)),
+					"group-by" => Ok(StageBuilder::Grouper(
+						Box::<dyn Grouper>::deserialize(component_value).map_err(serde::de::Error::custom)?,
+					)),
+					"sort-by" => Ok(StageBuilder::Sorter(
+						Box::<dyn Sorter>::deserialize(component_value).map_err(serde::de::Error::custom)?,
+					)),
+					_ => unreachable!(),
+				}
+			}
+			other => Err(serde::de::Error::custom(format!("Unknown stage type: '{other}'"))),
 		}
 	}
 }

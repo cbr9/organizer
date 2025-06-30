@@ -4,14 +4,14 @@ use std::{ffi::OsStr, path::PathBuf, sync::Arc};
 
 use async_trait::async_trait;
 
-use crate::{context::ExecutionContext, folder::Folder, resource::Resource, storage::Location};
+use crate::{context::ExecutionContext, folder::Location, resource::Resource};
 
 #[async_trait]
 pub trait PathExt {
 	type HiddenError;
 	fn is_hidden(&self) -> Result<bool, Self::HiddenError>;
 	fn expand_user(self) -> PathBuf;
-	async fn as_resource(&self, ctx: &ExecutionContext, location: Arc<dyn Location>) -> Arc<Resource>;
+	async fn as_resource(&self, ctx: &ExecutionContext, location: Arc<Location>) -> Arc<Resource>;
 }
 
 #[async_trait]
@@ -50,9 +50,9 @@ impl<T: AsRef<Path> + Sync + Send> PathExt for T {
 		Ok((attributes & 0x2) > 0)
 	}
 
-	async fn as_resource(&self, ctx: &ExecutionContext, location: Arc<dyn Location>) -> Arc<Resource> {
+	async fn as_resource(&self, ctx: &ExecutionContext, location: Arc<Location>) -> Arc<Resource> {
 		ctx.services
-			.blackboard
+			.fs
 			.resources
 			.get_with(self.as_ref().to_path_buf(), async move {
 				Arc::new(Resource::new(&self.as_ref().to_path_buf(), location))

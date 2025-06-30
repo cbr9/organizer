@@ -1758,10 +1758,12 @@ dependencies = [
  "tera",
  "thiserror 2.0.12",
  "tokio",
+ "toml",
  "tracing",
  "tracing-appender",
  "tracing-subscriber",
  "typetag",
+ "url",
  "uuid",
  "walkdir",
 ]

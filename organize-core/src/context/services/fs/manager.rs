@@ -1,16 +1,22 @@
 use crate::{
 	context::{services::fs::locker::Locker, ExecutionContext},
 	errors::Error,
-	resource::Resource,
+	folder::LocalFileSystem,
+	resource::{FileState, Resource},
+	storage::StorageProvider,
 	templates::template::Template,
 };
 use anyhow::Result;
+use moka::future::Cache;
 use path_clean::PathClean;
 use serde::{Deserialize, Serialize};
 use std::{
+	collections::HashMap,
+	iter::FromIterator,
 	path::{Path, PathBuf},
 	sync::Arc,
-}; // Assuming this is needed for dry_run and context
+};
+use url::Url; // Assuming this is needed for dry_run and context
 
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
 pub struct Destination {
@@ -41,20 +47,62 @@ impl Destination {
 	}
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct FileSystemManager {
 	pub locker: Locker,
 	pub resources: Cache<PathBuf, Arc<Resource>>,
-	pub tracked_files: Cache<PathBuf, FileState>
+	pub tracked_files: Cache<PathBuf, FileState>,
+	pub backends: HashMap<String, Arc<dyn StorageProvider>>,
+}
+
+pub fn parse_uri(uri_str: &str) -> anyhow::Result<(String, String)> {
+	// For local paths, we must construct a valid file URI first.
+	if !uri_str.contains("://") {
+		// let path = PathBuf::from(uri_str).clean();
+		// dbg!(&path);
+		// This will correctly handle paths on both Windows and Unix.
+		// let url = Url::from_file_path(path).map_err(|_| anyhow::anyhow!("Invalid local path"))?;
+		// Return "local" as the host (backend) and the original path.
+		return Ok(("local".to_string(), uri_str.to_string()));
+	}
+
+	let url = Url::parse(uri_str)?;
+	let host = url
+		.host_str()
+		.ok_or_else(|| anyhow::anyhow!("URI is missing a host (connection name)"))?;
+	let path = url.path().to_string();
+
+	Ok((host.to_string(), path))
+}
+
+impl Default for FileSystemManager {
+	fn default() -> Self {
+		Self::new()
+	}
 }
 
 impl FileSystemManager {
+	pub fn new() -> Self {
+		let local: Arc<dyn StorageProvider> = Arc::new(LocalFileSystem);
+		let backends = HashMap::from_iter(vec![("local".to_string(), local)]);
+		Self {
+			locker: Locker::default(),
+			resources: Cache::new(10_000),
+			tracked_files: Cache::new(10_000),
+			backends,
+		}
+	}
+
 	pub async fn ensure_parent_dir_exists(&self, path: &Path) -> std::io::Result<()> {
 		if let Some(parent) = path.parent() {
 			if !tokio::fs::try_exists(parent).await.unwrap_or(false) {
 				tokio::fs::create_dir_all(parent).await?;
 			}
 		}
+		// resources: CacheBuilder::new(1_000_000)
+		// 	.time_to_live(Duration::new(60 * 60 * 24, 0)) // ONE DAY
+		// 	.name("cached_resources")
+		// 	.build(),
 		Ok(())
 	}
 

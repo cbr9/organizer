@@ -1,20 +1,20 @@
 use anyhow::Result;
 use dashmap::DashMap;
-use moka::future::{Cache, CacheBuilder};
-use std::{any::Any, path::PathBuf, sync::Arc, time::Duration};
+use std::{
+	any::Any,
+	path::{Path, PathBuf},
+	sync::Arc,
+};
 
 pub mod services;
 
 use crate::{
 	batch::Batch,
-	config::Config,
 	context::services::{fs::manager::FileSystemManager, history::Journal},
 	errors::Error,
-	folder::Folder,
-	options::Options,
+	folder::Location,
 	resource::Resource,
-	rule::Rule,
-	storage::Location,
+	rule::RuleMetadata,
 };
 
 #[derive(Debug, Clone)]
@@ -35,10 +35,6 @@ impl Default for Blackboard {
 		Self {
 			scratchpad: Arc::new(DashMap::new()),
 			shared_context: Arc::new(DashMap::new()),
-			resources: CacheBuilder::new(1_000_000)
-				.time_to_live(Duration::new(60 * 60 * 24, 0)) // ONE DAY
-				.name("cached_resources")
-				.build(),
 		}
 	}
 }
@@ -61,101 +57,92 @@ pub struct RunSettings {
 
 #[derive(Debug, Clone)]
 pub enum ExecutionScope<'a> {
-	Config(ConfigScope<'a>),
-	Rule(RuleScope<'a>),
-	Location(LocationScope<'a>),
-	Resource(ResourceScope<'a>),
+	Rule(RuleScope),
+	Search(SearchScope<'a>),
+	Resource(ResourceScope),
 	Batch(BatchScope<'a>),
+	Build(BuildScope),
+	Blank,
 }
 
 impl<'a> ExecutionScope<'a> {
-	pub fn new_config_scope(config: &'a Config) -> ExecutionScope<'a> {
-		ExecutionScope::Config(ConfigScope { config })
+	pub fn new_rule_scope(rule: Arc<RuleMetadata>) -> ExecutionScope<'a> {
+		ExecutionScope::Rule(RuleScope { rule })
 	}
 
-	pub fn new_rule_scope(config: &'a Config, rule: &'a Rule) -> ExecutionScope<'a> {
-		ExecutionScope::Rule(RuleScope { config, rule })
+	pub fn new_location_scope(rule: Arc<RuleMetadata>, location: &'a Location) -> ExecutionScope<'a> {
+		ExecutionScope::Search(SearchScope { rule, location })
 	}
 
-	pub fn new_location_scope(config: &'a Config, rule: &'a Rule, location: &'a Box<dyn Location>) -> ExecutionScope<'a> {
-		ExecutionScope::Location(LocationScope { config, rule, location })
+	pub fn new_resource_scope(rule: Arc<RuleMetadata>, resource: Arc<Resource>) -> ExecutionScope<'a> {
+		ExecutionScope::Resource(ResourceScope { rule, resource })
 	}
 
-	pub fn new_resource_scope(config: &'a Config, rule: &'a Rule, resource: Arc<Resource>) -> ExecutionScope<'a> {
-		ExecutionScope::Resource(ResourceScope { config, rule, resource })
+	pub fn new_batch_scope(rule: Arc<RuleMetadata>, batch: &'a Batch) -> ExecutionScope<'a> {
+		ExecutionScope::Batch(BatchScope { rule, batch })
 	}
 
-	pub fn new_batch_scope(config: &'a Config, rule: &'a Rule, batch: &'a Batch) -> ExecutionScope<'a> {
-		ExecutionScope::Batch(BatchScope { config, rule, batch })
+	pub fn new_build_scope(root: &Path) -> ExecutionScope<'a> {
+		ExecutionScope::Build(BuildScope { root: root.to_path_buf() })
 	}
 
-	pub fn config(&self) -> Result<&'a Config, Error> {
+	pub fn rule(&self) -> Result<Arc<RuleMetadata>, Error> {
 		match self {
-			ExecutionScope::Config(scope) => Ok(scope.config),
-			ExecutionScope::Rule(scope) => Ok(scope.config),
-			ExecutionScope::Resource(scope) => Ok(scope.config),
-			ExecutionScope::Batch(scope) => Ok(scope.config),
-			ExecutionScope::Location(scope) => Ok(scope.config),
-		}
-	}
-
-	pub fn rule(&self) -> Result<&'a Rule, Error> {
-		match self {
-			ExecutionScope::Config(_scope) => Err(Error::OutOfScope("rule".into())),
-			ExecutionScope::Rule(scope) => Ok(scope.rule),
-			ExecutionScope::Resource(scope) => Ok(scope.rule),
-			ExecutionScope::Batch(scope) => Ok(scope.rule),
-			ExecutionScope::Location(scope) => Ok(scope.rule),
+			ExecutionScope::Rule(scope) => Ok(scope.rule.clone()),
+			ExecutionScope::Resource(scope) => Ok(scope.rule.clone()),
+			ExecutionScope::Batch(scope) => Ok(scope.rule.clone()),
+			ExecutionScope::Search(scope) => Ok(scope.rule.clone()),
+			_ => Err(Error::OutOfScope("rule".into())),
 		}
 	}
 
 	pub fn resource(&self) -> Result<Arc<Resource>, Error> {
 		match self {
-			ExecutionScope::Config(_scope) => Err(Error::OutOfScope("resource".into())),
-			ExecutionScope::Rule(_scope) => Err(Error::OutOfScope("resource".into())),
-			ExecutionScope::Location(_scope) => Err(Error::OutOfScope("resource".into())),
 			ExecutionScope::Resource(scope) => Ok(scope.resource.clone()),
-			ExecutionScope::Batch(_scope) => Err(Error::OutOfScope("resource".into())),
+			_ => Err(Error::OutOfScope("resource".into())),
 		}
 	}
 
 	pub fn batch(&self) -> Result<&'a Batch, Error> {
 		match self {
-			ExecutionScope::Config(_scope) => Err(Error::OutOfScope("batch".into())),
-			ExecutionScope::Rule(_scope) => Err(Error::OutOfScope("batch".into())),
-			ExecutionScope::Location(_scope) => Err(Error::OutOfScope("batch".into())),
-			ExecutionScope::Resource(_scope) => Err(Error::OutOfScope("batch".into())),
 			ExecutionScope::Batch(scope) => Ok(scope.batch),
+			_ => Err(Error::OutOfScope("batch".into())),
+		}
+	}
+
+	pub fn root(&self) -> Result<PathBuf, Error> {
+		match self {
+			ExecutionScope::Search(scope) => Ok(scope.location.path.clone()),
+			ExecutionScope::Resource(scope) => Ok(scope.resource.location.path.clone()),
+			ExecutionScope::Build(path) => Ok(path.root.clone()), // <-- ADD THIS CASE
+			_ => Err(Error::OutOfScope("root".into())),
 		}
 	}
 }
 
 #[derive(Debug, Clone)]
-pub struct ConfigScope<'a> {
-	pub config: &'a Config,
+pub struct RuleScope {
+	pub rule: Arc<RuleMetadata>,
 }
 #[derive(Debug, Clone)]
-pub struct RuleScope<'a> {
-	pub config: &'a Config,
-	pub rule: &'a Rule,
+pub struct SearchScope<'a> {
+	pub rule: Arc<RuleMetadata>,
+	pub location: &'a Location,
 }
 #[derive(Debug, Clone)]
-pub struct LocationScope<'a> {
-	pub config: &'a Config,
-	pub rule: &'a Rule,
-	pub location: &'a Box<dyn Location>,
-}
-#[derive(Debug, Clone)]
-pub struct ResourceScope<'a> {
-	pub config: &'a Config,
-	pub rule: &'a Rule,
+pub struct ResourceScope {
+	pub rule: Arc<RuleMetadata>,
 	pub resource: Arc<Resource>,
 }
 #[derive(Debug, Clone)]
 pub struct BatchScope<'a> {
-	pub config: &'a Config,
-	pub rule: &'a Rule,
+	pub rule: Arc<RuleMetadata>,
 	pub batch: &'a Batch,
+}
+
+#[derive(Debug, Clone)]
+pub struct BuildScope {
+	pub root: PathBuf,
 }
 
 /// The top-level context object, composed of the three distinct categories of information.
@@ -164,6 +151,16 @@ pub struct ExecutionContext<'a> {
 	pub services: &'a RunServices,
 	pub scope: ExecutionScope<'a>,
 	pub settings: &'a RunSettings,
+}
+
+impl<'a> ExecutionContext<'a> {
+	pub fn with_scope(&self, scope: ExecutionScope<'a>) -> ExecutionContext {
+		Self {
+			services: self.services,
+			scope,
+			settings: self.settings,
+		}
+	}
 }
 
 // #[cfg(test)]

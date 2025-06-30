@@ -1,6 +1,5 @@
 use crate::{
 	action::{Action, Receipt},
-	config::Config,
 	context::RunSettings,
 };
 use anyhow::Result;
@@ -37,17 +36,15 @@ impl Journal {
 		Ok(Self { pool })
 	}
 
-	pub async fn start_session(&self, config: &Config) -> Result<i64> {
+	pub async fn start_session(&self) -> Result<i64> {
 		let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs() as i64;
-		let config_data = serde_json::to_string(config)?;
 
 		let record = sqlx::query!(
 			r#"
-            INSERT INTO sessions (start_time, status, config)
-            VALUES (?1, 'running', ?2)
+            INSERT INTO sessions (start_time, status)
+            VALUES (?1, 'running')
             "#,
 			now,
-			config_data
 		)
 		.execute(&self.pool)
 		.await?;

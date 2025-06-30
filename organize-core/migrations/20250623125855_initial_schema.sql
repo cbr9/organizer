@@ -2,7 +2,6 @@ CREATE TABLE IF NOT EXISTS sessions (
     id              INTEGER PRIMARY KEY,
     start_time      INTEGER NOT NULL,
     end_time        INTEGER,
-    config          TEXT NOT NULL,
     status          TEXT NOT NULL
 );
 

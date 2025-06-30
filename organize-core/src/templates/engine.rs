@@ -1,13 +1,7 @@
 use std::env::VarError;
 
-use anyhow::Result;
 use thiserror::Error;
 
-use crate::{
-	context::ExecutionContext,
-	errors::Error,
-	templates::template::{Piece, Template},
-};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Templater;

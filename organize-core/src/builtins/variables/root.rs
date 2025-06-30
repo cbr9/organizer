@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
 	context::ExecutionContext,
 	errors::Error,
-	templates::{engine::TemplateError, prelude::Variable},
+	templates::prelude::Variable,
 };
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default, PartialEq, Eq)]
@@ -20,8 +20,7 @@ impl Variable for Root {
 	}
 
 	async fn compute(&self, ctx: &ExecutionContext<'_>) -> Result<serde_json::Value, Error> {
-		let resource = ctx.scope.resource()?;
-		let location = resource.location.path();
-		Ok(serde_json::to_value(&location.clean())?)
+		let root = ctx.scope.root()?;
+		Ok(serde_json::to_value(root.clean())?)
 	}
 }

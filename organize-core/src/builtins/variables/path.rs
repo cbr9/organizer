@@ -1,11 +1,9 @@
-use std::os::windows::fs::MetadataExt;
 
 use crate::{context::ExecutionContext, errors::Error, templates::prelude::*};
 use anyhow::Result;
 use async_trait::async_trait;
-use itertools::Itertools;
 use serde::{Deserialize, Serialize};
-use strum::{Display, EnumIter, IntoEnumIterator};
+use strum::{Display, EnumIter};
 
 #[derive(Debug, Clone, Deserialize, Display, Serialize, EnumIter, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]

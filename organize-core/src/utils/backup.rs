@@ -1,6 +1,6 @@
-use std::{path::PathBuf, sync::Arc};
+use std::path::PathBuf;
 
-use crate::{context::ExecutionContext, errors::Error, resource::Resource, stdx::path::PathExt};
+use crate::{context::ExecutionContext, errors::Error};
 use anyhow::Result;
 use dirs;
 use serde::{Deserialize, Serialize}; // Import the dirs crate
@@ -11,16 +11,10 @@ use uuid::Uuid; // Import Uuid for generating unique IDs // Import chrono for ti
 /// This will be inside the platform-specific local data directory,
 /// in a subdirectory named after the project, and then a "backups" folder.
 fn get_backup_base_dir(ctx: &ExecutionContext<'_>) -> Result<PathBuf, Error> {
-	match &ctx.scope.resource()?.location.options().backup_location {
-		BackupLocation::System => {
-			let project_name = env!("CARGO_PKG_NAME");
-			let base_dir = dirs::data_local_dir().expect("Could not determine platform-specific local data directory for backups.");
-			let dir = base_dir.join(project_name).join("backups");
-			Ok(dir)
-		}
-		BackupLocation::Root => Ok(ctx.scope.resource()?.location.path().join(".organize").join("backups").into()),
-		BackupLocation::Custom(path) => Ok(path.clone()),
-	}
+	let project_name = env!("CARGO_PKG_NAME");
+	let base_dir = dirs::data_local_dir().expect("Could not determine platform-specific local data directory for backups.");
+	let dir = base_dir.join(project_name).join("backups");
+	Ok(dir)
 }
 
 #[derive(Default, Clone, Deserialize, Serialize, PartialEq, Eq, Debug)]
@@ -56,7 +50,7 @@ impl Backup {
 				break proposed_path;
 			}
 		};
-		Ok(Self(path.into()))
+		Ok(Self(path))
 	}
 
 	pub async fn persist(&self, ctx: &ExecutionContext<'_>) -> Result<(), Error> {
