@@ -9,6 +9,7 @@ use crate::{
 	grouper::Grouper,
 	resource::Resource,
 	rule::{Rule, Stage},
+	sorter::Sorter,
 };
 use std::sync::Arc;
 
@@ -22,6 +23,7 @@ pub struct PipelineStream {
 	pub batches: Vec<Batch>,
 	/// The ordered stack of groupers that have been applied.
 	pub groupers: Vec<Box<dyn Grouper>>,
+	pub sorters: Vec<Box<dyn Sorter>>,
 }
 
 impl PipelineStream {
@@ -30,12 +32,21 @@ impl PipelineStream {
 		Self {
 			batches: vec![Batch::initial(files)],
 			groupers: Vec::new(),
+			sorters: Vec::new(),
 		}
 	}
 
 	/// Flattens all batches into a single, unordered list of files.
 	pub fn all_files(&self) -> Vec<Arc<Resource>> {
 		self.batches.iter().flat_map(|batch| batch.files.clone()).collect()
+	}
+
+	pub async fn resort(&mut self) {
+		for batch in self.batches.iter_mut() {
+			for sorter in &self.sorters {
+				sorter.sort(&mut batch.files).await;
+			}
+		}
 	}
 
 	/// Re-applies the entire stack of stored groupers to a new set of files.
@@ -79,19 +90,20 @@ impl Pipeline {
 						let mut all_files = self.stream.all_files();
 						all_files.extend(new_files);
 						self.stream.batches = self.stream.regroup(all_files).await?;
+						self.stream.resort().await;
 					} else {
 						self.stream = PipelineStream::new(new_files);
 					}
 				}
 				Stage::Grouper { grouper, .. } => {
-					self.stream.groupers.push(grouper);
 					let all_files = self.stream.all_files();
+					self.stream.groupers.push(grouper);
 					self.stream.batches = self.stream.regroup(all_files).await?;
+					self.stream.resort().await;
 				}
 				Stage::Sorter { sorter, .. } => {
-					for batch in self.stream.batches.iter_mut() {
-						sorter.sort(&mut batch.files).await;
-					}
+					self.stream.sorters.push(sorter);
+					self.stream.resort().await;
 				}
 				Stage::Filter { filter, source } => {
 					let mut next_batches = Vec::new();
@@ -169,6 +181,11 @@ impl Pipeline {
 					}
 					// An action's output always replaces the current data stream and resets grouping.
 					self.stream = PipelineStream::new(all_next_files);
+				}
+				Stage::Flatten { flatten, .. } => {
+					if flatten {
+						self.stream = PipelineStream::new(self.stream.all_files());
+					}
 				}
 			}
 		}

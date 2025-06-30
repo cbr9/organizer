@@ -86,6 +86,7 @@ pub enum StageBuilder {
 	Filter(Box<dyn Filter>),
 	Grouper(Box<dyn Grouper>),
 	Sorter(Box<dyn Sorter>),
+	Flatten(bool),
 }
 
 impl StageBuilder {
@@ -95,6 +96,10 @@ impl StageBuilder {
 				let stage = location_builder.build(ctx).await.unwrap();
 				Stage::Search { location: stage, source }
 			}
+			StageBuilder::Flatten(bool) => Stage::Flatten {
+				flatten: bool,
+				source: source,
+			},
 			StageBuilder::Action(stage) => Stage::Action { action: stage, source },
 			StageBuilder::Filter(stage) => Stage::Filter { filter: stage, source },
 			StageBuilder::Grouper(stage) => Stage::Grouper { grouper: stage, source },
@@ -109,6 +114,7 @@ pub enum Stage {
 	Search { location: Location, source: Arc<RuleMetadata> },
 	Action { action: Box<dyn Action>, source: Arc<RuleMetadata> },
 	Filter { filter: Box<dyn Filter>, source: Arc<RuleMetadata> },
+	Flatten { flatten: bool, source: Arc<RuleMetadata> },
 	Grouper { grouper: Box<dyn Grouper>, source: Arc<RuleMetadata> },
 	Sorter { sorter: Box<dyn Sorter>, source: Arc<RuleMetadata> },
 }
@@ -227,6 +233,10 @@ impl<'de> Deserialize<'de> for StageBuilder {
 			"compose" => {
 				let rule_to_compose = value.try_into::<PathBuf>().map_err(serde::de::Error::custom)?;
 				Ok(StageBuilder::Compose(rule_to_compose))
+			}
+			"flatten" => {
+				let value = value.try_into::<bool>().map_err(serde::de::Error::custom)?;
+				Ok(StageBuilder::Flatten(value))
 			}
 			"filter" | "action" | "group-by" | "sort-by" => {
 				let component_type = value
