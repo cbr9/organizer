@@ -1643,6 +1643,7 @@ dependencies = [
  "dyn-clone",
  "dyn-eq",
  "futures",
+ "inventory",
  "itertools",
  "libc",
  "logos",

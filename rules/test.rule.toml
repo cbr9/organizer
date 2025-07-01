@@ -1,7 +1,7 @@
 [[stage]]
-search = '/Users/H0UB8WV/Downloads/'
+search = '/Users/cabero/Downloads/'
 max_depth = 1
 
 [[stage]]
 action = "echo"
-message = "{{ file.path }}"
+message = "{{ env.HOME }}"

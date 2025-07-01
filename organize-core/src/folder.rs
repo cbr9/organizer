@@ -2,15 +2,13 @@ use std::{
 	collections::HashSet,
 	fs::Metadata,
 	path::{Path, PathBuf},
-	str::FromStr,
 	sync::Arc,
 };
 
 use anyhow::{Context as ErrorContext, Result};
 use async_trait::async_trait;
 use futures::{stream, StreamExt};
-use itertools::Itertools;
-use serde::{Deserialize, Deserializer, Serialize};
+use serde::{Deserialize, Serialize};
 
 use crate::{
 	context::{services::fs::manager::parse_uri, ExecutionContext, ExecutionScope},
@@ -19,14 +17,14 @@ use crate::{
 	resource::Resource,
 	stdx::path::PathExt,
 	storage::StorageProvider,
-	templates::prelude::Template,
+	templates::template::TemplateString,
 };
 
 use super::options::{Options, Target};
 
 #[derive(Debug, Serialize, PartialEq, Eq, Clone, Deserialize)]
 pub struct LocationBuilder {
-	pub path: Template,
+	pub path: TemplateString,
 	#[serde(flatten)]
 	pub options: OptionsBuilder,
 	#[serde(default)]
@@ -50,8 +48,9 @@ impl PartialEq for Location {
 impl Eq for Location {}
 
 impl LocationBuilder {
-	pub async fn build(self, ctx: &ExecutionContext<'_>) -> Result<Location> {
-		let uri = self.path.render(ctx).await?;
+	pub async fn build(self, ctx: &ExecutionContext<'_>) -> Result<Location, Error> {
+		let path_template = ctx.services.compiler.compile_template(&self.path)?;
+		let uri = path_template.render(ctx).await?;
 		let (host, path) = parse_uri(&uri)?;
 		let path = PathBuf::from(path);
 
@@ -63,7 +62,7 @@ impl LocationBuilder {
 
 		Ok(Location {
 			path,
-			options: self.options.compile(ctx).await,
+			options: self.options.compile(ctx).await?,
 			mode: self.mode,
 			backend: ctx.services.fs.backends.get(&host).unwrap().clone(), // The direct Arc clone to the provider
 		})

@@ -1,12 +1,9 @@
+pub mod accessor;
+pub mod compiler;
 pub mod engine;
 pub mod filter;
+pub mod registry;
+pub mod schema;
 pub mod template;
+pub mod value;
 pub mod variable;
-
-pub mod prelude {
-	pub use super::{
-		engine::{TemplateError, Templater},
-		template::Template,
-		variable::Variable,
-	};
-}

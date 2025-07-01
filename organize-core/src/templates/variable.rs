@@ -1,17 +1,23 @@
-use anyhow::Result;
-use async_trait::async_trait;
-use dyn_clone::DynClone;
-use dyn_eq::DynEq;
-use std::fmt::Debug;
+use crate::templates::schema::Property;
 
-use crate::{context::ExecutionContext, errors::Error};
+/// The plugin interface for a static variable provider.
+///
+/// Any struct implementing this trait can be automatically discovered and
+/// integrated into the template engine's schema. This trait is intended for
+/// built-in variables with fixed schemas, like `file` or `env`.
+pub trait StatelessVariable: Sync + Send {
+	/// Returns the canonical name of the root variable (e.g., "file", "env").
+	fn name(&self) -> &'static str;
 
-dyn_clone::clone_trait_object!(Variable);
-dyn_eq::eq_trait_object!(Variable);
-
-#[async_trait]
-#[typetag::serde(tag = "type", content = "value")]
-pub trait Variable: DynEq + DynClone + Sync + Send + Debug {
-	fn name(&self) -> String;
-	async fn compute(&self, ctx: &ExecutionContext<'_>) -> Result<serde_json::Value, Error>;
+	/// Returns the schema for this variable, defining its properties and accessors.
+	fn schema(&self) -> Property;
 }
+
+/// The collectible struct for the `inventory` crate.
+/// It holds a static reference to an object that implements our `Variable` trait.
+pub struct VariableInventory {
+	pub provider: &'static (dyn StatelessVariable + Sync),
+}
+
+// Declare the global collection for automatic registration of static variable providers.
+inventory::collect!(VariableInventory);

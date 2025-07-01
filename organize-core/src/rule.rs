@@ -4,13 +4,13 @@ use itertools::Itertools;
 use serde::{Deserialize, Deserializer, Serialize};
 
 use crate::{
-	action::Action,
+	action::{Action, ActionBuilder},
 	context::ExecutionContext,
+	errors::Error,
 	filter::Filter,
 	folder::{Location, LocationBuilder},
 	grouper::Grouper,
 	sorter::Sorter,
-	templates::prelude::*,
 };
 
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]
@@ -30,10 +30,8 @@ pub struct RuleBuilder {
 	pub pipeline: Vec<StageBuilder>,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]
-#[serde(deny_unknown_fields)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Rule {
-	#[serde(flatten)]
 	pub metadata: Arc<RuleMetadata>,
 	pub pipeline: Vec<Stage>,
 }
@@ -43,8 +41,9 @@ async fn load_rule_builder_from_path(path: &std::path::Path) -> Result<RuleBuild
 	let builder: RuleBuilder = toml::from_str(&content)?;
 	Ok(builder)
 }
+
 impl RuleBuilder {
-	pub async fn build(self, ctx: &ExecutionContext<'_>) -> Result<Rule, anyhow::Error> {
+	pub async fn build(self, ctx: &ExecutionContext<'_>) -> Result<Rule, Error> {
 		let mut final_pipeline = Vec::new();
 		let main_meta = Arc::new(self.metadata);
 		let mut processing_stack: Vec<(StageBuilder, Arc<RuleMetadata>)> = self
@@ -65,7 +64,7 @@ impl RuleBuilder {
 				}
 				// The logic to build the final Stage enum now changes slightly
 				other_builder => {
-					let stage_enum = other_builder.build(ctx, meta).await;
+					let stage_enum = other_builder.build(ctx, meta).await?;
 					final_pipeline.push(stage_enum);
 				}
 			}
@@ -82,7 +81,7 @@ impl RuleBuilder {
 pub enum StageBuilder {
 	Search(LocationBuilder),
 	Compose(PathBuf),
-	Action(Box<dyn Action>),
+	Action(Box<dyn ActionBuilder>),
 	Filter(Box<dyn Filter>),
 	Grouper(Box<dyn Grouper>),
 	Sorter(Box<dyn Sorter>),
@@ -90,26 +89,29 @@ pub enum StageBuilder {
 }
 
 impl StageBuilder {
-	pub async fn build(self, ctx: &ExecutionContext<'_>, source: Arc<RuleMetadata>) -> Stage {
+	pub async fn build(self, ctx: &ExecutionContext<'_>, source: Arc<RuleMetadata>) -> Result<Stage, Error> {
 		match self {
 			StageBuilder::Search(location_builder) => {
 				let stage = location_builder.build(ctx).await.unwrap();
-				Stage::Search { location: stage, source }
+				Ok(Stage::Search { location: stage, source })
 			}
-			StageBuilder::Flatten(bool) => Stage::Flatten {
+			StageBuilder::Flatten(bool) => Ok(Stage::Flatten {
 				flatten: bool,
-				source: source,
-			},
-			StageBuilder::Action(stage) => Stage::Action { action: stage, source },
-			StageBuilder::Filter(stage) => Stage::Filter { filter: stage, source },
-			StageBuilder::Grouper(stage) => Stage::Grouper { grouper: stage, source },
-			StageBuilder::Sorter(stage) => Stage::Sorter { sorter: stage, source },
+				source,
+			}),
+			StageBuilder::Action(builder) => {
+				let stage = builder.build(ctx).await?;
+				Ok(Stage::Action { action: stage, source })
+			}
+			StageBuilder::Filter(stage) => Ok(Stage::Filter { filter: stage, source }),
+			StageBuilder::Grouper(stage) => Ok(Stage::Grouper { grouper: stage, source }),
+			StageBuilder::Sorter(stage) => Ok(Stage::Sorter { sorter: stage, source }),
 			StageBuilder::Compose(_) => unreachable!("Compose stages should be flattened"),
 		}
 	}
 }
 
-#[derive(Debug, Deserialize, Serialize, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Stage {
 	Search { location: Location, source: Arc<RuleMetadata> },
 	Action { action: Box<dyn Action>, source: Arc<RuleMetadata> },
@@ -252,7 +254,7 @@ impl<'de> Deserialize<'de> for StageBuilder {
 						Box::<dyn Filter>::deserialize(component_value).map_err(serde::de::Error::custom)?,
 					)),
 					"action" => Ok(StageBuilder::Action(
-						Box::<dyn Action>::deserialize(component_value).map_err(serde::de::Error::custom)?,
+						Box::<dyn ActionBuilder>::deserialize(component_value).map_err(serde::de::Error::custom)?,
 					)),
 					"group-by" => Ok(StageBuilder::Grouper(
 						Box::<dyn Grouper>::deserialize(component_value).map_err(serde::de::Error::custom)?,

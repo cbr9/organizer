@@ -15,6 +15,7 @@ use crate::{
 	folder::Location,
 	resource::Resource,
 	rule::RuleMetadata,
+	templates::compiler::TemplateCompiler,
 };
 
 #[derive(Debug, Clone)]
@@ -22,6 +23,7 @@ pub struct RunServices {
 	pub blackboard: Blackboard,
 	pub fs: FileSystemManager,
 	pub journal: Arc<Journal>,
+	pub compiler: TemplateCompiler,
 }
 
 #[derive(Debug, Clone)]
@@ -154,7 +156,7 @@ pub struct ExecutionContext<'a> {
 }
 
 impl<'a> ExecutionContext<'a> {
-	pub fn with_scope(&self, scope: ExecutionScope<'a>) -> ExecutionContext {
+	pub fn with_scope(&'a self, scope: ExecutionScope<'a>) -> ExecutionContext<'a> {
 		Self {
 			services: self.services,
 			scope,

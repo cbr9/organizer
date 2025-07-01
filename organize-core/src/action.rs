@@ -2,13 +2,7 @@ use async_trait::async_trait;
 use clap::ValueEnum;
 use dialoguer::{theme::ColorfulTheme, Input as RenameInput, Select};
 use serde::{Deserialize, Serialize};
-use std::{
-	collections::HashMap,
-	ffi::OsStr,
-	fmt::Debug,
-	path::Path,
-	sync::Arc,
-};
+use std::{collections::HashMap, ffi::OsStr, fmt::Debug, path::Path, sync::Arc};
 use strum::{Display, EnumIter, IntoEnumIterator};
 
 use anyhow::Result;
@@ -166,6 +160,15 @@ impl UndoConflict {
 			UndoConflict::AutoRename => Ok(Some(suggest_new_path(resource).await?)),
 		}
 	}
+}
+
+dyn_clone::clone_trait_object!(ActionBuilder);
+dyn_eq::eq_trait_object!(ActionBuilder);
+
+#[async_trait]
+#[typetag::serde(tag = "type")]
+pub trait ActionBuilder: DynEq + DynClone + Sync + Send + Debug {
+	async fn build(&self, _ctx: &ExecutionContext<'_>) -> Result<Box<dyn Action>, Error>;
 }
 
 dyn_clone::clone_trait_object!(Action);

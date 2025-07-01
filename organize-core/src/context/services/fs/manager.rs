@@ -4,11 +4,10 @@ use crate::{
 	folder::LocalFileSystem,
 	resource::{FileState, Resource},
 	storage::StorageProvider,
-	templates::template::Template,
+	templates::template::{Template, TemplateString},
 };
 use anyhow::Result;
 use moka::future::Cache;
-use path_clean::PathClean;
 use serde::{Deserialize, Serialize};
 use std::{
 	collections::HashMap,
@@ -19,30 +18,39 @@ use std::{
 use url::Url; // Assuming this is needed for dry_run and context
 
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
+pub struct DestinationBuilder {
+	pub folder: TemplateString,
+	pub filename: Option<TemplateString>,
+}
+impl DestinationBuilder {
+	/// Compiles the raw DestinationBuilder into an executable Destination.
+	pub fn build(self, ctx: &ExecutionContext<'_>) -> Result<Destination, Error> {
+		let folder = ctx.services.compiler.compile_template(&self.folder)?;
+		let filename = self.filename.map(|f| ctx.services.compiler.compile_template(&f)).transpose()?; // This elegantly handles the Option<Result<T, E>>
+		Ok(Destination { folder, filename })
+	}
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Destination {
 	pub folder: Template,
 	pub filename: Option<Template>,
 }
 
 impl Destination {
-	pub async fn resolve(&self, ctx: &ExecutionContext<'_>) -> Result<PathBuf, Error> {
-		let folder = self.folder.render(ctx).await?;
-
-		let mut folder = PathBuf::from(folder).clean();
-		let filename = if let Some(filename) = &self.filename {
-			filename.render(ctx).await?
-		} else {
-			ctx.scope
-				.resource()?
-				.as_path()
-				.file_name()
-				.unwrap()
-				.to_string_lossy()
-				.to_string()
-		};
-
-		let filename = PathBuf::from(filename).clean();
-		folder.push(filename);
+	pub async fn resolve(&self, ctx: &ExecutionContext<'_>) -> Result<PathBuf> {
+		let mut folder = PathBuf::from(self.folder.render(ctx).await?);
+		if let Some(filename_template) = &self.filename {
+			let filename = filename_template.render(ctx).await?;
+			folder.push(filename);
+		}
+		// A placeholder for the original filename if `filename` is not provided.
+		// This would need access to the resource from the context.
+		else if let Ok(resource) = ctx.scope.resource() {
+			if let Some(name) = resource.path.file_name() {
+				folder.push(name);
+			}
+		}
 		Ok(folder)
 	}
 }

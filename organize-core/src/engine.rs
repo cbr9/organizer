@@ -9,6 +9,7 @@ use crate::{
 	},
 	pipeline::Pipeline,
 	rule::{Rule, RuleBuilder},
+	templates::compiler::TemplateCompiler,
 };
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
@@ -46,6 +47,7 @@ impl Engine {
 			blackboard: Blackboard::default(),
 			journal: Arc::new(Journal::new(&settings).await?),
 			fs: FileSystemManager::new(),
+			compiler: TemplateCompiler::new(),
 		};
 		let content = tokio::fs::read_to_string(path).await?;
 		let rule = {
