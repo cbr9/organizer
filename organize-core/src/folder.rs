@@ -278,7 +278,7 @@ impl StorageProvider for LocalFileSystem {
 		Ok(tokio::fs::read(path).await?)
 	}
 
-	async fn write(&self, path: &Path, content: &[u8]) -> Result<()> {
+	async fn write(&self, _path: &Path, _content: &[u8]) -> Result<()> {
 		todo!()
 	}
 }

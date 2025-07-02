@@ -11,7 +11,7 @@ use crate::{
 	rule::{Rule, Stage},
 	sorter::Sorter,
 };
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 /// Represents the data flowing through the pipeline.
 /// It tracks the current set of file batches and the sequence of
@@ -20,7 +20,7 @@ use std::sync::Arc;
 pub struct PipelineStream {
 	/// The current data, always represented as a list of batches.
 	/// An "ungrouped" state is simply a Vec with one Batch.
-	pub batches: Vec<Batch>,
+	pub batches: HashMap<String, Batch>,
 	/// The ordered stack of groupers that have been applied.
 	pub groupers: Vec<Box<dyn Grouper>>,
 	pub sorters: Vec<Box<dyn Sorter>>,
@@ -30,7 +30,7 @@ impl PipelineStream {
 	/// Creates a new stream with a single batch of files and no groupings.
 	pub fn new(files: Vec<Arc<Resource>>) -> Self {
 		Self {
-			batches: vec![Batch::initial(files)],
+			batches: HashMap::from([("root".into(), Batch::initial(files))]),
 			groupers: Vec::new(),
 			sorters: Vec::new(),
 		}
@@ -38,11 +38,11 @@ impl PipelineStream {
 
 	/// Flattens all batches into a single, unordered list of files.
 	pub fn all_files(&self) -> Vec<Arc<Resource>> {
-		self.batches.iter().flat_map(|batch| batch.files.clone()).collect()
+		self.batches.values().flat_map(|batch| batch.files.clone()).collect()
 	}
 
 	pub async fn resort(&mut self) {
-		for batch in self.batches.iter_mut() {
+		for batch in self.batches.values_mut() {
 			for sorter in &self.sorters {
 				sorter.sort(&mut batch.files).await;
 			}
@@ -51,24 +51,22 @@ impl PipelineStream {
 
 	/// Re-applies the entire stack of stored groupers to a new set of files.
 	/// This is the key to maintaining a consistent state.
-	pub async fn regroup(&self, files: Vec<Arc<Resource>>) -> Result<Vec<Batch>, anyhow::Error> {
-		let mut current_batches = vec![Batch::initial(files)];
+	pub async fn regroup(&self, files: Vec<Arc<Resource>>) -> Result<HashMap<String, Batch>, anyhow::Error> {
+		let mut current_batches = HashMap::from([("root".into(), Batch::initial(files))]);
 
 		for grouper in &self.groupers {
-			let mut next_level_batches = Vec::new();
-			for parent_batch in &current_batches {
+			let mut next_level_batches = HashMap::new();
+			for (parent_name, parent_batch) in &current_batches {
 				let named_batches_map = grouper.group(parent_batch).await?;
 				for (new_key_part, mut sub_batch) in named_batches_map {
-					// Construct the new concatenated name
-					sub_batch.name = if parent_batch.name.is_empty() {
+					let new_name = if parent_name == "root" {
 						new_key_part.clone()
 					} else {
-						format!("{}.{}", parent_batch.name, new_key_part)
+						format!("{parent_name}.{new_key_part}")
 					};
-					// Inherit context and add the new grouping key
 					sub_batch.context.extend(parent_batch.context.clone());
 					sub_batch.context.insert(grouper.name().to_string(), new_key_part.clone());
-					next_level_batches.push(sub_batch);
+					next_level_batches.insert(new_name, sub_batch);
 				}
 			}
 			current_batches = next_level_batches;
@@ -107,38 +105,36 @@ impl Pipeline {
 					}
 				}
 				Stage::Split { splitter, .. } => {
-					let mut next_stream_batches = Vec::new();
-					for parent_batch in &self.stream.batches {
-						let mut split_batches = splitter.split(parent_batch).await?;
+					let mut next_stream_batches = HashMap::new();
+					for (parent_name, parent_batch) in &self.stream.batches {
+						let split_batches = splitter.split(parent_batch).await?;
 
-						// Post-process the newly created batches to handle names and context
-						for sub_batch in &mut split_batches {
-							sub_batch.name = if parent_batch.name.is_empty() {
-								sub_batch.name.clone() // It was already set by the splitter
+						for (new_key_part, mut sub_batch) in split_batches {
+							let new_name = if parent_name == "root" {
+								new_key_part.clone()
 							} else {
-								format!("{}.{}", parent_batch.name, sub_batch.name)
+								format!("{parent_name}.{new_key_part}")
 							};
 							sub_batch.context.extend(parent_batch.context.clone());
+							next_stream_batches.insert(new_name, sub_batch);
 						}
-						next_stream_batches.extend(split_batches);
 					}
 					self.stream.batches = next_stream_batches;
 					self.stream.resort().await;
 				}
 				Stage::Group { grouper, .. } => {
-					let mut next_level_batches = Vec::new();
-					for parent_batch in &self.stream.batches {
+					let mut next_level_batches = HashMap::new();
+					for (parent_name, parent_batch) in &self.stream.batches {
 						let named_batches_map = grouper.group(parent_batch).await?;
 						for (new_key_part, mut sub_batch) in named_batches_map {
-							// Construct the new concatenated name
-							sub_batch.name = if parent_batch.name.is_empty() {
+							let new_name = if parent_name == "root" {
 								new_key_part.clone()
 							} else {
-								format!("{}.{}", parent_batch.name, new_key_part)
+								format!("{parent_name}.{new_key_part}")
 							};
 							sub_batch.context.extend(parent_batch.context.clone());
 							sub_batch.context.insert(grouper.name().to_string(), new_key_part);
-							next_level_batches.push(sub_batch);
+							next_level_batches.insert(new_name, sub_batch);
 						}
 					}
 					self.stream.batches = next_level_batches;
@@ -150,16 +146,15 @@ impl Pipeline {
 					self.stream.resort().await;
 				}
 				Stage::Filter { filter, source } => {
-					let mut next_batches = Vec::new();
+					let mut next_batches = HashMap::new();
 					match filter.execution_model() {
 						ExecutionModel::Batch => {
-							for batch in self.stream.batches.iter() {
+							for (name, batch) in &self.stream.batches {
 								let scope = ExecutionScope::new_batch_scope(source.clone(), batch);
 								let batch_ctx = ctx.with_scope(scope);
 								let passed_files = filter.filter(&batch_ctx).await?;
 								if !passed_files.is_empty() {
-									next_batches.push(Batch {
-										name: batch.name.clone(),
+									next_batches.insert(name.clone(), Batch {
 										files: passed_files,
 										context: batch.context.clone(),
 									});
@@ -167,7 +162,7 @@ impl Pipeline {
 							}
 						}
 						ExecutionModel::Single => {
-							for batch in self.stream.batches.iter() {
+							for (name, batch) in &self.stream.batches {
 								let mut futs = Vec::new();
 								for resource in &batch.files {
 									let resource_clone = resource.clone();
@@ -182,8 +177,7 @@ impl Pipeline {
 								}
 								let results: Vec<Arc<Resource>> = future::try_join_all(futs).await?.into_iter().flatten().collect();
 								if !results.is_empty() {
-									next_batches.push(Batch {
-										name: batch.name.clone(),
+									next_batches.insert(name.clone(), Batch {
 										files: results,
 										context: batch.context.clone(),
 									});
@@ -194,18 +188,19 @@ impl Pipeline {
 					self.stream.batches = next_batches;
 				}
 				Stage::Action { action, source } => {
-					let mut all_next_files = Vec::new();
-					match action.execution_model() {
-						ExecutionModel::Batch => {
-							for batch in self.stream.batches.iter() {
+					let mut next_stream_batches = HashMap::new(); // This will hold the new batches
+
+					for (name, batch) in &self.stream.batches {
+						let mut current_batch_next_files = Vec::new(); // Files for the current batch
+
+						match action.execution_model() {
+							ExecutionModel::Batch => {
 								let scope = ExecutionScope::new_batch_scope(source.clone(), batch);
 								let batch_ctx = ctx.with_scope(scope);
 								let receipt = action.commit(&batch_ctx).await?;
-								all_next_files.extend(receipt.next);
+								current_batch_next_files.extend(receipt.next);
 							}
-						}
-						ExecutionModel::Single => {
-							for batch in self.stream.batches.iter() {
+							ExecutionModel::Single => {
 								let mut futs = Vec::new();
 								for resource in &batch.files {
 									let resource_clone = resource.clone();
@@ -220,13 +215,20 @@ impl Pipeline {
 								}
 								let receipts: Vec<Receipt> = future::try_join_all(futs).await?;
 								for receipt in receipts {
-									all_next_files.extend(receipt.next);
+									current_batch_next_files.extend(receipt.next);
 								}
 							}
 						}
+
+						// Create a new batch with the original name and the collected files
+						if !current_batch_next_files.is_empty() {
+							next_stream_batches.insert(name.clone(), Batch {
+								files: current_batch_next_files,
+								context: batch.context.clone(), // Inherit context
+							});
+						}
 					}
-					// An action's output always replaces the current data stream and resets grouping.
-					self.stream = PipelineStream::new(all_next_files);
+					self.stream.batches = next_stream_batches;
 				}
 				Stage::Flatten { flatten, .. } => {
 					if flatten {
@@ -234,9 +236,14 @@ impl Pipeline {
 					}
 				}
 				Stage::Select { selector, .. } => {
-					let selection_futures = self.stream.batches.iter().map(|batch| selector.select(batch));
-					let selected_batches: Vec<Batch> = future::try_join_all(selection_futures).await?.into_iter().collect();
-					self.stream.batches = selected_batches;
+					let mut next_batches = HashMap::new();
+					for (name, batch) in &self.stream.batches {
+						let selected_batch = selector.select(batch).await?;
+						if !selected_batch.files.is_empty() {
+							next_batches.insert(name.clone(), selected_batch);
+						}
+					}
+					self.stream.batches = next_batches;
 				}
 			}
 		}

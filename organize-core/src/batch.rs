@@ -6,7 +6,6 @@ use crate::resource::Resource;
 /// This is the primary data structure that flows between pipeline stages.
 #[derive(Debug, Clone)]
 pub struct Batch {
-	pub name: String,
 	pub files: Vec<Arc<Resource>>,
 	pub context: HashMap<String, String>,
 }
@@ -14,7 +13,6 @@ pub struct Batch {
 impl Batch {
 	pub fn new() -> Self {
 		Self {
-			name: String::new(),
 			files: Vec::new(),
 			context: HashMap::new(),
 		}
@@ -22,7 +20,6 @@ impl Batch {
 
 	pub fn initial(files: Vec<Arc<Resource>>) -> Self {
 		Self {
-			name: String::new(),
 			files,
 			context: HashMap::new(),
 		}

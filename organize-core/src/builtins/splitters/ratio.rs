@@ -1,7 +1,7 @@
 use crate::{batch::Batch, errors::Error, splitter::Splitter};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::{collections::HashMap, iter::FromIterator};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RatioSplitter {
@@ -40,7 +40,7 @@ impl PartialEq for RatioSplitter {
 #[async_trait]
 #[typetag::serde(name = "ratio")]
 impl Splitter for RatioSplitter {
-	async fn split(&self, batch: &Batch) -> Result<Vec<Batch>, Error> {
+	async fn split(&self, batch: &Batch) -> Result<HashMap<String, Batch>, Error> {
 		// 1. Validate that the ratios sum to approximately 1.0
 		let total_ratio: f64 = self.ratios.values().sum();
 		if (total_ratio - 1.0).abs() > 1e-9 {
@@ -63,9 +63,8 @@ impl Splitter for RatioSplitter {
 
 			let mut new_batch = Batch::new();
 			new_batch.files = split_files_slice.to_vec();
-			new_batch.name = name.clone();
 
-			result_batches.push(new_batch);
+			result_batches.push((name.clone(), new_batch));
 			remaining_files = rest;
 		}
 
@@ -73,10 +72,12 @@ impl Splitter for RatioSplitter {
 		//    to the last batch.
 		if !remaining_files.is_empty() {
 			if let Some(last_batch) = result_batches.last_mut() {
-				last_batch.files.extend_from_slice(remaining_files);
+				last_batch.1.files.extend_from_slice(remaining_files);
 			}
 		}
 
-		Ok(result_batches)
+		let batches = HashMap::from_iter(result_batches);
+
+		Ok(batches)
 	}
 }
