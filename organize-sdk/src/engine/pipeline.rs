@@ -156,6 +156,9 @@ impl Pipeline {
 				if !params.enabled {
 					continue;
 				}
+				if let Some(description) = &params.description {
+					tracing::debug!(description = %description, "Running stage");
+				}
 			}
 			match stage {
 				Stage::Search { location, source, .. } => {
@@ -348,4 +351,3 @@ impl Pipeline {
 		Ok(self.stream)
 	}
 }
-

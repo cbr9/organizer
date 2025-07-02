@@ -18,6 +18,8 @@ use crate::{
 
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq, Default)]
 pub struct StageParams {
+	#[serde(default)]
+	pub description: Option<String>,
 	#[serde(default = "default_true")]
 	pub enabled: bool,
 	#[serde(default)]
@@ -140,6 +142,7 @@ impl<'de> Deserialize<'de> for StageBuilder {
 		let params: StageParams = toml::Value::Table(table.clone()).try_into().map_err(serde::de::Error::custom)?;
 		table.remove("on_batches");
 		table.remove("enabled");
+		table.remove("description");
 
 		match key.as_str() {
 			"search" => {
