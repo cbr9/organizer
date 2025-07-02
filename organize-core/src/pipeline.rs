@@ -187,6 +187,11 @@ impl Pipeline {
 						self.stream = PipelineStream::new(self.stream.all_files());
 					}
 				}
+				Stage::Select { selector, .. } => {
+					let selection_futures = self.stream.batches.iter().map(|batch| selector.select(batch));
+					let selected_batches: Vec<Batch> = future::try_join_all(selection_futures).await?.into_iter().collect();
+					self.stream.batches = selected_batches;
+				}
 			}
 		}
 		Ok(self.stream)
