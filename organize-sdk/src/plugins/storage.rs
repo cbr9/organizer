@@ -23,14 +23,14 @@ pub trait StorageProvider: DynEq + DynClone + Sync + Send + Debug {
 	async fn metadata(&self, path: &Path) -> Result<Metadata, Error>;
 	async fn read_dir(&self, path: &Path) -> Result<Vec<PathBuf>, Error>;
 	async fn read(&self, path: &Path) -> Result<Vec<u8>, Error>;
-	async fn write(&self, path: &Path, content: &[u8]) -> Result<()>;
+	async fn write(&self, path: &Path, content: &[u8]) -> Result<(), Error>;
 	async fn discover(&self, location: &Location, ctx: &ExecutionContext<'_>) -> Result<Vec<Arc<Resource>>, Error>;
-	async fn mkdir(&self, path: &Path, ctx: ExecutionContext<'_>) -> Result<(), Error>;
-	async fn r#move(&self, from: &Path, to: &Path, ctx: ExecutionContext<'_>) -> Result<(), Error>;
-	async fn copy(&self, from: &Path, to: &Path, ctx: ExecutionContext<'_>) -> Result<(), Error>;
+	async fn mkdir(&self, path: &Path, ctx: &ExecutionContext<'_>) -> Result<(), Error>;
+	async fn r#move(&self, from: &Path, to: &Path, ctx: &ExecutionContext<'_>) -> Result<(), Error>;
+	async fn copy(&self, from: &Path, to: &Path, ctx: &ExecutionContext<'_>) -> Result<(), Error>;
 	async fn delete(&self, path: &Path) -> Result<(), Error>;
 	async fn download(&self, from: &Path) -> Result<PathBuf, Error>;
-	async fn upload(&self, from_local: &Path, to: &Path, ctx: ExecutionContext<'_>) -> Result<(), Error>;
-	async fn hardlink(&self, from: &Path, to: &Path, ctx: ExecutionContext<'_>) -> Result<(), Error>;
-	async fn symlink(&self, from: &Path, to: &Path, ctx: ExecutionContext<'_>) -> Result<(), Error>;
+	async fn upload(&self, from_local: &Path, to: &Path, ctx: &ExecutionContext<'_>) -> Result<(), Error>;
+	async fn hardlink(&self, from: &Path, to: &Path, ctx: &ExecutionContext<'_>) -> Result<(), Error>;
+	async fn symlink(&self, from: &Path, to: &Path, ctx: &ExecutionContext<'_>) -> Result<(), Error>;
 }

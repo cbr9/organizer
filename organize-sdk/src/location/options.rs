@@ -20,6 +20,8 @@ pub struct OptionsBuilder {
 	#[serde(default)]
 	pub partial_files: bool,
 	#[serde(default)]
+	pub follow_symlinks: bool,
+	#[serde(default)]
 	pub target: Target,
 }
 
@@ -30,6 +32,7 @@ pub struct Options {
 	pub exclude: Vec<PathBuf>,
 	pub hidden_files: bool,
 	pub partial_files: bool,
+	pub follow_symlinks: bool,
 	pub target: Target,
 }
 
@@ -50,6 +53,7 @@ impl OptionsBuilder {
 			exclude: excluded_paths,
 			hidden_files: self.hidden_files,
 			partial_files: self.partial_files,
+			follow_symlinks: self.follow_symlinks,
 			target: self.target,
 		})
 	}

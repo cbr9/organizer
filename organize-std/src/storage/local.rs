@@ -1,5 +1,4 @@
 use std::{
-	collections::HashSet,
 	fs::Metadata,
 	path::{Path, PathBuf},
 	sync::Arc,
@@ -7,7 +6,7 @@ use std::{
 
 use anyhow::{Context as ErrorContext, Result};
 use async_trait::async_trait;
-use futures::{stream, StreamExt};
+use futures::{stream, StreamExt, TryStreamExt};
 use organize_sdk::{
 	context::ExecutionContext,
 	error::Error,
@@ -20,6 +19,7 @@ use organize_sdk::{
 	stdx::path::PathExt,
 };
 use serde::{Deserialize, Serialize};
+use walkdir::WalkDir;
 
 #[derive(Deserialize, Serialize, PartialEq, Eq, Debug, Clone)]
 pub struct LocalFileSystem;
@@ -35,7 +35,7 @@ impl StorageProvider for LocalFileSystem {
 		Ok(dirs::home_dir().context("unable to find home directory")?)
 	}
 
-	async fn mkdir(&self, path: &Path, ctx: ExecutionContext<'_>) -> Result<(), Error> {
+	async fn mkdir(&self, path: &Path, _ctx: &ExecutionContext<'_>) -> Result<(), Error> {
 		if let Some(parent) = path.parent() {
 			if !tokio::fs::try_exists(parent).await.unwrap_or(false) {
 				tokio::fs::create_dir_all(parent).await?;
@@ -44,7 +44,7 @@ impl StorageProvider for LocalFileSystem {
 		Ok(())
 	}
 
-	async fn r#move(&self, from: &Path, to: &Path, ctx: ExecutionContext<'_>) -> Result<(), Error> {
+	async fn r#move(&self, from: &Path, to: &Path, ctx: &ExecutionContext<'_>) -> Result<(), Error> {
 		// ctx.services.fs.ensure_parent_dir_exists(destination.as_path()).await?;
 		self.mkdir(to, ctx).await?;
 		match tokio::fs::rename(from, to).await {
@@ -65,125 +65,102 @@ impl StorageProvider for LocalFileSystem {
 		}
 	}
 
-	async fn copy(&self, from: &Path, to: &Path, ctx: ExecutionContext<'_>) -> Result<(), Error> {
-		todo!()
-	}
+	async fn copy(&self, from: &Path, to: &Path, ctx: &ExecutionContext<'_>) -> Result<(), Error> {
+		self.mkdir(to, ctx).await?;
 
-	async fn delete(&self, path: &Path) -> Result<(), Error> {
-		todo!()
-	}
+		let mut dirs = Vec::new();
+		let mut files = Vec::new();
+		for entry in WalkDir::new(from).into_iter().filter_map(|e| e.ok()) {
+			if entry.path().is_dir() {
+				dirs.push(entry.path().to_path_buf());
+			} else {
+				files.push(entry.path().to_path_buf());
+			}
+		}
 
-	async fn download(&self, from: &Path) -> Result<PathBuf, Error> {
-		Ok(PathBuf::new())
-	}
+		for dir in dirs {
+			let relative_path = dir.strip_prefix(from).unwrap();
+			let dest_path = to.join(relative_path);
+			tokio::fs::create_dir_all(&dest_path).await?;
+		}
 
-	async fn upload(&self, from_local: &Path, to: &Path, ctx: ExecutionContext<'_>) -> Result<(), Error> {
+		let copy_futures = files.into_iter().map(|file| {
+			let relative_path = file.strip_prefix(from).unwrap().to_path_buf();
+			let dest_path = to.join(relative_path);
+			async move { tokio::fs::copy(file, dest_path).await.map(|_| ()).map_err(Error::from) }
+		});
+
+		stream::iter(copy_futures)
+			.buffer_unordered(num_cpus::get())
+			.try_collect::<()>()
+			.await?;
+
 		Ok(())
 	}
 
-	async fn hardlink(&self, from: &Path, to: &Path, ctx: ExecutionContext<'_>) -> Result<(), Error> {
-		todo!()
+	async fn delete(&self, path: &Path) -> Result<(), Error> {
+		if path.is_dir() {
+			tokio::fs::remove_dir_all(path).await.map_err(Error::from)
+		} else {
+			tokio::fs::remove_file(path).await.map_err(Error::from)
+		}
 	}
 
-	async fn symlink(&self, from: &Path, to: &Path, ctx: ExecutionContext<'_>) -> Result<(), Error> {
-		todo!()
+	async fn download(&self, _from: &Path) -> Result<PathBuf, Error> {
+		Ok(PathBuf::new())
+	}
+
+	async fn upload(&self, _from_local: &Path, _to: &Path, _ctx: &ExecutionContext<'_>) -> Result<(), Error> {
+		Ok(())
+	}
+
+	async fn hardlink(&self, from: &Path, to: &Path, ctx: &ExecutionContext<'_>) -> Result<(), Error> {
+		self.mkdir(to, ctx).await?;
+		tokio::fs::hard_link(from, to).await.map_err(Error::from)
+	}
+
+	async fn symlink(&self, from: &Path, to: &Path, ctx: &ExecutionContext<'_>) -> Result<(), Error> {
+		self.mkdir(to, ctx).await?;
+		#[cfg(unix)]
+		{
+			tokio::fs::symlink(from, to).await.map_err(Error::from)
+		}
+		#[cfg(windows)]
+		{
+			if from.is_dir() {
+				tokio::fs::symlink_dir(from, to).await.map_err(Error::from)
+			} else {
+				tokio::fs::symlink_file(from, to).await.map_err(Error::from)
+			}
+		}
 	}
 
 	async fn discover(&self, location: &Location, ctx: &ExecutionContext<'_>) -> Result<Vec<Arc<Resource>>, Error> {
-		let concurrency_limit = 50;
-		let home = self.home()?;
-		let min_depth = {
-			let base = if location.path == home {
-				1.0 as usize
-			} else {
-				location.options.min_depth
-			};
-			(base as f64).max(1.0) as usize
-		};
+		let location = Arc::new(location.clone());
+		let walker = WalkDir::new(&location.path)
+			.min_depth(location.options.min_depth)
+			.max_depth(location.options.max_depth)
+			.follow_links(location.options.follow_symlinks);
 
-		let max_depth = if location.path == home {
-			1.0 as usize
-		} else {
-			location.options.max_depth
-		};
-
-		let mut collected_paths = Vec::new();
-		let mut dirs_to_visit: Vec<(PathBuf, usize)> = vec![];
-
-		let excluded_paths_set: HashSet<&PathBuf> = location.options.exclude.iter().collect();
-
-		if excluded_paths_set.contains(&location.path) {
-			tracing::warn!(
-				"Start directory '{}' is in the excluded paths. Aborting search.",
-				&location.path.display()
-			);
-			return Ok(Vec::new());
-		}
-
-		if min_depth == 0 {
-			collected_paths.push(location.path.clone());
-		}
-
-		dirs_to_visit.push((location.path.clone(), 0));
-
-		while let Some((current_dir, current_depth)) = dirs_to_visit.pop() {
-			if current_depth >= max_depth {
-				continue;
-			}
-
-			let mut entries = match tokio::fs::read_dir(&current_dir).await {
-				Ok(e) => e,
-				Err(e) => {
-					eprintln!("Warning: Could not read directory {}: {}", current_dir.display(), e);
-					continue;
-				}
-			};
-
-			while let Some(entry) = entries.next_entry().await? {
-				let path = entry.path();
-				let next_depth = current_depth + 1;
-
-				// --- Exclusion Logic for encountered paths (files or directories) ---
-				if excluded_paths_set.contains(&path) {
-					eprintln!("Excluding path: {}", path.display());
-					// If it's a directory, we effectively prune the branch.
-					// If it's a file, we just don't collect it.
-					continue;
-				}
-				// --- End Exclusion Logic ---
-
-				// Only add &location.path if it's within the specified depth range
-				if next_depth >= min_depth && next_depth <= max_depth {
-					collected_paths.push(path.clone());
-				}
-
-				// If it's a directory and still within max_depth, add it to dirs_to_visit
-				// (after checking for exclusion, which is done above)
-				if path.is_dir() && next_depth < max_depth {
-					dirs_to_visit.push((path, next_depth));
-				}
-			}
-		}
-
-		// let all_files = self.find_all_files(min_depth, max_depth, ctx).await?;
-		let location: Arc<Location> = Arc::new(location.clone());
-		let resource_creation_futures = collected_paths
+		let collected_paths: Vec<PathBuf> = walker
 			.into_iter()
-			.filter(|e| self.filter_entries(e, &location.options))
-			.map(|e| {
-				// Capture `e` by moving it into the async block
-				// Capture `ctx` by reference (or clone/Arc if its lifetime is an issue)
-				let ctx_ref = ctx;
-				let location = location.clone();
-				async move {
-					e.as_resource(ctx_ref, location).await // Returns Result<Resource, AsResourceError>
-				}
-			});
+			.filter_map(|e| e.ok())
+			.map(|e| e.path().to_path_buf())
+			.filter(|p| self.filter_entries(p, &location.options))
+			.collect();
 
-		Ok(stream::iter(resource_creation_futures) // stream::iter expects an Iterator<Item=Future>
-			.buffer_unordered(concurrency_limit) // Execute Futures concurrently
-			.collect()
-			.await)
+		let resource_creation_futures = collected_paths.into_iter().map(|path| {
+			let location = location.clone();
+			// let ctx = *ctx;
+			async move { path.as_resource(&ctx, location).await }
+		});
+
+		let resources = stream::iter(resource_creation_futures)
+			.buffer_unordered(num_cpus::get())
+			.collect::<Vec<_>>()
+			.await;
+
+		Ok(resources)
 	}
 
 	async fn metadata(&self, path: &Path) -> Result<Metadata, Error> {
@@ -203,8 +180,8 @@ impl StorageProvider for LocalFileSystem {
 		Ok(tokio::fs::read(path).await?)
 	}
 
-	async fn write(&self, _path: &Path, _content: &[u8]) -> Result<()> {
-		todo!()
+	async fn write(&self, path: &Path, content: &[u8]) -> Result<(), Error> {
+		tokio::fs::write(path, content).await.map_err(Error::from)
 	}
 }
 
