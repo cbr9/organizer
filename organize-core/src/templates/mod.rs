@@ -2,6 +2,7 @@ pub mod accessor;
 pub mod compiler;
 pub mod engine;
 pub mod filter;
+pub mod parser;
 pub mod registry;
 pub mod schema;
 pub mod template;

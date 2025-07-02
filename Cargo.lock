@@ -1651,6 +1651,8 @@ dependencies = [
  "moka",
  "notify",
  "path-clean",
+ "pest",
+ "pest_derive",
  "rand 0.9.1",
  "serde",
  "serde_json",

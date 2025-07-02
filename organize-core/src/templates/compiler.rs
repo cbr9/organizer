@@ -1,6 +1,5 @@
 use crate::{
 	errors::Error,
-	parser::ast::{Expression, Segment, AST},
 	templates::{
 		accessor::Accessor,
 		registry::SchemaRegistry,
@@ -8,6 +7,8 @@ use crate::{
 	},
 };
 use anyhow::Result;
+
+use super::parser::{Expression, Segment, AST};
 
 /// The central compiler for the template system.
 /// It uses a SchemaRegistry to validate variables and a full parser to build the template.

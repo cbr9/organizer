@@ -19,7 +19,6 @@ pub mod selector;
 pub mod splitter;
 // pub mod hook;
 pub mod options;
-pub mod parser;
 pub mod pipeline;
 pub mod resource;
 pub mod rule;

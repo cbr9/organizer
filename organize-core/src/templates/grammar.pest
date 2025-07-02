@@ -1,0 +1,19 @@
+// Whitespace is handled inside expressions but is significant in literals.
+// We will trim inside the Rust code where needed.
+WHITESPACE = _{ " " | "\t" | "\r" | "\n" }
+
+// An identifier is a letter followed by alphanumeric characters or underscores.
+identifier = @{ ('a'..'z' | 'A'..'Z') ~ ('a'..'z' | 'A'..'Z' | '0'..'9' | "_")* }
+
+// A variable is one or more identifiers separated by dots.
+variable = { identifier ~ ("." ~ identifier)* }
+
+// A delimited expression, e.g., "{{ file.name }}"
+moustache = { "{{" ~ WHITESPACE* ~ variable ~ WHITESPACE* ~ "}}" }
+
+// A literal is any sequence of characters that is NOT an opening delimiter.
+// The `+` ensures we match one or more characters.
+literal = @{ (!( "{{" | "}}" ) ~ ANY)+ }
+
+// The top-level rule for the entire template string.
+template = { SOI ~ (literal | moustache)* ~ EOI }

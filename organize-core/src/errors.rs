@@ -1,7 +1,10 @@
 use std::path::PathBuf;
 use thiserror::Error;
 
-use crate::{action::UndoError, parser::errors::ParseError, templates::engine::TemplateError};
+use crate::{
+	action::UndoError,
+	templates::{engine::TemplateError, parser::ParseError},
+};
 
 /// The primary error type for all actions within the application.
 #[derive(Error, Debug)]

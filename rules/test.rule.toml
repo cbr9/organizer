@@ -4,4 +4,4 @@ max_depth = 1
 
 [[stage]]
 action = "echo"
-message = "{{ env.HOME }}"
+message = "{{ env.windir }}"
