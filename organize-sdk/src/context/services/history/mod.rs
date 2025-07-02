@@ -1,6 +1,6 @@
 use crate::{
-	action::{Action, Receipt},
-	context::RunSettings,
+	context::settings::RunSettings,
+	plugins::action::{Action, Receipt},
 };
 use anyhow::Result;
 use sqlx::{sqlite::SqlitePoolOptions, SqlitePool};

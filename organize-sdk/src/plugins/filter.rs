@@ -10,7 +10,12 @@ use std::{fmt::Debug, sync::Arc};
 // pub mod mime;
 // pub mod regex;
 
-use crate::{context::ExecutionContext, engine::ExecutionModel, errors::Error, resource::Resource};
+use crate::{
+	context::ExecutionContext,
+	engine::ExecutionModel,
+	error::Error,
+	resource::Resource,
+};
 
 dyn_clone::clone_trait_object!(Filter);
 dyn_eq::eq_trait_object!(Filter);

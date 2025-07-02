@@ -11,16 +11,16 @@ use futures::{stream, StreamExt};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-	context::{services::fs::manager::parse_uri, ExecutionContext, ExecutionScope},
-	errors::Error,
-	options::OptionsBuilder,
+	context::{scope::ExecutionScope, services::fs::manager::parse_uri, ExecutionContext},
+	error::Error,
+	location::options::{Options, OptionsBuilder, Target},
+	plugins::storage::StorageProvider,
 	resource::Resource,
 	stdx::path::PathExt,
-	storage::StorageProvider,
 	templates::template::TemplateString,
 };
 
-use super::options::{Options, Target};
+pub mod options;
 
 #[derive(Debug, Serialize, PartialEq, Eq, Clone, Deserialize)]
 pub struct LocationBuilder {
@@ -39,13 +39,23 @@ pub struct Location {
 	pub backend: Arc<dyn StorageProvider>,
 }
 
+impl Eq for Location {}
+
 impl PartialEq for Location {
 	fn eq(&self, other: &Self) -> bool {
 		self.path == other.path && self.options == other.options && self.mode == other.mode
 	}
 }
 
-impl Eq for Location {}
+impl Location {
+	pub fn new_local() -> Arc<dyn StorageProvider> {
+		let value = serde_json::json!({
+			"type": "local"
+		});
+		let backend: Box<dyn StorageProvider> = serde_json::from_value(value).unwrap();
+		Arc::from(backend)
+	}
+}
 
 impl LocationBuilder {
 	pub async fn build(self, ctx: &ExecutionContext<'_>) -> Result<Location, Error> {

@@ -1,14 +1,19 @@
+pub mod batch;
+pub mod pipeline;
+pub mod rule;
+pub mod stage;
+
 use crate::{
 	context::{
-		services::{fs::manager::FileSystemManager, history::Journal},
-		Blackboard,
+		services::{fs::manager::FileSystemManager, history::Journal, Blackboard, RunServices},
 		ExecutionContext,
-		ExecutionScope,
-		RunServices,
-		RunSettings,
+		scope::ExecutionScope,
+		settings::RunSettings,
 	},
-	pipeline::Pipeline,
-	rule::{Rule, RuleBuilder},
+	engine::{
+		pipeline::Pipeline,
+		rule::{Rule, RuleBuilder},
+	},
 	templates::compiler::TemplateCompiler,
 };
 use anyhow::Result;

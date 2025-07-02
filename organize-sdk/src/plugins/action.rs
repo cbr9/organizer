@@ -11,7 +11,12 @@ use dyn_eq::DynEq;
 use std::path::PathBuf;
 use thiserror::Error;
 
-use crate::{context::ExecutionContext, engine::ExecutionModel, errors::Error, resource::Resource, utils::backup::Backup};
+use crate::{
+	context::{services::fs::backup::Backup, ExecutionContext},
+	engine::ExecutionModel,
+	error::Error,
+	resource::Resource,
+};
 
 #[derive(Debug, Serialize, Deserialize, Clone, Display)]
 #[serde(rename_all = "lowercase")]

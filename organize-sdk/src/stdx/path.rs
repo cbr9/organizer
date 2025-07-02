@@ -4,7 +4,7 @@ use std::{ffi::OsStr, path::PathBuf, sync::Arc};
 
 use async_trait::async_trait;
 
-use crate::{context::ExecutionContext, folder::Location, resource::Resource};
+use crate::{context::ExecutionContext, location::Location, resource::Resource};
 
 #[async_trait]
 pub trait PathExt {

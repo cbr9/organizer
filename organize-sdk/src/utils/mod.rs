@@ -1,1 +1,3 @@
-pub mod backup;
+pub fn enabled() -> bool {
+	true
+}

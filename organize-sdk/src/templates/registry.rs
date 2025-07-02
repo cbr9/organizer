@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::{
-	errors::Error,
+	error::Error,
 	templates::{
 		accessor::Accessor,
 		schema::{Property, SchemaNode},

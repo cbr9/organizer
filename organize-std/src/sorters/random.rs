@@ -1,5 +1,5 @@
-use organize_sdk::{resource::Resource, sorter::Sorter};
 use async_trait::async_trait;
+use organize_sdk::{plugins::sorter::Sorter, resource::Resource};
 use rand::{rng, seq::SliceRandom};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -15,5 +15,3 @@ impl Sorter for RandomSorter {
 		files.shuffle(&mut rng);
 	}
 }
-
-

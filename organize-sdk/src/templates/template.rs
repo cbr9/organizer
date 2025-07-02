@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::{context::ExecutionContext, errors::Error, templates::accessor::Accessor};
+use crate::{context::ExecutionContext, error::Error, templates::accessor::Accessor};
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub enum TemplatePart {

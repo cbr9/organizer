@@ -1,5 +1,5 @@
-use organize_sdk::{batch::Batch, errors::Error, partitioner::Partitioner};
 use async_trait::async_trait;
+use organize_sdk::{engine::batch::Batch, error::Error, plugins::partitioner::Partitioner};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, iter::FromIterator};
 
@@ -43,6 +43,7 @@ impl Partitioner for RatioPartitioner {
 	fn name(&self) -> &str {
 		self.typetag_name()
 	}
+
 	async fn partition(&self, batch: &Batch) -> Result<HashMap<String, Batch>, Error> {
 		// 1. Validate that the ratios sum to approximately 1.0
 		let total_ratio: f64 = self.ratios.values().sum();
@@ -84,5 +85,3 @@ impl Partitioner for RatioPartitioner {
 		Ok(batches)
 	}
 }
-
-

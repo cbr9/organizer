@@ -1,0 +1,27 @@
+# on_batches_test.rule.toml
+
+[[stage]]
+search = "test_data/on_batches"
+
+[[stage]]
+partition-by = "extension"
+
+[[stage]]
+action = "echo"
+on_batches = ["jpg", "png"]
+message = "This is an image file."
+
+[[stage]]
+action = "echo"
+on_batches = ["zip"]
+message = "This is a zip file."
+
+[[stage]]
+action = "echo"
+on_batches = ["*"]
+message = "This should run on all batches."
+
+[[stage]]
+action = "echo"
+on_batches = ["non_existent_batch"]
+message = "This should not run and should produce a warning."

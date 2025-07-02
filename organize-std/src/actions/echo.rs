@@ -1,11 +1,11 @@
-use organize_sdk::{
-	action::{Action, ActionBuilder, Receipt},
-	common::enabled,
-	context::ExecutionContext,
-	errors::Error,
-	templates::template::{Template, TemplateString},
-};
 use async_trait::async_trait;
+use organize_sdk::{
+	context::ExecutionContext,
+	error::Error,
+	plugins::action::{Action, ActionBuilder, Receipt},
+	templates::template::{Template, TemplateString},
+	utils::enabled,
+};
 use serde::{Deserialize, Serialize};
 
 use anyhow::Result;
@@ -52,5 +52,3 @@ impl Action for Echo {
 		})
 	}
 }
-
-

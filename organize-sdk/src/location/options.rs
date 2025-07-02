@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::{fmt::Debug, path::PathBuf};
 
-use crate::{context::ExecutionContext, errors::Error, templates::template::TemplateString};
+use crate::{context::ExecutionContext, error::Error, templates::template::TemplateString};
 
 fn default_usize() -> usize {
 	1.0 as usize

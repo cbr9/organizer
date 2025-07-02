@@ -9,7 +9,7 @@ use std::{
 };
 use tokio::{fs::File, io::AsyncReadExt};
 
-use crate::{context::ExecutionContext, errors::Error, folder::Location};
+use crate::{context::ExecutionContext, error::Error, location::Location};
 
 #[derive(Debug, Default, Clone)]
 pub enum FileState {

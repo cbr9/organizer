@@ -1,5 +1,5 @@
 use crate::{
-	errors::Error,
+	error::Error,
 	templates::{
 		accessor::Accessor,
 		registry::SchemaRegistry,

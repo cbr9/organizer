@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use crate::{context::ExecutionContext, errors::Error};
+use crate::{context::ExecutionContext, error::Error};
 use anyhow::Result;
 use dirs;
 use serde::{Deserialize, Serialize}; // Import the dirs crate

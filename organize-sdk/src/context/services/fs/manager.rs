@@ -1,9 +1,9 @@
 use crate::{
 	context::{services::fs::locker::Locker, ExecutionContext},
-	errors::Error,
-	folder::LocalFileSystem,
+	error::Error,
+	location::Location,
+	plugins::storage::StorageProvider,
 	resource::{FileState, Resource},
-	storage::StorageProvider,
 	templates::template::{Template, TemplateString},
 };
 use anyhow::Result;
@@ -91,7 +91,7 @@ impl Default for FileSystemManager {
 
 impl FileSystemManager {
 	pub fn new() -> Self {
-		let local: Arc<dyn StorageProvider> = Arc::new(LocalFileSystem);
+		let local: Arc<dyn StorageProvider> = Location::new_local();
 		let backends = HashMap::from_iter(vec![("local".to_string(), local)]);
 		Self {
 			locker: Locker::default(),

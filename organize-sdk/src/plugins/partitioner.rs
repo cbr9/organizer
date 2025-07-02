@@ -1,4 +1,4 @@
-use crate::{batch::Batch, errors::Error};
+use crate::{engine::batch::Batch, error::Error};
 use async_trait::async_trait;
 use dyn_clone::DynClone;
 use dyn_eq::DynEq;

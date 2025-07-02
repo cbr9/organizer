@@ -1,7 +1,7 @@
 use crate::{
 	context::{services::fs::manager::Destination, ExecutionContext},
 	engine::ConflictResolution,
-	errors::Error,
+	error::Error,
 };
 use anyhow::Result;
 use dashmap::DashSet;
