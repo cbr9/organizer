@@ -1,4 +1,4 @@
-use crate::{batch::Batch, errors::Error, partitioner::Partitioner};
+use organize_sdk::{batch::Batch, errors::Error, partitioner::Partitioner};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, iter::FromIterator};
@@ -84,3 +84,5 @@ impl Partitioner for RatioPartitioner {
 		Ok(batches)
 	}
 }
+
+

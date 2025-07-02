@@ -6,7 +6,6 @@ pub const PROJECT_NAME: &str = "organize";
 
 pub mod action;
 pub mod batch;
-pub mod builtins;
 pub mod common;
 pub mod config;
 pub mod context;

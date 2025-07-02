@@ -1,4 +1,4 @@
-use crate::{resource::Resource, sorter::Sorter};
+use organize_sdk::{resource::Resource, sorter::Sorter};
 use async_trait::async_trait;
 use rand::{rng, seq::SliceRandom};
 use serde::{Deserialize, Serialize};
@@ -15,3 +15,5 @@ impl Sorter for RandomSorter {
 		files.shuffle(&mut rng);
 	}
 }
+
+

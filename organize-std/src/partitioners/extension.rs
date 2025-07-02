@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-use crate::{
+use organize_sdk::{
     batch::Batch,
     errors::Error,
     partitioner::Partitioner,
@@ -36,3 +36,5 @@ impl Partitioner for ExtensionPartitioner {
         Ok(groups)
     }
 }
+
+

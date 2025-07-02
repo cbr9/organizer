@@ -1,0 +1,17 @@
+[package]
+name = "organize-std"
+version = "0.1.0"
+authors = ["Your Name <you@example.com>"]
+edition = "2021"
+description = "The standard library of components for the organize project."
+repository = "https://github.com/cbr9/organizer"
+
+[dependencies]
+organize-sdk = { path = "../organize-sdk" }
+anyhow = { workspace = true }
+async-trait = "0.1.88"
+serde = { workspace = true }
+typetag = { workspace = true }
+tracing = "0.1.41"
+rand = "0.9.1"
+inventory = "0.3.20"

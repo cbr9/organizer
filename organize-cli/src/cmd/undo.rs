@@ -3,7 +3,7 @@ use std::error::Error;
 use anyhow::{Result, anyhow};
 use async_trait::async_trait;
 use clap::Parser;
-use organize_core::{
+use organize_sdk::{
 	action::{Input, UndoConflict, UndoError, UndoSettings},
 	context::{RunSettings, services::history::Journal},
 };

@@ -10,7 +10,8 @@ repository = "https://github.com/cbr9/organize"
 resolver = "2"
 members = [
   "organize-cli",
-  "organize-core" ,
+  "organize-sdk",
+  "organize-std",
 ]
 
 default-members = ["organize-cli"]
