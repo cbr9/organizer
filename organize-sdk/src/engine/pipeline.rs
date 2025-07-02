@@ -128,6 +128,20 @@ fn select_batches<'a>(
 	(selected_batches, unselected_batches, unmatched_patterns)
 }
 
+impl Stage {
+	fn params(&self) -> Option<&StageParams> {
+		match self {
+			Stage::Action { params, .. } => Some(params),
+			Stage::Filter { params, .. } => Some(params),
+			Stage::Partition { params, .. } => Some(params),
+			Stage::Sort { params, .. } => Some(params),
+			Stage::Select { params, .. } => Some(params),
+			Stage::Search { params, .. } => Some(params),
+			Stage::Flatten { params, .. } => Some(params),
+		}
+	}
+}
+
 impl Pipeline {
 	pub fn new(rule: Rule) -> Self {
 		Self {
@@ -138,8 +152,13 @@ impl Pipeline {
 
 	pub async fn run(mut self, ctx: &ExecutionContext<'_>) -> Result<PipelineStream, Error> {
 		for stage in self.stages.into_iter() {
+			if let Some(params) = stage.params() {
+				if !params.enabled {
+					continue;
+				}
+			}
 			match stage {
-				Stage::Search { location, source } => {
+				Stage::Search { location, source, .. } => {
 					let scope = ExecutionScope::new_location_scope(source.clone(), &location);
 					let ctx = ctx.with_scope(scope);
 					let new_files = location.backend.discover(&location, &ctx).await?;
@@ -329,3 +348,4 @@ impl Pipeline {
 		Ok(self.stream)
 	}
 }
+

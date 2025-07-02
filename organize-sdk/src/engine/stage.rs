@@ -18,30 +18,45 @@ use crate::{
 
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq, Default)]
 pub struct StageParams {
+	#[serde(default = "default_true")]
+	pub enabled: bool,
 	#[serde(default)]
 	pub on_batches: Option<Vec<String>>,
 }
 
+fn default_true() -> bool {
+	true
+}
+
+
 #[derive(Debug, Serialize, PartialEq, Eq, Clone)]
 pub enum StageBuilder {
-	Search(LocationBuilder),
+	Search(LocationBuilder, StageParams),
 	Compose(PathBuf),
 	Action(Box<dyn ActionBuilder>, StageParams),
 	Filter(Box<dyn Filter>, StageParams),
 	Select(Box<dyn Selector>, StageParams),
 	Partition(Box<dyn Partitioner>, StageParams),
 	Sort(Box<dyn Sorter>, StageParams),
-	Flatten(bool),
+	Flatten(bool, StageParams),
 }
 
 impl StageBuilder {
 	pub async fn build(self, ctx: &ExecutionContext<'_>, source: Arc<RuleMetadata>) -> Result<Stage, Error> {
 		match self {
-			StageBuilder::Search(location_builder) => {
+			StageBuilder::Search(location_builder, params) => {
 				let stage = location_builder.build(ctx).await.unwrap();
-				Ok(Stage::Search { location: stage, source })
+				Ok(Stage::Search {
+					location: stage,
+					params,
+					source,
+				})
 			}
-			StageBuilder::Flatten(bool) => Ok(Stage::Flatten { flatten: bool, source }),
+			StageBuilder::Flatten(flatten, params) => Ok(Stage::Flatten {
+				flatten,
+				params,
+				source,
+			}),
 			StageBuilder::Action(builder, params) => {
 				let stage = builder.build(ctx).await?;
 				Ok(Stage::Action {
@@ -63,6 +78,7 @@ impl StageBuilder {
 pub enum Stage {
 	Search {
 		location: Location,
+		params: StageParams,
 		source: Arc<RuleMetadata>,
 	},
 	Action {
@@ -82,6 +98,7 @@ pub enum Stage {
 	},
 	Flatten {
 		flatten: bool,
+		params: StageParams,
 		source: Arc<RuleMetadata>,
 	},
 	Partition {
@@ -108,9 +125,11 @@ impl<'de> Deserialize<'de> for StageBuilder {
 
 		let key = {
 			let keys: Vec<_> = table.keys().cloned().collect();
-			let possible_keys = ["search", "compose", "action", "filter", "partition-by", "sort-by", "select"];
+			let possible_keys = [
+				"search", "compose", "action", "filter", "partition-by", "sort-by", "select", "flatten",
+			];
 			keys.into_iter().find(|k| possible_keys.contains(&k.as_str())).ok_or_else(|| {
-				serde::de::Error::custom("Stage must contain one of: 'search', 'compose', 'action', 'filter', 'partition-by', 'sort-by', 'select'")
+				serde::de::Error::custom("Stage must contain one of: 'search', 'compose', 'action', 'filter', 'partition-by', 'sort-by', 'select', 'flatten'")
 			})?
 		};
 
@@ -120,15 +139,17 @@ impl<'de> Deserialize<'de> for StageBuilder {
 
 		let params: StageParams = toml::Value::Table(table.clone()).try_into().map_err(serde::de::Error::custom)?;
 		table.remove("on_batches");
+		table.remove("enabled");
 
 		match key.as_str() {
 			"search" => {
 				let path_template_str = value.try_into::<String>().map_err(serde::de::Error::custom)?;
-				let mut params = table.clone();
-				params.insert("path".to_string(), path_template_str.into());
-				let builder: LocationBuilder = toml::Value::Table(params).try_into().map_err(serde::de::Error::custom)?;
+				let mut params_table = table.clone();
+				params_table.insert("path".to_string(), path_template_str.into());
+				let builder: LocationBuilder =
+					toml::Value::Table(params_table).try_into().map_err(serde::de::Error::custom)?;
 
-				Ok(StageBuilder::Search(builder))
+				Ok(StageBuilder::Search(builder, params))
 			}
 			"compose" => {
 				let rule_to_compose = value.try_into::<PathBuf>().map_err(serde::de::Error::custom)?;
@@ -136,7 +157,7 @@ impl<'de> Deserialize<'de> for StageBuilder {
 			}
 			"flatten" => {
 				let value = value.try_into::<bool>().map_err(serde::de::Error::custom)?;
-				Ok(StageBuilder::Flatten(value))
+				Ok(StageBuilder::Flatten(value, params))
 			}
 			"filter" | "select" | "action" | "partition-by" | "sort-by" => {
 				let component_type = value
