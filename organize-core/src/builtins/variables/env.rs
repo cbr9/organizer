@@ -22,8 +22,8 @@ struct EnvAccessor {
 #[async_trait]
 impl Accessor for EnvAccessor {
 	async fn get(&self, _ctx: &ExecutionContext) -> Result<Value> {
-		let value = std::env::var(&self.key).ok();
-		Ok(Value::OptionString(value))
+		let value = std::env::var(&self.key).unwrap_or("<UNDEFINED>".to_string());
+		Ok(Value::String(value))
 	}
 }
 

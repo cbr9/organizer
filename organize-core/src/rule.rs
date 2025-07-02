@@ -97,10 +97,7 @@ impl StageBuilder {
 				let stage = location_builder.build(ctx).await.unwrap();
 				Ok(Stage::Search { location: stage, source })
 			}
-			StageBuilder::Flatten(bool) => Ok(Stage::Flatten {
-				flatten: bool,
-				source,
-			}),
+			StageBuilder::Flatten(bool) => Ok(Stage::Flatten { flatten: bool, source }),
 			StageBuilder::Action(builder) => {
 				let stage = builder.build(ctx).await?;
 				Ok(Stage::Action { action: stage, source })
@@ -109,7 +106,7 @@ impl StageBuilder {
 			StageBuilder::Grouper(stage) => Ok(Stage::Grouper { grouper: stage, source }),
 			StageBuilder::Sorter(stage) => Ok(Stage::Sorter { sorter: stage, source }),
 			StageBuilder::Compose(_) => unreachable!("Compose stages should be flattened"),
-			StageBuilder::Select(stage) => Stage::Select { selector: stage, source },
+			StageBuilder::Select(stage) => Ok(Stage::Select { selector: stage, source }),
 		}
 	}
 }

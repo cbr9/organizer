@@ -31,12 +31,6 @@ impl TemplateCompiler {
 		}
 	}
 
-	/// Creates a compiler from a fully-built schema (e.g., one that includes
-	/// user-defined variables from a config file).
-	pub fn from_schema(schema: SchemaRegistry) -> Self {
-		Self { schema }
-	}
-
 	/// Compiles a raw string into an executable Template object using your parser.
 	pub fn compile_template(&self, raw_template: &str) -> Result<Template, Error> {
 		// Stage 1: Parse the raw string into an Abstract Syntax Tree (AST)

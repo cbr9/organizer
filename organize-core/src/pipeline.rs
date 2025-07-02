@@ -56,9 +56,20 @@ impl PipelineStream {
 
 		for grouper in &self.groupers {
 			let mut next_level_batches = Vec::new();
-			for batch in current_batches {
-				// Apply the grouper to each batch from the previous level
-				next_level_batches.extend(grouper.group(&batch).await?);
+			for parent_batch in &current_batches {
+				let named_batches_map = grouper.group(parent_batch).await?;
+				for (new_key_part, mut sub_batch) in named_batches_map {
+					// Construct the new concatenated name
+					sub_batch.name = if parent_batch.name.is_empty() {
+						new_key_part.clone()
+					} else {
+						format!("{}.{}", parent_batch.name, new_key_part)
+					};
+					// Inherit context and add the new grouping key
+					sub_batch.context.extend(parent_batch.context.clone());
+					sub_batch.context.insert(grouper.name().to_string(), new_key_part.clone());
+					next_level_batches.push(sub_batch);
+				}
 			}
 			current_batches = next_level_batches;
 		}
@@ -96,9 +107,23 @@ impl Pipeline {
 					}
 				}
 				Stage::Grouper { grouper, .. } => {
-					let all_files = self.stream.all_files();
+					let mut next_level_batches = Vec::new();
+					for parent_batch in &self.stream.batches {
+						let named_batches_map = grouper.group(parent_batch).await?;
+						for (new_key_part, mut sub_batch) in named_batches_map {
+							// Construct the new concatenated name
+							sub_batch.name = if parent_batch.name.is_empty() {
+								new_key_part.clone()
+							} else {
+								format!("{}.{}", parent_batch.name, new_key_part)
+							};
+							sub_batch.context.extend(parent_batch.context.clone());
+							sub_batch.context.insert(grouper.name().to_string(), new_key_part);
+							next_level_batches.push(sub_batch);
+						}
+					}
+					self.stream.batches = next_level_batches;
 					self.stream.groupers.push(grouper);
-					self.stream.batches = self.stream.regroup(all_files).await?;
 					self.stream.resort().await;
 				}
 				Stage::Sorter { sorter, .. } => {
@@ -115,6 +140,7 @@ impl Pipeline {
 								let passed_files = filter.filter(&batch_ctx).await?;
 								if !passed_files.is_empty() {
 									next_batches.push(Batch {
+										name: batch.name.clone(),
 										files: passed_files,
 										context: batch.context.clone(),
 									});
@@ -138,6 +164,7 @@ impl Pipeline {
 								let results: Vec<Arc<Resource>> = future::try_join_all(futs).await?.into_iter().flatten().collect();
 								if !results.is_empty() {
 									next_batches.push(Batch {
+										name: batch.name.clone(),
 										files: results,
 										context: batch.context.clone(),
 									});

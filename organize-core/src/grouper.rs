@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use dyn_clone::DynClone;
 use dyn_eq::DynEq;
-use std::fmt::Debug;
+use std::{collections::HashMap, fmt::Debug};
 
 use crate::{batch::Batch, errors::Error};
 
@@ -12,5 +12,5 @@ dyn_eq::eq_trait_object!(Grouper);
 #[typetag::serde(tag = "type")]
 pub trait Grouper: DynEq + DynClone + Sync + Send + Debug {
 	fn name(&self) -> &str;
-	async fn group(&self, batch: &Batch) -> Result<Vec<Batch>, Error>;
+	async fn group(&self, batch: &Batch) -> Result<HashMap<String, Batch>, Error>;
 }
