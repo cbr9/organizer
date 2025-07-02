@@ -14,7 +14,7 @@ dyn_clone::clone_trait_object!(StorageProvider);
 dyn_eq::eq_trait_object!(StorageProvider);
 
 #[async_trait]
-#[typetag::serde(tag = "provider")]
+#[typetag::serde(tag = "type")]
 /// A trait for any component that can provide a list of files to be processed.
 /// This could be a local folder, an S3 bucket, an SFTP connection, etc.
 pub trait StorageProvider: DynEq + DynClone + Sync + Send + Debug {

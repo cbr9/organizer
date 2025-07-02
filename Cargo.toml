@@ -30,5 +30,3 @@ serde = { version = "1.0.160", features = ["derive"] }
 strum = { version = "0.26", features = ["derive"] }
 typetag = "0.2.20"
 
-
-
