@@ -1,6 +1,5 @@
 use std::{path::PathBuf, sync::Arc};
 
-use itertools::Itertools;
 use serde::{Deserialize, Deserializer, Serialize};
 
 use crate::{
@@ -12,6 +11,7 @@ use crate::{
 	grouper::Grouper,
 	selector::Selector,
 	sorter::Sorter,
+	splitter::Splitter,
 };
 
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]
@@ -85,8 +85,9 @@ pub enum StageBuilder {
 	Action(Box<dyn ActionBuilder>),
 	Filter(Box<dyn Filter>),
 	Select(Box<dyn Selector>),
-	Grouper(Box<dyn Grouper>),
-	Sorter(Box<dyn Sorter>),
+	Group(Box<dyn Grouper>),
+	Split(Box<dyn Splitter>),
+	Sort(Box<dyn Sorter>),
 	Flatten(bool),
 }
 
@@ -102,11 +103,12 @@ impl StageBuilder {
 				let stage = builder.build(ctx).await?;
 				Ok(Stage::Action { action: stage, source })
 			}
-			StageBuilder::Filter(stage) => Ok(Stage::Filter { filter: stage, source }),
-			StageBuilder::Grouper(stage) => Ok(Stage::Grouper { grouper: stage, source }),
-			StageBuilder::Sorter(stage) => Ok(Stage::Sorter { sorter: stage, source }),
+			StageBuilder::Filter(filter) => Ok(Stage::Filter { filter, source }),
+			StageBuilder::Group(grouper) => Ok(Stage::Group { grouper, source }),
+			StageBuilder::Sort(sorter) => Ok(Stage::Sort { sorter, source }),
 			StageBuilder::Compose(_) => unreachable!("Compose stages should be flattened"),
-			StageBuilder::Select(stage) => Ok(Stage::Select { selector: stage, source }),
+			StageBuilder::Select(selector) => Ok(Stage::Select { selector, source }),
+			StageBuilder::Split(splitter) => Ok(Stage::Split { splitter, source }),
 		}
 	}
 }
@@ -133,11 +135,15 @@ pub enum Stage {
 		flatten: bool,
 		source: Arc<RuleMetadata>,
 	},
-	Grouper {
+	Group {
 		grouper: Box<dyn Grouper>,
 		source: Arc<RuleMetadata>,
 	},
-	Sorter {
+	Split {
+		splitter: Box<dyn Splitter>,
+		source: Arc<RuleMetadata>,
+	},
+	Sort {
 		sorter: Box<dyn Sorter>,
 		source: Arc<RuleMetadata>,
 	},
@@ -262,7 +268,7 @@ impl<'de> Deserialize<'de> for StageBuilder {
 				let value = value.try_into::<bool>().map_err(serde::de::Error::custom)?;
 				Ok(StageBuilder::Flatten(value))
 			}
-			"filter" | "select" | "action" | "group-by" | "sort-by" => {
+			"filter" | "select" | "action" | "split-by" | "group-by" | "sort-by" => {
 				let component_type = value
 					.as_str()
 					.ok_or_else(|| serde::de::Error::custom(format!("Expected a string for key '{key}'")))?;
@@ -275,16 +281,19 @@ impl<'de> Deserialize<'de> for StageBuilder {
 					"filter" => Ok(StageBuilder::Filter(
 						Box::<dyn Filter>::deserialize(component_value).map_err(serde::de::Error::custom)?,
 					)),
+					"split-by" => Ok(StageBuilder::Split(
+						Box::<dyn Splitter>::deserialize(component_value).map_err(serde::de::Error::custom)?,
+					)),
 					"select" => Ok(StageBuilder::Select(
 						Box::<dyn Selector>::deserialize(component_value).map_err(serde::de::Error::custom)?,
 					)),
 					"action" => Ok(StageBuilder::Action(
 						Box::<dyn ActionBuilder>::deserialize(component_value).map_err(serde::de::Error::custom)?,
 					)),
-					"group-by" => Ok(StageBuilder::Grouper(
+					"group-by" => Ok(StageBuilder::Group(
 						Box::<dyn Grouper>::deserialize(component_value).map_err(serde::de::Error::custom)?,
 					)),
-					"sort-by" => Ok(StageBuilder::Sorter(
+					"sort-by" => Ok(StageBuilder::Sort(
 						Box::<dyn Sorter>::deserialize(component_value).map_err(serde::de::Error::custom)?,
 					)),
 					_ => unreachable!(),

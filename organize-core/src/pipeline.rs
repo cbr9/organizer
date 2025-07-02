@@ -106,7 +106,26 @@ impl Pipeline {
 						self.stream = PipelineStream::new(new_files);
 					}
 				}
-				Stage::Grouper { grouper, .. } => {
+				Stage::Split { splitter, .. } => {
+					let mut next_stream_batches = Vec::new();
+					for parent_batch in &self.stream.batches {
+						let mut split_batches = splitter.split(parent_batch).await?;
+
+						// Post-process the newly created batches to handle names and context
+						for sub_batch in &mut split_batches {
+							sub_batch.name = if parent_batch.name.is_empty() {
+								sub_batch.name.clone() // It was already set by the splitter
+							} else {
+								format!("{}.{}", parent_batch.name, sub_batch.name)
+							};
+							sub_batch.context.extend(parent_batch.context.clone());
+						}
+						next_stream_batches.extend(split_batches);
+					}
+					self.stream.batches = next_stream_batches;
+					self.stream.resort().await;
+				}
+				Stage::Group { grouper, .. } => {
 					let mut next_level_batches = Vec::new();
 					for parent_batch in &self.stream.batches {
 						let named_batches_map = grouper.group(parent_batch).await?;
@@ -126,7 +145,7 @@ impl Pipeline {
 					self.stream.groupers.push(grouper);
 					self.stream.resort().await;
 				}
-				Stage::Sorter { sorter, .. } => {
+				Stage::Sort { sorter, .. } => {
 					self.stream.sorters.push(sorter);
 					self.stream.resort().await;
 				}

@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use anyhow::Result;
 use async_trait::async_trait;
-use clap::{ArgAction, Parser, ValueHint};
+use clap::{Parser, ValueHint};
 use organize_core::{context::RunSettings, engine::Engine};
 
 use crate::Cmd;
@@ -19,7 +19,6 @@ pub struct Run {
 impl Cmd for Run {
 	async fn run(mut self) -> Result<()> {
 		let settings = RunSettings { dry_run: !self.no_dry_run };
-		println!("{:?}", &settings);
 		let engine = Engine::new(&self.rule, settings).await?;
 		engine.run().await?;
 

@@ -16,6 +16,7 @@ pub mod filter;
 pub mod folder;
 pub mod grouper;
 pub mod selector;
+pub mod splitter;
 // pub mod hook;
 pub mod options;
 pub mod parser;
