@@ -22,6 +22,12 @@ pub struct RuleMetadata {
 	pub tags: Vec<String>,
 }
 
+#[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq, Default)]
+pub struct StageParams {
+	#[serde(default)]
+	pub on_batches: Option<Vec<String>>,
+}
+
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct RuleBuilder {
@@ -82,12 +88,12 @@ impl RuleBuilder {
 pub enum StageBuilder {
 	Search(LocationBuilder),
 	Compose(PathBuf),
-	Action(Box<dyn ActionBuilder>),
-	Filter(Box<dyn Filter>),
-	Select(Box<dyn Selector>),
-	Group(Box<dyn Grouper>),
-	Split(Box<dyn Splitter>),
-	Sort(Box<dyn Sorter>),
+	Action(Box<dyn ActionBuilder>, StageParams),
+	Filter(Box<dyn Filter>, StageParams),
+	Select(Box<dyn Selector>, StageParams),
+	Group(Box<dyn Grouper>, StageParams),
+	Split(Box<dyn Splitter>, StageParams),
+	Sort(Box<dyn Sorter>, StageParams),
 	Flatten(bool),
 }
 
@@ -99,16 +105,40 @@ impl StageBuilder {
 				Ok(Stage::Search { location: stage, source })
 			}
 			StageBuilder::Flatten(bool) => Ok(Stage::Flatten { flatten: bool, source }),
-			StageBuilder::Action(builder) => {
+			StageBuilder::Action(builder, params) => {
 				let stage = builder.build(ctx).await?;
-				Ok(Stage::Action { action: stage, source })
+				Ok(Stage::Action {
+					action: stage,
+					params,
+					source,
+				})
 			}
-			StageBuilder::Filter(filter) => Ok(Stage::Filter { filter, source }),
-			StageBuilder::Group(grouper) => Ok(Stage::Group { grouper, source }),
-			StageBuilder::Sort(sorter) => Ok(Stage::Sort { sorter, source }),
+			StageBuilder::Filter(filter, params) => Ok(Stage::Filter {
+				filter,
+				params,
+				source,
+			}),
+			StageBuilder::Group(grouper, params) => Ok(Stage::Group {
+				grouper,
+				params,
+				source,
+			}),
+			StageBuilder::Sort(sorter, params) => Ok(Stage::Sort {
+				sorter,
+				params,
+				source,
+			}),
 			StageBuilder::Compose(_) => unreachable!("Compose stages should be flattened"),
-			StageBuilder::Select(selector) => Ok(Stage::Select { selector, source }),
-			StageBuilder::Split(splitter) => Ok(Stage::Split { splitter, source }),
+			StageBuilder::Select(selector, params) => Ok(Stage::Select {
+				selector,
+				params,
+				source,
+			}),
+			StageBuilder::Split(splitter, params) => Ok(Stage::Split {
+				splitter,
+				params,
+				source,
+			}),
 		}
 	}
 }
@@ -121,14 +151,17 @@ pub enum Stage {
 	},
 	Action {
 		action: Box<dyn Action>,
+		params: StageParams,
 		source: Arc<RuleMetadata>,
 	},
 	Filter {
 		filter: Box<dyn Filter>,
+		params: StageParams,
 		source: Arc<RuleMetadata>,
 	},
 	Select {
 		selector: Box<dyn Selector>,
+		params: StageParams,
 		source: Arc<RuleMetadata>,
 	},
 	Flatten {
@@ -137,14 +170,17 @@ pub enum Stage {
 	},
 	Group {
 		grouper: Box<dyn Grouper>,
+		params: StageParams,
 		source: Arc<RuleMetadata>,
 	},
 	Split {
 		splitter: Box<dyn Splitter>,
+		params: StageParams,
 		source: Arc<RuleMetadata>,
 	},
 	Sort {
 		sorter: Box<dyn Sorter>,
+		params: StageParams,
 		source: Arc<RuleMetadata>,
 	},
 }
@@ -159,7 +195,7 @@ impl<'de> Deserialize<'de> for StageBuilder {
 			.as_table_mut()
 			.ok_or_else(|| serde::de::Error::custom("Expected a table for the stage"))?;
 
-				let key = {
+		let key = {
 			let keys: Vec<_> = table.keys().cloned().collect();
 			let possible_keys = ["search", "compose", "action", "filter", "group-by", "sort-by", "split-by", "select"];
 			keys.into_iter().find(|k| possible_keys.contains(&k.as_str())).ok_or_else(|| {
@@ -171,14 +207,16 @@ impl<'de> Deserialize<'de> for StageBuilder {
 			.remove(&key)
 			.ok_or_else(|| serde::de::Error::custom(format!("Could not find key '{key}'")))?;
 
-		let params = toml::Value::Table(table.clone());
+		let params: StageParams =
+			toml::Value::Table(table.clone()).try_into().map_err(serde::de::Error::custom)?;
+		table.remove("on_batches");
 
 		match key.as_str() {
 			"search" => {
 				let path_template_str = value.try_into::<String>().map_err(serde::de::Error::custom)?;
-				let mut params = params.as_table().unwrap().clone();
+				let mut params = table.clone();
 				params.insert("path".to_string(), path_template_str.into());
-				let builder: LocationBuilder = params.try_into().map_err(serde::de::Error::custom)?;
+				let builder: LocationBuilder = toml::Value::Table(params).try_into().map_err(serde::de::Error::custom)?;
 
 				Ok(StageBuilder::Search(builder))
 			}
@@ -195,28 +233,35 @@ impl<'de> Deserialize<'de> for StageBuilder {
 					.as_str()
 					.ok_or_else(|| serde::de::Error::custom(format!("Expected a string for key '{key}'")))?;
 
-				let mut component_table = params.try_into::<toml::value::Table>().map_err(serde::de::Error::custom)?;
+				let mut component_table = table.clone();
 				component_table.insert("type".to_string(), toml::Value::String(component_type.to_string()));
 				let component_value = toml::Value::Table(component_table);
 
 				match key.as_str() {
 					"filter" => Ok(StageBuilder::Filter(
 						Box::<dyn Filter>::deserialize(component_value).map_err(serde::de::Error::custom)?,
+						params,
 					)),
 					"split-by" => Ok(StageBuilder::Split(
 						Box::<dyn Splitter>::deserialize(component_value).map_err(serde::de::Error::custom)?,
+						params,
 					)),
 					"select" => Ok(StageBuilder::Select(
 						Box::<dyn Selector>::deserialize(component_value).map_err(serde::de::Error::custom)?,
+						params,
 					)),
 					"action" => Ok(StageBuilder::Action(
 						Box::<dyn ActionBuilder>::deserialize(component_value).map_err(serde::de::Error::custom)?,
+						params,
 					)),
+
 					"group-by" => Ok(StageBuilder::Group(
 						Box::<dyn Grouper>::deserialize(component_value).map_err(serde::de::Error::custom)?,
+						params,
 					)),
 					"sort-by" => Ok(StageBuilder::Sort(
 						Box::<dyn Sorter>::deserialize(component_value).map_err(serde::de::Error::custom)?,
+						params,
 					)),
 					_ => unreachable!(),
 				}
@@ -225,3 +270,4 @@ impl<'de> Deserialize<'de> for StageBuilder {
 		}
 	}
 }
+

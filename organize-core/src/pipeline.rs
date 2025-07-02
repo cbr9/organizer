@@ -8,10 +8,14 @@ use crate::{
 	errors::Error,
 	grouper::Grouper,
 	resource::Resource,
-	rule::{Rule, Stage},
+	rule::{Rule, Stage, StageParams},
 	sorter::Sorter,
 };
-use std::{collections::HashMap, sync::Arc};
+use glob::Pattern;
+use std::{
+	collections::{HashMap, HashSet},
+	sync::Arc,
+};
 
 /// Represents the data flowing through the pipeline.
 /// It tracks the current set of file batches and the sequence of
@@ -80,6 +84,49 @@ pub struct Pipeline {
 	stream: PipelineStream,
 }
 
+fn select_batches<'a>(
+	all_batches: &'a HashMap<String, Batch>,
+	params: &StageParams,
+) -> (HashMap<String, &'a Batch>, HashMap<String, &'a Batch>, Vec<String>) {
+	let mut selected_batches = HashMap::new();
+	let mut unselected_batches = HashMap::new();
+	let mut unmatched_patterns = Vec::new();
+
+	if let Some(patterns) = &params.on_batches {
+		let all_batch_names: HashSet<_> = all_batches.keys().cloned().collect();
+		let mut matched_names = HashSet::new();
+
+		for pattern_str in patterns {
+			let pattern = Pattern::new(pattern_str).unwrap();
+			let mut matched_any = false;
+			for name in &all_batch_names {
+				if pattern.matches(name) {
+					matched_names.insert(name.clone());
+					matched_any = true;
+				}
+			}
+			if !matched_any {
+				unmatched_patterns.push(pattern_str.clone());
+			}
+		}
+
+		for (name, batch) in all_batches {
+			if matched_names.contains(name) {
+				selected_batches.insert(name.clone(), batch);
+			} else {
+				unselected_batches.insert(name.clone(), batch);
+			}
+		}
+	} else {
+		// If no patterns are specified, select all batches
+		for (name, batch) in all_batches {
+			selected_batches.insert(name.clone(), batch);
+		}
+	}
+
+	(selected_batches, unselected_batches, unmatched_patterns)
+}
+
 impl Pipeline {
 	pub fn new(rule: Rule) -> Self {
 		Self {
@@ -104,11 +151,17 @@ impl Pipeline {
 						self.stream = PipelineStream::new(new_files);
 					}
 				}
-				Stage::Split { splitter, .. } => {
-					let mut next_stream_batches = HashMap::new();
-					for (parent_name, parent_batch) in &self.stream.batches {
-						let split_batches = splitter.split(parent_batch).await?;
+				Stage::Split { splitter, params, .. } => {
+					let (selected_batches, unselected, unmatched) = select_batches(&self.stream.batches, &params);
+					if !unmatched.is_empty() {
+						println!("Warning: The following patterns in `on_batches` did not match any existing batches: {}", unmatched.join(", "));
+					}
 
+					let mut next_stream_batches: HashMap<String, Batch> =
+						unselected.into_iter().map(|(k, v)| (k, v.clone())).collect();
+
+					for (parent_name, parent_batch) in selected_batches {
+						let split_batches = splitter.split(parent_batch).await?;
 						for (new_key_part, mut sub_batch) in split_batches {
 							let new_name = if parent_name == "root" {
 								new_key_part.clone()
@@ -119,12 +172,20 @@ impl Pipeline {
 							next_stream_batches.insert(new_name, sub_batch);
 						}
 					}
+
 					self.stream.batches = next_stream_batches;
 					self.stream.resort().await;
 				}
-				Stage::Group { grouper, .. } => {
-					let mut next_level_batches = HashMap::new();
-					for (parent_name, parent_batch) in &self.stream.batches {
+				Stage::Group { grouper, params, .. } => {
+					let (selected_batches, unselected, unmatched) = select_batches(&self.stream.batches, &params);
+					if !unmatched.is_empty() {
+						println!("Warning: The following patterns in `on_batches` did not match any existing batches: {}", unmatched.join(", "));
+					}
+
+					let mut next_level_batches: HashMap<String, Batch> =
+						unselected.into_iter().map(|(k, v)| (k, v.clone())).collect();
+
+					for (parent_name, parent_batch) in selected_batches {
 						let named_batches_map = grouper.group(parent_batch).await?;
 						for (new_key_part, mut sub_batch) in named_batches_map {
 							let new_name = if parent_name == "root" {
@@ -141,15 +202,35 @@ impl Pipeline {
 					self.stream.groupers.push(grouper);
 					self.stream.resort().await;
 				}
-				Stage::Sort { sorter, .. } => {
-					self.stream.sorters.push(sorter);
-					self.stream.resort().await;
+				Stage::Sort { sorter, params, .. } => {
+					if params.on_batches.is_some() {
+						let (selected_batches, _, unmatched) = select_batches(&self.stream.batches, &params);
+						if !unmatched.is_empty() {
+							println!("Warning: The following patterns in `on_batches` did not match any existing batches: {}", unmatched.join(", "));
+						}
+						let selected_names: Vec<String> = selected_batches.keys().cloned().collect();
+						for name in selected_names {
+							if let Some(batch) = self.stream.batches.get_mut(&name) {
+								sorter.sort(&mut batch.files).await;
+							}
+						}
+					} else {
+						self.stream.sorters.push(sorter);
+						self.stream.resort().await;
+					}
 				}
-				Stage::Filter { filter, source } => {
-					let mut next_batches = HashMap::new();
+				Stage::Filter { filter, params, source } => {
+					let (selected_batches, unselected, unmatched) = select_batches(&self.stream.batches, &params);
+					if !unmatched.is_empty() {
+						println!("Warning: The following patterns in `on_batches` did not match any existing batches: {}", unmatched.join(", "));
+					}
+
+					let mut next_batches: HashMap<String, Batch> =
+						unselected.into_iter().map(|(k, v)| (k, v.clone())).collect();
+
 					match filter.execution_model() {
 						ExecutionModel::Batch => {
-							for (name, batch) in &self.stream.batches {
+							for (name, batch) in selected_batches {
 								let scope = ExecutionScope::new_batch_scope(source.clone(), batch);
 								let batch_ctx = ctx.with_scope(scope);
 								let passed_files = filter.filter(&batch_ctx).await?;
@@ -162,7 +243,7 @@ impl Pipeline {
 							}
 						}
 						ExecutionModel::Single => {
-							for (name, batch) in &self.stream.batches {
+							for (name, batch) in selected_batches {
 								let mut futs = Vec::new();
 								for resource in &batch.files {
 									let resource_clone = resource.clone();
@@ -187,12 +268,17 @@ impl Pipeline {
 					}
 					self.stream.batches = next_batches;
 				}
-				Stage::Action { action, source } => {
-					let mut next_stream_batches = HashMap::new(); // This will hold the new batches
+				Stage::Action { action, params, source } => {
+					let (selected_batches, unselected, unmatched) = select_batches(&self.stream.batches, &params);
+					if !unmatched.is_empty() {
+						println!("Warning: The following patterns in `on_batches` did not match any existing batches: {}", unmatched.join(", "));
+					}
 
-					for (name, batch) in &self.stream.batches {
-						let mut current_batch_next_files = Vec::new(); // Files for the current batch
+					let mut next_stream_batches: HashMap<String, Batch> =
+						unselected.into_iter().map(|(k, v)| (k, v.clone())).collect();
 
+					for (name, batch) in selected_batches {
+						let mut current_batch_next_files = Vec::new();
 						match action.execution_model() {
 							ExecutionModel::Batch => {
 								let scope = ExecutionScope::new_batch_scope(source.clone(), batch);
@@ -220,11 +306,10 @@ impl Pipeline {
 							}
 						}
 
-						// Create a new batch with the original name and the collected files
 						if !current_batch_next_files.is_empty() {
 							next_stream_batches.insert(name.clone(), Batch {
 								files: current_batch_next_files,
-								context: batch.context.clone(), // Inherit context
+								context: batch.context.clone(),
 							});
 						}
 					}
@@ -235,9 +320,16 @@ impl Pipeline {
 						self.stream = PipelineStream::new(self.stream.all_files());
 					}
 				}
-				Stage::Select { selector, .. } => {
-					let mut next_batches = HashMap::new();
-					for (name, batch) in &self.stream.batches {
+				Stage::Select { selector, params, .. } => {
+					let (selected_batches, unselected, unmatched) = select_batches(&self.stream.batches, &params);
+					if !unmatched.is_empty() {
+						println!("Warning: The following patterns in `on_batches` did not match any existing batches: {}", unmatched.join(", "));
+					}
+
+					let mut next_batches: HashMap<String, Batch> =
+						unselected.into_iter().map(|(k, v)| (k, v.clone())).collect();
+
+					for (name, batch) in selected_batches {
 						let selected_batch = selector.select(batch).await?;
 						if !selected_batch.files.is_empty() {
 							next_batches.insert(name.clone(), selected_batch);
