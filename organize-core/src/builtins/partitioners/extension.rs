@@ -5,20 +5,20 @@ use std::collections::HashMap;
 use crate::{
     batch::Batch,
     errors::Error,
-    grouper::Grouper,
+    partitioner::Partitioner,
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct ExtensionGrouper;
+pub struct ExtensionPartitioner;
 
 #[async_trait]
 #[typetag::serde(name = "extension")]
-impl Grouper for ExtensionGrouper {
+impl Partitioner for ExtensionPartitioner {
     fn name(&self) -> &str {
         self.typetag_name()
     }
 
-    async fn group(&self, batch: &Batch) -> Result<HashMap<String, Batch>, Error> {
+    async fn partition(&self, batch: &Batch) -> Result<HashMap<String, Batch>, Error> {
         let mut groups: HashMap<String, Batch> = HashMap::new();
         for resource in &batch.files {
             let extension = resource

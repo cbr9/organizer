@@ -1,19 +1,19 @@
-use crate::{batch::Batch, errors::Error, splitter::Splitter};
+use crate::{batch::Batch, errors::Error, partitioner::Partitioner};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, iter::FromIterator};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RatioSplitter {
+pub struct RatioPartitioner {
 	/// Captures arbitrary split names and their corresponding ratios,
 	/// e.g., `test = 0.2`, `train = 0.8`.
 	#[serde(flatten)]
 	pub ratios: HashMap<String, f64>,
 }
 
-impl Eq for RatioSplitter {}
+impl Eq for RatioPartitioner {}
 
-impl PartialEq for RatioSplitter {
+impl PartialEq for RatioPartitioner {
 	fn eq(&self, other: &Self) -> bool {
 		// First, check if the number of entries is the same
 		if self.ratios.len() != other.ratios.len() {
@@ -39,8 +39,11 @@ impl PartialEq for RatioSplitter {
 
 #[async_trait]
 #[typetag::serde(name = "ratio")]
-impl Splitter for RatioSplitter {
-	async fn split(&self, batch: &Batch) -> Result<HashMap<String, Batch>, Error> {
+impl Partitioner for RatioPartitioner {
+	fn name(&self) -> &str {
+		self.typetag_name()
+	}
+	async fn partition(&self, batch: &Batch) -> Result<HashMap<String, Batch>, Error> {
 		// 1. Validate that the ratios sum to approximately 1.0
 		let total_ratio: f64 = self.ratios.values().sum();
 		if (total_ratio - 1.0).abs() > 1e-9 {

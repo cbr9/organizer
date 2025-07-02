@@ -6,7 +6,7 @@ use crate::{
 	context::{ExecutionContext, ExecutionScope},
 	engine::ExecutionModel,
 	errors::Error,
-	grouper::Grouper,
+	partitioner::Partitioner,
 	resource::Resource,
 	rule::{Rule, Stage, StageParams},
 	sorter::Sorter,
@@ -19,14 +19,14 @@ use std::{
 
 /// Represents the data flowing through the pipeline.
 /// It tracks the current set of file batches and the sequence of
-/// groupers that have been applied to create them.
+/// partitioners that have been applied to create them.
 #[derive(Debug)]
 pub struct PipelineStream {
 	/// The current data, always represented as a list of batches.
 	/// An "ungrouped" state is simply a Vec with one Batch.
 	pub batches: HashMap<String, Batch>,
-	/// The ordered stack of groupers that have been applied.
-	pub groupers: Vec<Box<dyn Grouper>>,
+	/// The ordered stack of partitioners that have been applied.
+	pub partitioners: Vec<Box<dyn Partitioner>>,
 	pub sorters: Vec<Box<dyn Sorter>>,
 }
 
@@ -35,7 +35,7 @@ impl PipelineStream {
 	pub fn new(files: Vec<Arc<Resource>>) -> Self {
 		Self {
 			batches: HashMap::from([("root".into(), Batch::initial(files))]),
-			groupers: Vec::new(),
+			partitioners: Vec::new(),
 			sorters: Vec::new(),
 		}
 	}
@@ -53,15 +53,15 @@ impl PipelineStream {
 		}
 	}
 
-	/// Re-applies the entire stack of stored groupers to a new set of files.
+	/// Re-applies the entire stack of stored partitioners to a new set of files.
 	/// This is the key to maintaining a consistent state.
-	pub async fn regroup(&self, files: Vec<Arc<Resource>>) -> Result<HashMap<String, Batch>, anyhow::Error> {
+	pub async fn repartition(&self, files: Vec<Arc<Resource>>) -> Result<HashMap<String, Batch>, anyhow::Error> {
 		let mut current_batches = HashMap::from([("root".into(), Batch::initial(files))]);
 
-		for grouper in &self.groupers {
+		for partitioner in &self.partitioners {
 			let mut next_level_batches = HashMap::new();
 			for (parent_name, parent_batch) in &current_batches {
-				let named_batches_map = grouper.group(parent_batch).await?;
+				let named_batches_map = partitioner.partition(parent_batch).await?;
 				for (new_key_part, mut sub_batch) in named_batches_map {
 					let new_name = if parent_name == "root" {
 						new_key_part.clone()
@@ -69,7 +69,7 @@ impl PipelineStream {
 						format!("{parent_name}.{new_key_part}")
 					};
 					sub_batch.context.extend(parent_batch.context.clone());
-					sub_batch.context.insert(grouper.name().to_string(), new_key_part.clone());
+					sub_batch.context.insert(partitioner.name().to_string(), new_key_part.clone());
 					next_level_batches.insert(new_name, sub_batch);
 				}
 			}
@@ -145,38 +145,17 @@ impl Pipeline {
 					if location.mode.is_append() {
 						let mut all_files = self.stream.all_files();
 						all_files.extend(new_files);
-						self.stream.batches = self.stream.regroup(all_files).await?;
+						self.stream.batches = self.stream.repartition(all_files).await?;
 						self.stream.resort().await;
 					} else {
 						self.stream = PipelineStream::new(new_files);
 					}
 				}
-				Stage::Split { splitter, params, .. } => {
-					let (selected_batches, unselected, unmatched) = select_batches(&self.stream.batches, &params);
-					if !unmatched.is_empty() {
-						println!("Warning: The following patterns in `on_batches` did not match any existing batches: {}", unmatched.join(", "));
-					}
-
-					let mut next_stream_batches: HashMap<String, Batch> =
-						unselected.into_iter().map(|(k, v)| (k, v.clone())).collect();
-
-					for (parent_name, parent_batch) in selected_batches {
-						let split_batches = splitter.split(parent_batch).await?;
-						for (new_key_part, mut sub_batch) in split_batches {
-							let new_name = if parent_name == "root" {
-								new_key_part.clone()
-							} else {
-								format!("{parent_name}.{new_key_part}")
-							};
-							sub_batch.context.extend(parent_batch.context.clone());
-							next_stream_batches.insert(new_name, sub_batch);
-						}
-					}
-
-					self.stream.batches = next_stream_batches;
-					self.stream.resort().await;
-				}
-				Stage::Group { grouper, params, .. } => {
+				Stage::Partition {
+					partitioner,
+					params,
+					..
+				} => {
 					let (selected_batches, unselected, unmatched) = select_batches(&self.stream.batches, &params);
 					if !unmatched.is_empty() {
 						println!("Warning: The following patterns in `on_batches` did not match any existing batches: {}", unmatched.join(", "));
@@ -186,7 +165,7 @@ impl Pipeline {
 						unselected.into_iter().map(|(k, v)| (k, v.clone())).collect();
 
 					for (parent_name, parent_batch) in selected_batches {
-						let named_batches_map = grouper.group(parent_batch).await?;
+						let named_batches_map = partitioner.partition(parent_batch).await?;
 						for (new_key_part, mut sub_batch) in named_batches_map {
 							let new_name = if parent_name == "root" {
 								new_key_part.clone()
@@ -194,12 +173,12 @@ impl Pipeline {
 								format!("{parent_name}.{new_key_part}")
 							};
 							sub_batch.context.extend(parent_batch.context.clone());
-							sub_batch.context.insert(grouper.name().to_string(), new_key_part);
+							sub_batch.context.insert(partitioner.name().to_string(), new_key_part);
 							next_level_batches.insert(new_name, sub_batch);
 						}
 					}
 					self.stream.batches = next_level_batches;
-					self.stream.groupers.push(grouper);
+					self.stream.partitioners.push(partitioner);
 					self.stream.resort().await;
 				}
 				Stage::Sort { sorter, params, .. } => {

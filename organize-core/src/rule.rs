@@ -8,10 +8,9 @@ use crate::{
 	errors::Error,
 	filter::Filter,
 	folder::{Location, LocationBuilder},
-	grouper::Grouper,
+	partitioner::Partitioner,
 	selector::Selector,
 	sorter::Sorter,
-	splitter::Splitter,
 };
 
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]
@@ -91,8 +90,7 @@ pub enum StageBuilder {
 	Action(Box<dyn ActionBuilder>, StageParams),
 	Filter(Box<dyn Filter>, StageParams),
 	Select(Box<dyn Selector>, StageParams),
-	Group(Box<dyn Grouper>, StageParams),
-	Split(Box<dyn Splitter>, StageParams),
+	Partition(Box<dyn Partitioner>, StageParams),
 	Sort(Box<dyn Sorter>, StageParams),
 	Flatten(bool),
 }
@@ -118,8 +116,8 @@ impl StageBuilder {
 				params,
 				source,
 			}),
-			StageBuilder::Group(grouper, params) => Ok(Stage::Group {
-				grouper,
+			StageBuilder::Partition(partitioner, params) => Ok(Stage::Partition {
+				partitioner,
 				params,
 				source,
 			}),
@@ -131,11 +129,6 @@ impl StageBuilder {
 			StageBuilder::Compose(_) => unreachable!("Compose stages should be flattened"),
 			StageBuilder::Select(selector, params) => Ok(Stage::Select {
 				selector,
-				params,
-				source,
-			}),
-			StageBuilder::Split(splitter, params) => Ok(Stage::Split {
-				splitter,
 				params,
 				source,
 			}),
@@ -168,13 +161,8 @@ pub enum Stage {
 		flatten: bool,
 		source: Arc<RuleMetadata>,
 	},
-	Group {
-		grouper: Box<dyn Grouper>,
-		params: StageParams,
-		source: Arc<RuleMetadata>,
-	},
-	Split {
-		splitter: Box<dyn Splitter>,
+	Partition {
+		partitioner: Box<dyn Partitioner>,
 		params: StageParams,
 		source: Arc<RuleMetadata>,
 	},
@@ -197,9 +185,9 @@ impl<'de> Deserialize<'de> for StageBuilder {
 
 		let key = {
 			let keys: Vec<_> = table.keys().cloned().collect();
-			let possible_keys = ["search", "compose", "action", "filter", "group-by", "sort-by", "split-by", "select"];
+			let possible_keys = ["search", "compose", "action", "filter", "partition-by", "sort-by", "select"];
 			keys.into_iter().find(|k| possible_keys.contains(&k.as_str())).ok_or_else(|| {
-				serde::de::Error::custom("Stage must contain one of: 'search', 'compose', 'action', 'filter', 'group-by', 'sort-by', 'split-by', 'select'")
+				serde::de::Error::custom("Stage must contain one of: 'search', 'compose', 'action', 'filter', 'partition-by', 'sort-by', 'select'")
 			})?
 		};
 
@@ -228,7 +216,7 @@ impl<'de> Deserialize<'de> for StageBuilder {
 				let value = value.try_into::<bool>().map_err(serde::de::Error::custom)?;
 				Ok(StageBuilder::Flatten(value))
 			}
-			"filter" | "select" | "action" | "split-by" | "group-by" | "sort-by" => {
+			"filter" | "select" | "action" | "partition-by" | "sort-by" => {
 				let component_type = value
 					.as_str()
 					.ok_or_else(|| serde::de::Error::custom(format!("Expected a string for key '{key}'")))?;
@@ -242,8 +230,8 @@ impl<'de> Deserialize<'de> for StageBuilder {
 						Box::<dyn Filter>::deserialize(component_value).map_err(serde::de::Error::custom)?,
 						params,
 					)),
-					"split-by" => Ok(StageBuilder::Split(
-						Box::<dyn Splitter>::deserialize(component_value).map_err(serde::de::Error::custom)?,
+					"partition-by" => Ok(StageBuilder::Partition(
+						Box::<dyn Partitioner>::deserialize(component_value).map_err(serde::de::Error::custom)?,
 						params,
 					)),
 					"select" => Ok(StageBuilder::Select(
@@ -252,11 +240,6 @@ impl<'de> Deserialize<'de> for StageBuilder {
 					)),
 					"action" => Ok(StageBuilder::Action(
 						Box::<dyn ActionBuilder>::deserialize(component_value).map_err(serde::de::Error::custom)?,
-						params,
-					)),
-
-					"group-by" => Ok(StageBuilder::Group(
-						Box::<dyn Grouper>::deserialize(component_value).map_err(serde::de::Error::custom)?,
 						params,
 					)),
 					"sort-by" => Ok(StageBuilder::Sort(
