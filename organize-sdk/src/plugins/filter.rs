@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use dyn_clone::DynClone;
 use dyn_eq::DynEq;
-use std::{fmt::Debug, sync::Arc};
+use std::{fmt::Debug, path::PathBuf, sync::Arc};
 
 // pub mod content;
 // pub mod empty;
@@ -29,7 +29,7 @@ pub trait Filter: DynClone + DynEq + Debug + Send + Sync {
 
 	/// Takes the execution context, which contains the appropriate scope,
 	/// and returns a Result containing the list of files that passed.
-	async fn filter(&self, ctx: &ExecutionContext) -> Result<Vec<Arc<Resource>>, Error>;
+	async fn filter(&self, check: Option<&PathBuf>, ctx: &ExecutionContext) -> Result<Vec<Arc<Resource>>, Error>;
 }
 
 // #[derive(Eq, PartialEq, Deserialize, Serialize, Debug, Clone)]

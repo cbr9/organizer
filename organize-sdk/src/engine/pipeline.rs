@@ -223,6 +223,7 @@ impl Pipeline {
 					}
 				}
 				Stage::Filter { filter, params, source } => {
+					let check_path = params.check.as_ref();
 					let (selected_batches, unselected, unmatched) = select_batches(&self.stream.batches, &params);
 					if !unmatched.is_empty() {
 						println!(
@@ -238,7 +239,7 @@ impl Pipeline {
 							for (name, batch) in selected_batches {
 								let scope = ExecutionScope::new_batch_scope(source.clone(), batch);
 								let batch_ctx = ctx.with_scope(scope);
-								let passed_files = filter.filter(&batch_ctx).await?;
+								let passed_files = filter.filter(check_path, &batch_ctx).await?;
 								if !passed_files.is_empty() {
 									next_batches.insert(name.clone(), Batch {
 										files: passed_files,
@@ -257,7 +258,7 @@ impl Pipeline {
 									let fut = async move {
 										let scope = ExecutionScope::new_resource_scope(meta.clone(), resource_clone);
 										let ctx = ctx.with_scope(scope);
-										filter.filter(&ctx).await
+										filter.filter(check_path, &ctx).await
 									};
 									futs.push(fut);
 								}

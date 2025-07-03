@@ -5,3 +5,11 @@ max_depth = 1
 [[stage]]
 action = "echo"
 message = "{{ args.var1 }}"
+
+[[stage]]
+filter = "empty"
+check = "C:/Users/H0UB8WV/source/repos/organizer/test_data/empty_file.txt"
+
+[[stage]]
+action = "echo"
+message = "C:/Users/H0UB8WV/source/repos/organizer/test_data/empty_file.txt is empty!"

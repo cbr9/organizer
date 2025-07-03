@@ -24,6 +24,8 @@ pub struct StageParams {
 	pub enabled: bool,
 	#[serde(default)]
 	pub on_batches: Option<Vec<String>>,
+	#[serde(default)]
+	pub check: Option<PathBuf>,
 }
 
 fn default_true() -> bool {
@@ -143,6 +145,7 @@ impl<'de> Deserialize<'de> for StageBuilder {
 		table.remove("on_batches");
 		table.remove("enabled");
 		table.remove("description");
+		table.remove("check");
 
 		match key.as_str() {
 			"search" => {
