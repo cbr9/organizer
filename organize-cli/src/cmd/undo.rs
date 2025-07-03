@@ -1,4 +1,4 @@
-use std::error::Error;
+use std::{collections::HashMap, error::Error};
 
 use anyhow::{Result, anyhow};
 use async_trait::async_trait;
@@ -32,7 +32,7 @@ pub struct Undo {
 #[async_trait]
 impl Cmd for Undo {
 	async fn run(self) -> Result<()> {
-		let settings = RunSettings { dry_run: false };
+		let settings = RunSettings { dry_run: false, args: HashMap::new() };
 		let journal = Journal::new(&settings).await?; // Assumes a simple ::new()
 
 		let settings = UndoSettings {
