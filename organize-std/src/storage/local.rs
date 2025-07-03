@@ -138,24 +138,23 @@ impl StorageProvider for LocalFileSystem {
 
 	async fn discover(&self, location: &Location, ctx: &ExecutionContext<'_>) -> Result<Vec<Arc<Resource>>, Error> {
 		let location = Arc::new(location.clone());
-		let walker = WalkDir::new(&location.path)
+		let backend = ctx.services.fs.get_provider(&location.path)?;
+		let resources = WalkDir::new(&location.path)
 			.min_depth(location.options.min_depth)
 			.max_depth(location.options.max_depth)
-			.follow_links(location.options.follow_symlinks);
-
-		let collected_paths: Vec<PathBuf> = walker
+			.follow_links(location.options.follow_symlinks)
 			.into_iter()
+			.filter_entry(|entry| self.filter_entry(entry, &location.options))
 			.filter_map(|e| e.ok())
-			.map(|e| e.path().to_path_buf())
-			.filter(|p| self.filter_entries(p, &location.options))
-			.collect();
+			.map(|entry| {
+				entry
+					.path()
+					.to_path_buf()
+					.as_resource(ctx, Some(location.clone()), backend.clone())
+			})
+			.collect::<Vec<_>>();
 
-		let backend = ctx.services.fs.get_provider(&location.path)?;
-		let resource_creation_futures = collected_paths
-			.into_iter()
-			.map(|path| path.as_resource(ctx, Some(location.clone()), backend.clone()));
-
-		let resources = stream::iter(resource_creation_futures)
+		let resources = stream::iter(resources)
 			.buffer_unordered(num_cpus::get())
 			.collect::<Vec<_>>()
 			.await;
@@ -186,22 +185,25 @@ impl StorageProvider for LocalFileSystem {
 }
 
 impl LocalFileSystem {
-	fn filter_entries(&self, path: &Path, options: &Options) -> bool {
-		if path.is_file() && options.target == Target::Folders {
+	fn filter_entry(&self, entry: &walkdir::DirEntry, options: &Options) -> bool {
+		if options.exclude.contains(&entry.path().to_path_buf()) {
 			return false;
 		}
-		if path.is_dir() && options.target == Target::Files {
+		if entry.path().is_file() && options.target == Target::Folders {
 			return false;
+		}
+		if entry.path().is_dir() && options.target == Target::Files {
+			return true;
 		}
 
-		if path.is_file() {
-			if let Some(extension) = path.extension() {
+		if entry.path().is_file() {
+			if let Some(extension) = entry.path().extension() {
 				let partial_extensions = &["crdownload", "part", "download"];
 				if partial_extensions.contains(&&*extension.to_string_lossy()) && !options.partial_files {
 					return false;
 				}
 			}
-			if path.is_hidden().unwrap_or(false) && !options.hidden_files {
+			if entry.path().is_hidden().unwrap_or(false) && !options.hidden_files {
 				return false;
 			}
 		}
