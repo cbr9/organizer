@@ -1,15 +1,16 @@
-use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
 use std::{
-	fmt::{Debug, Display},
+	fmt::Display,
 	fs::Metadata,
 	hash::Hash,
 	path::{Path, PathBuf},
-	sync::{Arc, OnceLock},
+	sync::Arc,
 };
-use tokio::{fs::File, io::AsyncReadExt};
 
-use crate::{context::ExecutionContext, error::Error, location::Location};
+use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
+use tokio::{fs::File, io::AsyncReadExt, sync::OnceCell};
+
+use crate::{context::ExecutionContext, error::Error, location::Location, plugins::storage::StorageProvider};
 
 #[derive(Debug, Default, Clone)]
 pub enum FileState {
@@ -22,15 +23,16 @@ pub enum FileState {
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Resource {
 	pub path: PathBuf,
-	pub location: Arc<Location>,
+	pub location: Option<Arc<Location>>,
+	pub backend: Arc<dyn StorageProvider>,
 	#[serde(skip)]
-	mime: OnceLock<String>,
+	mime: OnceCell<String>,
 	#[serde(skip)]
-	bytes: OnceLock<Vec<u8>>,
+	bytes: OnceCell<Vec<u8>>,
 	#[serde(skip)]
-	hash: OnceLock<String>,
+	hash: OnceCell<String>,
 	#[serde(skip)]
-	metadata: OnceLock<Metadata>,
+	metadata: OnceCell<Metadata>,
 }
 
 impl AsRef<Path> for Resource {
@@ -73,6 +75,7 @@ impl Resource {
 		Self {
 			path: new_path,
 			location: self.location, // The origin root folder remains the same.
+			backend: self.backend,
 
 			// The content, hash, and MIME type of a file do not change when it is moved.
 			// We can move these initialized OnceLock fields to the new struct to preserve the cache.
@@ -82,7 +85,7 @@ impl Resource {
 
 			// The filesystem metadata (like modification times of parent dirs) IS different
 			// at the new location. We reset this field to force a re-fetch if needed.
-			metadata: OnceLock::new(),
+			metadata: OnceCell::new(),
 		}
 	}
 
@@ -101,7 +104,7 @@ impl Resource {
 		match self.metadata.get() {
 			Some(metadata) => metadata,
 			None => {
-				let metadata = tokio::fs::metadata(&self.path).await.unwrap();
+				let metadata = self.backend.metadata(&self.path).await.unwrap();
 				self.metadata.set(metadata).unwrap();
 				self.metadata.get().unwrap()
 			}
@@ -112,7 +115,7 @@ impl Resource {
 		match self.bytes.get() {
 			Some(content) => content,
 			None => {
-				let content = tokio::fs::read(&self.path).await.unwrap();
+				let content = self.backend.read(&self.path).await.unwrap();
 				self.bytes.set(content).unwrap();
 				self.bytes.get().unwrap()
 			}
@@ -153,14 +156,15 @@ impl Resource {
 // }
 //
 impl Resource {
-	pub fn new(path: &Path, location: Arc<Location>) -> Self {
+	pub fn new(path: &Path, location: Option<Arc<Location>>, backend: Arc<dyn StorageProvider>) -> Self {
 		Self {
 			path: path.to_path_buf(),
 			location,
-			mime: OnceLock::new(),
-			bytes: OnceLock::new(),
-			hash: OnceLock::new(),
-			metadata: OnceLock::new(),
+			backend,
+			mime: OnceCell::new(),
+			bytes: OnceCell::new(),
+			hash: OnceCell::new(),
+			metadata: OnceCell::new(),
 		}
 	}
 

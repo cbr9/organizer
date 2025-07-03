@@ -1,0 +1,18 @@
+# rules/copy_test.rule.toml
+
+[metadata]
+name = "Copy Test"
+description = "Tests the copy action"
+
+[connections.sftp_test]
+type = "sftp"
+address = "${SFTP_ADDRESS}"
+username = "${SFTP_USERNAME}"
+password = "${SFTP_PASSWORD}"
+
+[pipeline.search]
+path = "sftp://sftp_test/test_data/empty_file.txt"
+
+[pipeline.action]
+type = "copy"
+folder = "test_data/copy_destination"

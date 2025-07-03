@@ -18,7 +18,7 @@ dyn_eq::eq_trait_object!(StorageProvider);
 /// A trait for any component that can provide a list of files to be processed.
 /// This could be a local folder, an S3 bucket, an SFTP connection, etc.
 pub trait StorageProvider: DynEq + DynClone + Sync + Send + Debug {
-	fn home(&self) -> Result<PathBuf, Error>;
+	async fn home(&self) -> Result<PathBuf, Error>;
 	fn prefix(&self) -> &'static str;
 	async fn metadata(&self, path: &Path) -> Result<Metadata, Error>;
 	async fn read_dir(&self, path: &Path) -> Result<Vec<PathBuf>, Error>;

@@ -4,12 +4,7 @@ use std::{path::PathBuf, sync::Arc};
 
 use anyhow::Result;
 
-use organize_sdk::{
-	context::ExecutionContext,
-	error::Error,
-	plugins::filter::Filter,
-	resource::Resource,
-};
+use organize_sdk::{context::ExecutionContext, error::Error, plugins::filter::Filter, resource::Resource};
 
 #[derive(Debug, Clone, Deserialize, Serialize, Eq, PartialEq)]
 #[serde(deny_unknown_fields)]
@@ -22,7 +17,7 @@ impl Filter for Empty {
 		let resource = ctx.scope.resource()?;
 		let path = check.unwrap_or(&resource.path);
 
-		let backend = &resource.location.backend;
+		let backend = &resource.backend;
 		let content = backend.read(path).await?;
 
 		if content.is_empty() {

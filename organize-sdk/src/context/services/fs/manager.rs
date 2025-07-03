@@ -1,7 +1,7 @@
 use crate::{
 	context::{services::fs::locker::Locker, ExecutionContext},
+	engine::rule::RuleBuilder,
 	error::Error,
-	location::Location,
 	plugins::storage::StorageProvider,
 	resource::{FileState, Resource},
 	templates::template::{Template, TemplateString},
@@ -9,9 +9,9 @@ use crate::{
 use anyhow::Result;
 use moka::future::Cache;
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 use std::{
 	collections::HashMap,
-	iter::FromIterator,
 	path::{Path, PathBuf},
 	sync::Arc,
 };
@@ -71,7 +71,7 @@ pub fn parse_uri(uri_str: &str) -> anyhow::Result<(String, String)> {
 		// This will correctly handle paths on both Windows and Unix.
 		// let url = Url::from_file_path(path).map_err(|_| anyhow::anyhow!("Invalid local path"))?;
 		// Return "local" as the host (backend) and the original path.
-		return Ok(("local".to_string(), uri_str.to_string()));
+		return Ok(("file".to_string(), uri_str.to_string()));
 	}
 
 	let url = Url::parse(uri_str)?;
@@ -83,16 +83,19 @@ pub fn parse_uri(uri_str: &str) -> anyhow::Result<(String, String)> {
 	Ok((host.to_string(), path))
 }
 
-impl Default for FileSystemManager {
-	fn default() -> Self {
-		Self::new()
-	}
-}
-
 impl FileSystemManager {
-	pub fn new() -> Self {
-		let local: Arc<dyn StorageProvider> = Location::new_local();
-		let backends = HashMap::from_iter(vec![("local".to_string(), local)]);
+	pub fn new(rule: &RuleBuilder) -> Self {
+		let mut backends: HashMap<String, Arc<dyn StorageProvider + 'static>> = rule
+			.connections
+			.iter()
+			.map(|(k, v)| (k.clone(), Arc::from(v.clone())))
+			.collect();
+
+		backends.insert(
+			"file".to_string(),
+			serde_json::from_value::<Arc<dyn StorageProvider>>(json!({ "type": "local" })).expect("missing local file system provider"),
+		);
+
 		Self {
 			locker: Locker::default(),
 			resources: Cache::new(10_000),
@@ -101,40 +104,89 @@ impl FileSystemManager {
 		}
 	}
 
+	pub fn get_provider(&self, path: &Path) -> Result<Arc<dyn StorageProvider>> {
+		let (host, _) = parse_uri(path.to_str().unwrap())?;
+		self.backends
+			.get(&host)
+			.cloned()
+			.ok_or_else(|| anyhow::anyhow!("No provider found for host: {}", host))
+	}
+
 	pub async fn ensure_parent_dir_exists(&self, path: &Path) -> std::io::Result<()> {
 		if let Some(parent) = path.parent() {
 			if !tokio::fs::try_exists(parent).await.unwrap_or(false) {
 				tokio::fs::create_dir_all(parent).await?;
 			}
 		}
-		// resources: CacheBuilder::new(1_000_000)
-		// 	.time_to_live(Duration::new(60 * 60 * 24, 0)) // ONE DAY
-		// 	.name("cached_resources")
-		// 	.build(),
 		Ok(())
 	}
 
-	pub async fn r#move(&self, source: Arc<Resource>, destination: Arc<Resource>) -> Result<(), Error> {
-		// Attempt a direct rename first
-		self.ensure_parent_dir_exists(destination.as_path()).await?;
-		match tokio::fs::rename(source.as_path(), destination.as_path()).await {
-			Ok(_) => Ok(()),
-			Err(e) if e.raw_os_error() == Some(libc::EXDEV) || e.kind() == std::io::ErrorKind::CrossesDevices => {
-				// Handle "Cross-device link" error (EXDEV on Unix, specific error kind on Windows)
-				// This means source and destination are on different file systems.
-				tracing::warn!(
-					"Attempting copy-then-delete for move operation due to cross-device link: {} to {}",
-					source.as_path().display(),
-					destination.as_path().display()
-				);
+	pub async fn copy(&self, from: &Arc<Resource>, to: &Arc<Resource>, ctx: &ExecutionContext<'_>) -> Result<(), Error> {
+		let from_provider = &from.backend;
+		let to_provider = &to.backend;
 
-				// Perform copy
-				tokio::fs::copy(source.as_path(), destination.as_path()).await?;
+		let from_is_local = from_provider.prefix() == "file";
+		let to_is_local = to_provider.prefix() == "file";
 
-				// If copy is successful, delete the original
-				Ok(tokio::fs::remove_file(source.as_path()).await?)
+		match (from_is_local, to_is_local) {
+			(true, false) => to_provider.upload(from.as_path(), to.as_path(), ctx).await,
+			(false, true) => {
+				let temp_path = from_provider.download(from.as_path()).await?;
+				tokio::fs::copy(&temp_path, to.as_path())
+					.await
+					.map_err(|e| Error::Io(e))
+					.map(|_| ())?;
+				tokio::fs::remove_file(temp_path).await.map_err(|e| Error::Io(e))
 			}
-			Err(e) => Err(Error::Io(e)),
+			(false, false) => {
+				let temp_path = from_provider.download(from.as_path()).await?;
+				to_provider.upload(&temp_path, to.as_path(), ctx).await
+			}
+			(true, true) => from_provider.copy(from.as_path(), to.as_path(), ctx).await,
+		}
+	}
+
+	pub async fn delete(&self, path: &Path) -> Result<(), Error> {
+		let provider = self.get_provider(path)?;
+		provider.delete(path).await
+	}
+
+	pub async fn mkdir(&self, path: &Path, ctx: &ExecutionContext<'_>) -> Result<(), Error> {
+		let provider = self.get_provider(path)?;
+		provider.mkdir(path, ctx).await
+	}
+
+	pub async fn hardlink(&self, from: &Path, to: &Path, ctx: &ExecutionContext<'_>) -> Result<(), Error> {
+		let from_provider = self.get_provider(from)?;
+		let to_provider = self.get_provider(to)?;
+
+		if from_provider == to_provider {
+			from_provider.hardlink(from, to, ctx).await
+		} else {
+			Err(Error::ImpossibleOp("Cannot create hardlink across different filesystems".to_string()))
+		}
+	}
+
+	pub async fn symlink(&self, from: &Path, to: &Path, ctx: &ExecutionContext<'_>) -> Result<(), Error> {
+		let from_provider = self.get_provider(from)?;
+		let to_provider = self.get_provider(to)?;
+
+		if from_provider == to_provider {
+			from_provider.symlink(from, to, ctx).await
+		} else {
+			Err(Error::ImpossibleOp("Cannot create symlink across different filesystems".to_string()))
+		}
+	}
+
+	pub async fn r#move(&self, from: &Arc<Resource>, to: &Arc<Resource>, ctx: &ExecutionContext<'_>) -> Result<(), Error> {
+		let from_provider = &from.backend;
+		let to_provider = &to.backend;
+
+		if from_provider == to_provider {
+			from_provider.r#move(from.as_path(), to.as_path(), ctx).await
+		} else {
+			self.copy(from, to, ctx).await?;
+			self.delete(from.as_path()).await
 		}
 	}
 }

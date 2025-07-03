@@ -9,6 +9,15 @@ use crate::{
 /// The primary error type for all actions within the application.
 #[derive(Error, Debug)]
 pub enum Error {
+	#[error("SFTP error: {0}")]
+	Sftp(#[from] ssh2::Error),
+
+	#[error("Impossible operation: {0}")]
+	ImpossibleOp(String),
+
+	#[error("Error in configuration: {0}")]
+	Config(String),
+
 	#[error("Error converting to value")]
 	Json(#[from] serde_json::Error),
 

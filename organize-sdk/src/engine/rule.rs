@@ -1,12 +1,11 @@
-use std::sync::Arc;
-
 use serde::{Deserialize, Serialize};
-
 use crate::{
 	context::ExecutionContext,
 	engine::stage::{Stage, StageBuilder},
 	error::Error,
+	plugins::storage::StorageProvider,
 };
+use std::{collections::HashMap, sync::Arc};
 
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]
 pub struct RuleMetadata {
@@ -21,15 +20,25 @@ pub struct RuleMetadata {
 pub struct RuleBuilder {
 	#[serde(flatten)]
 	pub metadata: RuleMetadata,
+	#[serde(default)]
+	pub connections: HashMap<String, Box<dyn StorageProvider>>,
 	#[serde(rename = "stage")]
 	pub pipeline: Vec<StageBuilder>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub struct Rule {
 	pub metadata: Arc<RuleMetadata>,
+	pub connections: HashMap<String, Box<dyn StorageProvider>>,
 	pub pipeline: Vec<Stage>,
 }
+
+impl PartialEq for Rule {
+	fn eq(&self, other: &Self) -> bool {
+		self.metadata == other.metadata && self.pipeline == other.pipeline
+	}
+}
+impl Eq for Rule {}
 
 async fn load_rule_builder_from_path(path: &std::path::Path) -> Result<RuleBuilder, anyhow::Error> {
 	let content = tokio::fs::read_to_string(path).await?;
@@ -67,6 +76,7 @@ impl RuleBuilder {
 
 		Ok(Rule {
 			metadata: main_meta.clone(),
+			connections: self.connections,
 			pipeline: final_pipeline,
 		})
 	}

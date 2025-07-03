@@ -48,15 +48,15 @@ pub struct Engine {
 
 impl Engine {
 	pub async fn new(path: &PathBuf, settings: RunSettings) -> Result<Arc<Self>> {
+		let content = tokio::fs::read_to_string(path).await?;
+		let builder: RuleBuilder = toml::from_str(&content)?;
 		let services = RunServices {
 			blackboard: Blackboard::default(),
 			journal: Arc::new(Journal::new(&settings).await?),
-			fs: FileSystemManager::new(),
+			fs: FileSystemManager::new(&builder),
 			compiler: TemplateCompiler::new(),
 		};
-		let content = tokio::fs::read_to_string(path).await?;
 		let rule = {
-			let builder: RuleBuilder = toml::from_str(&content)?;
 			let ctx = ExecutionContext {
 				services: &services,
 				scope: ExecutionScope::Blank,

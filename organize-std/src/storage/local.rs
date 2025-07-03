@@ -16,7 +16,7 @@ use organize_sdk::{
 	},
 	plugins::storage::StorageProvider,
 	resource::Resource,
-	stdx::path::PathExt,
+	stdx::path::{PathBufExt, PathExt},
 };
 use serde::{Deserialize, Serialize};
 use walkdir::WalkDir;
@@ -31,7 +31,7 @@ impl StorageProvider for LocalFileSystem {
 		"file"
 	}
 
-	fn home(&self) -> Result<PathBuf, Error> {
+	async fn home(&self) -> Result<PathBuf, Error> {
 		Ok(dirs::home_dir().context("unable to find home directory")?)
 	}
 
@@ -106,12 +106,13 @@ impl StorageProvider for LocalFileSystem {
 		}
 	}
 
-	async fn download(&self, _from: &Path) -> Result<PathBuf, Error> {
-		Ok(PathBuf::new())
+	async fn download(&self, from: &Path) -> Result<PathBuf, Error> {
+		Ok(from.to_path_buf())
 	}
 
-	async fn upload(&self, _from_local: &Path, _to: &Path, _ctx: &ExecutionContext<'_>) -> Result<(), Error> {
-		Ok(())
+	async fn upload(&self, from_local: &Path, to: &Path, ctx: &ExecutionContext<'_>) -> Result<(), Error> {
+		self.mkdir(to, ctx).await?;
+		tokio::fs::copy(from_local, to).await.map_err(|e| Error::Io(e)).map(|_| ())
 	}
 
 	async fn hardlink(&self, from: &Path, to: &Path, ctx: &ExecutionContext<'_>) -> Result<(), Error> {
@@ -149,11 +150,10 @@ impl StorageProvider for LocalFileSystem {
 			.filter(|p| self.filter_entries(p, &location.options))
 			.collect();
 
-		let resource_creation_futures = collected_paths.into_iter().map(|path| {
-			let location = location.clone();
-			// let ctx = *ctx;
-			async move { path.as_resource(ctx, location).await }
-		});
+		let backend = ctx.services.fs.get_provider(&location.path)?;
+		let resource_creation_futures = collected_paths
+			.into_iter()
+			.map(|path| path.as_resource(ctx, Some(location.clone()), backend.clone()));
 
 		let resources = stream::iter(resource_creation_futures)
 			.buffer_unordered(num_cpus::get())

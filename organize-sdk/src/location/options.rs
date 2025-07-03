@@ -66,3 +66,21 @@ pub enum Target {
 	Files,
 	Folders,
 }
+
+impl Target {
+	/// Returns `true` if the target is [`Files`].
+	///
+	/// [`Files`]: Target::Files
+	#[must_use]
+	pub fn is_files(&self) -> bool {
+		matches!(self, Self::Files)
+	}
+
+	/// Returns `true` if the target is [`Folders`].
+	///
+	/// [`Folders`]: Target::Folders
+	#[must_use]
+	pub fn is_folders(&self) -> bool {
+		matches!(self, Self::Folders)
+	}
+}

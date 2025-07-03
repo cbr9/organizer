@@ -4,14 +4,17 @@ use std::{ffi::OsStr, path::PathBuf, sync::Arc};
 
 use async_trait::async_trait;
 
-use crate::{context::ExecutionContext, location::Location, resource::Resource};
+use crate::{context::ExecutionContext, location::Location, plugins::storage::StorageProvider, resource::Resource};
 
-#[async_trait]
 pub trait PathExt {
 	type HiddenError;
 	fn is_hidden(&self) -> Result<bool, Self::HiddenError>;
 	fn expand_user(self) -> PathBuf;
-	async fn as_resource(&self, ctx: &ExecutionContext, location: Arc<Location>) -> Arc<Resource>;
+}
+
+#[async_trait]
+pub trait PathBufExt {
+	async fn as_resource(self, ctx: &ExecutionContext<'_>, location: Option<Arc<Location>>, backend: Arc<dyn StorageProvider>) -> Arc<Resource>;
 }
 
 #[async_trait]
@@ -49,14 +52,15 @@ impl<T: AsRef<Path> + Sync + Send> PathExt for T {
 		let attributes = metadata.file_attributes();
 		Ok((attributes & 0x2) > 0)
 	}
+}
 
-	async fn as_resource(&self, ctx: &ExecutionContext, location: Arc<Location>) -> Arc<Resource> {
+#[async_trait]
+impl PathBufExt for PathBuf {
+	async fn as_resource(self, ctx: &ExecutionContext<'_>, location: Option<Arc<Location>>, backend: Arc<dyn StorageProvider>) -> Arc<Resource> {
 		ctx.services
 			.fs
 			.resources
-			.get_with(self.as_ref().to_path_buf(), async move {
-				Arc::new(Resource::new(self.as_ref(), location))
-			})
+			.get_with(self.clone(), async move { Arc::new(Resource::new(self.as_ref(), location, backend)) })
 			.await
 	}
 }

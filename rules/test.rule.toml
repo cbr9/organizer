@@ -1,15 +1,24 @@
+[connections.aws-frankfurt]
+type = "sftp"
+address = "localhost:10003"
+username = "andres_cabero"
+
 [[stage]]
-search = '/Users/H0UB8WV/Downloads/'
+search = 'sftp://aws-frankfurt/homes/andres_cabero/test-dir'
 max_depth = 1
 
 [[stage]]
 action = "echo"
-message = "{{ args.var1 }}"
+message = "{{ file.path }}"
 
 [[stage]]
-filter = "empty"
-check = "C:/Users/H0UB8WV/source/repos/organizer/test_data/empty_file.txt"
+action = "copy"
+folder = "/Users/H0UB8WV/Downloads/test-dir"
 
-[[stage]]
-action = "echo"
-message = "C:/Users/H0UB8WV/source/repos/organizer/test_data/empty_file.txt is empty!"
+# [[stage]]
+# filter = "empty"
+# check = "C:/Users/H0UB8WV/source/repos/organizer/test_data/empty_file.txt"
+
+# [[stage]]
+# action = "echo"
+# message = "C:/Users/H0UB8WV/source/repos/organizer/test_data/empty_file.txt is empty!"

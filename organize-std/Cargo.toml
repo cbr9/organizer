@@ -8,7 +8,7 @@ repository = "https://github.com/cbr9/organizer"
 
 [dependencies]
 organize-sdk = { path = "../organize-sdk" }
-anyhow = { workspace = true }
+anyhow.workspace = true
 async-trait = "0.1.88"
 serde = { workspace = true }
 typetag = { workspace = true }
@@ -22,5 +22,13 @@ num_cpus = "1.16.0"
 walkdir = "2.5.0"
 futures = "0.3.31"
 tokio-stream = "0.1"
+russh = "0.53.0"
+russh-keys = "0.49.2"
+russh-sftp = "2.1.1"
+dyn-clone.workspace = true
+dyn-eq.workspace = true
+tempfile = "3.20.0"
+ssh2 = "0.9.5"
+tokio-compat-02 = "0.2.0"
 
 

@@ -1,7 +1,4 @@
-use std::{
-	path::PathBuf,
-	sync::Arc,
-};
+use std::{path::PathBuf, sync::Arc};
 
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
@@ -33,7 +30,6 @@ pub struct Location {
 	pub options: Options,
 	pub mode: SearchMode,
 	pub keep_structure: bool,
-	pub backend: Arc<dyn StorageProvider>,
 }
 
 impl Eq for Location {}
@@ -58,7 +54,7 @@ impl LocationBuilder {
 	pub async fn build(self, ctx: &ExecutionContext<'_>) -> Result<Location, Error> {
 		let path_template = ctx.services.compiler.compile_template(&self.path)?;
 		let uri = path_template.render(ctx).await?;
-		let (host, path) = parse_uri(&uri)?;
+		let (_, path) = parse_uri(&uri)?;
 		let path = PathBuf::from(path);
 
 		let ctx = &ExecutionContext {
@@ -71,7 +67,6 @@ impl LocationBuilder {
 			path,
 			options: self.options.compile(ctx).await?,
 			mode: self.mode,
-			backend: ctx.services.fs.backends.get(&host).unwrap().clone(), // The direct Arc clone to the provider
 			keep_structure: self.keep_structure,
 		})
 	}
