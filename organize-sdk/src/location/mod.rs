@@ -23,6 +23,8 @@ pub struct LocationBuilder {
 	pub options: OptionsBuilder,
 	#[serde(default)]
 	pub mode: SearchMode,
+	#[serde(default = "defaults::keep_structure")]
+	pub keep_structure: bool,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -30,6 +32,7 @@ pub struct Location {
 	pub path: PathBuf,
 	pub options: Options,
 	pub mode: SearchMode,
+	pub keep_structure: bool,
 	pub backend: Arc<dyn StorageProvider>,
 }
 
@@ -37,7 +40,7 @@ impl Eq for Location {}
 
 impl PartialEq for Location {
 	fn eq(&self, other: &Self) -> bool {
-		self.path == other.path && self.options == other.options && self.mode == other.mode
+		self.path == other.path && self.options == other.options && self.mode == other.mode && self.keep_structure == other.keep_structure
 	}
 }
 
@@ -69,7 +72,14 @@ impl LocationBuilder {
 			options: self.options.compile(ctx).await?,
 			mode: self.mode,
 			backend: ctx.services.fs.backends.get(&host).unwrap().clone(), // The direct Arc clone to the provider
+			keep_structure: self.keep_structure,
 		})
+	}
+}
+
+mod defaults {
+	pub(super) fn keep_structure() -> bool {
+		true
 	}
 }
 /// The final, compiled `Folder` object, ready for execution.

@@ -165,13 +165,18 @@ impl Pipeline {
 					let scope = ExecutionScope::new_location_scope(source.clone(), &location);
 					let ctx = ctx.with_scope(scope);
 					let new_files = location.backend.discover(&location, &ctx).await?;
-					if location.mode.is_append() {
+					if location.mode.is_replace() {
+						if location.keep_structure {
+							self.stream.batches = self.stream.repartition(new_files).await?;
+							self.stream.resort().await;
+						} else {
+							self.stream = PipelineStream::new(new_files);
+						}
+					} else {
 						let mut all_files = self.stream.all_files();
 						all_files.extend(new_files);
 						self.stream.batches = self.stream.repartition(all_files).await?;
 						self.stream.resort().await;
-					} else {
-						self.stream = PipelineStream::new(new_files);
 					}
 				}
 				Stage::Partition { partitioner, params, .. } => {
