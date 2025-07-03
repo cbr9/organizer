@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::{fmt::Debug, path::PathBuf};
 
-use crate::{context::ExecutionContext, error::Error, plugins::storage::StorageProvider, stdx::path::PathExt, templates::template::TemplateString};
+use crate::{context::ExecutionContext, error::Error, stdx::path::PathExt, templates::template::TemplateString};
 
 fn default_usize() -> usize {
 	1.0 as usize
@@ -37,9 +37,9 @@ pub struct Options {
 }
 
 impl OptionsBuilder {
-	pub async fn compile(self, ctx: &ExecutionContext<'_>, location_path: &PathBuf) -> Result<Options, Error> {
+	pub async fn compile(self, ctx: &ExecutionContext<'_>, host: &str) -> Result<Options, Error> {
 		let mut excluded_paths = Vec::new();
-		let backend = ctx.services.fs.get_provider(location_path)?;
+		let backend = ctx.services.fs.get_provider(host)?;
 
 		for template in &self.exclude {
 			let template = ctx.services.compiler.compile_template(template)?;

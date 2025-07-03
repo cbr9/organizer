@@ -7,6 +7,7 @@ use crate::{
 	templates::template::{Template, TemplateString},
 };
 use anyhow::Result;
+use futures;
 use moka::future::Cache;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -15,19 +16,21 @@ use std::{
 	path::{Path, PathBuf},
 	sync::Arc,
 };
-use url::Url; // Assuming this is needed for dry_run and context
+
 
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
 pub struct DestinationBuilder {
 	pub folder: TemplateString,
 	pub filename: Option<TemplateString>,
+	pub host: TemplateString,
 }
 impl DestinationBuilder {
 	/// Compiles the raw DestinationBuilder into an executable Destination.
 	pub fn build(self, ctx: &ExecutionContext<'_>) -> Result<Destination, Error> {
 		let folder = ctx.services.compiler.compile_template(&self.folder)?;
 		let filename = self.filename.map(|f| ctx.services.compiler.compile_template(&f)).transpose()?; // This elegantly handles the Option<Result<T, E>>
-		Ok(Destination { folder, filename })
+		let host = ctx.services.compiler.compile_template(&self.host)?;
+		Ok(Destination { folder, filename, host })
 	}
 }
 
@@ -35,6 +38,7 @@ impl DestinationBuilder {
 pub struct Destination {
 	pub folder: Template,
 	pub filename: Option<Template>,
+	pub host: Template,
 }
 
 impl Destination {
@@ -63,25 +67,7 @@ pub struct FileSystemManager {
 	pub backends: HashMap<String, Arc<dyn StorageProvider>>,
 }
 
-pub fn parse_uri(uri_str: &str) -> anyhow::Result<(String, String)> {
-	// For local paths, we must construct a valid file URI first.
-	if !uri_str.contains("://") {
-		// let path = PathBuf::from(uri_str).clean();
-		// dbg!(&path);
-		// This will correctly handle paths on both Windows and Unix.
-		// let url = Url::from_file_path(path).map_err(|_| anyhow::anyhow!("Invalid local path"))?;
-		// Return "local" as the host (backend) and the original path.
-		return Ok(("file".to_string(), uri_str.to_string()));
-	}
 
-	let url = Url::parse(uri_str)?;
-	let host = url
-		.host_str()
-		.ok_or_else(|| anyhow::anyhow!("URI is missing a host (connection name)"))?;
-	let path = url.path().to_string();
-
-	Ok((host.to_string(), path))
-}
 
 impl FileSystemManager {
 	pub fn new(rule: &RuleBuilder) -> Self {
@@ -104,10 +90,9 @@ impl FileSystemManager {
 		}
 	}
 
-	pub fn get_provider(&self, path: &Path) -> Result<Arc<dyn StorageProvider>> {
-		let (host, _) = parse_uri(path.to_str().unwrap())?;
+	pub fn get_provider(&self, host: &str) -> Result<Arc<dyn StorageProvider>> {
 		self.backends
-			.get(&host)
+			.get(host)
 			.cloned()
 			.ok_or_else(|| anyhow::anyhow!("No provider found for host: {}", host))
 	}
@@ -121,72 +106,108 @@ impl FileSystemManager {
 		Ok(())
 	}
 
-	pub async fn copy(&self, from: &Arc<Resource>, to: &Arc<Resource>, ctx: &ExecutionContext<'_>) -> Result<(), Error> {
+	pub async fn download_many(&self, resources: &[Arc<Resource>]) -> Result<Vec<PathBuf>, Error> {
+		let mut downloaded_paths = Vec::with_capacity(resources.len());
+		for resource in resources {
+			let provider = &resource.backend;
+			let temp_path = provider.download(resource.as_path()).await?;
+			downloaded_paths.push(temp_path);
+		}
+		Ok(downloaded_paths)
+	}
+
+	pub async fn copy_many(&self, from: &[Arc<Resource>], to: &[Arc<Resource>]) -> Result<(), Error> {
+		if from.len() != to.len() {
+			return Err(Error::Other(anyhow::anyhow!(
+				"Mismatched number of source and destination resources for copy_many"
+			)));
+		}
+
+		let mut futures = Vec::with_capacity(from.len());
+		for (from_res, to_res) in from.iter().zip(to.iter()) {
+			let from_provider = from_res.backend.clone();
+			let to_provider = to_res.backend.clone();
+			let from_path = from_res.as_path().to_path_buf();
+			let to_path = to_res.as_path().to_path_buf();
+			let manager_clone = self.clone();
+
+			futures.push(async move {
+				manager_clone.ensure_parent_dir_exists(&to_path).await?;
+
+				let from_is_local = from_provider.prefix() == "file";
+				let to_is_local = to_provider.prefix() == "file";
+
+				match (from_is_local, to_is_local) {
+					(true, false) => to_provider.upload(&from_path, &to_path).await?,
+					(false, true) => {
+						let temp_path = from_provider.download(&from_path).await?;
+						tokio::fs::copy(&temp_path, &to_path)
+							.await
+							.map_err(Error::Io)
+							.map(|_| ())?;
+						tokio::fs::remove_file(temp_path).await.map_err(Error::Io)?;
+					}
+					(false, false) => {
+						let temp_path = from_provider.download(&from_path).await?;
+						to_provider.upload(&temp_path, &to_path).await?;
+					}
+					(true, true) => from_provider.copy(&from_path, &to_path).await?,
+				}
+				Ok::<(), Error>(())
+			});
+		}
+		futures::future::try_join_all(futures)
+			.await
+			.map(|_| ())
+			.map_err(|e| Error::Other(anyhow::anyhow!("Failed to copy one or more resources: {}", e)))?;
+		Ok(())
+	}
+
+	pub async fn copy(&self, from: &Arc<Resource>, to: &Arc<Resource>) -> Result<(), Error> {
+		self.copy_many(std::slice::from_ref(from), std::slice::from_ref(to)).await
+	}
+
+	pub async fn delete(&self, path: &Arc<Resource>) -> Result<(), Error> {
+		let provider = &path.backend;
+		provider.delete(path.as_path()).await
+	}
+
+	pub async fn mkdir(&self, path: &Arc<Resource>) -> Result<(), Error> {
+		let provider = &path.backend;
+		provider.mkdir(path.as_path()).await
+	}
+
+	pub async fn hardlink(&self, from: &Arc<Resource>, to: &Arc<Resource>) -> Result<(), Error> {
 		let from_provider = &from.backend;
 		let to_provider = &to.backend;
 
-		let from_is_local = from_provider.prefix() == "file";
-		let to_is_local = to_provider.prefix() == "file";
-
-		match (from_is_local, to_is_local) {
-			(true, false) => to_provider.upload(from.as_path(), to.as_path(), ctx).await,
-			(false, true) => {
-				let temp_path = from_provider.download(from.as_path()).await?;
-				tokio::fs::copy(&temp_path, to.as_path())
-					.await
-					.map_err(|e| Error::Io(e))
-					.map(|_| ())?;
-				tokio::fs::remove_file(temp_path).await.map_err(|e| Error::Io(e))
-			}
-			(false, false) => {
-				let temp_path = from_provider.download(from.as_path()).await?;
-				to_provider.upload(&temp_path, to.as_path(), ctx).await
-			}
-			(true, true) => from_provider.copy(from.as_path(), to.as_path(), ctx).await,
-		}
-	}
-
-	pub async fn delete(&self, path: &Path) -> Result<(), Error> {
-		let provider = self.get_provider(path)?;
-		provider.delete(path).await
-	}
-
-	pub async fn mkdir(&self, path: &Path, ctx: &ExecutionContext<'_>) -> Result<(), Error> {
-		let provider = self.get_provider(path)?;
-		provider.mkdir(path, ctx).await
-	}
-
-	pub async fn hardlink(&self, from: &Path, to: &Path, ctx: &ExecutionContext<'_>) -> Result<(), Error> {
-		let from_provider = self.get_provider(from)?;
-		let to_provider = self.get_provider(to)?;
-
 		if from_provider == to_provider {
-			from_provider.hardlink(from, to, ctx).await
+			from_provider.hardlink(from.as_path(), to.as_path()).await
 		} else {
 			Err(Error::ImpossibleOp("Cannot create hardlink across different filesystems".to_string()))
 		}
 	}
 
-	pub async fn symlink(&self, from: &Path, to: &Path, ctx: &ExecutionContext<'_>) -> Result<(), Error> {
-		let from_provider = self.get_provider(from)?;
-		let to_provider = self.get_provider(to)?;
+	pub async fn symlink(&self, from: &Arc<Resource>, to: &Arc<Resource>) -> Result<(), Error> {
+		let from_provider = &from.backend;
+		let to_provider = &to.backend;
 
 		if from_provider == to_provider {
-			from_provider.symlink(from, to, ctx).await
+			from_provider.symlink(from.as_path(), to.as_path()).await
 		} else {
 			Err(Error::ImpossibleOp("Cannot create symlink across different filesystems".to_string()))
 		}
 	}
 
-	pub async fn r#move(&self, from: &Arc<Resource>, to: &Arc<Resource>, ctx: &ExecutionContext<'_>) -> Result<(), Error> {
+	pub async fn r#move(&self, from: &Arc<Resource>, to: &Arc<Resource>) -> Result<(), Error> {
 		let from_provider = &from.backend;
 		let to_provider = &to.backend;
 
 		if from_provider == to_provider {
-			from_provider.r#move(from.as_path(), to.as_path(), ctx).await
+			from_provider.r#move(from.as_path(), to.as_path()).await
 		} else {
-			self.copy(from, to, ctx).await?;
-			self.delete(from.as_path()).await
+			self.copy(from, to).await?;
+			self.delete(from).await
 		}
 	}
 }

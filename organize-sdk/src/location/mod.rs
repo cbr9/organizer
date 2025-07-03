@@ -4,7 +4,7 @@ use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-	context::{scope::ExecutionScope, services::fs::manager::parse_uri, ExecutionContext},
+	context::{scope::ExecutionScope, ExecutionContext},
 	error::Error,
 	location::options::{Options, OptionsBuilder},
 	plugins::storage::StorageProvider,
@@ -16,6 +16,7 @@ pub mod options;
 #[derive(Debug, Serialize, PartialEq, Eq, Clone, Deserialize)]
 pub struct LocationBuilder {
 	pub path: TemplateString,
+	pub host: TemplateString,
 	#[serde(flatten)]
 	pub options: OptionsBuilder,
 	#[serde(default)]
@@ -27,6 +28,7 @@ pub struct LocationBuilder {
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Location {
 	pub path: PathBuf,
+	pub host: String,
 	pub options: Options,
 	pub mode: SearchMode,
 	pub keep_structure: bool,
@@ -53,9 +55,8 @@ impl Location {
 impl LocationBuilder {
 	pub async fn build(self, ctx: &ExecutionContext<'_>) -> Result<Location, Error> {
 		let path_template = ctx.services.compiler.compile_template(&self.path)?;
-		let uri = path_template.render(ctx).await?;
-		let (_, path) = parse_uri(&uri)?;
-		let path = PathBuf::from(path);
+		let path = PathBuf::from(path_template.render(ctx).await?);
+		let host = ctx.services.compiler.compile_template(&self.host)?.render(ctx).await?;
 
 		let ctx = &ExecutionContext {
 			services: ctx.services,
@@ -64,8 +65,9 @@ impl LocationBuilder {
 		};
 
 		Ok(Location {
-			path,
-			options: self.options.compile(ctx).await?,
+			path: path.clone(),
+			host,
+			options: self.options.compile(ctx, &path.to_string_lossy()).await?,
 			mode: self.mode,
 			keep_structure: self.keep_structure,
 		})

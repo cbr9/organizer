@@ -1,3 +1,4 @@
+
 use std::path::PathBuf;
 use thiserror::Error;
 
@@ -9,8 +10,11 @@ use crate::{
 /// The primary error type for all actions within the application.
 #[derive(Error, Debug)]
 pub enum Error {
-	#[error("SFTP error: {0}")]
-	Sftp(#[from] ssh2::Error),
+	#[error(transparent)]
+	SFTP(#[from] russh_sftp::client::error::Error),
+
+	#[error(transparent)]
+	SSH(#[from] russh::Error),
 
 	#[error("Impossible operation: {0}")]
 	ImpossibleOp(String),

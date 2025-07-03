@@ -35,7 +35,7 @@ impl StorageProvider for LocalFileSystem {
 		Ok(dirs::home_dir().context("unable to find home directory")?)
 	}
 
-	async fn mkdir(&self, path: &Path, _ctx: &ExecutionContext<'_>) -> Result<(), Error> {
+	async fn mkdir(&self, path: &Path) -> Result<(), Error> {
 		if let Some(parent) = path.parent() {
 			if !tokio::fs::try_exists(parent).await.unwrap_or(false) {
 				tokio::fs::create_dir_all(parent).await?;
@@ -44,9 +44,9 @@ impl StorageProvider for LocalFileSystem {
 		Ok(())
 	}
 
-	async fn r#move(&self, from: &Path, to: &Path, ctx: &ExecutionContext<'_>) -> Result<(), Error> {
+	async fn r#move(&self, from: &Path, to: &Path) -> Result<(), Error> {
 		// ctx.services.fs.ensure_parent_dir_exists(destination.as_path()).await?;
-		self.mkdir(to, ctx).await?;
+		self.mkdir(to).await?;
 		match tokio::fs::rename(from, to).await {
 			Ok(_) => Ok(()),
 			Err(e) if e.raw_os_error() == Some(libc::EXDEV) || e.kind() == std::io::ErrorKind::CrossesDevices => {
@@ -65,8 +65,8 @@ impl StorageProvider for LocalFileSystem {
 		}
 	}
 
-	async fn copy(&self, from: &Path, to: &Path, ctx: &ExecutionContext<'_>) -> Result<(), Error> {
-		self.mkdir(to, ctx).await?;
+	async fn copy(&self, from: &Path, to: &Path) -> Result<(), Error> {
+		self.mkdir(to).await?;
 
 		let mut dirs = Vec::new();
 		let mut files = Vec::new();
@@ -110,18 +110,35 @@ impl StorageProvider for LocalFileSystem {
 		Ok(from.to_path_buf())
 	}
 
-	async fn upload(&self, from_local: &Path, to: &Path, ctx: &ExecutionContext<'_>) -> Result<(), Error> {
-		self.mkdir(to, ctx).await?;
-		tokio::fs::copy(from_local, to).await.map_err(|e| Error::Io(e)).map(|_| ())
+	async fn download_many(&self, from: &[PathBuf]) -> Result<Vec<PathBuf>, Error> {
+		Ok(from.to_vec())
 	}
 
-	async fn hardlink(&self, from: &Path, to: &Path, ctx: &ExecutionContext<'_>) -> Result<(), Error> {
-		self.mkdir(to, ctx).await?;
+	async fn upload(&self, from_local: &Path, to: &Path) -> Result<(), Error> {
+		self.mkdir(to).await?;
+		tokio::fs::copy(from_local, to).await.map_err(Error::Io).map(|_| ())
+	}
+
+	async fn upload_many(&self, from_local: &[PathBuf], to: &[PathBuf]) -> Result<(), Error> {
+		if from_local.len() != to.len() {
+			return Err(Error::Other(anyhow::anyhow!(
+				"Mismatched number of source and destination paths for upload_many"
+			)));
+		}
+		for (from, to) in from_local.iter().zip(to.iter()) {
+			self.mkdir(to).await?;
+			tokio::fs::copy(from, to).await.map_err(Error::Io).map(|_| ())?;
+		}
+		Ok(())
+	}
+
+	async fn hardlink(&self, from: &Path, to: &Path) -> Result<(), Error> {
+		self.mkdir(to).await?;
 		tokio::fs::hard_link(from, to).await.map_err(Error::from)
 	}
 
-	async fn symlink(&self, from: &Path, to: &Path, ctx: &ExecutionContext<'_>) -> Result<(), Error> {
-		self.mkdir(to, ctx).await?;
+	async fn symlink(&self, from: &Path, to: &Path) -> Result<(), Error> {
+		self.mkdir(to).await?;
 		#[cfg(unix)]
 		{
 			tokio::fs::symlink(from, to).await.map_err(Error::from)
@@ -138,7 +155,7 @@ impl StorageProvider for LocalFileSystem {
 
 	async fn discover(&self, location: &Location, ctx: &ExecutionContext<'_>) -> Result<Vec<Arc<Resource>>, Error> {
 		let location = Arc::new(location.clone());
-		let backend = ctx.services.fs.get_provider(&location.path)?;
+		let backend = ctx.services.fs.get_provider(&location.host)?;
 		let resources = WalkDir::new(&location.path)
 			.min_depth(location.options.min_depth)
 			.max_depth(location.options.max_depth)
@@ -147,10 +164,8 @@ impl StorageProvider for LocalFileSystem {
 			.filter_entry(|entry| self.filter_entry(entry, &location.options))
 			.filter_map(|e| e.ok())
 			.map(|entry| {
-				entry
-					.path()
-					.to_path_buf()
-					.as_resource(ctx, Some(location.clone()), backend.clone())
+				let path_buf = entry.path().to_path_buf();
+				path_buf.as_resource(ctx, Some(location.clone()), backend.clone())
 			})
 			.collect::<Vec<_>>();
 

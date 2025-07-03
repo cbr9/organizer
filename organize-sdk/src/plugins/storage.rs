@@ -3,6 +3,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 use dyn_clone::DynClone;
 use dyn_eq::DynEq;
+use serde_json::Value;
 use std::{
 	fmt::Debug,
 	fs::Metadata,
@@ -25,12 +26,18 @@ pub trait StorageProvider: DynEq + DynClone + Sync + Send + Debug {
 	async fn read(&self, path: &Path) -> Result<Vec<u8>, Error>;
 	async fn write(&self, path: &Path, content: &[u8]) -> Result<(), Error>;
 	async fn discover(&self, location: &Location, ctx: &ExecutionContext<'_>) -> Result<Vec<Arc<Resource>>, Error>;
-	async fn mkdir(&self, path: &Path, ctx: &ExecutionContext<'_>) -> Result<(), Error>;
-	async fn r#move(&self, from: &Path, to: &Path, ctx: &ExecutionContext<'_>) -> Result<(), Error>;
-	async fn copy(&self, from: &Path, to: &Path, ctx: &ExecutionContext<'_>) -> Result<(), Error>;
+	async fn mkdir(&self, path: &Path) -> Result<(), Error>;
+	async fn r#move(&self, from: &Path, to: &Path) -> Result<(), Error>;
+	async fn copy(&self, from: &Path, to: &Path) -> Result<(), Error>;
 	async fn delete(&self, path: &Path) -> Result<(), Error>;
 	async fn download(&self, from: &Path) -> Result<PathBuf, Error>;
-	async fn upload(&self, from_local: &Path, to: &Path, ctx: &ExecutionContext<'_>) -> Result<(), Error>;
-	async fn hardlink(&self, from: &Path, to: &Path, ctx: &ExecutionContext<'_>) -> Result<(), Error>;
-	async fn symlink(&self, from: &Path, to: &Path, ctx: &ExecutionContext<'_>) -> Result<(), Error>;
+	async fn download_many(&self, from: &[PathBuf]) -> Result<Vec<PathBuf>, Error>;
+	async fn upload(&self, from_local: &Path, to: &Path) -> Result<(), Error>;
+	async fn upload_many(&self, from_local: &[PathBuf], to: &[PathBuf]) -> Result<(), Error>;
+	async fn hardlink(&self, from: &Path, to: &Path) -> Result<(), Error>;
+	async fn symlink(&self, from: &Path, to: &Path) -> Result<(), Error>;
+}
+
+pub trait StorageProviderFactory: Send + Sync {
+	fn create(&self, config: Value) -> Result<Option<Arc<dyn StorageProvider>>, Error>;
 }

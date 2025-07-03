@@ -1,18 +1,26 @@
 use std::{
 	fmt::{Debug, Formatter},
 	fs::Metadata,
-	io::{Read, Write},
-	net::TcpStream,
+	net::{IpAddr, SocketAddr},
 	path::{Path, PathBuf},
 	sync::Arc,
 };
 
-use anyhow::Result;
+use deadpool::managed::{self, Metrics, Object, Pool, RecycleResult};
+use russh_sftp::client::SftpSession;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+use anyhow::{Context, Result};
 use async_trait::async_trait;
 use futures::future::BoxFuture;
+use russh::{
+	client::{self, Handle},
+	keys::{agent::client::AgentClient, Algorithm},
+	Channel,
+};
 use serde::{Deserialize, Serialize};
-use ssh2::{Session, Sftp as SftpClient};
 use tempfile::NamedTempFile;
+use tokio::sync::OnceCell;
 
 use organize_sdk::{
 	context::ExecutionContext,
@@ -22,21 +30,30 @@ use organize_sdk::{
 	resource::Resource,
 	stdx::path::PathBufExt,
 };
-use tokio::sync::OnceCell;
 
 #[derive(Serialize, Deserialize)]
 pub struct Sftp {
-	pub address: String,
+	pub address: IpAddr,
+	pub port: u16,
 	pub username: String,
 	pub private_key: Option<PathBuf>,
 	#[serde(skip)]
-	sftp: OnceCell<SftpClient>,
+	pub pool: OnceCell<SftpPool>,
 }
+
+impl PartialEq for Sftp {
+	fn eq(&self, other: &Self) -> bool {
+		self.address == other.address && self.port == other.port && self.username == other.username
+	}
+}
+
+impl Eq for Sftp {}
 
 impl Debug for Sftp {
 	fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
 		f.debug_struct("Sftp")
 			.field("address", &self.address)
+			.field("port", &self.port)
 			.field("username", &self.username)
 			.finish()
 	}
@@ -44,59 +61,135 @@ impl Debug for Sftp {
 
 impl Clone for Sftp {
 	fn clone(&self) -> Self {
-		Sftp {
+		Self {
 			address: self.address.clone(),
+			port: self.port.clone(),
 			username: self.username.clone(),
 			private_key: self.private_key.clone(),
-			sftp: OnceCell::new(),
+			pool: self.pool.clone(),
 		}
 	}
 }
 
-impl Sftp {
-	pub async fn get_sftp(&self) -> Result<&SftpClient> {
-		self.sftp
-			.get_or_try_init(|| async {
-				let address = self.address.clone();
-				let username = self.username.clone();
-				let private_key = self.private_key.clone();
-				let tcp = TcpStream::connect(address)?;
-				let mut session = Session::new()?;
-				session.set_tcp_stream(tcp);
-				session.handshake()?;
-				if let Some(private_key) = private_key {
-					session.userauth_pubkey_file(&username, None, &private_key, None)?;
-				} else {
-					let mut agent = session.agent()?;
-					agent.connect()?;
-					agent.list_identities()?;
-					for identity in agent.identities()? {
-						if agent.userauth(&username, &identity).is_ok() {
-							break;
-						}
-					}
-				}
-				Ok(session.sftp()?)
-			})
+pub struct Client;
+
+impl client::Handler for Client {
+	type Error = anyhow::Error;
+
+	async fn check_server_key(&mut self, _server_public_key: &russh::keys::PublicKey) -> Result<bool, Self::Error> {
+		Ok(true)
+	}
+}
+
+impl managed::Manager for Sftp {
+	type Error = Error;
+	type Type = SftpSession;
+
+	/// Creates a new, authenticated SftpSession.
+	async fn create(&self) -> Result<SftpSession, Self::Error> {
+		let session = self.connect().await?;
+		// 3. Open a channel and request the SFTP subsystem
+		let channel: Channel<client::Msg> = session.channel_open_session().await.context("Failed to open session channel")?;
+		channel
+			.request_subsystem(true, "sftp")
 			.await
+			.context("Failed to request SFTP subsystem")?;
+
+		// 4. Create the SftpSession
+		SftpSession::new(channel.into_stream()).await.map_err(|e| Error::SFTP(e))
+	}
+
+	/// Checks if a connection is still valid before lending it out.
+	async fn recycle(&self, session: &mut Self::Type, _metrics: &Metrics) -> RecycleResult<Self::Error> {
+		// A simple, low-cost operation to check if the session is alive.
+		match session.canonicalize(".").await {
+			Ok(_) => Ok(()),
+			Err(e) => {
+				tracing::warn!("Recycling SFTP session failed, discarding. Error: {}", e);
+				// The error indicates the connection is broken.
+				Err(managed::RecycleError::Message(e.to_string().into()))
+			}
+		}
 	}
 }
 
-impl PartialEq for Sftp {
-	fn eq(&self, other: &Self) -> bool {
-		self.address == other.address && self.username == other.username && self.private_key == other.private_key
+/// The main runtime struct which holds the connection pool.
+/// This struct is NOT serializable directly. It is created from an SftpConfig.
+pub type SftpPool = Arc<managed::Pool<Sftp>>;
+
+impl Sftp {
+	/// Creates a new Sftp provider with a connection pool.
+	pub async fn pool(&self) -> Result<&Arc<Pool<Sftp>>, Error> {
+		let pool = self
+			.pool
+			.get_or_try_init(|| async {
+				let pool = managed::Pool::builder(self.clone())
+					.max_size(5) // Max 16 concurrent connections
+					.build()
+					.map(|pool| Arc::new(pool))
+					.map_err(|e| Error::Other(e.into()))?;
+				Ok::<Arc<Pool<Sftp>>, Error>(pool)
+			})
+			.await?;
+		Ok(pool)
 	}
 }
+impl Sftp {
+	/// Establishes a full connection, authenticates, and creates an SftpSession.
+	/// This is the main change: each public-facing operation will create and tear down
+	/// a connection. This is necessary for compatibility with servers that only allow
+	/// one SFTP subsystem per connection (e.g., using `ForceCommand`).
+	async fn connect(&self) -> Result<Handle<Client>, Error> {
+		// 1. Establish the underlying SSH session
+		let config = Arc::new(russh::client::Config::default());
+		let socket = SocketAddr::new(self.address, self.port);
+		let mut session = client::connect(config, socket, Client)
+			.await
+			.context("Could not establish SSH connection")?;
 
-impl Eq for Sftp {}
+		// 2. Authenticate using the SSH agent
+		let client_pipe = tokio::net::windows::named_pipe::ClientOptions::new()
+			.open(r"\\.\pipe\openssh-ssh-agent")
+			.context("Could not connect to the SSH agent pipe. Is 1Password or another agent running?")?;
+
+		let hash_alg = session.best_supported_rsa_hash().await?.flatten();
+
+		let mut authenticated = false;
+		let mut agent = AgentClient::connect(client_pipe);
+		let identities = agent.request_identities().await.unwrap();
+		for identity in identities {
+			let alg = match identity.algorithm() {
+				Algorithm::Dsa | Algorithm::Rsa { .. } => hash_alg,
+				_ => None,
+			};
+
+			let auth_result = session
+				.authenticate_publickey_with(&self.username, identity, alg, &mut agent)
+				.await
+				.unwrap();
+			if auth_result.success() {
+				tracing::debug!("Authenticated successfully with SSH agent.");
+				authenticated = true;
+				break;
+			}
+		}
+
+		if !authenticated {
+			return Err(Error::Other(anyhow::anyhow!(
+				"Authentication failed: No valid keys found in the agent for the given user."
+			)));
+		}
+		Ok(session)
+	}
+}
 
 #[async_trait]
 #[typetag::serde(name = "sftp")]
 impl StorageProvider for Sftp {
 	async fn home(&self) -> Result<PathBuf, Error> {
-		let sftp = self.get_sftp().await?;
-		let path = sftp.realpath(Path::new("."))?;
-		Ok(path)
+		let session = self.pool().await?.get().await.map_err(|e| Error::Other(e.into()))?;
+		let path = session.canonicalize(".").await?;
+		Ok(path.into())
 	}
 
 	fn prefix(&self) -> &'static str {
@@ -108,44 +201,46 @@ impl StorageProvider for Sftp {
 	}
 
 	async fn read_dir(&self, path: &Path) -> Result<Vec<PathBuf>, Error> {
-		let sftp = self.get_sftp().await?;
-		let entries = sftp.readdir(path)?;
-		let paths = entries.into_iter().map(|(path, _)| path).collect();
+		let session = self.pool().await?.get().await.map_err(|e| Error::Other(e.into()))?;
+		let entries = session.read_dir(path.to_string_lossy()).await?;
+		let paths: Vec<PathBuf> = entries.into_iter().map(|p| p.file_name().into()).collect();
 		Ok(paths)
 	}
 
 	async fn read(&self, path: &Path) -> Result<Vec<u8>, Error> {
-		let sftp = self.get_sftp().await?;
-		let mut file = sftp.open(path)?;
+		println!("READING: {}", path.display());
+		let session = self.pool().await?.get().await.map_err(|e| Error::Other(e.into()))?;
+		let mut file = session.open(path.to_str().unwrap()).await?;
 		let mut buf = Vec::new();
-		file.read_to_end(&mut buf)?;
+		file.read_to_end(&mut buf).await?;
 		Ok(buf)
 	}
 
 	async fn write(&self, path: &Path, content: &[u8]) -> Result<(), Error> {
-		let sftp = self.get_sftp().await?;
-		let mut file = sftp.create(path)?;
-		file.write_all(content)?;
+		let session = self.pool().await?.get().await.map_err(|e| Error::Other(e.into()))?;
+		let mut file = session.create(path.to_str().unwrap()).await?;
+		file.write_all(content).await?;
 		Ok(())
 	}
 
 	async fn discover(&self, location: &Location, ctx: &ExecutionContext<'_>) -> Result<Vec<Arc<Resource>>, Error> {
 		let mut files = Vec::new();
-		let backend = ctx.services.fs.get_provider(&location.path)?;
-		self.discover_recursive(ctx, location.path.clone(), 1, &location.options, &mut files, location, backend)
+		let session = self.pool().await?.get().await.map_err(|e| Error::Other(e.into()))?;
+		let backend = ctx.services.fs.get_provider(&location.host)?;
+		self.discover_recursive(&session, ctx, location.path.clone(), 1, &location.options, &mut files, location, backend)
 			.await?;
 		Ok(files)
 	}
 
-	async fn mkdir(&self, path: &Path, _ctx: &ExecutionContext<'_>) -> Result<(), Error> {
-		let sftp = self.get_sftp().await?;
-		sftp.mkdir(path, 0o755)?;
+	async fn mkdir(&self, path: &Path) -> Result<(), Error> {
+		let session = self.pool().await?.get().await.map_err(|e| Error::Other(e.into()))?;
+		session.create_dir(path.to_string_lossy()).await?;
 		Ok(())
 	}
 
-	async fn r#move(&self, from: &Path, to: &Path, ctx: &ExecutionContext<'_>) -> Result<(), Error> {
-		let sftp = self.get_sftp().await?;
-		let rename_result = sftp.rename(from, to, None);
+	async fn r#move(&self, from: &Path, to: &Path) -> Result<(), Error> {
+		let session = self.pool().await?.get().await.map_err(|e| Error::Other(e.into()))?;
+		let rename_result = session.rename(from.to_string_lossy(), to.to_string_lossy()).await;
 		if rename_result.is_err() {
 			tracing::warn!(
 				"Could not move {} to {}. Falling back to copy and delete. Original error: {:?}",
@@ -153,48 +248,91 @@ impl StorageProvider for Sftp {
 				to.display(),
 				rename_result.err()
 			);
-			self.copy(from, to, ctx).await?;
+			self.copy(from, to).await?;
 			self.delete(from).await?;
 		}
 		Ok(())
 	}
 
-	async fn copy(&self, from: &Path, to: &Path, _ctx: &ExecutionContext<'_>) -> Result<(), Error> {
+	async fn copy(&self, from: &Path, to: &Path) -> Result<(), Error> {
 		let content = self.read(from).await?;
 		self.write(to, &content).await
 	}
 
 	async fn delete(&self, path: &Path) -> Result<(), Error> {
-		let sftp = self.get_sftp().await?;
-		let stat = sftp.stat(path)?;
+		let path = path.to_string_lossy().to_string();
+		let session = self.pool().await?.get().await.map_err(|e| Error::Other(e.into()))?;
+		let stat = session.metadata(&path).await?;
 		if stat.is_dir() {
-			sftp.rmdir(path)?;
+			session.remove_dir(&path).await?;
 		} else {
-			sftp.unlink(path)?;
+			session.remove_file(&path).await?;
 		}
 		Ok(())
 	}
 
 	async fn download(&self, from: &Path) -> Result<PathBuf, Error> {
+		tracing::info!("Downloading {}", from.display());
 		let content = self.read(from).await?;
 		let temp_file = NamedTempFile::new().map_err(|e| Error::Io(e))?;
 		tokio::fs::write(temp_file.path(), &content).await.map_err(|e| Error::Io(e))?;
+		tracing::info!("Downloaded {}", from.display());
 		let path = temp_file.keep().map_err(|e| Error::Other(e.into()))?;
 		Ok(path.1)
 	}
 
-	async fn upload(&self, from_local: &Path, to: &Path, _ctx: &ExecutionContext<'_>) -> Result<(), Error> {
+	async fn download_many(&self, from: &[PathBuf]) -> Result<Vec<PathBuf>, Error> {
+		let mut futures = Vec::with_capacity(from.len());
+		for path in from {
+			let sftp_clone = self.clone();
+			let path_clone = path.clone();
+			futures.push(tokio::spawn(async move { sftp_clone.download(&path_clone).await }));
+		}
+		let results: Result<Vec<PathBuf>, Error> = futures::future::try_join_all(futures)
+			.await
+			.map_err(|e| Error::Other(e.into()))?
+			.into_iter()
+			.collect();
+		results
+	}
+
+	async fn upload(&self, from_local: &Path, to: &Path) -> Result<(), Error> {
 		let content = tokio::fs::read(from_local).await.map_err(|e| Error::Io(e))?;
 		self.write(to, &content).await
 	}
 
-	async fn hardlink(&self, _from: &Path, _to: &Path, _ctx: &ExecutionContext<'_>) -> Result<(), Error> {
-		Err(Error::ImpossibleOp("SFTP does not support hardlinks".to_string()))
+	async fn upload_many(&self, from_local: &[PathBuf], to: &[PathBuf]) -> Result<(), Error> {
+		if from_local.len() != to.len() {
+			return Err(Error::Other(anyhow::anyhow!(
+				"Mismatched number of source and destination paths for upload_many"
+			)));
+		}
+
+		let mut futures = Vec::with_capacity(from_local.len());
+		for (from, to) in from_local.iter().zip(to.iter()) {
+			let sftp_clone = self.clone();
+			let from_clone = from.clone();
+			let to_clone = to.clone();
+			futures.push(tokio::spawn(async move { sftp_clone.upload(&from_clone, &to_clone).await }));
+		}
+
+		futures::future::try_join_all(futures)
+			.await
+			.map_err(|e| Error::Other(e.into()))?
+			.into_iter()
+			.for_each(drop);
+		Ok(())
 	}
 
-	async fn symlink(&self, from: &Path, to: &Path, _ctx: &ExecutionContext<'_>) -> Result<(), Error> {
-		let sftp = self.get_sftp().await?;
-		sftp.symlink(from, to)?;
+	async fn hardlink(&self, from: &Path, to: &Path) -> Result<(), Error> {
+		let session = self.pool().await?.get().await.map_err(|e| Error::Other(e.into()))?;
+		session.hardlink(from.to_string_lossy(), to.to_string_lossy()).await?;
+		Ok(())
+	}
+
+	async fn symlink(&self, from: &Path, to: &Path) -> Result<(), Error> {
+		let session = self.pool().await?.get().await.map_err(|e| Error::Other(e.into()))?;
+		session.symlink(from.to_string_lossy(), to.to_string_lossy()).await?;
 		Ok(())
 	}
 }
@@ -202,6 +340,7 @@ impl StorageProvider for Sftp {
 impl Sftp {
 	fn discover_recursive<'a>(
 		&'a self,
+		sftp: &'a Object<Self>,
 		ctx: &'a ExecutionContext<'a>,
 		path: PathBuf,
 		depth: usize,
@@ -215,35 +354,51 @@ impl Sftp {
 				return Ok(());
 			}
 
-			let sftp = self.get_sftp().await?;
-			let entries = sftp.readdir(&path)?;
+			let entries = sftp.read_dir(path.to_string_lossy()).await?;
+			let parent_components: Vec<String> = path
+				.components()
+				.enumerate()
+				.map(|(i, component)| {
+					if i == 0 {
+						"/".to_string()
+					} else {
+						component.as_os_str().to_string_lossy().to_string()
+					}
+				})
+				.collect();
 
-			for (entry_path, stat) in entries {
-				let entry_path = sftp.realpath(&entry_path)?;
-				if options.exclude.contains(&entry_path) {
+			for entry in entries {
+				let mut components = parent_components.clone();
+				components.push(entry.file_name());
+				let entry = components.join("/").replace("//", "/");
+				let pathbuf = PathBuf::from(&entry);
+
+				if options.exclude.contains(&pathbuf) {
 					continue;
 				}
 
-				if !options.hidden_files && entry_path.file_name().unwrap().to_str().unwrap().starts_with('.') {
+				if !options.hidden_files && entry.starts_with('.') {
 					continue;
 				}
 
-				if stat.is_dir() {
+				let metadata = sftp.metadata(entry).await?;
+
+				if metadata.is_dir() {
 					if depth >= options.min_depth {
 						if let organize_sdk::location::options::Target::Folders = options.target {
-							let resource = entry_path
+							let resource = pathbuf
 								.clone()
 								.as_resource(ctx, Some(Arc::new(location.clone())), backend.clone())
 								.await;
 							files.push(resource);
 						}
 					}
-					self.discover_recursive(ctx, entry_path, depth + 1, options, files, location, backend.clone())
+					self.discover_recursive(sftp, ctx, pathbuf, depth + 1, options, files, location, backend.clone())
 						.await?;
 				} else {
 					if depth >= options.min_depth {
 						if options.target.is_files() {
-							let resource = entry_path
+							let resource = pathbuf
 								.as_resource(ctx, Some(Arc::new(location.clone())), backend.clone())
 								.await;
 							files.push(resource);

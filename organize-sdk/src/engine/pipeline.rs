@@ -164,7 +164,7 @@ impl Pipeline {
 				Stage::Search { location, source, .. } => {
 					let scope = ExecutionScope::new_location_scope(source.clone(), &location);
 					let ctx = ctx.with_scope(scope);
-					let new_files = ctx.services.fs.get_provider(&location.path)?.discover(&location, &ctx).await?;
+					let new_files = ctx.services.fs.get_provider(&location.host)?.discover(&location, &ctx).await?;
 					if location.mode.is_replace() {
 						if location.keep_structure {
 							self.stream.batches = self.stream.repartition(new_files).await?;

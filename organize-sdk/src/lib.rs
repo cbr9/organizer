@@ -4,7 +4,6 @@
 
 pub const PROJECT_NAME: &str = "organize";
 
-pub mod utils;
 pub mod context;
 pub mod engine;
 pub mod error;
@@ -13,3 +12,4 @@ pub mod plugins;
 pub mod resource;
 pub mod stdx;
 pub mod templates;
+pub mod utils;

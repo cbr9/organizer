@@ -63,6 +63,18 @@ impl Accessor for Extension {
 	}
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct Parent;
+
+#[async_trait]
+impl Accessor for Parent {
+	async fn get(&self, ctx: &ExecutionContext) -> Result<Value> {
+		let resource = ctx.scope.resource()?;
+		let value = resource.path.parent().map(|parent| parent.to_string_lossy().to_string());
+		Ok(Value::OptionString(value))
+	}
+}
+
 // SCHEMA AND REGISTRATION
 
 impl StatelessVariable for FileProvider {
@@ -90,6 +102,10 @@ impl StatelessVariable for FileProvider {
 				Property {
 					name: "extension",
 					node: SchemaNode::Terminal(Arc::new(|| Box::new(Extension))),
+				},
+				Property {
+					name: "parent",
+					node: SchemaNode::Terminal(Arc::new(|| Box::new(Parent))),
 				},
 			]),
 		}
