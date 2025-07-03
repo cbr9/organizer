@@ -1,14 +1,17 @@
 use crate::templates::accessor::Accessor;
 use std::{fmt::Debug, sync::Arc};
 
+pub type TerminalAccessorConstructor = Arc<dyn Fn() -> Box<dyn Accessor> + Send + Sync>;
+pub type DynamicMapAccessorConstructor = Arc<dyn Fn(&str) -> Box<dyn Accessor> + Send + Sync>;
+
 #[derive(Clone)]
 pub enum SchemaNode {
 	/// A terminal node that creates a specific, type-safe Accessor.
-	Terminal(Arc<dyn Fn() -> Box<dyn Accessor> + Send + Sync>),
+	Terminal(TerminalAccessorConstructor),
 	/// An object node with a fixed, known set of sub-properties.
 	Object(Vec<Property>),
 	/// A map node where sub-properties are dynamic keys.
-	DynamicMap(Arc<dyn Fn(&str) -> Box<dyn Accessor> + Send + Sync>),
+	DynamicMap(DynamicMapAccessorConstructor),
 }
 
 #[derive(Clone)]

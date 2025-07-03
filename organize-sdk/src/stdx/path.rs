@@ -55,7 +55,7 @@ impl<T: AsRef<Path> + Sync + Send> PathExt for T {
 			.fs
 			.resources
 			.get_with(self.as_ref().to_path_buf(), async move {
-				Arc::new(Resource::new(&self.as_ref().to_path_buf(), location))
+				Arc::new(Resource::new(self.as_ref(), location))
 			})
 			.await
 	}

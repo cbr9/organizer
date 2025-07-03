@@ -2,6 +2,7 @@ use crate::cmd::{App, Cmd};
 use anyhow::Result;
 use clap::Parser;
 mod cmd;
+#[allow(unused_imports)]
 use organize_std::*;
 
 #[tokio::main]

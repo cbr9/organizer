@@ -152,7 +152,7 @@ impl StorageProvider for LocalFileSystem {
 		let resource_creation_futures = collected_paths.into_iter().map(|path| {
 			let location = location.clone();
 			// let ctx = *ctx;
-			async move { path.as_resource(&ctx, location).await }
+			async move { path.as_resource(ctx, location).await }
 		});
 
 		let resources = stream::iter(resource_creation_futures)

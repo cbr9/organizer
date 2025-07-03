@@ -4,7 +4,6 @@ use organize_sdk::{
 	error::Error,
 	plugins::action::{Action, ActionBuilder, Receipt},
 	templates::template::{Template, TemplateString},
-	utils::enabled,
 };
 use serde::{Deserialize, Serialize};
 

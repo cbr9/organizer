@@ -153,9 +153,9 @@ impl Resource {
 // }
 //
 impl Resource {
-	pub fn new(path: &PathBuf, location: Arc<Location>) -> Self {
+	pub fn new(path: &Path, location: Arc<Location>) -> Self {
 		Self {
-			path: path.clone(),
+			path: path.to_path_buf(),
 			location,
 			mime: OnceLock::new(),
 			bytes: OnceLock::new(),

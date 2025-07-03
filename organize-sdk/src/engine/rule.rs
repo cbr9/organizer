@@ -1,19 +1,11 @@
-use std::{path::PathBuf, sync::Arc};
+use std::sync::Arc;
 
-use serde::{Deserialize, Deserializer, Serialize};
+use serde::{Deserialize, Serialize};
 
 use crate::{
 	context::ExecutionContext,
-	engine::stage::{Stage, StageBuilder, StageParams},
+	engine::stage::{Stage, StageBuilder},
 	error::Error,
-	location::{Location, LocationBuilder},
-	plugins::{
-		action::{Action, ActionBuilder},
-		filter::Filter,
-		partitioner::Partitioner,
-		selector::Selector,
-		sorter::Sorter,
-	},
 };
 
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]

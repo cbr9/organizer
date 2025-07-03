@@ -1,22 +1,16 @@
 use std::{
-	collections::HashSet,
-	fs::Metadata,
-	path::{Path, PathBuf},
+	path::PathBuf,
 	sync::Arc,
 };
 
-use anyhow::{Context as ErrorContext, Result};
-use async_trait::async_trait;
-use futures::{stream, StreamExt};
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
 use crate::{
 	context::{scope::ExecutionScope, services::fs::manager::parse_uri, ExecutionContext},
 	error::Error,
-	location::options::{Options, OptionsBuilder, Target},
+	location::options::{Options, OptionsBuilder},
 	plugins::storage::StorageProvider,
-	resource::Resource,
-	stdx::path::PathExt,
 	templates::template::TemplateString,
 };
 

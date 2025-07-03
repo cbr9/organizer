@@ -24,7 +24,7 @@ impl Partitioner for ExtensionPartitioner {
 				.to_string();
 			groups
 				.entry(extension.clone())
-				.or_insert_with(Batch::new)
+				.or_default()
 				.files
 				.push(resource.clone());
 		}
