@@ -1,11 +1,11 @@
 use std::path::PathBuf;
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use async_trait::async_trait;
 use clap::{Parser, ValueHint};
 use organize_sdk::{context::settings::RunSettings, engine::Engine};
 
-use crate::Cmd;
+use crate::{Cmd, cli::CliUi};
 
 #[derive(Parser, Debug)]
 pub struct Run {
@@ -24,7 +24,8 @@ impl Cmd for Run {
 			dry_run: !self.no_dry_run,
 			args: self.args.into_iter().collect(),
 		};
-		let engine = Engine::new(&self.rule, settings).await?;
+		let cli = CliUi::new();
+		let engine = Engine::new(&self.rule, cli, settings).await?;
 		engine.run().await?;
 
 		Ok(())

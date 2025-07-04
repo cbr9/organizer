@@ -185,5 +185,5 @@ pub trait Action: DynEq + DynClone + Sync + Send + Debug {
 	fn execution_model(&self) -> ExecutionModel {
 		ExecutionModel::default()
 	}
-	async fn commit(&self, _ctx: &ExecutionContext<'_>) -> Result<Receipt, Error>;
+	async fn commit(&self, _ctx: Arc<ExecutionContext<'_>>) -> Result<Receipt, Error>;
 }

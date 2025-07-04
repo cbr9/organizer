@@ -1,21 +1,27 @@
 use std::sync::Arc;
 
 use crate::{
-    context::services::{fs::manager::FileSystemManager, history::Journal},
-    templates::compiler::TemplateCompiler,
+	context::services::{fs::manager::FileSystemManager, history::Journal},
+	templates::compiler::TemplateCompiler,
 };
 use dashmap::DashMap;
+use reporter::reporter::Reporter;
 use std::any::Any;
+use task_manager::TaskManager;
 
 pub mod fs;
 pub mod history;
+pub mod reporter;
+pub mod task_manager;
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct RunServices {
 	pub blackboard: Blackboard,
 	pub fs: FileSystemManager,
 	pub journal: Arc<Journal>,
-	pub compiler: TemplateCompiler,
+	pub template_compiler: TemplateCompiler,
+	pub reporter: Reporter,
+	pub task_manager: TaskManager,
 }
 
 #[derive(Debug, Clone)]

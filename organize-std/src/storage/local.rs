@@ -165,7 +165,7 @@ impl StorageProvider for LocalFileSystem {
 			.filter_map(|e| e.ok())
 			.map(|entry| {
 				let path_buf = entry.path().to_path_buf();
-				path_buf.as_resource(ctx, Some(location.clone()), backend.clone())
+				path_buf.as_resource(ctx, Some(location.clone()), location.host.clone(), backend.clone())
 			})
 			.collect::<Vec<_>>();
 

@@ -54,9 +54,9 @@ impl Location {
 
 impl LocationBuilder {
 	pub async fn build(self, ctx: &ExecutionContext<'_>) -> Result<Location, Error> {
-		let path_template = ctx.services.compiler.compile_template(&self.path)?;
+		let path_template = ctx.services.template_compiler.compile_template(&self.path)?;
 		let path = PathBuf::from(path_template.render(ctx).await?);
-		let host = ctx.services.compiler.compile_template(&self.host)?.render(ctx).await?;
+		let host = ctx.services.template_compiler.compile_template(&self.host)?.render(ctx).await?;
 
 		let ctx = &ExecutionContext {
 			services: ctx.services,
@@ -66,8 +66,8 @@ impl LocationBuilder {
 
 		Ok(Location {
 			path: path.clone(),
+			options: self.options.compile(ctx, &host).await?,
 			host,
-			options: self.options.compile(ctx, &path.to_string_lossy()).await?,
 			mode: self.mode,
 			keep_structure: self.keep_structure,
 		})

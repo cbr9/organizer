@@ -42,7 +42,7 @@ impl OptionsBuilder {
 		let backend = ctx.services.fs.get_provider(host)?;
 
 		for template in &self.exclude {
-			let template = ctx.services.compiler.compile_template(template)?;
+			let template = ctx.services.template_compiler.compile_template(template)?;
 			if let Ok(rendered_path_str) = template.render(ctx).await {
 				excluded_paths.push(PathBuf::from(rendered_path_str).expand_user(backend.clone()).await);
 			}

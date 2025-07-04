@@ -25,6 +25,7 @@ pub struct Resource {
 	pub path: PathBuf,
 	pub location: Option<Arc<Location>>,
 	pub backend: Arc<dyn StorageProvider>,
+	pub host: String,
 	#[serde(skip)]
 	mime: OnceCell<String>,
 	#[serde(skip)]
@@ -76,6 +77,7 @@ impl Resource {
 			path: new_path,
 			location: self.location, // The origin root folder remains the same.
 			backend: self.backend,
+			host: self.host,
 
 			// The content, hash, and MIME type of a file do not change when it is moved.
 			// We can move these initialized OnceLock fields to the new struct to preserve the cache.
@@ -156,9 +158,10 @@ impl Resource {
 // }
 //
 impl Resource {
-	pub fn new(path: &Path, location: Option<Arc<Location>>, backend: Arc<dyn StorageProvider>) -> Self {
+	pub fn new(path: &Path, host: String, location: Option<Arc<Location>>, backend: Arc<dyn StorageProvider>) -> Self {
 		Self {
 			path: path.to_path_buf(),
+			host,
 			location,
 			backend,
 			mime: OnceCell::new(),

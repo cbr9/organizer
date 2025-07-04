@@ -296,7 +296,8 @@ impl Pipeline {
 							ExecutionModel::Batch => {
 								let scope = ExecutionScope::new_batch_scope(source.clone(), batch);
 								let batch_ctx = ctx.with_scope(scope);
-								let receipt = action.commit(&batch_ctx).await?;
+								let ctx = Arc::new(batch_ctx);
+								let receipt = action.commit(ctx).await?;
 								current_batch_next_files.extend(receipt.next);
 							}
 							ExecutionModel::Single => {
@@ -307,8 +308,8 @@ impl Pipeline {
 									let action = action.clone();
 									let fut = async move {
 										let scope = ExecutionScope::new_resource_scope(meta.clone(), resource_clone);
-										let ctx = ctx.with_scope(scope);
-										action.commit(&ctx).await
+										let ctx = Arc::new(ctx.with_scope(scope));
+										action.commit(ctx).await
 									};
 									futs.push(fut);
 								}

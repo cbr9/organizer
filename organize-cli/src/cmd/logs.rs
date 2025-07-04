@@ -53,12 +53,8 @@ pub fn init(level: LogLevel) -> WorkerGuard {
 		.pretty()
 		.with_filter(LevelFilter::TRACE);
 
-	let stdout_layer = fmt::layer()
-		.with_writer(std::io::stdout)
-		.with_filter(LevelFilter::from_level(level.into()));
-
 	// 4. Combine the layers and initialize the global subscriber.
-	tracing_subscriber::registry().with(file_layer).with(stdout_layer).init();
+	tracing_subscriber::registry().with(file_layer).init();
 
 	tracing::debug!("Logging initialized. Log file in: {}", logs_dir.display());
 

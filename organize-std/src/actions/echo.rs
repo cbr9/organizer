@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use async_trait::async_trait;
 use organize_sdk::{
 	context::ExecutionContext,
@@ -19,7 +21,7 @@ pub struct EchoBuilder {
 #[typetag::serde(name = "echo")]
 impl ActionBuilder for EchoBuilder {
 	async fn build(&self, ctx: &ExecutionContext<'_>) -> Result<Box<dyn Action>, Error> {
-		let message = ctx.services.compiler.compile_template(&self.message)?;
+		let message = ctx.services.template_compiler.compile_template(&self.message)?;
 		Ok(Box::new(Echo { message }))
 	}
 }
@@ -32,9 +34,9 @@ pub struct Echo {
 #[async_trait]
 #[typetag::serde(name = "echo")]
 impl Action for Echo {
-	async fn commit(&self, ctx: &ExecutionContext<'_>) -> Result<Receipt, Error> {
+	async fn commit(&self, ctx: Arc<ExecutionContext<'_>>) -> Result<Receipt, Error> {
 		self.message
-			.render(ctx)
+			.render(&ctx)
 			.await
 			.inspect(|message| tracing::info!("{}", message))?;
 		Ok(Receipt {

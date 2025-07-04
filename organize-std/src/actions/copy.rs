@@ -1,7 +1,12 @@
+use std::sync::Arc;
+
 use anyhow::Result;
 use async_trait::async_trait;
 use organize_sdk::{
-	context::{scope::ExecutionScope, services::fs::manager::DestinationBuilder, ExecutionContext},
+	context::{
+		services::fs::manager::{Destination, DestinationBuilder},
+		ExecutionContext,
+	},
 	engine::ExecutionModel,
 	error::Error,
 	plugins::action::{Action, ActionBuilder, Input, Receipt},
@@ -10,16 +15,23 @@ use organize_sdk::{
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Deserialize, Serialize, Eq, PartialEq)]
-pub struct Copy(DestinationBuilder);
+pub struct Copy {
+	#[serde(flatten)]
+	destination: Destination,
+}
 
 #[derive(Debug, Clone, Deserialize, Serialize, Eq, PartialEq)]
-pub struct CopyBuilder(DestinationBuilder);
+pub struct CopyBuilder {
+	#[serde(flatten)]
+	destination: DestinationBuilder,
+}
 
 #[async_trait]
 #[typetag::serde(name = "copy")]
 impl ActionBuilder for CopyBuilder {
-	async fn build(&self, _ctx: &ExecutionContext<'_>) -> Result<Box<dyn Action>, Error> {
-		Ok(Box::new(Copy(self.0.clone())))
+	async fn build(&self, ctx: &ExecutionContext<'_>) -> Result<Box<dyn Action>, Error> {
+		let destination = self.destination.build(ctx).await?;
+		Ok(Box::new(Copy { destination }))
 	}
 }
 
@@ -30,23 +42,22 @@ impl Action for Copy {
 		ExecutionModel::Batch
 	}
 
-	async fn commit(&self, ctx: &ExecutionContext<'_>) -> Result<Receipt, Error> {
+	async fn commit(&self, ctx: Arc<ExecutionContext<'_>>) -> Result<Receipt, Error> {
 		let batch = ctx.scope.batch()?;
 		let mut inputs = Vec::new();
 		let mut outputs = Vec::new();
 		let mut to_resources = Vec::new();
 
 		for from_resource in &batch.files {
-			let scope = ExecutionScope::new_resource_scope(ctx.scope.rule()?, from_resource.clone());
-			let ctx = ctx.with_scope(scope);
-			let to_path = self.0.clone().build(&ctx)?.resolve(&ctx).await?;
-			let to_backend = ctx.services.fs.get_provider(&to_path.to_string_lossy())?;
-			let to_resource = to_path.as_resource(&ctx, None, to_backend).await;
+			let ctx = ctx.with_resource(from_resource)?;
+			let to_path = self.destination.resolve(&ctx).await?;
+			let to_backend = ctx.services.fs.get_provider(&self.destination.host)?;
+			let to_resource = to_path.as_resource(&ctx, None, self.destination.host.clone(), to_backend).await;
 			to_resources.push(to_resource);
 			inputs.push(Input::Processed(from_resource.clone()));
 		}
 
-		ctx.services.fs.copy_many(&batch.files, &to_resources).await?;
+		ctx.services.fs.copy_many(&batch.files, &to_resources, ctx).await?;
 
 		for to_resource in to_resources {
 			outputs.push(organize_sdk::plugins::action::Output::Created(to_resource));

@@ -15,7 +15,7 @@ enum Command {
 
 #[derive(Parser)]
 #[command(about, author, version)]
-pub struct App {
+pub struct OrganizeCli {
 	#[command(subcommand)]
 	command: Command,
 	#[arg(long, value_enum, global = true, default_value_t = LogLevel::Info)]
@@ -28,7 +28,7 @@ pub trait Cmd {
 }
 
 #[async_trait]
-impl Cmd for App {
+impl Cmd for OrganizeCli {
 	async fn run(self) -> anyhow::Result<()> {
 		let _guard = logs::init(self.log_level);
 		match self.command {

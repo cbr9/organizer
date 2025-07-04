@@ -22,4 +22,6 @@ tracing-appender = "0.2.3"
 tracing-subscriber = "0.3.19"
 dialoguer.workspace = true
 notify = "8.0.0"
+console = "0.16.0"
+indicatif = "0.18.0"
 

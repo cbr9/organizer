@@ -9,16 +9,22 @@ search = '/homes/andres_cabero/es-align/out_aligned'
 host = "aws-frankfurt"
 
 [[stage]]
+action = "copy"
+folder = "/Users/H0UB8WV/Downloads/es-align/out_aligned"
+
+[[stage]]
 search = '/homes/andres_cabero/es-align/out_decoded'
+mode = "replace"
 host = "aws-frankfurt"
+
+[[stage]]
+action = "copy"
+folder = "/Users/H0UB8WV/Downloads/es-align/out_decoded"
 
 # [[stage]]
 # select = "first"
 # n = 2
 
-[[stage]]
-action = "copy"
-folder = "/Users/H0UB8WV/Downloads/es-align/{{file.parent}}"
 
 
 # [[stage]]

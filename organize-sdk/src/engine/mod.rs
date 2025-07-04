@@ -5,10 +5,17 @@ pub mod stage;
 
 use crate::{
 	context::{
-		services::{fs::manager::FileSystemManager, history::Journal, Blackboard, RunServices},
-		ExecutionContext,
 		scope::ExecutionScope,
+		services::{
+			fs::manager::FileSystemManager,
+			history::Journal,
+			reporter::{reporter::Reporter, ui::UserInterface},
+			task_manager::TaskManager,
+			Blackboard,
+			RunServices,
+		},
 		settings::RunSettings,
+		ExecutionContext,
 	},
 	engine::{
 		pipeline::Pipeline,
@@ -47,15 +54,19 @@ pub struct Engine {
 }
 
 impl Engine {
-	pub async fn new(path: &PathBuf, settings: RunSettings) -> Result<Arc<Self>> {
+	pub async fn new(path: &PathBuf, ui: Arc<dyn UserInterface>, settings: RunSettings) -> Result<Arc<Self>> {
 		let content = tokio::fs::read_to_string(path).await?;
 		let builder: RuleBuilder = toml::from_str(&content)?;
+
 		let services = RunServices {
 			blackboard: Blackboard::default(),
 			journal: Arc::new(Journal::new(&settings).await?),
 			fs: FileSystemManager::new(&builder),
-			compiler: TemplateCompiler::new(),
+			template_compiler: TemplateCompiler::new(),
+			reporter: Reporter::new(ui.clone()),
+			task_manager: TaskManager::new(ui),
 		};
+
 		let rule = {
 			let ctx = ExecutionContext {
 				services: &services,

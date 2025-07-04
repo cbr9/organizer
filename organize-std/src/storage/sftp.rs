@@ -8,7 +8,10 @@ use std::{
 
 use deadpool::managed::{self, Metrics, Object, Pool, RecycleResult};
 use russh_sftp::client::SftpSession;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::{
+	io::{AsyncReadExt, AsyncWriteExt},
+	net::windows::named_pipe::NamedPipeClient,
+};
 
 use anyhow::{Context, Result};
 use async_trait::async_trait;
@@ -20,7 +23,7 @@ use russh::{
 };
 use serde::{Deserialize, Serialize};
 use tempfile::NamedTempFile;
-use tokio::sync::OnceCell;
+use tokio::sync::{Mutex, OnceCell};
 
 use organize_sdk::{
 	context::ExecutionContext,
@@ -39,6 +42,8 @@ pub struct Sftp {
 	pub private_key: Option<PathBuf>,
 	#[serde(skip)]
 	pub pool: OnceCell<SftpPool>,
+	#[serde(skip)]
+	agent: OnceCell<Mutex<AgentClient<NamedPipeClient>>>,
 }
 
 impl PartialEq for Sftp {
@@ -67,6 +72,7 @@ impl Clone for Sftp {
 			username: self.username.clone(),
 			private_key: self.private_key.clone(),
 			pool: self.pool.clone(),
+			agent: OnceCell::new(),
 		}
 	}
 }
@@ -124,7 +130,7 @@ impl Sftp {
 			.pool
 			.get_or_try_init(|| async {
 				let pool = managed::Pool::builder(self.clone())
-					.max_size(5) // Max 16 concurrent connections
+					.max_size(5) // Max 5 concurrent connections
 					.build()
 					.map(|pool| Arc::new(pool))
 					.map_err(|e| Error::Other(e.into()))?;
@@ -148,14 +154,21 @@ impl Sftp {
 			.context("Could not establish SSH connection")?;
 
 		// 2. Authenticate using the SSH agent
-		let client_pipe = tokio::net::windows::named_pipe::ClientOptions::new()
-			.open(r"\\.\pipe\openssh-ssh-agent")
-			.context("Could not connect to the SSH agent pipe. Is 1Password or another agent running?")?;
+		let agent_client = self
+			.agent
+			.get_or_try_init(|| async {
+				let client_pipe = tokio::net::windows::named_pipe::ClientOptions::new()
+					.open(r"\\.\pipe\openssh-ssh-agent")
+					.context("Could not connect to the SSH agent pipe. Is 1Password or another agent running?")?;
+				Ok::<Mutex<AgentClient<NamedPipeClient>>, Error>(Mutex::new(AgentClient::connect(client_pipe)))
+			})
+			.await?;
+
+		let mut agent = agent_client.lock().await;
 
 		let hash_alg = session.best_supported_rsa_hash().await?.flatten();
 
 		let mut authenticated = false;
-		let mut agent = AgentClient::connect(client_pipe);
 		let identities = agent.request_identities().await.unwrap();
 		for identity in identities {
 			let alg = match identity.algorithm() {
@@ -164,7 +177,7 @@ impl Sftp {
 			};
 
 			let auth_result = session
-				.authenticate_publickey_with(&self.username, identity, alg, &mut agent)
+				.authenticate_publickey_with(&self.username, identity, alg, &mut *agent)
 				.await
 				.unwrap();
 			if auth_result.success() {
@@ -208,7 +221,6 @@ impl StorageProvider for Sftp {
 	}
 
 	async fn read(&self, path: &Path) -> Result<Vec<u8>, Error> {
-		println!("READING: {}", path.display());
 		let session = self.pool().await?.get().await.map_err(|e| Error::Other(e.into()))?;
 		let mut file = session.open(path.to_str().unwrap()).await?;
 		let mut buf = Vec::new();
@@ -272,11 +284,9 @@ impl StorageProvider for Sftp {
 	}
 
 	async fn download(&self, from: &Path) -> Result<PathBuf, Error> {
-		tracing::info!("Downloading {}", from.display());
 		let content = self.read(from).await?;
 		let temp_file = NamedTempFile::new().map_err(|e| Error::Io(e))?;
 		tokio::fs::write(temp_file.path(), &content).await.map_err(|e| Error::Io(e))?;
-		tracing::info!("Downloaded {}", from.display());
 		let path = temp_file.keep().map_err(|e| Error::Other(e.into()))?;
 		Ok(path.1)
 	}
@@ -388,7 +398,7 @@ impl Sftp {
 						if let organize_sdk::location::options::Target::Folders = options.target {
 							let resource = pathbuf
 								.clone()
-								.as_resource(ctx, Some(Arc::new(location.clone())), backend.clone())
+								.as_resource(ctx, Some(Arc::new(location.clone())), location.host.clone(), backend.clone())
 								.await;
 							files.push(resource);
 						}
@@ -399,7 +409,7 @@ impl Sftp {
 					if depth >= options.min_depth {
 						if options.target.is_files() {
 							let resource = pathbuf
-								.as_resource(ctx, Some(Arc::new(location.clone())), backend.clone())
+								.as_resource(ctx, Some(Arc::new(location.clone())), location.host.clone(), backend.clone())
 								.await;
 							files.push(resource);
 						}

@@ -1,6 +1,10 @@
 #[cfg(target_family = "windows")]
 use std::path::Path;
-use std::{ffi::OsStr, path::PathBuf, sync::Arc};
+use std::{
+	ffi::OsStr,
+	path::{Component, PathBuf},
+	sync::Arc,
+};
 
 use async_trait::async_trait;
 
@@ -11,11 +15,18 @@ pub trait PathExt {
 	type HiddenError;
 	fn is_hidden(&self) -> Result<bool, Self::HiddenError>;
 	async fn expand_user(self, backend: Arc<dyn StorageProvider>) -> PathBuf;
+	fn shorten(&self, max_depth: usize) -> PathBuf;
 }
 
 #[async_trait]
 pub trait PathBufExt {
-	async fn as_resource(self, ctx: &ExecutionContext<'_>, location: Option<Arc<Location>>, backend: Arc<dyn StorageProvider>) -> Arc<Resource>;
+	async fn as_resource(
+		self,
+		ctx: &ExecutionContext<'_>,
+		location: Option<Arc<Location>>,
+		host: String,
+		backend: Arc<dyn StorageProvider>,
+	) -> Arc<Resource>;
 }
 
 #[async_trait]
@@ -24,6 +35,37 @@ impl<T: AsRef<Path> + Sync + Send> PathExt for T {
 	type HiddenError = std::convert::Infallible;
 	#[cfg(target_family = "windows")]
 	type HiddenError = std::io::Error;
+
+	fn shorten(&self, max_depth: usize) -> PathBuf {
+		let path = self.as_ref();
+		let components: Vec<Component> = path.components().collect();
+		if components.len() <= max_depth {
+			return path.to_path_buf();
+		}
+
+		// Ensure max_depth is at least 3 to show root, ellipsis, and filename.
+		if max_depth < 3 {
+			return path.to_path_buf();
+		}
+
+		let mut result = PathBuf::new();
+		let num_to_take_start = (max_depth - 1) / 2;
+		let num_to_take_end = max_depth - num_to_take_start - 1;
+
+		// Add the starting components
+		for component in components.iter().take(num_to_take_start) {
+			result.push(component.as_os_str());
+		}
+
+		// Add the ellipsis
+		result.push("...");
+
+		// Add the ending components
+		for component in components.iter().rev().take(num_to_take_end).rev() {
+			result.push(component.as_os_str());
+		}
+		result
+	}
 
 	async fn expand_user(self, backend: Arc<dyn StorageProvider>) -> PathBuf {
 		let path = self.as_ref();
@@ -57,11 +99,19 @@ impl<T: AsRef<Path> + Sync + Send> PathExt for T {
 
 #[async_trait]
 impl PathBufExt for PathBuf {
-	async fn as_resource(self, ctx: &ExecutionContext<'_>, location: Option<Arc<Location>>, backend: Arc<dyn StorageProvider>) -> Arc<Resource> {
+	async fn as_resource(
+		self,
+		ctx: &ExecutionContext<'_>,
+		location: Option<Arc<Location>>,
+		host: String,
+		backend: Arc<dyn StorageProvider>,
+	) -> Arc<Resource> {
 		ctx.services
 			.fs
 			.resources
-			.get_with(self.clone(), async move { Arc::new(Resource::new(self.as_ref(), location, backend)) })
+			.get_with(self.clone(), async move {
+				Arc::new(Resource::new(self.as_ref(), host, location, backend))
+			})
 			.await
 	}
 }
