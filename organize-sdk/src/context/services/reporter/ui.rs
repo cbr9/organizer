@@ -11,8 +11,9 @@ pub enum IndicatorStyle {
 /// An abstract, generic contract for all user-facing interactions.
 pub trait UserInterface: Send + Sync {
 	// --- Progress Indicator Management ---
-	fn create_progress_indicator(&self, initial_message: &str) -> u64;
-	fn update_progress_indicator(&self, id: u64, step: u64, description: &str);
+	fn create_progress_indicator(&self, title: &str, length: Option<u64>) -> u64;
+	fn increment_progress_indicator(&self, id: u64, delta: u64);
+	fn update_progress_indicator(&self, id: u64, description: &str);
 	fn remove_progress_indicator(&self, id: u64, style: IndicatorStyle, final_message: &str);
 
 	// --- User Input ---

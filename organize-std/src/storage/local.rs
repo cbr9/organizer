@@ -1,12 +1,17 @@
 use std::{
-	fs::Metadata,
+	collections::HashMap,
 	path::{Path, PathBuf},
 	sync::Arc,
 };
 
 use anyhow::{Context as ErrorContext, Result};
 use async_trait::async_trait;
-use futures::{stream, StreamExt, TryStreamExt};
+use bytes::Bytes;
+use futures::{
+	stream::{self, BoxStream},
+	StreamExt,
+	TryStreamExt,
+};
 use organize_sdk::{
 	context::ExecutionContext,
 	error::Error,
@@ -14,12 +19,28 @@ use organize_sdk::{
 		options::{Options, Target},
 		Location,
 	},
-	plugins::storage::StorageProvider,
+	plugins::storage::{Metadata, StorageProvider},
 	resource::Resource,
 	stdx::path::{PathBufExt, PathExt},
 };
 use serde::{Deserialize, Serialize};
+use tokio_util::codec::{BytesCodec, FramedRead, FramedWrite};
 use walkdir::WalkDir;
+
+use super::IntoMetadata;
+
+impl IntoMetadata for std::fs::Metadata {
+	fn into_metadata(self) -> Metadata {
+		Metadata {
+			size: Some(self.len()),
+			modified: self.modified().ok(),
+			created: self.created().ok(),
+			is_dir: self.is_dir(),
+			is_file: self.is_file(),
+			extra: HashMap::new(), // No extra fields for standard metadata
+		}
+	}
+}
 
 #[derive(Deserialize, Serialize, PartialEq, Eq, Debug, Clone)]
 pub struct LocalFileSystem;
@@ -65,6 +86,7 @@ impl StorageProvider for LocalFileSystem {
 		}
 	}
 
+	// TODO: what is this?
 	async fn copy(&self, from: &Path, to: &Path) -> Result<(), Error> {
 		self.mkdir(to).await?;
 
@@ -106,17 +128,23 @@ impl StorageProvider for LocalFileSystem {
 		}
 	}
 
-	async fn download(&self, from: &Path) -> Result<PathBuf, Error> {
-		Ok(from.to_path_buf())
+	fn download<'a>(&'a self, path: &'a Path) -> BoxStream<'a, Result<Bytes, Error>> {
+		// The `async_stream::try_stream!` macro lets us write async code
+		// inside this block, and it bundles it all into a stream.
+		let stream = async_stream::try_stream! {
+			let file = tokio::fs::File::open(path).await?;
+			let mut reader = FramedRead::new(file, BytesCodec::new());
+			while let Some(chunk_result) = reader.next().await {
+				// `yield` sends the next item out of the stream.
+				yield chunk_result?.freeze();
+			}
+		};
+		// We pin and box the stream to return it as a trait object.
+		Box::pin(stream)
 	}
 
-	async fn download_many(&self, from: &[PathBuf]) -> Result<Vec<PathBuf>, Error> {
-		Ok(from.to_vec())
-	}
-
-	async fn upload(&self, from_local: &Path, to: &Path) -> Result<(), Error> {
-		self.mkdir(to).await?;
-		tokio::fs::copy(from_local, to).await.map_err(Error::Io).map(|_| ())
+	async fn upload(&self, from: &Path, to: &Path) -> Result<(), Error> {
+		unimplemented!()
 	}
 
 	async fn upload_many(&self, from_local: &[PathBuf], to: &[PathBuf]) -> Result<(), Error> {
@@ -178,7 +206,7 @@ impl StorageProvider for LocalFileSystem {
 	}
 
 	async fn metadata(&self, path: &Path) -> Result<Metadata, Error> {
-		Ok(tokio::fs::metadata(path).await?)
+		Ok(tokio::fs::metadata(path).await?.into_metadata())
 	}
 
 	async fn read_dir(&self, path: &Path) -> Result<Vec<PathBuf>, Error> {

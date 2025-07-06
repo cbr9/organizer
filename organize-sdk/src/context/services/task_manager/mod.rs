@@ -19,14 +19,15 @@ pub struct TaskManager {
 
 /// A short-lived handle for a specific running task, passed to the `with_task` closure.
 /// It provides the methods for progressing the task.
-pub struct TaskReporter {
+pub struct Task {
 	task_manager: TaskManager,
 	id: u64,
+	ui: Arc<dyn UserInterface>,
 	total_steps: u16,
 	current_step: AtomicU64,
 }
 
-impl TaskReporter {
+impl Task {
 	/// Manages the execution of a single step within the task's scope.
 	/// This method is consistently async and always expects a Future.
 	pub async fn new_step<T, E, F>(self: Arc<Self>, description: &str, operation: F) -> Result<T, Error>
@@ -40,6 +41,14 @@ impl TaskReporter {
 			.execute_step_internal(self.id, step_num, self.total_steps, description, operation)
 			.await
 	}
+
+	pub fn increment_progress_bar(&self, delta: u64) {
+		self.ui.increment_progress_indicator(self.id, delta);
+	}
+
+	pub fn update_progress_indicator(&self, description: &str) {
+		self.ui.update_progress_indicator(self.id, description);
+	}
 }
 
 impl TaskManager {
@@ -50,17 +59,18 @@ impl TaskManager {
 
 	/// The primary public method. It manages the full lifecycle of a multi-step task
 	/// within a scoped, asynchronous closure.
-	pub async fn with_task<F, Fut>(&self, title: &str, total_steps: u16, operation: F) -> Result<(), Error>
+	pub async fn with_task<F, Fut>(&self, title: &str, total_steps: u16, length: Option<u64>, operation: F) -> Result<(), Error>
 	where
-		F: FnOnce(Arc<TaskReporter>) -> Fut,
+		F: FnOnce(Arc<Task>) -> Fut,
 		Fut: Future<Output = Result<(String, IndicatorStyle), Error>>,
 	{
 		// 1. Setup: TaskManager creates the UI indicator.
-		let id = self.ui.create_progress_indicator(title);
+		let id = self.ui.create_progress_indicator(title, length);
 		tracing::debug!(id, title, "Task started.");
 
-		let task = Arc::new(TaskReporter {
+		let task = Arc::new(Task {
 			task_manager: self.clone(),
+			ui: self.ui.clone(),
 			id,
 			total_steps,
 			current_step: AtomicU64::new(1),
@@ -90,7 +100,7 @@ impl TaskManager {
 	{
 		// The TaskManager is responsible for formatting the step string.
 		let message = format!("[{}/{}] {}", current_step, total_steps, description);
-		self.ui.update_progress_indicator(id, current_step, &message);
+		self.ui.update_progress_indicator(id, &message);
 		tracing::debug!(task_id = id, step = current_step, description, "Starting task step.");
 
 		match operation.await {

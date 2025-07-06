@@ -1,13 +1,17 @@
 use std::{
+	collections::HashMap,
 	fmt::{Debug, Formatter},
-	fs::Metadata,
 	net::{IpAddr, SocketAddr},
 	path::{Path, PathBuf},
 	sync::Arc,
+	time::{Duration, UNIX_EPOCH},
 };
+use tokio_stream::StreamExt;
+use tokio_util::codec::{BytesCodec, FramedRead};
 
+use bytes::Bytes;
 use deadpool::managed::{self, Metrics, Object, Pool, RecycleResult};
-use russh_sftp::client::SftpSession;
+use russh_sftp::{client::SftpSession, protocol::FileAttributes};
 use tokio::{
 	io::{AsyncReadExt, AsyncWriteExt},
 	net::windows::named_pipe::NamedPipeClient,
@@ -15,7 +19,7 @@ use tokio::{
 
 use anyhow::{Context, Result};
 use async_trait::async_trait;
-use futures::future::BoxFuture;
+use futures::{future::BoxFuture, stream::BoxStream};
 use russh::{
 	client::{self, Handle},
 	keys::{agent::client::AgentClient, Algorithm},
@@ -29,10 +33,12 @@ use organize_sdk::{
 	context::ExecutionContext,
 	error::Error,
 	location::{options::Options, Location},
-	plugins::storage::StorageProvider,
+	plugins::storage::{Metadata, StorageProvider},
 	resource::Resource,
 	stdx::path::PathBufExt,
 };
+
+use super::IntoMetadata;
 
 #[derive(Serialize, Deserialize)]
 pub struct Sftp {
@@ -196,6 +202,30 @@ impl Sftp {
 	}
 }
 
+impl IntoMetadata for FileAttributes {
+	fn into_metadata(self) -> Metadata {
+		let mut extra = HashMap::new();
+		if let Some(uid) = self.uid {
+			extra.insert("uid".to_string(), uid.to_string());
+		}
+		if let Some(gid) = self.gid {
+			extra.insert("gid".to_string(), gid.to_string());
+		}
+		if let Some(permissions) = self.permissions {
+			extra.insert("permissions".to_string(), format!("{:#o}", permissions));
+		}
+
+		Metadata {
+			size: self.size,
+			modified: self.mtime.map(|t| UNIX_EPOCH + Duration::from_secs(t as u64)),
+			created: None, // The SFTP protocol doesn't provide creation time.
+			is_dir: self.is_dir(),
+			is_file: !self.is_dir(),
+			extra,
+		}
+	}
+}
+
 #[async_trait]
 #[typetag::serde(name = "sftp")]
 impl StorageProvider for Sftp {
@@ -209,8 +239,10 @@ impl StorageProvider for Sftp {
 		"sftp"
 	}
 
-	async fn metadata(&self, _path: &Path) -> Result<Metadata, Error> {
-		Err(Error::ImpossibleOp("SFTP does not support std::fs::Metadata".to_string()))
+	async fn metadata(&self, path: &Path) -> Result<Metadata, Error> {
+		let session = self.pool().await?.get().await.map_err(|e| Error::Other(e.into()))?;
+		let sftp_attrs = session.metadata(path.to_string_lossy()).await?;
+		Ok(sftp_attrs.into_metadata())
 	}
 
 	async fn read_dir(&self, path: &Path) -> Result<Vec<PathBuf>, Error> {
@@ -283,27 +315,17 @@ impl StorageProvider for Sftp {
 		Ok(())
 	}
 
-	async fn download(&self, from: &Path) -> Result<PathBuf, Error> {
-		let content = self.read(from).await?;
-		let temp_file = NamedTempFile::new().map_err(|e| Error::Io(e))?;
-		tokio::fs::write(temp_file.path(), &content).await.map_err(|e| Error::Io(e))?;
-		let path = temp_file.keep().map_err(|e| Error::Other(e.into()))?;
-		Ok(path.1)
-	}
+	fn download<'a>(&'a self, path: &'a Path) -> BoxStream<'a, Result<Bytes, Error>> {
+		let stream = async_stream::try_stream! {
+			let session = self.pool().await?.get().await.map_err(|e| Error::Other(e.into()))?;
+			let remote_file = session.open(path.to_string_lossy()).await?;
+			let mut reader = FramedRead::new(remote_file, BytesCodec::new());
+			while let Some(chunk_result) = reader.next().await {
+				yield chunk_result?.freeze();
+			}
+		};
 
-	async fn download_many(&self, from: &[PathBuf]) -> Result<Vec<PathBuf>, Error> {
-		let mut futures = Vec::with_capacity(from.len());
-		for path in from {
-			let sftp_clone = self.clone();
-			let path_clone = path.clone();
-			futures.push(tokio::spawn(async move { sftp_clone.download(&path_clone).await }));
-		}
-		let results: Result<Vec<PathBuf>, Error> = futures::future::try_join_all(futures)
-			.await
-			.map_err(|e| Error::Other(e.into()))?
-			.into_iter()
-			.collect();
-		results
+		Box::pin(stream)
 	}
 
 	async fn upload(&self, from_local: &Path, to: &Path) -> Result<(), Error> {

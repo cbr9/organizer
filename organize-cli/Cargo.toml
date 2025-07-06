@@ -24,4 +24,5 @@ dialoguer.workspace = true
 notify = "8.0.0"
 console = "0.16.0"
 indicatif = "0.18.0"
+dashmap = "6.1.0"
 

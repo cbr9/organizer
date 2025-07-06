@@ -9,7 +9,7 @@ use organize_sdk::{
 	},
 	engine::ExecutionModel,
 	error::Error,
-	plugins::action::{Action, ActionBuilder, Input, Receipt},
+	plugins::action::{Action, ActionBuilder, Input, Output, Receipt},
 	stdx::path::PathBufExt,
 };
 use serde::{Deserialize, Serialize};
@@ -38,37 +38,25 @@ impl ActionBuilder for CopyBuilder {
 #[async_trait]
 #[typetag::serde(name = "copy")]
 impl Action for Copy {
-	fn execution_model(&self) -> ExecutionModel {
-		ExecutionModel::Batch
-	}
-
 	async fn commit(&self, ctx: Arc<ExecutionContext<'_>>) -> Result<Receipt, Error> {
-		let batch = ctx.scope.batch()?;
-		let mut inputs = Vec::new();
-		let mut outputs = Vec::new();
-		let mut to_resources = Vec::new();
+		let res = ctx.scope.resource()?;
+		let backend = ctx.services.fs.get_provider(&self.destination.host)?;
+		let dest = self
+			.destination
+			.resolve(&ctx)
+			.await?
+			.as_resource(&ctx, None, self.destination.host.clone(), backend)
+			.await;
 
-		for from_resource in &batch.files {
-			let ctx = ctx.with_resource(from_resource)?;
-			let to_path = self.destination.resolve(&ctx).await?;
-			let to_backend = ctx.services.fs.get_provider(&self.destination.host)?;
-			let to_resource = to_path.as_resource(&ctx, None, self.destination.host.clone(), to_backend).await;
-			to_resources.push(to_resource);
-			inputs.push(Input::Processed(from_resource.clone()));
-		}
-
-		ctx.services.fs.copy_many(&batch.files, &to_resources, ctx).await?;
-
-		for to_resource in to_resources {
-			outputs.push(organize_sdk::plugins::action::Output::Created(to_resource));
-		}
+		ctx.services.fs.copy(&res, &dest, &ctx).await?;
 
 		let receipt = Receipt {
-			inputs,
-			outputs,
-			next: batch.files.clone(),
+			inputs: vec![Input::Processed(res.clone())],
+			outputs: vec![Output::Created(dest.clone())],
+			next: vec![dest.clone()],
 			..Default::default()
 		};
+
 		Ok(receipt)
 	}
 }

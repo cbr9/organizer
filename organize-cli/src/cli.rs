@@ -1,4 +1,5 @@
 use console::{Color, Emoji, style};
+use dashmap::DashMap;
 use dialoguer::{Confirm, Input, Select, theme::ColorfulTheme};
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use organize_sdk::context::services::reporter::ui::{IndicatorStyle, UserInterface};
@@ -19,7 +20,7 @@ pub struct CliUi {
 	/// The container that manages the rendering of all active progress bars and spinners.
 	multi_progress: MultiProgress,
 	/// A thread-safe map to access specific progress indicators by their unique ID.
-	bars: Mutex<HashMap<u64, ProgressBar>>,
+	bars: DashMap<u64, ProgressBar>,
 	/// An atomic counter to generate unique IDs for each progress indicator.
 	id_counter: AtomicU64,
 }
@@ -28,7 +29,7 @@ impl CliUi {
 	pub fn new() -> Arc<Self> {
 		Arc::new(Self {
 			multi_progress: MultiProgress::new(),
-			bars: Mutex::new(HashMap::new()),
+			bars: DashMap::new(),
 			id_counter: AtomicU64::new(1),
 		})
 	}
@@ -38,34 +39,55 @@ impl CliUi {
 	}
 }
 
+impl Drop for CliUi {
+	/// This code will run when the `CliUi` struct is dropped at the end of `main`.
+	fn drop(&mut self) {
+		// `clear()` finishes all progress bars and clears them from the screen,
+		// ensuring their final state is visible before the program exits.
+		if let Err(e) = self.multi_progress.clear() {
+			eprintln!("Error clearing progress bars: {}", e);
+		}
+	}
+}
+
 impl UserInterface for CliUi {
-	// --- Progress Indicator Management ---
-
-	fn create_progress_indicator(&self, initial_message: &str) -> u64 {
-		let pb = self.multi_progress.add(ProgressBar::new_spinner());
-		pb.enable_steady_tick(std::time::Duration::from_millis(120));
-		// The style is generic; it doesn't know about steps, only a message.
-		pb.set_style(
-			ProgressStyle::with_template("{spinner:.blue} {wide_msg}")
-				.unwrap()
-				.tick_strings(&["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]),
-		);
+	fn create_progress_indicator(&self, initial_message: &str, length: Option<u64>) -> u64 {
+		let pb = match length {
+			Some(len) => {
+				let bar = self.multi_progress.add(ProgressBar::new(len));
+				bar.set_style(
+					ProgressStyle::with_template("{wide_msg} {bytes}/{total_bytes} ({eta}) [{bar:40.cyan/blue}]")
+						.unwrap()
+						.progress_chars("=>-"),
+				);
+				bar
+			}
+			None => {
+				let spinner = self.multi_progress.add(ProgressBar::new_spinner());
+				spinner.set_style(ProgressStyle::with_template("{spinner:.blue} {wide_msg}").unwrap());
+				spinner
+			}
+		};
 		pb.set_message(initial_message.to_string());
-
 		let id = self.new_id();
-		self.bars.lock().unwrap().insert(id, pb);
+		self.bars.insert(id, pb);
 		id
 	}
 
-	fn update_progress_indicator(&self, id: u64, step: u64, description: &str) {
-		if let Some(pb) = self.bars.lock().unwrap().get(&id) {
-			pb.set_position(step);
-			pb.set_message(description.to_string());
+	fn increment_progress_indicator(&self, id: u64, delta: u64) {
+		if let Some(pb) = self.bars.get(&id) {
+			pb.inc(delta);
+		}
+	}
+
+	fn update_progress_indicator(&self, id: u64, message: &str) {
+		if let Some(pb) = self.bars.get(&id) {
+			pb.set_message(message.to_string());
 		}
 	}
 
 	fn remove_progress_indicator(&self, id: u64, style: IndicatorStyle, final_message: &str) {
-		if let Some(pb) = self.bars.lock().unwrap().remove(&id) {
+		if let Some((_, pb)) = self.bars.remove(&id) {
 			let (prefix_emoji, color) = match style {
 				IndicatorStyle::Success => (Emoji("✔", "✓"), Color::Green),
 				IndicatorStyle::Warning => (Emoji("⚠", "!"), Color::Yellow),

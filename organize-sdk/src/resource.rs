@@ -1,6 +1,5 @@
 use std::{
 	fmt::Display,
-	fs::Metadata,
 	hash::Hash,
 	path::{Path, PathBuf},
 	sync::Arc,
@@ -10,7 +9,12 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use tokio::{fs::File, io::AsyncReadExt, sync::OnceCell};
 
-use crate::{context::ExecutionContext, error::Error, location::Location, plugins::storage::StorageProvider};
+use crate::{
+	context::ExecutionContext,
+	error::Error,
+	location::Location,
+	plugins::storage::{Metadata, StorageProvider},
+};
 
 #[derive(Debug, Default, Clone)]
 pub enum FileState {
@@ -106,9 +110,9 @@ impl Resource {
 		match self.metadata.get() {
 			Some(metadata) => metadata,
 			None => {
-				let metadata = self.backend.metadata(&self.path).await.unwrap();
-				self.metadata.set(metadata).unwrap();
-				self.metadata.get().unwrap()
+				self.metadata
+					.get_or_init(async || self.backend.metadata(&self.path).await.unwrap())
+					.await
 			}
 		}
 	}

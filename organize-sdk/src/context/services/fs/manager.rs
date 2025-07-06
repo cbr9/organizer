@@ -9,8 +9,8 @@ use crate::{
 	resource::{FileState, Resource},
 	templates::template::{Template, TemplateString},
 };
-use anyhow::Result;
-use futures::{self, future};
+use anyhow::{Context, Result};
+use futures::{self, future, TryStreamExt};
 use moka::future::Cache;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -19,6 +19,8 @@ use std::{
 	path::{Path, PathBuf},
 	sync::Arc,
 };
+use tempfile::NamedTempFile;
+use tokio::io::AsyncWriteExt;
 
 fn default_host() -> TemplateString {
 	TemplateString("file".to_string())
@@ -115,108 +117,72 @@ impl FileSystemManager {
 		Ok(())
 	}
 
-	pub async fn download_many(&self, resources: &[Arc<Resource>]) -> Result<Vec<PathBuf>, Error> {
-		let mut downloaded_paths = Vec::with_capacity(resources.len());
-		for resource in resources {
-			let provider = &resource.backend;
-			let temp_path = provider.download(resource.as_path()).await?;
-			downloaded_paths.push(temp_path);
-		}
-		Ok(downloaded_paths)
-	}
+	pub async fn copy(&self, from: &Arc<Resource>, to: &Arc<Resource>, ctx: &ExecutionContext<'_>) -> Result<(), Error> {
+		let task_manager = ctx.services.task_manager.clone();
 
-	pub async fn copy_many(&self, from: &[Arc<Resource>], to: &[Arc<Resource>], ctx: Arc<ExecutionContext<'_>>) -> Result<(), Error> {
-		if from.len() != to.len() {
-			return Err(Error::Other(anyhow::anyhow!(
-				"Mismatched number of source and destination resources for copy_many"
-			)));
-		}
-		if from.is_empty() {
-			return Ok(()); // Nothing to do
-		}
+		let source_provider = from.backend.clone();
+		let dest_provider = to.backend.clone();
 
-		let mut futures = Vec::with_capacity(from.len());
+		let from_is_remote = from.backend.prefix() != "file";
+		let to_is_local = to.backend.prefix() == "file";
+		let total_steps = if from_is_remote { 2 } else { 1 };
+		let size = from.backend.metadata(from.as_path()).await?.size;
 
-		for (from_res, to_res) in from.iter().zip(to.iter()) {
-			// Clone Arcs for moving into the async block
-			let task_manager = ctx.services.task_manager.clone();
-			let from_clone = from_res.clone().clone();
-			let to_clone = to_res.clone().clone();
+		let title = from.path.file_name().unwrap_or_default().to_string_lossy().to_string();
+		// Each file gets its own `with_task` call.
+		task_manager
+			.with_task(&title, total_steps, size, |task| async move {
+				match (from_is_remote, to_is_local) {
+					// Case: Remote -> Local (or Remote -> Remote)
+					(true, _) => {
+						let temp_path = task
+							.clone()
+							.new_step::<PathBuf, Error, _>(&format!("Downloading {}", from.as_path().display()), async {
+								let mut stream = from.backend.download(from.as_path());
+								let temp_file = NamedTempFile::new()?;
+								let mut writer = tokio::fs::File::create(temp_file.path()).await?;
 
-			let source_provider = from_clone.backend.clone();
-			let dest_provider = to_clone.backend.clone();
+								// Consume the stream, updating the bar after each chunk
+								while let Ok(Some(chunk)) = stream.try_next().await {
+									writer.write(&chunk).await?;
+									task.increment_progress_bar(chunk.len() as u64);
+								}
 
-			let from_is_local = from_res.backend.prefix() == "file";
-			let to_is_local = to_res.backend.prefix() == "file";
-			let total_steps = if !from_is_local { 2 } else { 1 };
+								Ok(temp_file.keep().context("could not persist temporary file")?.1) // Return the path to the temp file
+							})
+							.await?;
 
-			// Create a future for each file copy operation.
-			let future = async move {
-				let title = from_clone.path.file_name().unwrap_or_default().to_string_lossy().to_string();
-				// Each file gets its own `with_task` call.
-				task_manager
-					.with_task(&title, total_steps, |task| async move {
-						match (from_is_local, to_is_local) {
-							(true, true) => {
-								let message = format!("Copy {} -> {}", from_clone.as_path().display(), to_clone.as_path().display());
-								task.clone()
-									.new_step(&message, async { dest_provider.copy(from_clone.as_path(), to_clone.as_path()).await })
-									.await?;
-								Ok(("Copied".to_string(), IndicatorStyle::Success))
+						task.new_step::<(), Error, _>("Writing to destination", async {
+							if to.backend.prefix() == "file" {
+								to.backend.r#move(&temp_path, to.as_path()).await?;
+							} else {
+								to.backend.upload(&temp_path, to.as_path()).await?;
+								tokio::fs::remove_file(temp_path).await?;
 							}
-							(true, false) => {
-								let message = format!(
-									"Uploading {} to {} ({})",
-									from_clone.as_path().display(),
-									to_clone.as_path().display(),
-									&to_clone.host
-								);
-								task.clone()
-									.new_step(&message, async { dest_provider.upload(from_clone.as_path(), to_clone.as_path()).await })
-									.await?;
-								Ok(("Uploaded".to_string(), IndicatorStyle::Success))
-							}
-							(false, true) => {
-								let message = format!("Downloading {}", from_clone.as_path().display());
-								let temp_path = task
-									.clone()
-									.new_step(&message, async { source_provider.download(from_clone.as_path()).await })
-									.await?;
-								task.new_step("Writing to destination", async {
-									let result = dest_provider.upload(&temp_path, to_clone.as_path()).await;
-									let _ = tokio::fs::remove_file(temp_path).await;
-									result
-								})
-								.await?;
-								let message = format!("Downloaded {}", from_clone.as_path().display());
-								Ok((message, IndicatorStyle::Success))
-							}
-							(false, false) => {
-								let temp = task
-									.clone()
-									.new_step("Downloading", async { source_provider.download(from_clone.as_path()).await })
-									.await?;
-								task.new_step("Uploading", async {
-									let result = dest_provider.upload(&temp, to_clone.as_path()).await;
-									let _ = tokio::fs::remove_file(temp).await;
-									result
-								})
-								.await?;
-								Ok(("Downloaded and uploaded file to destination".to_string(), IndicatorStyle::Success))
-							}
-						}
-					})
-					.await
-			};
-			futures.push(future);
-		}
+							Ok(())
+						})
+						.await?;
 
-		future::try_join_all(futures).await?;
-		Ok(())
-	}
-
-	pub async fn copy(&self, from: &Arc<Resource>, to: &Arc<Resource>, ctx: Arc<ExecutionContext<'_>>) -> Result<(), Error> {
-		self.copy_many(std::slice::from_ref(from), std::slice::from_ref(to), ctx).await
+						Ok((
+							format!("Transferred {} -> {}", from.as_path().display(), to.as_path().display()),
+							IndicatorStyle::Success,
+						))
+					}
+					// Case: Local -> Remote
+					(false, true) => {
+						task.new_step("Uploading", async { to.backend.upload(from.as_path(), to.as_path()).await })
+							.await?;
+						Ok(("✓ Uploaded".to_string(), IndicatorStyle::Success))
+					}
+					// Case: Local -> Local
+					(false, false) => {
+						task.new_step("Copying", async { from.backend.copy(from.as_path(), to.as_path()).await })
+							.await?;
+						Ok(("Copied".to_string(), IndicatorStyle::Success))
+					}
+				}
+			})
+			.await
 	}
 
 	pub async fn delete(&self, path: &Arc<Resource>) -> Result<(), Error> {
@@ -258,7 +224,7 @@ impl FileSystemManager {
 		if from_provider == to_provider {
 			from_provider.r#move(from.as_path(), to.as_path()).await
 		} else {
-			self.copy(from, to, ctx).await?;
+			self.copy(from, to, &ctx).await?;
 			self.delete(from).await
 		}
 	}

@@ -1,15 +1,34 @@
 use crate::{context::ExecutionContext, error::Error, location::Location, resource::Resource};
 use anyhow::Result;
 use async_trait::async_trait;
+use bytes::Bytes;
 use dyn_clone::DynClone;
 use dyn_eq::DynEq;
+use futures::stream::BoxStream;
 use serde_json::Value;
 use std::{
+	collections::HashMap,
 	fmt::Debug,
-	fs::Metadata,
 	path::{Path, PathBuf},
 	sync::Arc,
+	time::SystemTime,
 };
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Metadata {
+	/// The size of the file in bytes, if available.
+	pub size: Option<u64>,
+	/// The last modification timestamp, if available.
+	pub modified: Option<SystemTime>,
+	/// The creation timestamp, if available.
+	pub created: Option<SystemTime>,
+	/// True if the path points to a directory.
+	pub is_dir: bool,
+	/// True if the path points to a file.
+	pub is_file: bool,
+	/// A map for any backend-specific metadata (e.g., S3 ETag, SFTP UID/GID).
+	pub extra: HashMap<String, String>,
+}
 
 dyn_clone::clone_trait_object!(StorageProvider);
 dyn_eq::eq_trait_object!(StorageProvider);
@@ -30,8 +49,7 @@ pub trait StorageProvider: DynEq + DynClone + Sync + Send + Debug {
 	async fn r#move(&self, from: &Path, to: &Path) -> Result<(), Error>;
 	async fn copy(&self, from: &Path, to: &Path) -> Result<(), Error>;
 	async fn delete(&self, path: &Path) -> Result<(), Error>;
-	async fn download(&self, from: &Path) -> Result<PathBuf, Error>;
-	async fn download_many(&self, from: &[PathBuf]) -> Result<Vec<PathBuf>, Error>;
+	fn download<'a>(&'a self, path: &'a Path) -> BoxStream<'a, Result<Bytes, Error>>;
 	async fn upload(&self, from_local: &Path, to: &Path) -> Result<(), Error>;
 	async fn upload_many(&self, from_local: &[PathBuf], to: &[PathBuf]) -> Result<(), Error>;
 	async fn hardlink(&self, from: &Path, to: &Path) -> Result<(), Error>;
