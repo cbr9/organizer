@@ -1,16 +1,18 @@
 use crate::{
 	context::{
-		services::{fs::locker::Locker, reporter::ui::IndicatorStyle},
+		services::{fs::locker::Locker, reporter::ui::IndicatorStyle, task_manager::Task},
 		ExecutionContext,
 	},
 	engine::rule::RuleBuilder,
 	error::Error,
-	plugins::storage::StorageProvider,
+	plugins::storage::{BackendType, StorageProvider},
 	resource::{FileState, Resource},
+	stdx::path::PathExt,
 	templates::template::{Template, TemplateString},
 };
 use anyhow::{Context, Result};
-use futures::{self, future, TryStreamExt};
+use bytes::Bytes;
+use futures::{self, StreamExt, TryStreamExt};
 use moka::future::Cache;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -35,7 +37,7 @@ pub struct DestinationBuilder {
 }
 impl DestinationBuilder {
 	/// Compiles the raw DestinationBuilder into an executable Destination.
-	pub async fn build(&self, ctx: &ExecutionContext<'_>) -> Result<Destination, Error> {
+	pub async fn build(&self, ctx: &ExecutionContext) -> Result<Destination, Error> {
 		let folder = ctx.services.template_compiler.compile_template(&self.folder)?;
 		let filename = self
 			.filename
@@ -55,7 +57,7 @@ pub struct Destination {
 }
 
 impl Destination {
-	pub async fn resolve(&self, ctx: &ExecutionContext<'_>) -> Result<PathBuf> {
+	pub async fn resolve(&self, ctx: &ExecutionContext) -> Result<PathBuf> {
 		let mut folder = PathBuf::from(self.folder.render(ctx).await?);
 		if let Some(filename_template) = &self.filename {
 			let filename = filename_template.render(ctx).await?;
@@ -117,69 +119,135 @@ impl FileSystemManager {
 		Ok(())
 	}
 
-	pub async fn copy(&self, from: &Arc<Resource>, to: &Arc<Resource>, ctx: &ExecutionContext<'_>) -> Result<(), Error> {
+	async fn remote_to_local_copy(&self, task: Arc<Task>, from: &Resource, to: &Resource) -> Result<(String, IndicatorStyle), Error> {
+		let temp_path = task
+			.clone()
+			.new_step::<PathBuf, Error, _>(&format!("Downloading {}", from.as_path().display()), async {
+				let mut stream = from.backend.download(from.as_path());
+				let temp_file = NamedTempFile::new()?;
+				let mut writer = tokio::fs::File::create(temp_file.path()).await?;
+
+				while let Ok(Some(chunk)) = stream.try_next().await {
+					writer.write_all(&chunk).await?;
+					task.increment_progress_bar(chunk.len() as u64);
+				}
+
+				Ok(temp_file.keep().context("could not persist temporary file")?.1)
+			})
+			.await?;
+
+		to.backend.rename(&temp_path, to.as_path()).await?;
+
+		Ok((
+			format!("Downloaded {} -> {}", from.as_path().display(), to.as_path().display()),
+			IndicatorStyle::Success,
+		))
+	}
+
+	async fn any_to_remote_copy(
+		&self,
+		task: Arc<Task>,
+		from: &Resource,
+		to: &Resource,
+		description: String,
+	) -> Result<(String, IndicatorStyle), Error> {
+		task.clone()
+			.new_step(&description, async {
+				let download = from.backend.download(from.as_path()).map(move |chunk: Result<Bytes, Error>| {
+					if let Ok(chunk) = &chunk {
+						task.increment_progress_bar(chunk.len() as u64);
+					}
+					chunk
+				});
+				to.backend.upload(to.as_path(), Box::pin(download)).await
+			})
+			.await?;
+		Ok(("Copied".to_string(), IndicatorStyle::Success))
+	}
+
+	async fn local_to_local_copy(&self, task: Arc<Task>, from: &Resource, to: &Resource) -> Result<(String, IndicatorStyle), Error> {
+		let file_size = from.backend.metadata(from.as_path()).await?.size.unwrap_or(0);
+		const THRESHOLD: u64 = 1024_u64.pow(3); // 1GB
+
+		if file_size < THRESHOLD {
+			task.clone()
+				.new_step("Copying (small file)", async { from.backend.copy(from.as_path(), to.as_path()).await })
+				.await?;
+		} else {
+			task.clone()
+				.new_step("Copying (large file)", async {
+					let stream = from.backend.download(from.as_path()).map(move |chunk: Result<Bytes, Error>| {
+						if let Ok(chunk) = &chunk {
+							task.increment_progress_bar(chunk.len() as u64);
+						}
+						chunk
+					});
+					to.backend.upload(to.as_path(), Box::pin(stream)).await
+				})
+				.await?;
+		}
+		Ok(("Copied".to_string(), IndicatorStyle::Success))
+	}
+
+	pub async fn r#move(&self, from: &Arc<Resource>, to: &Arc<Resource>, ctx: Arc<ExecutionContext>) -> Result<(), Error> {
+		// A native move/rename is only possible if the two resources are on the same filesystem backend.
+		if &from.backend == &to.backend {
+			let rename_result = from.backend.rename(from.as_path(), to.as_path()).await;
+
+			match rename_result {
+				Ok(()) => {
+					// The fast, native rename succeeded. We are done.
+					ctx.services
+						.reporter
+						.success(&format!("Moved {} -> {}", from.path.shorten(5).display(), to.path.shorten(5).display()));
+					return Ok(());
+				}
+				Err(e) if e.is_cross_device() => {
+					ctx.services.reporter.warning("Cross-device move; falling back to copy.");
+				}
+				Err(other_error) => {
+					// Any other error (e.g., permissions, not found) is a genuine
+					// failure and should be propagated immediately.
+					return Err(other_error);
+				}
+			}
+		}
+
+		// --- Fallback Logic: Copy then Delete ---
+		// If we reach this point, it's either a cross-provider operation (e.g. SFTP -> local)
+		// or a failed native move that requires a fallback.
+
+		// 1. Call the `copy` method, which will use the TaskManager to show progress.
+		self.copy(from, to, &ctx).await?;
+
+		// 2. If the copy was successful, delete the original source file.
+		from.backend.delete(from.as_path()).await?;
+
+		Ok(())
+	}
+
+	pub async fn copy(&self, from: &Arc<Resource>, to: &Arc<Resource>, ctx: &ExecutionContext) -> Result<(), Error> {
+		use BackendType::*;
 		let task_manager = ctx.services.task_manager.clone();
 
-		let source_provider = from.backend.clone();
-		let dest_provider = to.backend.clone();
-
-		let from_is_remote = from.backend.prefix() != "file";
-		let to_is_local = to.backend.prefix() == "file";
-		let total_steps = if from_is_remote { 2 } else { 1 };
+		let total_steps = if from.backend.kind().is_remote() { 2 } else { 1 };
 		let size = from.backend.metadata(from.as_path()).await?.size;
 
 		let title = from.path.file_name().unwrap_or_default().to_string_lossy().to_string();
-		// Each file gets its own `with_task` call.
+
 		task_manager
 			.with_task(&title, total_steps, size, |task| async move {
-				match (from_is_remote, to_is_local) {
-					// Case: Remote -> Local (or Remote -> Remote)
-					(true, _) => {
-						let temp_path = task
-							.clone()
-							.new_step::<PathBuf, Error, _>(&format!("Downloading {}", from.as_path().display()), async {
-								let mut stream = from.backend.download(from.as_path());
-								let temp_file = NamedTempFile::new()?;
-								let mut writer = tokio::fs::File::create(temp_file.path()).await?;
-
-								// Consume the stream, updating the bar after each chunk
-								while let Ok(Some(chunk)) = stream.try_next().await {
-									writer.write(&chunk).await?;
-									task.increment_progress_bar(chunk.len() as u64);
-								}
-
-								Ok(temp_file.keep().context("could not persist temporary file")?.1) // Return the path to the temp file
-							})
-							.await?;
-
-						task.new_step::<(), Error, _>("Writing to destination", async {
-							if to.backend.prefix() == "file" {
-								to.backend.r#move(&temp_path, to.as_path()).await?;
-							} else {
-								to.backend.upload(&temp_path, to.as_path()).await?;
-								tokio::fs::remove_file(temp_path).await?;
-							}
-							Ok(())
-						})
-						.await?;
-
-						Ok((
-							format!("Transferred {} -> {}", from.as_path().display(), to.as_path().display()),
-							IndicatorStyle::Success,
-						))
+				match (from.backend.kind(), to.backend.kind()) {
+					(Local, Local) => self.local_to_local_copy(task, from, to).await,
+					(Local, Remote) => {
+						let description = format!("Uploading {}", from.as_path().display());
+						self.any_to_remote_copy(task, from, to, description).await
 					}
-					// Case: Local -> Remote
-					(false, true) => {
-						task.new_step("Uploading", async { to.backend.upload(from.as_path(), to.as_path()).await })
-							.await?;
-						Ok(("✓ Uploaded".to_string(), IndicatorStyle::Success))
+					(Remote, Remote) => {
+						let description = format!("Transferring {}", from.as_path().display());
+						self.any_to_remote_copy(task, from, to, description).await
 					}
-					// Case: Local -> Local
-					(false, false) => {
-						task.new_step("Copying", async { from.backend.copy(from.as_path(), to.as_path()).await })
-							.await?;
-						Ok(("Copied".to_string(), IndicatorStyle::Success))
-					}
+					(Remote, Local) => self.remote_to_local_copy(task, from, to).await,
 				}
 			})
 			.await
@@ -214,18 +282,6 @@ impl FileSystemManager {
 			from_provider.symlink(from.as_path(), to.as_path()).await
 		} else {
 			Err(Error::ImpossibleOp("Cannot create symlink across different filesystems".to_string()))
-		}
-	}
-
-	pub async fn r#move(&self, from: &Arc<Resource>, to: &Arc<Resource>, ctx: Arc<ExecutionContext<'_>>) -> Result<(), Error> {
-		let from_provider = &from.backend;
-		let to_provider = &to.backend;
-
-		if from_provider == to_provider {
-			from_provider.r#move(from.as_path(), to.as_path()).await
-		} else {
-			self.copy(from, to, &ctx).await?;
-			self.delete(from).await
 		}
 	}
 }

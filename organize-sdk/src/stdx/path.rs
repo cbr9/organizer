@@ -22,7 +22,7 @@ pub trait PathExt {
 pub trait PathBufExt {
 	async fn as_resource(
 		self,
-		ctx: &ExecutionContext<'_>,
+		ctx: &ExecutionContext,
 		location: Option<Arc<Location>>,
 		host: String,
 		backend: Arc<dyn StorageProvider>,
@@ -43,7 +43,6 @@ impl<T: AsRef<Path> + Sync + Send> PathExt for T {
 			return path.to_path_buf();
 		}
 
-		// Ensure max_depth is at least 3 to show root, ellipsis, and filename.
 		if max_depth < 3 {
 			return path.to_path_buf();
 		}
@@ -52,15 +51,12 @@ impl<T: AsRef<Path> + Sync + Send> PathExt for T {
 		let num_to_take_start = (max_depth - 1) / 2;
 		let num_to_take_end = max_depth - num_to_take_start - 1;
 
-		// Add the starting components
 		for component in components.iter().take(num_to_take_start) {
 			result.push(component.as_os_str());
 		}
 
-		// Add the ellipsis
 		result.push("...");
 
-		// Add the ending components
 		for component in components.iter().rev().take(num_to_take_end).rev() {
 			result.push(component.as_os_str());
 		}
@@ -101,7 +97,7 @@ impl<T: AsRef<Path> + Sync + Send> PathExt for T {
 impl PathBufExt for PathBuf {
 	async fn as_resource(
 		self,
-		ctx: &ExecutionContext<'_>,
+		ctx: &ExecutionContext,
 		location: Option<Arc<Location>>,
 		host: String,
 		backend: Arc<dyn StorageProvider>,
@@ -109,9 +105,10 @@ impl PathBufExt for PathBuf {
 		ctx.services
 			.fs
 			.resources
-			.get_with(self.clone(), async move {
-				Arc::new(Resource::new(self.as_ref(), host, location, backend))
-			})
+			.get_with(
+				self.clone(),
+				async move { Arc::new(Resource::new(self.as_ref(), host, location, backend)) },
+			)
 			.await
 	}
 }

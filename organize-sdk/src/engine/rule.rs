@@ -47,7 +47,7 @@ async fn load_rule_builder_from_path(path: &std::path::Path) -> Result<RuleBuild
 }
 
 impl RuleBuilder {
-	pub async fn build(self, ctx: &ExecutionContext<'_>) -> Result<Rule, Error> {
+	pub async fn build(self, ctx: &ExecutionContext) -> Result<Rule, Error> {
 		let mut final_pipeline = Vec::new();
 		let main_meta = Arc::new(self.metadata);
 		let mut processing_stack: Vec<(StageBuilder, Arc<RuleMetadata>)> = self

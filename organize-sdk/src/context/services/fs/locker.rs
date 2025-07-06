@@ -15,7 +15,7 @@ pub struct Locker {
 impl Locker {
 	pub async fn with_locked_destination<F, Fut, T>(
 		&self,
-		ctx: &ExecutionContext<'_>,
+		ctx: &ExecutionContext,
 		destination: &Destination,
 		strategy: &ConflictResolution,
 		action: F,

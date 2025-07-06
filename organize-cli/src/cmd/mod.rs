@@ -1,4 +1,4 @@
-use crate::cmd::{logs::LogLevel, run::Run};
+use crate::cmd::run::Run;
 use async_trait::async_trait;
 use clap::{Parser, Subcommand};
 use undo::Undo;
@@ -18,8 +18,6 @@ enum Command {
 pub struct OrganizeCli {
 	#[command(subcommand)]
 	command: Command,
-	#[arg(long, value_enum, global = true, default_value_t = LogLevel::Info)]
-	pub log_level: LogLevel,
 }
 
 #[async_trait]
@@ -30,7 +28,7 @@ pub trait Cmd {
 #[async_trait]
 impl Cmd for OrganizeCli {
 	async fn run(self) -> anyhow::Result<()> {
-		let _guard = logs::init(self.log_level);
+		let _guard = logs::init();
 		match self.command {
 			Command::Run(cmd) => cmd.run().await,
 			Command::Undo(undo) => undo.run().await,

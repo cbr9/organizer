@@ -173,7 +173,7 @@ dyn_eq::eq_trait_object!(ActionBuilder);
 #[async_trait]
 #[typetag::serde(tag = "type")]
 pub trait ActionBuilder: DynEq + DynClone + Sync + Send + Debug {
-	async fn build(&self, _ctx: &ExecutionContext<'_>) -> Result<Box<dyn Action>, Error>;
+	async fn build(&self, _ctx: &ExecutionContext) -> Result<Box<dyn Action>, Error>;
 }
 
 dyn_clone::clone_trait_object!(Action);
@@ -185,5 +185,5 @@ pub trait Action: DynEq + DynClone + Sync + Send + Debug {
 	fn execution_model(&self) -> ExecutionModel {
 		ExecutionModel::default()
 	}
-	async fn commit(&self, _ctx: Arc<ExecutionContext<'_>>) -> Result<Receipt, Error>;
+	async fn commit(&self, _ctx: Arc<ExecutionContext>) -> Result<Receipt, Error>;
 }

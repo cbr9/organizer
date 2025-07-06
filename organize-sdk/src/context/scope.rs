@@ -10,33 +10,33 @@ use std::{
 };
 
 #[derive(Debug, Clone)]
-pub enum ExecutionScope<'a> {
+pub enum ExecutionScope {
 	Rule(RuleScope),
-	Search(SearchScope<'a>),
+	Search(SearchScope),
 	Resource(ResourceScope),
-	Batch(BatchScope<'a>),
+	Batch(BatchScope),
 	Build(BuildScope),
 	Blank,
 }
 
-impl<'a> ExecutionScope<'a> {
-	pub fn new_rule_scope(rule: Arc<RuleMetadata>) -> ExecutionScope<'a> {
+impl ExecutionScope {
+	pub fn new_rule_scope(rule: Arc<RuleMetadata>) -> ExecutionScope {
 		ExecutionScope::Rule(RuleScope { rule })
 	}
 
-	pub fn new_location_scope(rule: Arc<RuleMetadata>, location: &'a Location) -> ExecutionScope<'a> {
+	pub fn new_location_scope(rule: Arc<RuleMetadata>, location: Arc<Location>) -> ExecutionScope {
 		ExecutionScope::Search(SearchScope { rule, location })
 	}
 
-	pub fn new_resource_scope(rule: Arc<RuleMetadata>, resource: Arc<Resource>) -> ExecutionScope<'a> {
+	pub fn new_resource_scope(rule: Arc<RuleMetadata>, resource: Arc<Resource>) -> ExecutionScope {
 		ExecutionScope::Resource(ResourceScope { rule, resource })
 	}
 
-	pub fn new_batch_scope(rule: Arc<RuleMetadata>, batch: &'a Batch) -> ExecutionScope<'a> {
+	pub fn new_batch_scope(rule: Arc<RuleMetadata>, batch: Arc<Batch>) -> ExecutionScope {
 		ExecutionScope::Batch(BatchScope { rule, batch })
 	}
 
-	pub fn new_build_scope(root: &Path) -> ExecutionScope<'a> {
+	pub fn new_build_scope(root: &Path) -> ExecutionScope {
 		ExecutionScope::Build(BuildScope { root: root.to_path_buf() })
 	}
 
@@ -57,9 +57,9 @@ impl<'a> ExecutionScope<'a> {
 		}
 	}
 
-	pub fn batch(&self) -> Result<&'a Batch> {
+	pub fn batch(&self) -> Result<&Batch> {
 		match self {
-			ExecutionScope::Batch(scope) => Ok(scope.batch),
+			ExecutionScope::Batch(scope) => Ok(&scope.batch),
 			_ => anyhow::bail!("Batch not in scope"),
 		}
 	}
@@ -70,9 +70,9 @@ pub struct RuleScope {
 	pub rule: Arc<RuleMetadata>,
 }
 #[derive(Debug, Clone)]
-pub struct SearchScope<'a> {
+pub struct SearchScope {
 	pub rule: Arc<RuleMetadata>,
-	pub location: &'a Location,
+	pub location: Arc<Location>,
 }
 #[derive(Debug, Clone)]
 pub struct ResourceScope {
@@ -80,9 +80,9 @@ pub struct ResourceScope {
 	pub resource: Arc<Resource>,
 }
 #[derive(Debug, Clone)]
-pub struct BatchScope<'a> {
+pub struct BatchScope {
 	pub rule: Arc<RuleMetadata>,
-	pub batch: &'a Batch,
+	pub batch: Arc<Batch>,
 }
 
 #[derive(Debug, Clone)]

@@ -150,7 +150,7 @@ impl Pipeline {
 		}
 	}
 
-	pub async fn run(mut self, ctx: &ExecutionContext<'_>) -> Result<PipelineStream, Error> {
+	pub async fn run(mut self, ctx: &ExecutionContext) -> Result<PipelineStream, Error> {
 		for stage in self.stages.into_iter() {
 			if let Some(params) = stage.params() {
 				if !params.enabled {
@@ -162,7 +162,7 @@ impl Pipeline {
 			}
 			match stage {
 				Stage::Search { location, source, .. } => {
-					let scope = ExecutionScope::new_location_scope(source.clone(), &location);
+					let scope = ExecutionScope::new_location_scope(source.clone(), location.clone());
 					let ctx = ctx.with_scope(scope);
 					let new_files = ctx.services.fs.get_provider(&location.host)?.discover(&location, &ctx).await?;
 					if location.mode.is_replace() {
@@ -242,7 +242,7 @@ impl Pipeline {
 					match filter.execution_model() {
 						ExecutionModel::Batch => {
 							for (name, batch) in selected_batches {
-								let scope = ExecutionScope::new_batch_scope(source.clone(), batch);
+								let scope = ExecutionScope::new_batch_scope(source.clone(), Arc::new(batch.clone()));
 								let batch_ctx = ctx.with_scope(scope);
 								let passed_files = filter.filter(check_path, &batch_ctx).await?;
 								if !passed_files.is_empty() {
@@ -294,7 +294,7 @@ impl Pipeline {
 						let mut current_batch_next_files = Vec::new();
 						match action.execution_model() {
 							ExecutionModel::Batch => {
-								let scope = ExecutionScope::new_batch_scope(source.clone(), batch);
+								let scope = ExecutionScope::new_batch_scope(source.clone(), Arc::new(batch.clone()));
 								let batch_ctx = ctx.with_scope(scope);
 								let ctx = Arc::new(batch_ctx);
 								let receipt = action.commit(ctx).await?;

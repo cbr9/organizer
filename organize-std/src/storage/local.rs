@@ -8,6 +8,7 @@ use anyhow::{Context as ErrorContext, Result};
 use async_trait::async_trait;
 use bytes::Bytes;
 use futures::{
+	future::BoxFuture,
 	stream::{self, BoxStream},
 	StreamExt,
 	TryStreamExt,
@@ -19,12 +20,13 @@ use organize_sdk::{
 		options::{Options, Target},
 		Location,
 	},
-	plugins::storage::{Metadata, StorageProvider},
+	plugins::storage::{BackendType, Metadata, StorageProvider},
 	resource::Resource,
 	stdx::path::{PathBufExt, PathExt},
 };
 use serde::{Deserialize, Serialize};
-use tokio_util::codec::{BytesCodec, FramedRead, FramedWrite};
+use tokio::io::AsyncWriteExt;
+use tokio_util::codec::{BytesCodec, FramedRead};
 use walkdir::WalkDir;
 
 use super::IntoMetadata;
@@ -48,6 +50,10 @@ pub struct LocalFileSystem;
 #[async_trait]
 #[typetag::serde(name = "local")]
 impl StorageProvider for LocalFileSystem {
+	fn kind(&self) -> BackendType {
+		BackendType::Local
+	}
+
 	fn prefix(&self) -> &'static str {
 		"file"
 	}
@@ -57,33 +63,20 @@ impl StorageProvider for LocalFileSystem {
 	}
 
 	async fn mkdir(&self, path: &Path) -> Result<(), Error> {
-		if let Some(parent) = path.parent() {
-			if !tokio::fs::try_exists(parent).await.unwrap_or(false) {
-				tokio::fs::create_dir_all(parent).await?;
+		if path.is_file() {
+			if let Some(parent) = path.parent() {
+				if !tokio::fs::try_exists(parent).await.unwrap_or(false) {
+					tokio::fs::create_dir_all(parent).await?;
+				}
 			}
+		} else {
+			tokio::fs::create_dir_all(path).await?;
 		}
 		Ok(())
 	}
 
-	async fn r#move(&self, from: &Path, to: &Path) -> Result<(), Error> {
-		// ctx.services.fs.ensure_parent_dir_exists(destination.as_path()).await?;
-		self.mkdir(to).await?;
-		match tokio::fs::rename(from, to).await {
-			Ok(_) => Ok(()),
-			Err(e) if e.raw_os_error() == Some(libc::EXDEV) || e.kind() == std::io::ErrorKind::CrossesDevices => {
-				// Handle "Cross-device link" error (EXDEV on Unix, specific error kind on Windows)
-				// This means source and destination are on different file systems.
-				tracing::warn!(
-					"Attempting copy-then-delete for move operation due to cross-device link: {} to {}",
-					from.display(),
-					to.display()
-				);
-
-				tokio::fs::copy(from, to).await?;
-				Ok(tokio::fs::remove_file(from).await?)
-			}
-			Err(e) => Err(Error::Io(e)),
-		}
+	async fn rename(&self, from: &Path, to: &Path) -> Result<(), Error> {
+		tokio::fs::rename(from, to).await.map_err(|e| Error::Io(e))
 	}
 
 	// TODO: what is this?
@@ -143,21 +136,14 @@ impl StorageProvider for LocalFileSystem {
 		Box::pin(stream)
 	}
 
-	async fn upload(&self, from: &Path, to: &Path) -> Result<(), Error> {
-		unimplemented!()
-	}
-
-	async fn upload_many(&self, from_local: &[PathBuf], to: &[PathBuf]) -> Result<(), Error> {
-		if from_local.len() != to.len() {
-			return Err(Error::Other(anyhow::anyhow!(
-				"Mismatched number of source and destination paths for upload_many"
-			)));
-		}
-		for (from, to) in from_local.iter().zip(to.iter()) {
-			self.mkdir(to).await?;
-			tokio::fs::copy(from, to).await.map_err(Error::Io).map(|_| ())?;
-		}
-		Ok(())
+	fn upload<'a>(&'a self, to: &'a Path, mut stream: BoxStream<'a, Result<Bytes, Error>>) -> BoxFuture<'a, Result<(), Error>> {
+		Box::pin(async move {
+			let mut file = tokio::fs::File::create(to).await?;
+			while let Some(chunk_result) = stream.next().await {
+				file.write_all(&chunk_result?).await?;
+			}
+			Ok(())
+		})
 	}
 
 	async fn hardlink(&self, from: &Path, to: &Path) -> Result<(), Error> {
@@ -181,7 +167,7 @@ impl StorageProvider for LocalFileSystem {
 		}
 	}
 
-	async fn discover(&self, location: &Location, ctx: &ExecutionContext<'_>) -> Result<Vec<Arc<Resource>>, Error> {
+	async fn discover(&self, location: &Location, ctx: &ExecutionContext) -> Result<Vec<Arc<Resource>>, Error> {
 		let location = Arc::new(location.clone());
 		let backend = ctx.services.fs.get_provider(&location.host)?;
 		let resources = WalkDir::new(&location.path)
@@ -189,8 +175,8 @@ impl StorageProvider for LocalFileSystem {
 			.max_depth(location.options.max_depth)
 			.follow_links(location.options.follow_symlinks)
 			.into_iter()
-			.filter_entry(|entry| self.filter_entry(entry, &location.options))
 			.filter_map(|e| e.ok())
+			.filter(|entry| self.filter_entry(entry, &location.options))
 			.map(|entry| {
 				let path_buf = entry.path().to_path_buf();
 				path_buf.as_resource(ctx, Some(location.clone()), location.host.clone(), backend.clone())
@@ -236,7 +222,7 @@ impl LocalFileSystem {
 			return false;
 		}
 		if entry.path().is_dir() && options.target == Target::Files {
-			return true;
+			return false;
 		}
 
 		if entry.path().is_file() {

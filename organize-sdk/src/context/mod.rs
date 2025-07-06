@@ -12,22 +12,22 @@ use crate::{
 
 /// The top-level context object, composed of the three distinct categories of information.
 #[derive(Clone)]
-pub struct ExecutionContext<'a> {
-	pub services: &'a RunServices,
-	pub scope: ExecutionScope<'a>,
-	pub settings: &'a RunSettings,
+pub struct ExecutionContext {
+	pub services: Arc<RunServices>,
+	pub scope: ExecutionScope,
+	pub settings: Arc<RunSettings>,
 }
 
-impl<'a> ExecutionContext<'a> {
-	pub fn with_scope(&'a self, scope: ExecutionScope<'a>) -> ExecutionContext<'a> {
+impl ExecutionContext {
+	pub fn with_scope(&self, scope: ExecutionScope) -> ExecutionContext {
 		Self {
-			services: self.services,
+			services: self.services.clone(),
 			scope,
-			settings: self.settings,
+			settings: self.settings.clone(),
 		}
 	}
 
-	pub fn with_resource(&'a self, resource: &Arc<Resource>) -> Result<ExecutionContext<'a>, Error> {
+	pub fn with_resource(&self, resource: &Arc<Resource>) -> Result<ExecutionContext, Error> {
 		let scope = ExecutionScope::new_resource_scope(self.scope.rule()?, resource.clone());
 		Ok(self.with_scope(scope))
 	}

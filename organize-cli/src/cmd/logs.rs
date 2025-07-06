@@ -1,7 +1,5 @@
 use chrono::Local;
-use clap::ValueEnum;
 use std::path::PathBuf;
-use tracing::Level;
 use tracing_appender::non_blocking::WorkerGuard; // Import the guard type
 use tracing_subscriber::{
 	Layer,
@@ -11,31 +9,7 @@ use tracing_subscriber::{
 	util::SubscriberInitExt,
 };
 
-#[derive(ValueEnum, Clone, Debug, Default)]
-pub enum LogLevel {
-	#[default]
-	Info,
-	Debug,
-	Trace,
-	Warn,
-	Error,
-}
-
-// Implement a conversion from our CLI enum to the `tracing` LevelFilter.
-impl From<LogLevel> for Level {
-	fn from(level: LogLevel) -> Self {
-		match level {
-			LogLevel::Info => Level::INFO,
-			LogLevel::Debug => Level::DEBUG,
-			LogLevel::Trace => Level::TRACE,
-			LogLevel::Warn => Level::WARN,
-			LogLevel::Error => Level::ERROR,
-		}
-	}
-}
-
-/// Initializes the logging system and returns a guard that must be kept in scope.
-pub fn init(level: LogLevel) -> WorkerGuard {
+pub fn init() -> WorkerGuard {
 	// 1. Determine the destination directory for logs.
 	let logs_dir = PathBuf::from(".").join("logs"); // A hidden folder is a common convention
 

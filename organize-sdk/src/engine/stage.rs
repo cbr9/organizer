@@ -32,7 +32,6 @@ fn default_true() -> bool {
 	true
 }
 
-
 #[derive(Debug, Serialize, PartialEq, Eq, Clone)]
 pub enum StageBuilder {
 	Search(LocationBuilder, StageParams),
@@ -46,21 +45,17 @@ pub enum StageBuilder {
 }
 
 impl StageBuilder {
-	pub async fn build(self, ctx: &ExecutionContext<'_>, source: Arc<RuleMetadata>) -> Result<Stage, Error> {
+	pub async fn build(self, ctx: &ExecutionContext, source: Arc<RuleMetadata>) -> Result<Stage, Error> {
 		match self {
 			StageBuilder::Search(location_builder, params) => {
 				let stage = location_builder.build(ctx).await.unwrap();
 				Ok(Stage::Search {
-					location: stage,
+					location: Arc::new(stage),
 					params,
 					source,
 				})
 			}
-			StageBuilder::Flatten(flatten, params) => Ok(Stage::Flatten {
-				flatten,
-				params,
-				source,
-			}),
+			StageBuilder::Flatten(flatten, params) => Ok(Stage::Flatten { flatten, params, source }),
 			StageBuilder::Action(builder, params) => {
 				let stage = builder.build(ctx).await?;
 				Ok(Stage::Action {
@@ -81,7 +76,7 @@ impl StageBuilder {
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Stage {
 	Search {
-		location: Location,
+		location: Arc<Location>,
 		params: StageParams,
 		source: Arc<RuleMetadata>,
 	},
@@ -129,11 +124,11 @@ impl<'de> Deserialize<'de> for StageBuilder {
 
 		let key = {
 			let keys: Vec<_> = table.keys().cloned().collect();
-			let possible_keys = [
-				"search", "compose", "action", "filter", "partition-by", "sort-by", "select", "flatten",
-			];
+			let possible_keys = ["search", "compose", "action", "filter", "partition-by", "sort-by", "select", "flatten"];
 			keys.into_iter().find(|k| possible_keys.contains(&k.as_str())).ok_or_else(|| {
-				serde::de::Error::custom("Stage must contain one of: 'search', 'compose', 'action', 'filter', 'partition-by', 'sort-by', 'select', 'flatten'")
+				serde::de::Error::custom(
+					"Stage must contain one of: 'search', 'compose', 'action', 'filter', 'partition-by', 'sort-by', 'select', 'flatten'",
+				)
 			})?
 		};
 
@@ -152,8 +147,7 @@ impl<'de> Deserialize<'de> for StageBuilder {
 				let path_template_str = value.try_into::<String>().map_err(serde::de::Error::custom)?;
 				let mut params_table = table.clone();
 				params_table.insert("path".to_string(), path_template_str.into());
-				let builder: LocationBuilder =
-					toml::Value::Table(params_table).try_into().map_err(serde::de::Error::custom)?;
+				let builder: LocationBuilder = toml::Value::Table(params_table).try_into().map_err(serde::de::Error::custom)?;
 
 				Ok(StageBuilder::Search(builder, params))
 			}

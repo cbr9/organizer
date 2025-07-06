@@ -49,8 +49,8 @@ pub enum ConflictResolution {
 /// It owns the compiled configuration and all run-wide services.
 pub struct Engine {
 	rule: Rule,
-	services: RunServices,
-	settings: RunSettings,
+	services: Arc<RunServices>,
+	settings: Arc<RunSettings>,
 }
 
 impl Engine {
@@ -58,20 +58,22 @@ impl Engine {
 		let content = tokio::fs::read_to_string(path).await?;
 		let builder: RuleBuilder = toml::from_str(&content)?;
 
-		let services = RunServices {
+		let services = Arc::new(RunServices {
 			blackboard: Blackboard::default(),
 			journal: Arc::new(Journal::new(&settings).await?),
 			fs: FileSystemManager::new(&builder),
 			template_compiler: TemplateCompiler::new(),
 			reporter: Reporter::new(ui.clone()),
 			task_manager: TaskManager::new(ui),
-		};
+		});
+
+		let settings = Arc::new(settings);
 
 		let rule = {
 			let ctx = ExecutionContext {
-				services: &services,
+				services: services.clone(),
 				scope: ExecutionScope::Blank,
-				settings: &settings,
+				settings: settings.clone(),
 			};
 			let rule = builder.build(&ctx).await?;
 			rule
@@ -85,8 +87,8 @@ impl Engine {
 
 		// Create the top-level execution context with a blank scope.
 		let ctx = ExecutionContext {
-			services: &self.services,
-			settings: &self.settings, // Assuming you have settings
+			services: self.services.clone(),
+			settings: self.settings.clone(), // Assuming you have settings
 			scope: ExecutionScope::Blank,
 		};
 

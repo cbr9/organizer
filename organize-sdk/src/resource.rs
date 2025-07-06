@@ -175,7 +175,7 @@ impl Resource {
 		}
 	}
 
-	pub async fn try_exists(&self, ctx: &ExecutionContext<'_>) -> Result<bool, Error> {
+	pub async fn try_exists(&self, ctx: &ExecutionContext) -> Result<bool, Error> {
 		if ctx.settings.dry_run {
 			return match ctx
 				.services

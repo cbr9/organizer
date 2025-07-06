@@ -1,29 +1,25 @@
-[connections.aws-frankfurt]
-type = "sftp"
-address = "127.0.0.1"
-port = 10002
-username = "andres_cabero"
+# [connections.aws-frankfurt]
+# type = "sftp"
+# address = "127.0.0.1"
+# port = 10002
+# username = "andres_cabero"
+
+# [[stage]]
+# search = '/homes/andres_cabero/es-align/out_aligned'
+# host = "aws-frankfurt"
 
 [[stage]]
-search = '/homes/andres_cabero/es-align/out_aligned'
-host = "aws-frankfurt"
-
-[[stage]]
-action = "copy"
-folder = "/Users/H0UB8WV/Downloads/es-align/out_aligned"
-
-[[stage]]
-search = '/homes/andres_cabero/es-align/out_decoded'
-mode = "replace"
-host = "aws-frankfurt"
-
-[[stage]]
-action = "copy"
-folder = "/Users/H0UB8WV/Downloads/es-align/out_decoded"
+search = "/Users/H0UB8WV/Downloads"
 
 # [[stage]]
 # select = "first"
-# n = 2
+# n = 3
+
+[[stage]]
+action = "copy"
+folder = "/Users/H0UB8WV/Downloads/"
+filename = "{{file.stem}}-1.{{file.extension}}"
+
 
 
 

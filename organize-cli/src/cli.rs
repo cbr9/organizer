@@ -4,11 +4,9 @@ use dialoguer::{Confirm, Input, Select, theme::ColorfulTheme};
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use organize_sdk::context::services::reporter::ui::{IndicatorStyle, UserInterface};
 use std::{
-	collections::HashMap,
 	io::Error,
 	sync::{
 		Arc,
-		Mutex,
 		atomic::{AtomicU64, Ordering},
 	},
 };

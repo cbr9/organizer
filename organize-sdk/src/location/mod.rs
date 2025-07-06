@@ -13,9 +13,14 @@ use crate::{
 
 pub mod options;
 
+fn default_host() -> TemplateString {
+	TemplateString("file".to_string())
+}
+
 #[derive(Debug, Serialize, PartialEq, Eq, Clone, Deserialize)]
 pub struct LocationBuilder {
 	pub path: TemplateString,
+	#[serde(default = "default_host")]
 	pub host: TemplateString,
 	#[serde(flatten)]
 	pub options: OptionsBuilder,
@@ -53,20 +58,17 @@ impl Location {
 }
 
 impl LocationBuilder {
-	pub async fn build(self, ctx: &ExecutionContext<'_>) -> Result<Location, Error> {
+	pub async fn build(self, ctx: &ExecutionContext) -> Result<Location, Error> {
 		let path_template = ctx.services.template_compiler.compile_template(&self.path)?;
 		let path = PathBuf::from(path_template.render(ctx).await?);
 		let host = ctx.services.template_compiler.compile_template(&self.host)?.render(ctx).await?;
 
-		let ctx = &ExecutionContext {
-			services: ctx.services,
-			scope: ExecutionScope::new_build_scope(&path),
-			settings: ctx.settings,
-		};
+		let scope = ExecutionScope::new_build_scope(&path);
+		let ctx = ctx.with_scope(scope);
 
 		Ok(Location {
 			path: path.clone(),
-			options: self.options.compile(ctx, &host).await?,
+			options: self.options.compile(&ctx, &host).await?,
 			host,
 			mode: self.mode,
 			keep_structure: self.keep_structure,

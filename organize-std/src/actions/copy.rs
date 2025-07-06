@@ -7,7 +7,6 @@ use organize_sdk::{
 		services::fs::manager::{Destination, DestinationBuilder},
 		ExecutionContext,
 	},
-	engine::ExecutionModel,
 	error::Error,
 	plugins::action::{Action, ActionBuilder, Input, Output, Receipt},
 	stdx::path::PathBufExt,
@@ -29,7 +28,7 @@ pub struct CopyBuilder {
 #[async_trait]
 #[typetag::serde(name = "copy")]
 impl ActionBuilder for CopyBuilder {
-	async fn build(&self, ctx: &ExecutionContext<'_>) -> Result<Box<dyn Action>, Error> {
+	async fn build(&self, ctx: &ExecutionContext) -> Result<Box<dyn Action>, Error> {
 		let destination = self.destination.build(ctx).await?;
 		Ok(Box::new(Copy { destination }))
 	}
@@ -38,7 +37,7 @@ impl ActionBuilder for CopyBuilder {
 #[async_trait]
 #[typetag::serde(name = "copy")]
 impl Action for Copy {
-	async fn commit(&self, ctx: Arc<ExecutionContext<'_>>) -> Result<Receipt, Error> {
+	async fn commit(&self, ctx: Arc<ExecutionContext>) -> Result<Receipt, Error> {
 		let res = ctx.scope.resource()?;
 		let backend = ctx.services.fs.get_provider(&self.destination.host)?;
 		let dest = self
@@ -48,7 +47,9 @@ impl Action for Copy {
 			.as_resource(&ctx, None, self.destination.host.clone(), backend)
 			.await;
 
-		ctx.services.fs.copy(&res, &dest, &ctx).await?;
+		if !ctx.settings.dry_run {
+			ctx.services.fs.copy(&res, &dest, &ctx).await?;
+		}
 
 		let receipt = Receipt {
 			inputs: vec![Input::Processed(res.clone())],

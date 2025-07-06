@@ -26,7 +26,6 @@ use russh::{
 	Channel,
 };
 use serde::{Deserialize, Serialize};
-use tempfile::NamedTempFile;
 use tokio::sync::{Mutex, OnceCell};
 
 use organize_sdk::{
@@ -267,7 +266,7 @@ impl StorageProvider for Sftp {
 		Ok(())
 	}
 
-	async fn discover(&self, location: &Location, ctx: &ExecutionContext<'_>) -> Result<Vec<Arc<Resource>>, Error> {
+	async fn discover(&self, location: &Location, ctx: &ExecutionContext) -> Result<Vec<Arc<Resource>>, Error> {
 		let mut files = Vec::new();
 		let session = self.pool().await?.get().await.map_err(|e| Error::Other(e.into()))?;
 		let backend = ctx.services.fs.get_provider(&location.host)?;
@@ -282,19 +281,9 @@ impl StorageProvider for Sftp {
 		Ok(())
 	}
 
-	async fn r#move(&self, from: &Path, to: &Path) -> Result<(), Error> {
+	async fn rename(&self, from: &Path, to: &Path) -> Result<(), Error> {
 		let session = self.pool().await?.get().await.map_err(|e| Error::Other(e.into()))?;
-		let rename_result = session.rename(from.to_string_lossy(), to.to_string_lossy()).await;
-		if rename_result.is_err() {
-			tracing::warn!(
-				"Could not move {} to {}. Falling back to copy and delete. Original error: {:?}",
-				from.display(),
-				to.display(),
-				rename_result.err()
-			);
-			self.copy(from, to).await?;
-			self.delete(from).await?;
-		}
+		session.rename(from.to_string_lossy(), to.to_string_lossy()).await?;
 		Ok(())
 	}
 
@@ -328,32 +317,17 @@ impl StorageProvider for Sftp {
 		Box::pin(stream)
 	}
 
-	async fn upload(&self, from_local: &Path, to: &Path) -> Result<(), Error> {
-		let content = tokio::fs::read(from_local).await.map_err(|e| Error::Io(e))?;
-		self.write(to, &content).await
-	}
+	fn upload<'a>(&'a self, to: &'a Path, mut stream: BoxStream<'a, Result<Bytes, Error>>) -> BoxFuture<'a, Result<(), Error>> {
+		Box::pin(async move {
+			let session = self.pool().await?.get().await.map_err(|e| Error::Other(e.into()))?;
+			let mut remote_file = session.create(to.to_string_lossy()).await?;
 
-	async fn upload_many(&self, from_local: &[PathBuf], to: &[PathBuf]) -> Result<(), Error> {
-		if from_local.len() != to.len() {
-			return Err(Error::Other(anyhow::anyhow!(
-				"Mismatched number of source and destination paths for upload_many"
-			)));
-		}
+			while let Some(chunk) = stream.try_next().await? {
+				remote_file.write_all(&chunk).await?;
+			}
 
-		let mut futures = Vec::with_capacity(from_local.len());
-		for (from, to) in from_local.iter().zip(to.iter()) {
-			let sftp_clone = self.clone();
-			let from_clone = from.clone();
-			let to_clone = to.clone();
-			futures.push(tokio::spawn(async move { sftp_clone.upload(&from_clone, &to_clone).await }));
-		}
-
-		futures::future::try_join_all(futures)
-			.await
-			.map_err(|e| Error::Other(e.into()))?
-			.into_iter()
-			.for_each(drop);
-		Ok(())
+			Ok(())
+		})
 	}
 
 	async fn hardlink(&self, from: &Path, to: &Path) -> Result<(), Error> {
@@ -373,7 +347,7 @@ impl Sftp {
 	fn discover_recursive<'a>(
 		&'a self,
 		sftp: &'a Object<Self>,
-		ctx: &'a ExecutionContext<'a>,
+		ctx: &'a ExecutionContext,
 		path: PathBuf,
 		depth: usize,
 		options: &'a Options,

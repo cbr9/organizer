@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use dyn_clone::DynClone;
 use dyn_eq::DynEq;
-use futures::stream::BoxStream;
+use futures::{future::BoxFuture, stream::BoxStream};
 use serde_json::Value;
 use std::{
 	collections::HashMap,
@@ -30,6 +30,21 @@ pub struct Metadata {
 	pub extra: HashMap<String, String>,
 }
 
+pub enum BackendType {
+	Local,
+	Remote,
+}
+
+impl BackendType {
+	/// Returns `true` if the backend type is [`Remote`].
+	///
+	/// [`Remote`]: BackendType::Remote
+	#[must_use]
+	pub fn is_remote(&self) -> bool {
+		matches!(self, Self::Remote)
+	}
+}
+
 dyn_clone::clone_trait_object!(StorageProvider);
 dyn_eq::eq_trait_object!(StorageProvider);
 
@@ -40,18 +55,20 @@ dyn_eq::eq_trait_object!(StorageProvider);
 pub trait StorageProvider: DynEq + DynClone + Sync + Send + Debug {
 	async fn home(&self) -> Result<PathBuf, Error>;
 	fn prefix(&self) -> &'static str;
+	fn kind(&self) -> BackendType {
+		BackendType::Remote
+	}
 	async fn metadata(&self, path: &Path) -> Result<Metadata, Error>;
 	async fn read_dir(&self, path: &Path) -> Result<Vec<PathBuf>, Error>;
 	async fn read(&self, path: &Path) -> Result<Vec<u8>, Error>;
 	async fn write(&self, path: &Path, content: &[u8]) -> Result<(), Error>;
-	async fn discover(&self, location: &Location, ctx: &ExecutionContext<'_>) -> Result<Vec<Arc<Resource>>, Error>;
+	async fn discover(&self, location: &Location, ctx: &ExecutionContext) -> Result<Vec<Arc<Resource>>, Error>;
 	async fn mkdir(&self, path: &Path) -> Result<(), Error>;
-	async fn r#move(&self, from: &Path, to: &Path) -> Result<(), Error>;
+	async fn rename(&self, from: &Path, to: &Path) -> Result<(), Error>;
 	async fn copy(&self, from: &Path, to: &Path) -> Result<(), Error>;
 	async fn delete(&self, path: &Path) -> Result<(), Error>;
 	fn download<'a>(&'a self, path: &'a Path) -> BoxStream<'a, Result<Bytes, Error>>;
-	async fn upload(&self, from_local: &Path, to: &Path) -> Result<(), Error>;
-	async fn upload_many(&self, from_local: &[PathBuf], to: &[PathBuf]) -> Result<(), Error>;
+	fn upload<'a>(&'a self, to: &'a Path, stream: BoxStream<'a, Result<Bytes, Error>>) -> BoxFuture<'a, Result<(), Error>>;
 	async fn hardlink(&self, from: &Path, to: &Path) -> Result<(), Error>;
 	async fn symlink(&self, from: &Path, to: &Path) -> Result<(), Error>;
 }

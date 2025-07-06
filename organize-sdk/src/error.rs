@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{io::ErrorKind, path::PathBuf};
 use thiserror::Error;
 
 use crate::{
@@ -55,4 +55,19 @@ pub enum Error {
 
 	#[error(transparent)]
 	UndoError(#[from] UndoError),
+}
+
+impl Error {
+	/// Checks if the error is a "cross-device" or "rename-not-possible" error
+	/// that should trigger a copy-delete fallback.
+	pub fn is_cross_device(&self) -> bool {
+		if let Error::Io(e) = self {
+			if e.kind() == ErrorKind::CrossesDevices {
+				return true;
+			}
+		}
+		// Could add checks for specific SFTP or S3 error codes here in the future
+		// if let Error::Sftp(e) = self { ... }
+		false
+	}
 }

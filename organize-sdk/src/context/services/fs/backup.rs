@@ -10,7 +10,7 @@ use uuid::Uuid; // Import Uuid for generating unique IDs // Import chrono for ti
 /// Determines the base directory for all backups.
 /// This will be inside the platform-specific local data directory,
 /// in a subdirectory named after the project, and then a "backups" folder.
-fn get_backup_base_dir(_ctx: &ExecutionContext<'_>) -> Result<PathBuf, Error> {
+fn get_backup_base_dir(_ctx: &ExecutionContext) -> Result<PathBuf, Error> {
 	let project_name = env!("CARGO_PKG_NAME");
 	let base_dir = dirs::data_local_dir().expect("Could not determine platform-specific local data directory for backups.");
 	let dir = base_dir.join(project_name).join("backups");
@@ -38,7 +38,7 @@ impl std::ops::Deref for Backup {
 }
 
 impl Backup {
-	pub async fn new(ctx: &ExecutionContext<'_>) -> Result<Self, Error> {
+	pub async fn new(ctx: &ExecutionContext) -> Result<Self, Error> {
 		let dir = get_backup_base_dir(ctx)?;
 
 		// Loop until a unique UUID is found for the backup filename
@@ -53,7 +53,7 @@ impl Backup {
 		Ok(Self(path))
 	}
 
-	pub async fn persist(&self, ctx: &ExecutionContext<'_>) -> Result<(), Error> {
+	pub async fn persist(&self, ctx: &ExecutionContext) -> Result<(), Error> {
 		let parent = self.0.parent().unwrap();
 		fs::create_dir_all(parent).await?;
 		let source = ctx.scope.resource()?;

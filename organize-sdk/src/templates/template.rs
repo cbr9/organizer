@@ -27,7 +27,7 @@ pub struct Template {
 }
 
 impl Template {
-	pub async fn render(&self, ctx: &ExecutionContext<'_>) -> Result<String, Error> {
+	pub async fn render(&self, ctx: &ExecutionContext) -> Result<String, Error> {
 		let mut output = String::new();
 		for part in &self.parts {
 			match part {

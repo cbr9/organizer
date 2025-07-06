@@ -37,7 +37,7 @@ pub struct Options {
 }
 
 impl OptionsBuilder {
-	pub async fn compile(self, ctx: &ExecutionContext<'_>, host: &str) -> Result<Options, Error> {
+	pub async fn compile(self, ctx: &ExecutionContext, host: &str) -> Result<Options, Error> {
 		let mut excluded_paths = Vec::new();
 		let backend = ctx.services.fs.get_provider(host)?;
 
