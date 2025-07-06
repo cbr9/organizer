@@ -95,48 +95,33 @@ impl Resource {
 		}
 	}
 
-	pub fn get_mime(&self) -> &str {
-		match self.mime.get() {
-			Some(mime) => mime.as_str(),
-			None => {
-				let mime = mime_guess::from_path(&self.path).first_or_octet_stream().to_string();
-				self.mime.set(mime).unwrap();
-				self.mime.get().unwrap().as_str()
-			}
-		}
+	pub async fn get_mime(&self) -> &str {
+		self.mime
+			.get_or_init(async || mime_guess::from_path(&self.path).first_or_octet_stream().to_string())
+			.await
+			.as_str()
 	}
 
-	pub async fn get_metadata(&self) -> &Metadata {
-		match self.metadata.get() {
-			Some(metadata) => metadata,
-			None => {
-				self.metadata
-					.get_or_init(async || self.backend.metadata(&self.path).await.unwrap())
-					.await
-			}
-		}
+	pub async fn get_metadata(&self) -> Result<&Metadata, Error> {
+		self.metadata
+			.get_or_try_init(|| async { self.backend.metadata(&self.path).await })
+			.await
 	}
 
-	pub async fn get_bytes(&self) -> &Vec<u8> {
-		match self.bytes.get() {
-			Some(content) => content,
-			None => {
-				let content = self.backend.read(&self.path).await.unwrap();
-				self.bytes.set(content).unwrap();
-				self.bytes.get().unwrap()
-			}
-		}
+	pub async fn get_bytes(&self) -> Result<&Vec<u8>, Error> {
+		self.bytes
+			.get_or_try_init(|| async { self.backend.read(&self.path).await })
+			.await
 	}
 
-	pub async fn get_hash(&self) -> &String {
-		match self.hash.get() {
-			Some(hash) => hash,
-			None => {
-				let mut file = File::open(&self.path).await.unwrap();
+	pub async fn get_hash(&self) -> Result<&String, Error> {
+		self.hash
+			.get_or_try_init(|| async {
+				let mut file = File::open(&self.path).await?;
 				let mut hasher = Sha256::new();
 				let mut buffer = [0; 1024];
 				loop {
-					let count = file.read(&mut buffer).await.unwrap();
+					let count = file.read(&mut buffer).await?;
 					if count == 0 {
 						break;
 					}
@@ -144,10 +129,9 @@ impl Resource {
 				}
 				let hash = hasher.finalize();
 				let hash_str = format!("{hash:x}");
-				self.hash.set(hash_str).unwrap();
-				self.hash.get().unwrap()
-			}
-		}
+				Ok(hash_str)
+			})
+			.await
 	}
 }
 
