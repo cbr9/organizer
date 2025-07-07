@@ -9,7 +9,6 @@ pub mod engine;
 pub mod error;
 pub mod location;
 pub mod plugins;
-pub mod resource;
 pub mod stdx;
 pub mod templates;
 pub mod utils;

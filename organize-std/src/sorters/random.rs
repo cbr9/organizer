@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use organize_sdk::{plugins::sorter::Sorter, resource::Resource};
+use organize_sdk::{context::services::fs::resource::Resource, plugins::sorter::Sorter};
 use rand::{rng, seq::SliceRandom};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;

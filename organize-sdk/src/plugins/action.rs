@@ -12,10 +12,12 @@ use std::path::PathBuf;
 use thiserror::Error;
 
 use crate::{
-	context::{services::fs::backup::Backup, ExecutionContext},
+	context::{
+		services::fs::{backup::Backup, resource::Resource},
+		ExecutionContext,
+	},
 	engine::ExecutionModel,
 	error::Error,
-	resource::Resource,
 };
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]

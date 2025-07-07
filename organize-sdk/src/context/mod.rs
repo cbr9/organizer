@@ -5,9 +5,12 @@ pub mod settings;
 use std::sync::Arc;
 
 use crate::{
-	context::{scope::ExecutionScope, services::RunServices, settings::RunSettings},
+	context::{
+		scope::ExecutionScope,
+		services::{fs::resource::Resource, RunServices},
+		settings::RunSettings,
+	},
 	error::Error,
-	resource::Resource,
 };
 
 /// The top-level context object, composed of the three distinct categories of information.

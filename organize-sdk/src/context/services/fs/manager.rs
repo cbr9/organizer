@@ -1,13 +1,19 @@
 use crate::{
 	context::{
-		services::{fs::locker::Locker, task_manager::ProgressHandle},
+		services::{
+			fs::{
+				backup::Backup,
+				locker::Locker,
+				resource::{FileState, Resource},
+			},
+			task_manager::ProgressHandle,
+		},
 		ExecutionContext,
 	},
 	engine::{rule::RuleBuilder, ConflictResolution},
 	error::Error,
 	location::Location,
 	plugins::storage::{BackendType, StorageProvider},
-	resource::{FileState, Resource},
 	stdx::path::PathExt,
 	templates::template::{Template, TemplateString},
 };
@@ -239,7 +245,18 @@ impl FileSystemManager {
 			.await;
 		// A native move/rename is only possible if the two resources are on the same filesystem backend.
 		if &from.backend == &to_resource.backend {
-			let rename_result = from.backend.rename(from.as_path(), to_resource.as_path()).await;
+			let rename_result: Result<(), Error> = if !ctx.settings.dry_run {
+				let backup = Backup::new(&from.host, &ctx).await?;
+				backup.persist(&ctx).await?;
+				from.backend.rename(from.as_path(), to_resource.as_path()).await?;
+				self.resources.remove(from.as_path()).await;
+				self.resources
+					.insert(to_resource.as_path().to_path_buf(), to_resource.clone())
+					.await;
+				Ok(())
+			} else {
+				Ok(())
+			};
 
 			match rename_result {
 				Ok(()) => {
@@ -293,6 +310,8 @@ impl FileSystemManager {
 			task_manager
 				.with_task(&title, size, |task| async {
 					if !ctx.settings.dry_run {
+						let backup = Backup::new(&from.host, ctx).await?;
+						backup.persist(ctx).await?;
 						match (from.backend.kind(), dest_resource.backend.kind()) {
 							(Local, Local) => self.local_to_local_copy(task, from, &dest_resource, ctx).await?,
 							(Local, Remote) => {
@@ -305,14 +324,14 @@ impl FileSystemManager {
 							}
 							(Remote, Local) => self.remote_to_local_copy(task, from, &dest_resource, ctx).await?,
 						}
+						self.resources
+							.insert(dest_resource.as_path().to_path_buf(), dest_resource.clone())
+							.await;
 					}
 					Ok(())
 				})
 				.await?;
 
-			self.resources
-				.insert(dest_resource.as_path().to_path_buf(), dest_resource.clone())
-				.await;
 			self.tracked_files
 				.insert(dest_resource.as_path().to_path_buf(), FileState::Exists)
 				.await;
@@ -329,8 +348,12 @@ impl FileSystemManager {
 
 	pub async fn delete(&self, path: &Arc<Resource>, ctx: &ExecutionContext) -> Result<(), Error> {
 		let provider = &path.backend;
-		provider.delete(path.as_path()).await?;
-		self.resources.remove(path.as_path()).await;
+		if !ctx.settings.dry_run {
+			let backup = Backup::new(&path.host, &ctx).await?;
+			backup.persist(&ctx).await?;
+			provider.delete(path.as_path()).await?;
+			self.resources.remove(path.as_path()).await;
+		}
 		self.tracked_files
 			.insert(path.as_path().to_path_buf(), FileState::Deleted)
 			.await;
@@ -357,6 +380,8 @@ impl FileSystemManager {
 
 			if from_provider == to_provider {
 				if !ctx.settings.dry_run {
+					let backup = Backup::new(&from.host, &ctx).await?;
+					backup.persist(&ctx).await?;
 					from_provider.hardlink(from.as_path(), dest_resource.as_path()).await?;
 				}
 			} else {
@@ -402,11 +427,11 @@ impl FileSystemManager {
 				};
 
 				dest_resource.backend.write(dest_resource.as_path(), &final_content).await?;
+				self.resources
+					.insert(dest_resource.as_path().to_path_buf(), dest_resource.clone())
+					.await;
 			}
 
-			self.resources
-				.insert(dest_resource.as_path().to_path_buf(), dest_resource.clone())
-				.await;
 			self.tracked_files
 				.insert(dest_resource.as_path().to_path_buf(), FileState::Exists)
 				.await;
@@ -431,14 +456,16 @@ impl FileSystemManager {
 
 			if from_provider == to_provider {
 				if !ctx.settings.dry_run {
+					let backup = Backup::new(&from.host, &ctx).await?;
+					backup.persist(&ctx).await?;
 					from_provider.symlink(from.as_path(), dest_resource.as_path()).await?;
+					self.resources
+						.insert(dest_resource.as_path().to_path_buf(), dest_resource.clone())
+						.await;
 				}
 			} else {
 				return Err(Error::ImpossibleOp("Cannot create symlink across different filesystems".to_string()));
 			}
-			self.resources
-				.insert(dest_resource.as_path().to_path_buf(), dest_resource.clone())
-				.await;
 			self.tracked_files
 				.insert(dest_resource.as_path().to_path_buf(), FileState::Exists)
 				.await;

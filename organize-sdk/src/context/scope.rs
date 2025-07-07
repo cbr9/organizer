@@ -1,7 +1,7 @@
 use crate::{
+	context::services::fs::resource::Resource,
 	engine::{batch::Batch, rule::RuleMetadata},
 	location::Location,
-	resource::Resource,
 };
 use anyhow::Result;
 use std::{

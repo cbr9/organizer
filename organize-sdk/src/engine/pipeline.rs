@@ -1,7 +1,7 @@
 use futures::future;
 
 use crate::{
-	context::{scope::ExecutionScope, ExecutionContext},
+	context::{scope::ExecutionScope, services::fs::resource::Resource, ExecutionContext},
 	engine::{
 		batch::Batch,
 		rule::Rule,
@@ -10,7 +10,6 @@ use crate::{
 	},
 	error::Error,
 	plugins::{action::Receipt, partitioner::Partitioner, sorter::Sorter},
-	resource::Resource,
 };
 use glob::Pattern;
 use std::{

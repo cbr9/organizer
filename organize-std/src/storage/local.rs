@@ -13,14 +13,13 @@ use futures::{
 	StreamExt,
 };
 use organize_sdk::{
-	context::ExecutionContext,
+	context::{services::fs::resource::Resource, ExecutionContext},
 	error::Error,
 	location::{
 		options::{Options, Target},
 		Location,
 	},
 	plugins::storage::{BackendType, Metadata, StorageProvider},
-	resource::Resource,
 	stdx::path::PathExt,
 };
 use serde::{Deserialize, Serialize};

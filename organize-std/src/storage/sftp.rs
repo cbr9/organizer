@@ -29,11 +29,10 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::{Mutex, OnceCell};
 
 use organize_sdk::{
-	context::ExecutionContext,
+	context::{services::fs::resource::Resource, ExecutionContext},
 	error::Error,
 	location::{options::Options, Location},
 	plugins::storage::{Metadata, StorageProvider},
-	resource::Resource,
 };
 
 use super::IntoMetadata;

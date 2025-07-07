@@ -1,6 +1,6 @@
 use std::{collections::HashMap, sync::Arc};
 
-use crate::resource::Resource;
+use crate::context::services::fs::resource::Resource;
 
 /// Represents a batch of files that have been grouped by one or more criteria.
 /// This is the primary data structure that flows between pipeline stages.

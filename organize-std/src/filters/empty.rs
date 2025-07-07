@@ -4,7 +4,11 @@ use std::{path::PathBuf, sync::Arc};
 
 use anyhow::Result;
 
-use organize_sdk::{context::ExecutionContext, error::Error, plugins::filter::Filter, resource::Resource};
+use organize_sdk::{
+	context::{services::fs::resource::Resource, ExecutionContext},
+	error::Error,
+	plugins::filter::Filter,
+};
 
 #[derive(Debug, Clone, Deserialize, Serialize, Eq, PartialEq)]
 #[serde(deny_unknown_fields)]

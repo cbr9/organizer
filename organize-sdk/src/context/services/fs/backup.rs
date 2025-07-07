@@ -1,45 +1,37 @@
-use std::path::PathBuf;
+use std::{path::PathBuf, sync::Arc};
 
-use crate::{context::ExecutionContext, error::Error};
+use crate::{context::ExecutionContext, error::Error, plugins::storage::StorageProvider, PROJECT_NAME};
 use anyhow::Result;
 use dirs;
 use serde::{Deserialize, Serialize}; // Import the dirs crate
-use tokio::fs;
 use uuid::Uuid; // Import Uuid for generating unique IDs // Import chrono for timestamps (already in Cargo.toml)
 
 /// Determines the base directory for all backups.
 /// This will be inside the platform-specific local data directory,
 /// in a subdirectory named after the project, and then a "backups" folder.
-fn get_backup_base_dir(_ctx: &ExecutionContext) -> Result<PathBuf, Error> {
-	let project_name = env!("CARGO_PKG_NAME");
+fn get_backup_base_dir() -> Result<PathBuf, Error> {
+	let project_name = &PROJECT_NAME;
 	let base_dir = dirs::data_local_dir().expect("Could not determine platform-specific local data directory for backups.");
 	let dir = base_dir.join(project_name).join("backups");
 	Ok(dir)
 }
 
-#[derive(Default, Clone, Deserialize, Serialize, PartialEq, Eq, Debug)]
-#[serde(rename_all = "snake_case")]
-pub enum BackupLocation {
-	#[default]
-	System,
-	Root,
-	Custom(PathBuf),
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct Backup {
+	path: PathBuf,
+	host: String,
+	backend: Arc<dyn StorageProvider>,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
-pub struct Backup(pub PathBuf);
-
-impl std::ops::Deref for Backup {
-	type Target = PathBuf;
-
-	fn deref(&self) -> &Self::Target {
-		&self.0
+impl PartialEq for Backup {
+	fn eq(&self, other: &Self) -> bool {
+		self.path == other.path && self.host == other.host
 	}
 }
 
 impl Backup {
-	pub async fn new(ctx: &ExecutionContext) -> Result<Self, Error> {
-		let dir = get_backup_base_dir(ctx)?;
+	pub async fn new(host: &str, ctx: &ExecutionContext) -> Result<Self, Error> {
+		let dir = get_backup_base_dir()?;
 
 		// Loop until a unique UUID is found for the backup filename
 		let path = loop {
@@ -50,28 +42,33 @@ impl Backup {
 				break proposed_path;
 			}
 		};
-		Ok(Self(path))
+
+		let backend = ctx.services.fs.get_provider(host)?;
+		Ok(Self {
+			path,
+			host: host.to_string(),
+			backend,
+		})
 	}
 
 	pub async fn persist(&self, ctx: &ExecutionContext) -> Result<(), Error> {
-		let parent = self.0.parent().unwrap();
-		fs::create_dir_all(parent).await?;
-		let source = ctx.scope.resource()?;
+		let resource = ctx.scope.resource()?;
+		let from = resource.as_path();
+		let to = self.path.as_path();
 
-		match fs::hard_link(source.as_path(), self.0.as_path()).await {
-			Ok(()) => {
-				tracing::debug!("Created hard link backup for {}", source.as_path().display());
-				Ok(())
-			}
-			Err(e) if e.raw_os_error() == Some(libc::EXDEV) || e.kind() == std::io::ErrorKind::CrossesDevices => {
-				tracing::warn!(
-					"Backup for {} is on a different filesystem. Falling back to a full copy.",
-					ctx.scope.resource()?.as_path().display()
-				);
-				fs::copy(ctx.scope.resource()?.as_path(), self.0.as_path()).await?;
-				Ok(())
-			}
-			Err(e) => Err(Error::Io(e)),
+		// Attempt to hardlink
+		if let Err(e) = self
+			.backend
+			.hardlink(from, to)
+			.await
+			.inspect(|_| tracing::debug!(backup_path = %self.path.display(), file = %from.display(), "Backup complete"))
+		{
+			// If hardlink fails, try copy and delete
+			eprintln!("Hardlink failed: {}. Falling back to copy and delete.", e);
+			self.backend.copy(from, to).await?;
+			tracing::debug!(backup_path = %self.path.display(), file = %from.display(), "Backup complete");
 		}
+
+		Ok(())
 	}
 }

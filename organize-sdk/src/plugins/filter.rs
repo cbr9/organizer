@@ -11,10 +11,9 @@ use std::{fmt::Debug, path::PathBuf, sync::Arc};
 // pub mod regex;
 
 use crate::{
-	context::ExecutionContext,
+	context::{services::fs::resource::Resource, ExecutionContext},
 	engine::ExecutionModel,
 	error::Error,
-	resource::Resource,
 };
 
 dyn_clone::clone_trait_object!(Filter);
