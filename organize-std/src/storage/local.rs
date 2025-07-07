@@ -11,6 +11,7 @@ use futures::{
 	future::BoxFuture,
 	stream::{self, BoxStream},
 	StreamExt,
+	TryStreamExt,
 };
 use organize_sdk::{
 	context::{services::fs::resource::Resource, ExecutionContext},
@@ -58,6 +59,10 @@ impl StorageProvider for LocalFileSystem {
 
 	async fn home(&self) -> Result<PathBuf, Error> {
 		Ok(dirs::home_dir().context("unable to find home directory")?)
+	}
+
+	async fn try_exists(&self, path: &Path) -> Result<bool, Error> {
+		Ok(tokio::fs::try_exists(path).await?)
 	}
 
 	async fn mk_parent(&self, path: &Path) -> Result<(), Error> {
@@ -146,15 +151,15 @@ impl StorageProvider for LocalFileSystem {
 			.map(|entry| {
 				ctx.services
 					.fs
-					.get_or_init_resource(entry.into_path(), Some(location.clone()), &location.host, backend.clone())
+					.get_or_init_resource(entry.into_path(), Some(location.clone()), &location.host)
 			})
 			.collect::<Vec<_>>();
 
 		let resources = stream::iter(resources)
 			.buffer_unordered(num_cpus::get())
+			.filter_map(|res| res.ok())
 			.collect::<Vec<_>>()
 			.await;
-
 		Ok(resources)
 	}
 

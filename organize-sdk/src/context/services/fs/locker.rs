@@ -56,7 +56,12 @@ impl Locker {
 				}
 			}
 
-			if ctx.services.fs.try_exists(&path, ctx).await? {
+			let res = ctx
+				.services
+				.fs
+				.get_or_init_resource(path.to_path_buf(), None, &destination.host)
+				.await?;
+			if ctx.services.fs.try_exists(&res, ctx).await? {
 				match destination.resolution_strategy {
 					ConflictResolution::Skip => return Ok(None),
 					ConflictResolution::Overwrite => {

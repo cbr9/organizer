@@ -128,35 +128,26 @@ impl FileSystemManager {
 		}
 	}
 
-	pub async fn get_or_init_resource(
-		&self,
-		path: PathBuf,
-		location: Option<Arc<Location>>,
-		host: &str,
-		backend: Arc<dyn StorageProvider>,
-	) -> Arc<Resource> {
-		self.resources
+	pub async fn get_or_init_resource(&self, path: PathBuf, location: Option<Arc<Location>>, host: &str) -> Result<Arc<Resource>> {
+		let backend = self.get_provider(host)?;
+		Ok(self
+			.resources
 			.get_with(path.clone(), async move {
 				Arc::new(Resource::new(&path, host.to_string(), location, backend))
 			})
-			.await
+			.await)
 	}
 
-	pub async fn try_exists(&self, path: &Path, ctx: &ExecutionContext) -> Result<bool, Error> {
-		match self.resources.get(path).await {
-			Some(res) => {
-				if ctx.settings.dry_run {
-					return match self.tracked_files.get(res.as_path()).await.unwrap_or(FileState::Unknown) {
-						FileState::Exists => Ok(true),
-						FileState::Deleted => Ok(false),
-						FileState::Unknown => Ok(tokio::fs::try_exists(res.as_path()).await?),
-					};
-				}
-
-				Ok(tokio::fs::try_exists(res.as_path()).await?)
-			}
-			None => Ok(tokio::fs::try_exists(path).await?),
+	pub async fn try_exists(&self, res: &Resource, ctx: &ExecutionContext) -> Result<bool, Error> {
+		if ctx.settings.dry_run {
+			return match self.tracked_files.get(res.as_path()).await.unwrap_or(FileState::Unknown) {
+				FileState::Exists => Ok(true),
+				FileState::Deleted => Ok(false),
+				FileState::Unknown => Ok(res.backend.try_exists(res.as_path()).await?),
+			};
 		}
+
+		Ok(res.backend.try_exists(res.as_path()).await?)
 	}
 
 	pub fn get_provider(&self, host: &str) -> Result<Arc<dyn StorageProvider>> {
@@ -240,9 +231,7 @@ impl FileSystemManager {
 
 	pub async fn r#move(&self, from: &Arc<Resource>, to: &Destination, ctx: Arc<ExecutionContext>) -> Result<(), Error> {
 		let to_path = to.resolve(&ctx).await?;
-		let to_resource = self
-			.get_or_init_resource(to_path, None, &to.host, self.get_provider(&to.host)?)
-			.await;
+		let to_resource = self.get_or_init_resource(to_path, None, &to.host).await?;
 		// A native move/rename is only possible if the two resources are on the same filesystem backend.
 		if &from.backend == &to_resource.backend {
 			let rename_result: Result<(), Error> = if !ctx.settings.dry_run {
@@ -297,10 +286,7 @@ impl FileSystemManager {
 		let task_manager = ctx.services.task_manager.clone();
 
 		if let Some(guard) = self.locker.lock_destination(&ctx, to).await? {
-			let backend = self.get_provider(&to.host)?;
-			let dest_resource = self
-				.get_or_init_resource(guard.as_path().to_path_buf(), None, &to.host, backend)
-				.await;
+			let dest_resource = self.get_or_init_resource(guard.as_path().to_path_buf(), None, &to.host).await?;
 
 			dest_resource.backend.mk_parent(dest_resource.as_path()).await?;
 			let size = from.backend.metadata(from.as_path()).await?.size;
@@ -370,10 +356,7 @@ impl FileSystemManager {
 
 	pub async fn hardlink(&self, from: &Arc<Resource>, to: &Destination, ctx: &ExecutionContext) -> Result<Arc<Resource>, Error> {
 		if let Some(guard) = self.locker.lock_destination(&ctx, to).await? {
-			let backend = self.get_provider(&to.host)?;
-			let dest_resource = self
-				.get_or_init_resource(guard.as_path().to_path_buf(), None, &to.host, backend)
-				.await;
+			let dest_resource = self.get_or_init_resource(guard.as_path().to_path_buf(), None, &to.host).await?;
 
 			let from_provider = &from.backend;
 			let to_provider = &dest_resource.backend;
@@ -406,10 +389,7 @@ impl FileSystemManager {
 
 	pub async fn write(&self, content: Bytes, to: &Destination, mode: WriteMode, ctx: &ExecutionContext) -> Result<Arc<Resource>, Error> {
 		if let Some(guard) = self.locker.lock_destination(&ctx, to).await? {
-			let backend = self.get_provider(&to.host)?;
-			let dest_resource = self
-				.get_or_init_resource(guard.as_path().to_path_buf(), None, &to.host, backend)
-				.await;
+			let dest_resource = self.get_or_init_resource(guard.as_path().to_path_buf(), None, &to.host).await?;
 
 			dest_resource.backend.mk_parent(dest_resource.as_path()).await?;
 
@@ -426,8 +406,11 @@ impl FileSystemManager {
 					WriteMode::Replace => content,
 				};
 
-				dest_resource.bytes.set(final_content).expect("bytes should not be initialized");
 				dest_resource.backend.write(dest_resource.as_path(), &final_content).await?;
+				dest_resource
+					.bytes
+					.set(final_content.into())
+					.expect("bytes should not be initialized");
 				self.resources
 					.insert(dest_resource.as_path().to_path_buf(), dest_resource.clone())
 					.await;
@@ -447,10 +430,7 @@ impl FileSystemManager {
 
 	pub async fn symlink(&self, from: &Arc<Resource>, to: &Destination, ctx: &ExecutionContext) -> Result<Arc<Resource>, Error> {
 		if let Some(guard) = self.locker.lock_destination(&ctx, to).await? {
-			let backend = self.get_provider(&to.host)?;
-			let dest_resource = self
-				.get_or_init_resource(guard.as_path().to_path_buf(), None, &to.host, backend)
-				.await;
+			let dest_resource = self.get_or_init_resource(guard.as_path().to_path_buf(), None, &to.host).await?;
 
 			let from_provider = &from.backend;
 			let to_provider = &dest_resource.backend;

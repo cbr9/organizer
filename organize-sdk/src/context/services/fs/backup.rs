@@ -19,35 +19,33 @@ fn get_backup_base_dir() -> Result<PathBuf, Error> {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Backup {
 	path: PathBuf,
-	host: String,
 	backend: Arc<dyn StorageProvider>,
 }
 
 impl PartialEq for Backup {
 	fn eq(&self, other: &Self) -> bool {
-		self.path == other.path && self.host == other.host
+		self.path == other.path
 	}
 }
 
 impl Backup {
-	pub async fn new(host: &str, ctx: &ExecutionContext) -> Result<Self, Error> {
+	pub async fn new(ctx: &ExecutionContext) -> Result<Self, Error> {
 		let dir = get_backup_base_dir()?;
 
+		let backend = &ctx.scope.resource()?.backend;
 		// Loop until a unique UUID is found for the backup filename
 		let path = loop {
 			let new_uuid = Uuid::new_v4().to_string();
 			let proposed_path = dir.join(&new_uuid);
 
-			if !tokio::fs::try_exists(&proposed_path).await? {
+			if !backend.try_exists(&proposed_path).await? {
 				break proposed_path;
 			}
 		};
 
-		let backend = ctx.services.fs.get_provider(host)?;
 		Ok(Self {
 			path,
-			host: host.to_string(),
-			backend,
+			backend: backend.clone(),
 		})
 	}
 
@@ -69,6 +67,13 @@ impl Backup {
 			tracing::debug!(backup_path = %self.path.display(), file = %from.display(), "Backup complete");
 		}
 
+		Ok(())
+	}
+
+	pub async fn restore(&self, to: &PathBuf) -> Result<(), Error> {
+		let from = self.path.as_path();
+		self.backend.rename(from, to).await?;
+		tracing::debug!(backup_path = %self.path.display(), file = %to.display(), "Backup restored");
 		Ok(())
 	}
 }

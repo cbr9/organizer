@@ -73,6 +73,7 @@ pub trait StorageProvider: DynEq + DynClone + Sync + Send + Debug {
 	async fn delete(&self, path: &Path) -> Result<(), Error>;
 	fn download<'a>(&'a self, path: &'a Path) -> BoxStream<'a, Result<Bytes, Error>>;
 	fn upload<'a>(&'a self, to: &'a Path, stream: BoxStream<'a, Result<Bytes, Error>>) -> BoxFuture<'a, Result<(), Error>>;
+	async fn try_exists(&self, path: &Path) -> Result<bool, Error>;
 	async fn hardlink(&self, from: &Path, to: &Path) -> Result<(), Error>;
 	async fn symlink(&self, from: &Path, to: &Path) -> Result<(), Error>;
 }

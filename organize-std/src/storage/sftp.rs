@@ -236,6 +236,11 @@ impl StorageProvider for Sftp {
 		"sftp"
 	}
 
+	async fn try_exists(&self, path: &Path) -> Result<bool, Error> {
+		self.metadata(path).await?;
+		Ok(true)
+	}
+
 	async fn metadata(&self, path: &Path) -> Result<Metadata, Error> {
 		let session = self.pool().await?.get().await.map_err(|e| Error::Other(e.into()))?;
 		let sftp_attrs = session.metadata(path.to_string_lossy()).await?;
@@ -393,8 +398,8 @@ impl Sftp {
 							let resource = ctx
 								.services
 								.fs
-								.get_or_init_resource(pathbuf.clone(), Some(Arc::new(location.clone())), &location.host, backend.clone())
-								.await;
+								.get_or_init_resource(pathbuf.clone(), Some(Arc::new(location.clone())), &location.host)
+								.await?;
 							files.push(resource);
 						}
 					}
@@ -406,8 +411,8 @@ impl Sftp {
 							let resource = ctx
 								.services
 								.fs
-								.get_or_init_resource(pathbuf.clone(), Some(Arc::new(location.clone())), &location.host, backend.clone())
-								.await;
+								.get_or_init_resource(pathbuf.clone(), Some(Arc::new(location.clone())), &location.host)
+								.await?;
 							files.push(resource);
 						}
 					}
