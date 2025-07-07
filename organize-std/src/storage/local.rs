@@ -21,7 +21,7 @@ use organize_sdk::{
 	},
 	plugins::storage::{BackendType, Metadata, StorageProvider},
 	resource::Resource,
-	stdx::path::{PathBufExt, PathExt},
+	stdx::path::PathExt,
 };
 use serde::{Deserialize, Serialize};
 use tokio::io::AsyncWriteExt;
@@ -145,8 +145,9 @@ impl StorageProvider for LocalFileSystem {
 			.filter_map(|e| e.ok())
 			.filter(|entry| self.filter_entry(entry, &location.options))
 			.map(|entry| {
-				let path_buf = entry.path().to_path_buf();
-				path_buf.as_resource(ctx, Some(location.clone()), location.host.clone(), backend.clone())
+				ctx.services
+					.fs
+					.get_or_init_resource(entry.into_path(), Some(location.clone()), &location.host, backend.clone())
 			})
 			.collect::<Vec<_>>();
 

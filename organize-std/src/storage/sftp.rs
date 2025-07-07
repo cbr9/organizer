@@ -34,7 +34,6 @@ use organize_sdk::{
 	location::{options::Options, Location},
 	plugins::storage::{Metadata, StorageProvider},
 	resource::Resource,
-	stdx::path::PathBufExt,
 };
 
 use super::IntoMetadata;
@@ -392,9 +391,10 @@ impl Sftp {
 				if metadata.is_dir() {
 					if depth >= options.min_depth {
 						if let organize_sdk::location::options::Target::Folders = options.target {
-							let resource = pathbuf
-								.clone()
-								.as_resource(ctx, Some(Arc::new(location.clone())), location.host.clone(), backend.clone())
+							let resource = ctx
+								.services
+								.fs
+								.get_or_init_resource(pathbuf.clone(), Some(Arc::new(location.clone())), &location.host, backend.clone())
 								.await;
 							files.push(resource);
 						}
@@ -404,8 +404,10 @@ impl Sftp {
 				} else {
 					if depth >= options.min_depth {
 						if options.target.is_files() {
-							let resource = pathbuf
-								.as_resource(ctx, Some(Arc::new(location.clone())), location.host.clone(), backend.clone())
+							let resource = ctx
+								.services
+								.fs
+								.get_or_init_resource(pathbuf.clone(), Some(Arc::new(location.clone())), &location.host, backend.clone())
 								.await;
 							files.push(resource);
 						}

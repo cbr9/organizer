@@ -10,7 +10,6 @@ use sha2::{Digest, Sha256};
 use tokio::{fs::File, io::AsyncReadExt, sync::OnceCell};
 
 use crate::{
-	context::ExecutionContext,
 	error::Error,
 	location::Location,
 	plugins::storage::{Metadata, StorageProvider},
@@ -67,6 +66,19 @@ impl Hash for Resource {
 impl Eq for Resource {}
 
 impl Resource {
+	pub fn new(path: &Path, host: String, location: Option<Arc<Location>>, backend: Arc<dyn StorageProvider>) -> Self {
+		Self {
+			path: path.to_path_buf(),
+			host,
+			location,
+			backend,
+			mime: OnceCell::new(),
+			bytes: OnceCell::new(),
+			hash: OnceCell::new(),
+			metadata: OnceCell::new(),
+		}
+	}
+
 	pub fn as_path(&self) -> &Path {
 		self.path.as_path()
 	}
@@ -145,40 +157,6 @@ impl Resource {
 // 	}
 // }
 //
-impl Resource {
-	pub fn new(path: &Path, host: String, location: Option<Arc<Location>>, backend: Arc<dyn StorageProvider>) -> Self {
-		Self {
-			path: path.to_path_buf(),
-			host,
-			location,
-			backend,
-			mime: OnceCell::new(),
-			bytes: OnceCell::new(),
-			hash: OnceCell::new(),
-			metadata: OnceCell::new(),
-		}
-	}
-
-	pub async fn try_exists(&self, ctx: &ExecutionContext) -> Result<bool, Error> {
-		if ctx.settings.dry_run {
-			return match ctx
-				.services
-				.fs
-				.tracked_files
-				.get(self.as_path())
-				.await
-				.unwrap_or(FileState::Unknown)
-			{
-				FileState::Exists => Ok(true),
-				FileState::Deleted => Ok(false),
-				FileState::Unknown => Ok(tokio::fs::try_exists(&self.path).await?),
-			};
-		}
-
-		// Otherwise, check the physical filesystem using the resource's path.
-		Ok(tokio::fs::try_exists(&self.path).await?)
-	}
-}
 
 // #[cfg(test)]
 // mod tests {

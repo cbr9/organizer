@@ -56,13 +56,7 @@ impl Locker {
 				}
 			}
 
-			let exists = if let Some(res) = ctx.services.fs.resources.get(&path).await {
-				res.try_exists(ctx).await?
-			} else {
-				tokio::fs::try_exists(&path).await?
-			};
-
-			if exists {
+			if ctx.services.fs.try_exists(&path, ctx).await? {
 				match destination.resolution_strategy {
 					ConflictResolution::Skip => return Ok(None),
 					ConflictResolution::Overwrite => {
