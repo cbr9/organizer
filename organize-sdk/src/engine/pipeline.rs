@@ -150,6 +150,12 @@ impl Pipeline {
 	}
 
 	pub async fn run(mut self, ctx: &ExecutionContext) -> Result<PipelineStream, Error> {
+		if ctx.settings.dry_run {
+			ctx.services.reporter.ui.warning(
+				"This is a simulation. No real I/O operations will be performed. If you want to apply the reported changes, rerun the application \
+				 with the --no-dry-run flag.",
+			);
+		}
 		for stage in self.stages.into_iter() {
 			if let Some(params) = stage.params() {
 				if !params.enabled {

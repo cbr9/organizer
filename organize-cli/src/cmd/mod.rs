@@ -1,16 +1,19 @@
 use crate::cmd::run::Run;
 use async_trait::async_trait;
 use clap::{Parser, Subcommand};
+use snapshot::Snapshot;
 use undo::Undo;
 
 mod logs;
 mod run;
+mod snapshot;
 mod undo;
 
 #[derive(Subcommand)]
 enum Command {
 	Run(Run),
 	Undo(Undo),
+	Snapshot(Snapshot),
 }
 
 #[derive(Parser)]
@@ -32,6 +35,7 @@ impl Cmd for OrganizeCli {
 		match self.command {
 			Command::Run(cmd) => cmd.run().await,
 			Command::Undo(undo) => undo.run().await,
+			Command::Snapshot(snapshot) => snapshot.run().await,
 		}
 	}
 }

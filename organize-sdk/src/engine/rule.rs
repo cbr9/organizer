@@ -1,11 +1,10 @@
-use serde::{Deserialize, Serialize};
 use crate::{
 	context::ExecutionContext,
 	engine::stage::{Stage, StageBuilder},
 	error::Error,
-	plugins::storage::StorageProvider,
 };
-use std::{collections::HashMap, sync::Arc};
+use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]
 pub struct RuleMetadata {
@@ -20,8 +19,6 @@ pub struct RuleMetadata {
 pub struct RuleBuilder {
 	#[serde(flatten)]
 	pub metadata: RuleMetadata,
-	#[serde(default)]
-	pub connections: HashMap<String, Box<dyn StorageProvider>>,
 	#[serde(rename = "stage")]
 	pub pipeline: Vec<StageBuilder>,
 }
@@ -29,7 +26,6 @@ pub struct RuleBuilder {
 #[derive(Debug, Clone)]
 pub struct Rule {
 	pub metadata: Arc<RuleMetadata>,
-	pub connections: HashMap<String, Box<dyn StorageProvider>>,
 	pub pipeline: Vec<Stage>,
 }
 
@@ -76,7 +72,6 @@ impl RuleBuilder {
 
 		Ok(Rule {
 			metadata: main_meta.clone(),
-			connections: self.connections,
 			pipeline: final_pipeline,
 		})
 	}

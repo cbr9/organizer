@@ -5,7 +5,7 @@ use crate::{
 	templates::compiler::TemplateCompiler,
 };
 use dashmap::DashMap;
-use reporter::reporter::Reporter;
+use reporter::Reporter;
 use std::any::Any;
 use task_manager::TaskManager;
 

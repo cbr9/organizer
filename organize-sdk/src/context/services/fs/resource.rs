@@ -10,18 +10,11 @@ use sha2::{Digest, Sha256};
 use tokio::{fs::File, io::AsyncReadExt, sync::OnceCell};
 
 use crate::{
+	context::ExecutionContext,
 	error::Error,
 	location::Location,
 	plugins::storage::{Metadata, StorageProvider},
 };
-
-#[derive(Debug, Default, Clone)]
-pub enum FileState {
-	Unknown,
-	#[default]
-	Exists,
-	Deleted,
-}
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Resource {
@@ -114,15 +107,15 @@ impl Resource {
 			.as_str()
 	}
 
-	pub async fn get_metadata(&self) -> Result<&Metadata, Error> {
+	pub async fn get_metadata(&self, ctx: &ExecutionContext) -> Result<&Metadata, Error> {
 		self.metadata
-			.get_or_try_init(|| async { self.backend.metadata(&self.path).await })
+			.get_or_try_init(|| async { self.backend.metadata(&self.path, ctx).await })
 			.await
 	}
 
-	pub async fn get_bytes(&self) -> Result<&Vec<u8>, Error> {
+	pub async fn get_bytes(&self, ctx: &ExecutionContext) -> Result<&Vec<u8>, Error> {
 		self.bytes
-			.get_or_try_init(|| async { self.backend.read(&self.path).await })
+			.get_or_try_init(|| async { self.backend.read(&self.path, ctx).await })
 			.await
 	}
 

@@ -11,10 +11,17 @@ use crate::{Cmd, cli::CliUi};
 pub struct Run {
 	#[arg(long, short = 'r', value_hint = ValueHint::FilePath)]
 	rule: PathBuf,
+
 	#[arg(long, default_value_t = false)]
 	no_dry_run: bool,
+
+	// a list of key value pairs separated by '=' that will be made available in templates as {{ args.<key> }}
 	#[arg(last = true, value_parser = parse_key_val)]
 	args: Vec<(String, String)>,
+
+	/// Optional: Path to a VFS snapshot file to initialize the dry run environment.
+	#[arg(long, value_hint = ValueHint::FilePath)]
+	pub vfs_snapshot: Option<PathBuf>,
 }
 
 #[async_trait]
@@ -23,6 +30,7 @@ impl Cmd for Run {
 		let settings = RunSettings {
 			dry_run: !self.no_dry_run,
 			args: self.args.into_iter().collect(),
+			snapshot: self.vfs_snapshot,
 		};
 		let cli = CliUi::new();
 		let engine = Engine::new(&self.rule, cli, settings).await?;

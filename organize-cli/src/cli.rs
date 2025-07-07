@@ -115,7 +115,7 @@ impl UserInterface for CliUi {
 
 		if let Some(hint_text) = hint {
 			let hint_prefix = style("Hint:").cyan();
-			let hint_line = format!("  {} {}", hint_prefix, hint_text);
+			let hint_line = format!("  {hint_prefix} {hint_text}");
 			self.multi_progress.println(hint_line).unwrap();
 		}
 	}

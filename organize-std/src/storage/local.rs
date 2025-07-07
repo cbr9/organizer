@@ -11,7 +11,6 @@ use futures::{
 	future::BoxFuture,
 	stream::{self, BoxStream},
 	StreamExt,
-	TryStreamExt,
 };
 use organize_sdk::{
 	context::{services::fs::resource::Resource, ExecutionContext},
@@ -54,18 +53,18 @@ impl StorageProvider for LocalFileSystem {
 	}
 
 	fn prefix(&self) -> &'static str {
-		"file"
+		"local"
 	}
 
 	async fn home(&self) -> Result<PathBuf, Error> {
 		Ok(dirs::home_dir().context("unable to find home directory")?)
 	}
 
-	async fn try_exists(&self, path: &Path) -> Result<bool, Error> {
+	async fn try_exists(&self, path: &Path, _ctx: &ExecutionContext) -> Result<bool, Error> {
 		Ok(tokio::fs::try_exists(path).await?)
 	}
 
-	async fn mk_parent(&self, path: &Path) -> Result<(), Error> {
+	async fn mk_parent(&self, path: &Path, _ctx: &ExecutionContext) -> Result<(), Error> {
 		if let Some(parent) = path.parent() {
 			if !tokio::fs::try_exists(parent).await.unwrap_or(false) {
 				tokio::fs::create_dir_all(parent).await?;
@@ -74,17 +73,17 @@ impl StorageProvider for LocalFileSystem {
 		Ok(())
 	}
 
-	async fn rename(&self, from: &Path, to: &Path) -> Result<(), Error> {
-		tokio::fs::rename(from, to).await.map_err(|e| Error::Io(e))
+	async fn rename(&self, from: &Path, to: &Path, _ctx: &ExecutionContext) -> Result<(), Error> {
+		tokio::fs::rename(from, to).await.map_err(Error::Io)
 	}
 
-	async fn copy(&self, from: &Path, to: &Path) -> Result<(), Error> {
+	async fn copy(&self, from: &Path, to: &Path, _ctx: &ExecutionContext) -> Result<(), Error> {
 		tokio::fs::copy(from, to).await?;
 
 		Ok(())
 	}
 
-	async fn delete(&self, path: &Path) -> Result<(), Error> {
+	async fn delete(&self, path: &Path, _ctx: &ExecutionContext) -> Result<(), Error> {
 		if path.is_dir() {
 			tokio::fs::remove_dir_all(path).await.map_err(Error::from)
 		} else {
@@ -92,7 +91,7 @@ impl StorageProvider for LocalFileSystem {
 		}
 	}
 
-	fn download<'a>(&'a self, path: &'a Path) -> BoxStream<'a, Result<Bytes, Error>> {
+	fn download<'a>(&'a self, path: &'a Path, _ctx: &'a ExecutionContext) -> BoxStream<'a, Result<Bytes, Error>> {
 		// The `async_stream::try_stream!` macro lets us write async code
 		// inside this block, and it bundles it all into a stream.
 		let stream = async_stream::try_stream! {
@@ -107,7 +106,12 @@ impl StorageProvider for LocalFileSystem {
 		Box::pin(stream)
 	}
 
-	fn upload<'a>(&'a self, to: &'a Path, mut stream: BoxStream<'a, Result<Bytes, Error>>) -> BoxFuture<'a, Result<(), Error>> {
+	fn upload<'a>(
+		&'a self,
+		to: &'a Path,
+		mut stream: BoxStream<'a, Result<Bytes, Error>>,
+		_ctx: &'a ExecutionContext,
+	) -> BoxFuture<'a, Result<(), Error>> {
 		Box::pin(async move {
 			let mut file = tokio::fs::File::create(to).await?;
 			while let Some(chunk_result) = stream.next().await {
@@ -117,13 +121,13 @@ impl StorageProvider for LocalFileSystem {
 		})
 	}
 
-	async fn hardlink(&self, from: &Path, to: &Path) -> Result<(), Error> {
-		self.mk_parent(to).await?;
+	async fn hardlink(&self, from: &Path, to: &Path, ctx: &ExecutionContext) -> Result<(), Error> {
+		self.mk_parent(to, ctx).await?;
 		tokio::fs::hard_link(from, to).await.map_err(Error::from)
 	}
 
-	async fn symlink(&self, from: &Path, to: &Path) -> Result<(), Error> {
-		self.mk_parent(to).await?;
+	async fn symlink(&self, from: &Path, to: &Path, ctx: &ExecutionContext) -> Result<(), Error> {
+		self.mk_parent(to, ctx).await?;
 		#[cfg(unix)]
 		{
 			tokio::fs::symlink(from, to).await.map_err(Error::from)
@@ -140,7 +144,6 @@ impl StorageProvider for LocalFileSystem {
 
 	async fn discover(&self, location: &Location, ctx: &ExecutionContext) -> Result<Vec<Arc<Resource>>, Error> {
 		let location = Arc::new(location.clone());
-		let backend = ctx.services.fs.get_provider(&location.host)?;
 		let resources = WalkDir::new(&location.path)
 			.min_depth(location.options.min_depth)
 			.max_depth(location.options.max_depth)
@@ -149,25 +152,26 @@ impl StorageProvider for LocalFileSystem {
 			.filter_map(|e| e.ok())
 			.filter(|entry| self.filter_entry(entry, &location.options))
 			.map(|entry| {
+				let path = entry.into_path().normalize();
 				ctx.services
 					.fs
-					.get_or_init_resource(entry.into_path(), Some(location.clone()), &location.host)
+					.get_or_init_resource(path, Some(location.clone()), &location.host)
 			})
 			.collect::<Vec<_>>();
 
-		let resources = stream::iter(resources)
-			.buffer_unordered(num_cpus::get())
-			.filter_map(|res| res.ok())
+		let resources = stream::iter(resources) // Assuming 'resources' is a Vec<impl Future<Output = Result<Arc<Resource>, anyhow::Error>>>
+			.buffer_unordered(num_cpus::get()) // This yields Futures
+			.filter_map(|res_future| async move { res_future.ok() })
 			.collect::<Vec<_>>()
-			.await;
+			.await; // Don't forget this await!
 		Ok(resources)
 	}
 
-	async fn metadata(&self, path: &Path) -> Result<Metadata, Error> {
+	async fn metadata(&self, path: &Path, _ctx: &ExecutionContext) -> Result<Metadata, Error> {
 		Ok(tokio::fs::metadata(path).await?.into_metadata())
 	}
 
-	async fn read_dir(&self, path: &Path) -> Result<Vec<PathBuf>, Error> {
+	async fn read_dir(&self, path: &Path, _ctx: &ExecutionContext) -> Result<Vec<PathBuf>, Error> {
 		let mut dir = tokio::fs::read_dir(path).await?;
 		let mut paths = vec![];
 		while let Some(entry) = dir.next_entry().await? {
@@ -176,11 +180,11 @@ impl StorageProvider for LocalFileSystem {
 		Ok(paths)
 	}
 
-	async fn read(&self, path: &Path) -> Result<Vec<u8>, Error> {
+	async fn read(&self, path: &Path, _ctx: &ExecutionContext) -> Result<Vec<u8>, Error> {
 		Ok(tokio::fs::read(path).await?)
 	}
 
-	async fn write(&self, path: &Path, content: &[u8]) -> Result<(), Error> {
+	async fn write(&self, path: &Path, content: &[u8], _ctx: &ExecutionContext) -> Result<(), Error> {
 		tokio::fs::write(path, content).await.map_err(Error::from)
 	}
 }

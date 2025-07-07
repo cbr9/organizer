@@ -31,8 +31,9 @@ use tokio::sync::{Mutex, OnceCell};
 use organize_sdk::{
 	context::{services::fs::resource::Resource, ExecutionContext},
 	error::Error,
-	location::{options::Options, Location},
+	location::Location,
 	plugins::storage::{Metadata, StorageProvider},
+	stdx::path::PathExt,
 };
 
 use super::IntoMetadata;
@@ -70,8 +71,8 @@ impl Debug for Sftp {
 impl Clone for Sftp {
 	fn clone(&self) -> Self {
 		Self {
-			address: self.address.clone(),
-			port: self.port.clone(),
+			address: self.address,
+			port: self.port,
 			username: self.username.clone(),
 			private_key: self.private_key.clone(),
 			pool: self.pool.clone(),
@@ -105,7 +106,7 @@ impl managed::Manager for Sftp {
 			.context("Failed to request SFTP subsystem")?;
 
 		// 4. Create the SftpSession
-		SftpSession::new(channel.into_stream()).await.map_err(|e| Error::SFTP(e))
+		SftpSession::new(channel.into_stream()).await.map_err(Error::SFTP)
 	}
 
 	/// Checks if a connection is still valid before lending it out.
@@ -135,7 +136,7 @@ impl Sftp {
 				let pool = managed::Pool::builder(self.clone())
 					.max_size(5) // Max 5 concurrent connections
 					.build()
-					.map(|pool| Arc::new(pool))
+					.map(Arc::new)
 					.map_err(|e| Error::Other(e.into()))?;
 				Ok::<Arc<Pool<Sftp>>, Error>(pool)
 			})
@@ -143,6 +144,7 @@ impl Sftp {
 		Ok(pool)
 	}
 }
+
 impl Sftp {
 	/// Establishes a full connection, authenticates, and creates an SftpSession.
 	/// This is the main change: each public-facing operation will create and tear down
@@ -209,7 +211,7 @@ impl IntoMetadata for FileAttributes {
 			extra.insert("gid".to_string(), gid.to_string());
 		}
 		if let Some(permissions) = self.permissions {
-			extra.insert("permissions".to_string(), format!("{:#o}", permissions));
+			extra.insert("permissions".to_string(), format!("{permissions:#o}"));
 		}
 
 		Metadata {
@@ -236,25 +238,25 @@ impl StorageProvider for Sftp {
 		"sftp"
 	}
 
-	async fn try_exists(&self, path: &Path) -> Result<bool, Error> {
-		self.metadata(path).await?;
+	async fn try_exists(&self, path: &Path, ctx: &ExecutionContext) -> Result<bool, Error> {
+		self.metadata(path, ctx).await?;
 		Ok(true)
 	}
 
-	async fn metadata(&self, path: &Path) -> Result<Metadata, Error> {
+	async fn metadata(&self, path: &Path, _ctx: &ExecutionContext) -> Result<Metadata, Error> {
 		let session = self.pool().await?.get().await.map_err(|e| Error::Other(e.into()))?;
 		let sftp_attrs = session.metadata(path.to_string_lossy()).await?;
 		Ok(sftp_attrs.into_metadata())
 	}
 
-	async fn read_dir(&self, path: &Path) -> Result<Vec<PathBuf>, Error> {
+	async fn read_dir(&self, path: &Path, _ctx: &ExecutionContext) -> Result<Vec<PathBuf>, Error> {
 		let session = self.pool().await?.get().await.map_err(|e| Error::Other(e.into()))?;
 		let entries = session.read_dir(path.to_string_lossy()).await?;
 		let paths: Vec<PathBuf> = entries.into_iter().map(|p| p.file_name().into()).collect();
 		Ok(paths)
 	}
 
-	async fn read(&self, path: &Path) -> Result<Vec<u8>, Error> {
+	async fn read(&self, path: &Path, _ctx: &ExecutionContext) -> Result<Vec<u8>, Error> {
 		let session = self.pool().await?.get().await.map_err(|e| Error::Other(e.into()))?;
 		let mut file = session.open(path.to_str().unwrap()).await?;
 		let mut buf = Vec::new();
@@ -262,7 +264,7 @@ impl StorageProvider for Sftp {
 		Ok(buf)
 	}
 
-	async fn write(&self, path: &Path, content: &[u8]) -> Result<(), Error> {
+	async fn write(&self, path: &Path, content: &[u8], _ctx: &ExecutionContext) -> Result<(), Error> {
 		let session = self.pool().await?.get().await.map_err(|e| Error::Other(e.into()))?;
 		let mut file = session.create(path.to_str().unwrap()).await?;
 		file.write_all(content).await?;
@@ -273,29 +275,28 @@ impl StorageProvider for Sftp {
 		let mut files = Vec::new();
 		let session = self.pool().await?.get().await.map_err(|e| Error::Other(e.into()))?;
 		let backend = ctx.services.fs.get_provider(&location.host)?;
-		self.discover_recursive(&session, ctx, location.path.clone(), 1, &location.options, &mut files, location, backend)
-			.await?;
+		discover_recursive(&session, ctx, location.path.clone(), 1, &mut files, location, backend).await?;
 		Ok(files)
 	}
 
-	async fn mk_parent(&self, path: &Path) -> Result<(), Error> {
+	async fn mk_parent(&self, path: &Path, _ctx: &ExecutionContext) -> Result<(), Error> {
 		let session = self.pool().await?.get().await.map_err(|e| Error::Other(e.into()))?;
 		session.create_dir(path.to_string_lossy()).await?;
 		Ok(())
 	}
 
-	async fn rename(&self, from: &Path, to: &Path) -> Result<(), Error> {
+	async fn rename(&self, from: &Path, to: &Path, _ctx: &ExecutionContext) -> Result<(), Error> {
 		let session = self.pool().await?.get().await.map_err(|e| Error::Other(e.into()))?;
 		session.rename(from.to_string_lossy(), to.to_string_lossy()).await?;
 		Ok(())
 	}
 
-	async fn copy(&self, from: &Path, to: &Path) -> Result<(), Error> {
-		let content = self.read(from).await?;
-		self.write(to, &content).await
+	async fn copy(&self, from: &Path, to: &Path, ctx: &ExecutionContext) -> Result<(), Error> {
+		let content = self.read(from, ctx).await?;
+		self.write(to, &content, ctx).await
 	}
 
-	async fn delete(&self, path: &Path) -> Result<(), Error> {
+	async fn delete(&self, path: &Path, _ctx: &ExecutionContext) -> Result<(), Error> {
 		let path = path.to_string_lossy().to_string();
 		let session = self.pool().await?.get().await.map_err(|e| Error::Other(e.into()))?;
 		let stat = session.metadata(&path).await?;
@@ -307,7 +308,7 @@ impl StorageProvider for Sftp {
 		Ok(())
 	}
 
-	fn download<'a>(&'a self, path: &'a Path) -> BoxStream<'a, Result<Bytes, Error>> {
+	fn download<'a>(&'a self, path: &'a Path, _ctx: &'a ExecutionContext) -> BoxStream<'a, Result<Bytes, Error>> {
 		let stream = async_stream::try_stream! {
 			let session = self.pool().await?.get().await.map_err(|e| Error::Other(e.into()))?;
 			let remote_file = session.open(path.to_string_lossy()).await?;
@@ -320,7 +321,12 @@ impl StorageProvider for Sftp {
 		Box::pin(stream)
 	}
 
-	fn upload<'a>(&'a self, to: &'a Path, mut stream: BoxStream<'a, Result<Bytes, Error>>) -> BoxFuture<'a, Result<(), Error>> {
+	fn upload<'a>(
+		&'a self,
+		to: &'a Path,
+		mut stream: BoxStream<'a, Result<Bytes, Error>>,
+		_ctx: &'a ExecutionContext,
+	) -> BoxFuture<'a, Result<(), Error>> {
 		Box::pin(async move {
 			let session = self.pool().await?.get().await.map_err(|e| Error::Other(e.into()))?;
 			let mut remote_file = session.create(to.to_string_lossy()).await?;
@@ -333,92 +339,81 @@ impl StorageProvider for Sftp {
 		})
 	}
 
-	async fn hardlink(&self, from: &Path, to: &Path) -> Result<(), Error> {
+	async fn hardlink(&self, from: &Path, to: &Path, _ctx: &ExecutionContext) -> Result<(), Error> {
 		let session = self.pool().await?.get().await.map_err(|e| Error::Other(e.into()))?;
 		session.hardlink(from.to_string_lossy(), to.to_string_lossy()).await?;
 		Ok(())
 	}
 
-	async fn symlink(&self, from: &Path, to: &Path) -> Result<(), Error> {
+	async fn symlink(&self, from: &Path, to: &Path, _ctx: &ExecutionContext) -> Result<(), Error> {
 		let session = self.pool().await?.get().await.map_err(|e| Error::Other(e.into()))?;
 		session.symlink(from.to_string_lossy(), to.to_string_lossy()).await?;
 		Ok(())
 	}
 }
 
-impl Sftp {
-	fn discover_recursive<'a>(
-		&'a self,
-		sftp: &'a Object<Self>,
-		ctx: &'a ExecutionContext,
-		path: PathBuf,
-		depth: usize,
-		options: &'a Options,
-		files: &'a mut Vec<Arc<Resource>>,
-		location: &'a Location,
-		backend: Arc<dyn StorageProvider>,
-	) -> BoxFuture<'a, Result<(), Error>> {
-		Box::pin(async move {
-			if depth > options.max_depth {
-				return Ok(());
-			}
+fn discover_recursive<'a>(
+	sftp: &'a Object<Sftp>,
+	ctx: &'a ExecutionContext,
+	path: PathBuf,
+	depth: usize,
+	files: &'a mut Vec<Arc<Resource>>,
+	location: &'a Location,
+	backend: Arc<dyn StorageProvider>,
+) -> BoxFuture<'a, Result<(), Error>> {
+	Box::pin(async move {
+		if depth > location.options.max_depth {
+			return Ok(());
+		}
 
-			let entries = sftp.read_dir(path.to_string_lossy()).await?;
-			let parent_components: Vec<String> = path
-				.components()
-				.enumerate()
-				.map(|(i, component)| {
-					if i == 0 {
-						"/".to_string()
-					} else {
-						component.as_os_str().to_string_lossy().to_string()
-					}
-				})
-				.collect();
-
-			for entry in entries {
-				let mut components = parent_components.clone();
-				components.push(entry.file_name());
-				let entry = components.join("/").replace("//", "/");
-				let pathbuf = PathBuf::from(&entry);
-
-				if options.exclude.contains(&pathbuf) {
-					continue;
-				}
-
-				if !options.hidden_files && entry.starts_with('.') {
-					continue;
-				}
-
-				let metadata = sftp.metadata(entry).await?;
-
-				if metadata.is_dir() {
-					if depth >= options.min_depth {
-						if let organize_sdk::location::options::Target::Folders = options.target {
-							let resource = ctx
-								.services
-								.fs
-								.get_or_init_resource(pathbuf.clone(), Some(Arc::new(location.clone())), &location.host)
-								.await?;
-							files.push(resource);
-						}
-					}
-					self.discover_recursive(sftp, ctx, pathbuf, depth + 1, options, files, location, backend.clone())
-						.await?;
+		let entries = sftp.read_dir(path.to_string_lossy()).await?;
+		let parent_components: Vec<String> = path
+			.components()
+			.enumerate()
+			.map(|(i, component)| {
+				if i == 0 {
+					"/".to_string()
 				} else {
-					if depth >= options.min_depth {
-						if options.target.is_files() {
-							let resource = ctx
-								.services
-								.fs
-								.get_or_init_resource(pathbuf.clone(), Some(Arc::new(location.clone())), &location.host)
-								.await?;
-							files.push(resource);
-						}
-					}
+					component.as_os_str().to_string_lossy().to_string()
 				}
+			})
+			.collect();
+
+		for entry in entries {
+			let mut components = parent_components.clone();
+			components.push(entry.file_name());
+			let entry = components.join("/").replace("//", "/");
+			let pathbuf = PathBuf::from(&entry).normalize();
+
+			if location.options.exclude.contains(&pathbuf) {
+				continue;
 			}
-			Ok(())
-		})
-	}
+
+			if !location.options.hidden_files && entry.starts_with('.') {
+				continue;
+			}
+
+			let metadata = sftp.metadata(entry).await?;
+
+			if metadata.is_dir() {
+				if depth >= location.options.min_depth && location.options.target.is_folders() {
+					let resource = ctx
+						.services
+						.fs
+						.get_or_init_resource(pathbuf.clone(), Some(Arc::new(location.clone())), &location.host)
+						.await?;
+					files.push(resource);
+				}
+				discover_recursive(sftp, ctx, pathbuf, depth + 1, files, location, backend.clone()).await?;
+			} else if depth >= location.options.min_depth && location.options.target.is_files() {
+				let resource = ctx
+					.services
+					.fs
+					.get_or_init_resource(pathbuf.clone(), Some(Arc::new(location.clone())), &location.host)
+					.await?;
+				files.push(resource);
+			}
+		}
+		Ok(())
+	})
 }

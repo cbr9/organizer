@@ -7,6 +7,7 @@ use std::{
 };
 
 use async_trait::async_trait;
+use path_clean::PathClean;
 
 use crate::plugins::storage::StorageProvider;
 
@@ -16,6 +17,7 @@ pub trait PathExt {
 	fn is_hidden(&self) -> Result<bool, Self::HiddenError>;
 	async fn expand_user(self, backend: Arc<dyn StorageProvider>) -> PathBuf;
 	fn shorten(&self, max_depth: usize) -> PathBuf;
+	fn normalize(&self) -> PathBuf;
 }
 
 #[async_trait]
@@ -24,6 +26,35 @@ impl<T: AsRef<Path> + Sync + Send> PathExt for T {
 	type HiddenError = std::convert::Infallible;
 	#[cfg(target_family = "windows")]
 	type HiddenError = std::io::Error;
+
+	fn normalize(&self) -> PathBuf {
+		let path = self.as_ref().clean();
+		let mut normalized_str = path.to_string_lossy().into_owned();
+
+		// 1. Replace all backslashes with forward slashes (for Windows compatibility)
+		normalized_str = normalized_str.replace("\\", "/");
+
+		// 2. Handle Windows drive letters (e.g., "C:/foo" -> "/foo")
+		// If it starts with a drive letter (like 'C') followed by a colon ':', strip it.
+		#[cfg(windows)]
+		{
+			if let Some(pos) = normalized_str.find(':') {
+				if pos == 1 && (normalized_str.as_bytes()[0] as char).is_ascii_alphabetic() {
+					// Take the substring after the colon (e.g., from "C:/path" to "/path")
+					normalized_str = normalized_str[pos + 1..].to_string();
+				}
+			}
+		}
+
+		// 3. Ensure the path is absolute within the VFS context (add leading '/' if missing)
+		// This makes all VFS paths start with a '/' consistently.
+		if !normalized_str.starts_with('/') {
+			normalized_str = format!("/{normalized_str}");
+		}
+
+		// 4. Use path-clean to simplify and canonicalize components (e.g., "/a/./b" -> "/a/b", "/a/b/../c" -> "/a/c")
+		PathBuf::from(normalized_str)
+	}
 
 	fn shorten(&self, max_depth: usize) -> PathBuf {
 		let path = self.as_ref();

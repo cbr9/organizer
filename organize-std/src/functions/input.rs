@@ -61,7 +61,7 @@ impl Accessor for InputAccessor {
 		let prompt_value = self.prompt_accessor.get(ctx).await?;
 		let prompt = match prompt_value {
 			Value::String(s) => s,
-			other => return Err(Error::Config(format!("input() prompt must be a string, but received {:?}", other)).into()),
+			other => return Err(Error::Config(format!("input() prompt must be a string, but received {other:?}")).into()),
 		};
 
 		// Then, perform the function's logic.

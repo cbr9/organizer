@@ -14,7 +14,7 @@ use crate::{
 pub mod options;
 
 fn default_host() -> TemplateString {
-	TemplateString("file".to_string())
+	TemplateString("local".to_string())
 }
 
 #[derive(Debug, Serialize, PartialEq, Eq, Clone, Deserialize)]

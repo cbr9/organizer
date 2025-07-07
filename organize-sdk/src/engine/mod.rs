@@ -6,14 +6,7 @@ pub mod stage;
 use crate::{
 	context::{
 		scope::ExecutionScope,
-		services::{
-			fs::manager::FileSystemManager,
-			history::Journal,
-			reporter::{reporter::Reporter, ui::UserInterface},
-			task_manager::TaskManager,
-			Blackboard,
-			RunServices,
-		},
+		services::{fs::connections::Connections, reporter::ui::UserInterface, RunServices},
 		settings::RunSettings,
 		ExecutionContext,
 	},
@@ -21,7 +14,6 @@ use crate::{
 		pipeline::Pipeline,
 		rule::{Rule, RuleBuilder},
 	},
-	templates::compiler::TemplateCompiler,
 };
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
@@ -55,29 +47,17 @@ pub struct Engine {
 
 impl Engine {
 	pub async fn new(path: &PathBuf, ui: Arc<dyn UserInterface>, settings: RunSettings) -> Result<Arc<Self>> {
+		let connections = Connections::from_config_dir().await?;
+		let ExecutionContext { services, scope, settings } = ExecutionContext::new(settings, connections, ui).await?;
+
 		let content = tokio::fs::read_to_string(path).await?;
 		let builder: RuleBuilder = toml::from_str(&content)?;
-
-		let services = Arc::new(RunServices {
-			blackboard: Blackboard::default(),
-			journal: Arc::new(Journal::new(&settings).await?),
-			fs: FileSystemManager::new(&builder),
-			template_compiler: TemplateCompiler::new(),
-			reporter: Reporter::new(ui.clone()),
-			task_manager: TaskManager::new(ui),
-		});
-
-		let settings = Arc::new(settings);
-
-		let rule = {
-			let ctx = ExecutionContext {
-				services: services.clone(),
-				scope: ExecutionScope::Blank,
-				settings: settings.clone(),
-			};
-			let rule = builder.build(&ctx).await?;
-			rule
+		let ctx = ExecutionContext {
+			services: services.clone(),
+			scope: scope.clone(),
+			settings: settings.clone(),
 		};
+		let rule = builder.build(&ctx).await?;
 
 		Ok(Arc::new(Self { rule, services, settings }))
 	}

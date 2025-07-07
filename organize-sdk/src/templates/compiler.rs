@@ -77,7 +77,7 @@ impl TemplateCompiler {
 				let builder = self
 					.functions
 					.get(&name)
-					.ok_or_else(|| Error::TemplateError(super::engine::TemplateError::UnknownVariable(format!("Unknown function '{}'", name))))?;
+					.ok_or_else(|| Error::TemplateError(super::engine::TemplateError::UnknownVariable(format!("Unknown function '{name}'"))))?;
 
 				// Delegate the argument parsing and compilation to the function's own builder
 				builder.build(self, args)

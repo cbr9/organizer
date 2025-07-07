@@ -22,7 +22,7 @@ impl Filter for Empty {
 		let path = check.unwrap_or(&resource.path);
 
 		let backend = &resource.backend;
-		let content = backend.read(path).await?;
+		let content = backend.read(path, ctx).await?;
 
 		if content.is_empty() {
 			Ok(vec![resource.clone()])

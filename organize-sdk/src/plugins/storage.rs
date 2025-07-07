@@ -34,6 +34,7 @@ pub struct Metadata {
 	pub extra: HashMap<String, String>,
 }
 
+#[derive(PartialEq, Eq)]
 pub enum BackendType {
 	Local,
 	Remote,
@@ -46,6 +47,14 @@ impl BackendType {
 	#[must_use]
 	pub fn is_remote(&self) -> bool {
 		matches!(self, Self::Remote)
+	}
+
+	/// Returns `true` if the backend type is [`Local`].
+	///
+	/// [`Local`]: BackendType::Local
+	#[must_use]
+	pub fn is_local(&self) -> bool {
+		matches!(self, Self::Local)
 	}
 }
 
@@ -62,20 +71,21 @@ pub trait StorageProvider: DynEq + DynClone + Sync + Send + Debug {
 	fn kind(&self) -> BackendType {
 		BackendType::Remote
 	}
-	async fn metadata(&self, path: &Path) -> Result<Metadata, Error>;
-	async fn read_dir(&self, path: &Path) -> Result<Vec<PathBuf>, Error>;
-	async fn read(&self, path: &Path) -> Result<Vec<u8>, Error>;
-	async fn write(&self, path: &Path, content: &[u8]) -> Result<(), Error>;
+	async fn metadata(&self, path: &Path, ctx: &ExecutionContext) -> Result<Metadata, Error>;
+	async fn read_dir(&self, path: &Path, ctx: &ExecutionContext) -> Result<Vec<PathBuf>, Error>;
+	async fn read(&self, path: &Path, ctx: &ExecutionContext) -> Result<Vec<u8>, Error>;
+	async fn write(&self, path: &Path, content: &[u8], ctx: &ExecutionContext) -> Result<(), Error>;
 	async fn discover(&self, location: &Location, ctx: &ExecutionContext) -> Result<Vec<Arc<Resource>>, Error>;
-	async fn mk_parent(&self, path: &Path) -> Result<(), Error>;
-	async fn rename(&self, from: &Path, to: &Path) -> Result<(), Error>;
-	async fn copy(&self, from: &Path, to: &Path) -> Result<(), Error>;
-	async fn delete(&self, path: &Path) -> Result<(), Error>;
-	fn download<'a>(&'a self, path: &'a Path) -> BoxStream<'a, Result<Bytes, Error>>;
-	fn upload<'a>(&'a self, to: &'a Path, stream: BoxStream<'a, Result<Bytes, Error>>) -> BoxFuture<'a, Result<(), Error>>;
-	async fn try_exists(&self, path: &Path) -> Result<bool, Error>;
-	async fn hardlink(&self, from: &Path, to: &Path) -> Result<(), Error>;
-	async fn symlink(&self, from: &Path, to: &Path) -> Result<(), Error>;
+	async fn mk_parent(&self, path: &Path, ctx: &ExecutionContext) -> Result<(), Error>;
+	async fn rename(&self, from: &Path, to: &Path, ctx: &ExecutionContext) -> Result<(), Error>;
+	async fn copy(&self, from: &Path, to: &Path, ctx: &ExecutionContext) -> Result<(), Error>;
+	async fn delete(&self, path: &Path, ctx: &ExecutionContext) -> Result<(), Error>;
+	fn download<'a>(&'a self, path: &'a Path, ctx: &'a ExecutionContext) -> BoxStream<'a, Result<Bytes, Error>>;
+	fn upload<'a>(&'a self, to: &'a Path, stream: BoxStream<'a, Result<Bytes, Error>>, ctx: &'a ExecutionContext)
+		-> BoxFuture<'a, Result<(), Error>>;
+	async fn try_exists(&self, path: &Path, ctx: &ExecutionContext) -> Result<bool, Error>;
+	async fn hardlink(&self, from: &Path, to: &Path, ctx: &ExecutionContext) -> Result<(), Error>;
+	async fn symlink(&self, from: &Path, to: &Path, ctx: &ExecutionContext) -> Result<(), Error>;
 }
 
 pub trait StorageProviderFactory: Send + Sync {

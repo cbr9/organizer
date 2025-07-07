@@ -1,23 +1,23 @@
 use crate::{
 	context::{
 		services::{
-			fs::{
-				backup::Backup,
-				locker::Locker,
-				resource::{FileState, Resource},
-			},
+			fs::{backup::Backup, locker::Locker, resource::Resource, undo::undo_copy::UndoCopy},
 			task_manager::ProgressHandle,
 		},
+		settings::RunSettings,
 		ExecutionContext,
 	},
-	engine::{rule::RuleBuilder, ConflictResolution},
+	engine::ConflictResolution,
 	error::Error,
 	location::Location,
-	plugins::storage::{BackendType, StorageProvider},
+	plugins::{
+		action::Undo,
+		storage::{BackendType, StorageProvider},
+	},
 	stdx::path::PathExt,
 	templates::template::{Template, TemplateString},
 };
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use bytes::Bytes;
 use futures::{self, StreamExt, TryStreamExt};
 use moka::future::Cache;
@@ -31,8 +31,10 @@ use std::{
 use tempfile::NamedTempFile;
 use tokio::io::AsyncWriteExt;
 
+use super::connections::Connections;
+
 fn default_host() -> TemplateString {
-	TemplateString("file".to_string())
+	TemplateString("local".to_string())
 }
 
 const COPY_THRESHOLD: u64 = 1024 * 1024 * 1024; // 1GB
@@ -102,30 +104,55 @@ impl Destination {
 pub struct FileSystemManager {
 	locker: Locker,
 	resources: Cache<PathBuf, Arc<Resource>>,
-	// evidence of abscence > abscence of evidence
-	tracked_files: Cache<PathBuf, FileState>,
-	backends: HashMap<String, Arc<dyn StorageProvider>>,
+	backends: Connections,
 }
 
 impl FileSystemManager {
-	pub fn new(rule: &RuleBuilder) -> Self {
-		let mut backends: HashMap<String, Arc<dyn StorageProvider + 'static>> = rule
-			.connections
-			.iter()
-			.map(|(k, v)| (k.clone(), Arc::from(v.clone())))
-			.collect();
+	pub fn new(connections: Connections, settings: &RunSettings) -> Result<Self, Error> {
+		let Connections { backends } = connections;
+		let mut final_backends: HashMap<String, Arc<dyn StorageProvider + 'static>> = HashMap::new();
 
-		backends.insert(
-			"file".to_string(),
-			serde_json::from_value::<Arc<dyn StorageProvider>>(json!({ "type": "local" })).expect("missing local file system provider"),
-		);
+		for (name, provider) in backends.into_iter() {
+			if settings.dry_run {
+				if provider.prefix() == "vfs" {
+					final_backends.insert(name, provider); // Use the user's explicitly configured DryRun provider
+				} else {
+					final_backends.insert(
+						name.clone(),
+						serde_json::from_value::<Arc<dyn StorageProvider>>(
+							json!({ "type": "vfs", "simulated_host": name.clone(), "snapshot": settings.snapshot }),
+						)
+						.context(format!("Failed to create implicit VFS provider for connection '{name}'"))?,
+					);
+				}
+			} else {
+				final_backends.insert(name, provider);
+			}
+		}
 
-		Self {
+		if !final_backends.contains_key("local") {
+			if settings.dry_run {
+				final_backends.insert(
+					"local".to_string(),
+					serde_json::from_value::<Arc<dyn StorageProvider>>(
+						json!({ "type": "vfs", "simulated_host": "local".to_string(), "snapshot": settings.snapshot }),
+					)
+					.context("Failed to create default dry_run provider for 'local' backend")?,
+				);
+			} else {
+				final_backends.insert(
+					"local".to_string(),
+					serde_json::from_value::<Arc<dyn StorageProvider>>(json!({ "type": "local" }))
+						.context("Failed to create default 'local' file system provider")?,
+				);
+			}
+		}
+
+		Ok(Self {
 			locker: Locker::default(),
 			resources: Cache::new(10_000),
-			tracked_files: Cache::new(10_000),
-			backends,
-		}
+			backends: Connections { backends: final_backends },
+		})
 	}
 
 	pub async fn get_or_init_resource(&self, path: PathBuf, location: Option<Arc<Location>>, host: &str) -> Result<Arc<Resource>> {
@@ -138,16 +165,8 @@ impl FileSystemManager {
 			.await)
 	}
 
-	pub async fn try_exists(&self, res: &Resource, ctx: &ExecutionContext) -> Result<bool, Error> {
-		if ctx.settings.dry_run {
-			return match self.tracked_files.get(res.as_path()).await.unwrap_or(FileState::Unknown) {
-				FileState::Exists => Ok(true),
-				FileState::Deleted => Ok(false),
-				FileState::Unknown => Ok(res.backend.try_exists(res.as_path()).await?),
-			};
-		}
-
-		Ok(res.backend.try_exists(res.as_path()).await?)
+	pub async fn try_exists(&self, res: &Resource, _ctx: &ExecutionContext) -> Result<bool, Error> {
+		res.backend.try_exists(res.as_path(), _ctx).await
 	}
 
 	pub fn get_provider(&self, host: &str) -> Result<Arc<dyn StorageProvider>> {
@@ -170,7 +189,7 @@ impl FileSystemManager {
 		progress
 			.clone()
 			.new_long_step(&format!("Downloading {}", from.as_path().display()), ctx, async {
-				let mut stream = from.backend.download(from.as_path());
+				let mut stream = from.backend.download(from.as_path(), ctx);
 				let temp_file = NamedTempFile::new()?;
 				let mut writer = tokio::fs::File::create(temp_file.path()).await?;
 
@@ -179,7 +198,7 @@ impl FileSystemManager {
 					progress.increment(chunk.len() as u64);
 				}
 
-				to.backend.rename(&temp_file.into_temp_path(), to.as_path()).await
+				to.backend.rename(&temp_file.into_temp_path(), to.as_path(), ctx).await
 			})
 			.await?;
 
@@ -196,33 +215,39 @@ impl FileSystemManager {
 	) -> Result<(), Error> {
 		task.clone()
 			.new_long_step(&description, ctx, async {
-				let download = from.backend.download(from.as_path()).map(move |chunk: Result<Bytes, Error>| {
-					if let Ok(chunk) = &chunk {
-						task.increment(chunk.len() as u64);
-					}
-					chunk
-				});
-				to.backend.upload(to.as_path(), Box::pin(download)).await
+				let download = from
+					.backend
+					.download(from.as_path(), ctx)
+					.map(move |chunk: Result<Bytes, Error>| {
+						if let Ok(chunk) = &chunk {
+							task.increment(chunk.len() as u64);
+						}
+						chunk
+					});
+				to.backend.upload(to.as_path(), Box::pin(download), ctx).await
 			})
 			.await?;
 		Ok(())
 	}
 
 	async fn local_to_local_copy(&self, task: Arc<ProgressHandle>, from: &Resource, to: &Resource, ctx: &ExecutionContext) -> Result<(), Error> {
-		let file_size = from.backend.metadata(from.as_path()).await?.size.unwrap_or(0);
+		let file_size = from.backend.metadata(from.as_path(), ctx).await?.size.unwrap_or(0);
 
 		if file_size < COPY_THRESHOLD {
-			from.backend.copy(from.as_path(), to.as_path()).await?;
+			from.backend.copy(from.as_path(), to.as_path(), ctx).await?;
 		} else {
 			task.clone()
 				.new_long_step("Copying (large file)", ctx, async {
-					let stream = from.backend.download(from.as_path()).map(move |chunk: Result<Bytes, Error>| {
-						if let Ok(chunk) = &chunk {
-							task.increment(chunk.len() as u64);
-						}
-						chunk
-					});
-					to.backend.upload(to.as_path(), Box::pin(stream)).await
+					let stream = from
+						.backend
+						.download(from.as_path(), ctx)
+						.map(move |chunk: Result<Bytes, Error>| {
+							if let Ok(chunk) = &chunk {
+								task.increment(chunk.len() as u64);
+							}
+							chunk
+						});
+					to.backend.upload(to.as_path(), Box::pin(stream), ctx).await
 				})
 				.await?;
 		}
@@ -235,9 +260,9 @@ impl FileSystemManager {
 		// A native move/rename is only possible if the two resources are on the same filesystem backend.
 		if &from.backend == &to_resource.backend {
 			let rename_result: Result<(), Error> = if !ctx.settings.dry_run {
-				let backup = Backup::new(&from.host, &ctx).await?;
+				let backup = Backup::new(&ctx).await?;
 				backup.persist(&ctx).await?;
-				from.backend.rename(from.as_path(), to_resource.as_path()).await?;
+				from.backend.rename(from.as_path(), to_resource.as_path(), &ctx).await?;
 				self.resources.remove(from.as_path()).await;
 				self.resources
 					.insert(to_resource.as_path().to_path_buf(), to_resource.clone())
@@ -281,23 +306,29 @@ impl FileSystemManager {
 		Ok(())
 	}
 
-	pub async fn copy(&self, from: &Arc<Resource>, to: &Destination, ctx: &ExecutionContext) -> Result<Arc<Resource>, Error> {
+	pub async fn copy(
+		&self,
+		from: &Arc<Resource>,
+		to: &Destination,
+		ctx: &ExecutionContext,
+	) -> Result<Option<(Arc<Resource>, Box<dyn Undo>)>, Error> {
 		use BackendType::*;
 		let task_manager = ctx.services.task_manager.clone();
 
-		if let Some(guard) = self.locker.lock_destination(&ctx, to).await? {
+		if let Some(guard) = self.locker.lock_destination(ctx, to).await? {
 			let dest_resource = self.get_or_init_resource(guard.as_path().to_path_buf(), None, &to.host).await?;
 
-			dest_resource.backend.mk_parent(dest_resource.as_path()).await?;
-			let size = from.backend.metadata(from.as_path()).await?.size;
+			dest_resource.backend.mk_parent(dest_resource.as_path(), ctx).await?;
+			let size = from.backend.metadata(from.as_path(), ctx).await?.size;
 
 			let title = from.path.file_name().unwrap_or_default().to_string_lossy().to_string();
+
+			let backup = Backup::new(ctx).await?;
+			backup.persist(ctx).await?;
 
 			task_manager
 				.with_task(&title, size, |task| async {
 					if !ctx.settings.dry_run {
-						let backup = Backup::new(&from.host, ctx).await?;
-						backup.persist(ctx).await?;
 						match (from.backend.kind(), dest_resource.backend.kind()) {
 							(Local, Local) => self.local_to_local_copy(task, from, &dest_resource, ctx).await?,
 							(Local, Remote) => {
@@ -318,63 +349,54 @@ impl FileSystemManager {
 				})
 				.await?;
 
-			self.tracked_files
-				.insert(dest_resource.as_path().to_path_buf(), FileState::Exists)
-				.await;
 			ctx.services.reporter.success(&format!(
 				"Copied {} -> {}",
 				from.as_path().shorten(5).display(),
 				dest_resource.as_path().shorten(5).display()
 			));
-			Ok(dest_resource)
-		} else {
-			Err(Error::Other(anyhow!("could not acquire lock")))
+			let undo_copy = UndoCopy {
+				original: from.as_path().to_path_buf(),
+				new: dest_resource.as_path().to_path_buf(),
+				backup,
+			};
+			return Ok(Some((dest_resource, Box::new(undo_copy))));
 		}
+		Ok(None)
 	}
 
 	pub async fn delete(&self, path: &Arc<Resource>, ctx: &ExecutionContext) -> Result<(), Error> {
 		let provider = &path.backend;
-		if !ctx.settings.dry_run {
-			let backup = Backup::new(&path.host, &ctx).await?;
-			backup.persist(&ctx).await?;
-			provider.delete(path.as_path()).await?;
-			self.resources.remove(path.as_path()).await;
-		}
-		self.tracked_files
-			.insert(path.as_path().to_path_buf(), FileState::Deleted)
-			.await;
+		let backup = Backup::new(ctx).await?;
+		backup.persist(ctx).await?;
+		provider.delete(path.as_path(), ctx).await?;
+		self.resources.remove(path.as_path()).await;
 		ctx.services
 			.reporter
 			.success(&format!("Deleted {}", path.as_path().shorten(5).display(),));
 		Ok(())
 	}
 
-	pub async fn mkdir(&self, path: &Arc<Resource>) -> Result<(), Error> {
+	pub async fn mkdir(&self, path: &Arc<Resource>, ctx: &ExecutionContext) -> Result<(), Error> {
 		let provider = &path.backend;
-		provider.mk_parent(path.as_path()).await
+		provider.mk_parent(path.as_path(), ctx).await
 	}
 
 	pub async fn hardlink(&self, from: &Arc<Resource>, to: &Destination, ctx: &ExecutionContext) -> Result<Arc<Resource>, Error> {
-		if let Some(guard) = self.locker.lock_destination(&ctx, to).await? {
+		if let Some(guard) = self.locker.lock_destination(ctx, to).await? {
 			let dest_resource = self.get_or_init_resource(guard.as_path().to_path_buf(), None, &to.host).await?;
 
 			let from_provider = &from.backend;
 			let to_provider = &dest_resource.backend;
 
 			if from_provider == to_provider {
-				if !ctx.settings.dry_run {
-					let backup = Backup::new(&from.host, &ctx).await?;
-					backup.persist(&ctx).await?;
-					from_provider.hardlink(from.as_path(), dest_resource.as_path()).await?;
-				}
+				let backup = Backup::new(ctx).await?;
+				backup.persist(ctx).await?;
+				from_provider.hardlink(from.as_path(), dest_resource.as_path(), ctx).await?;
 			} else {
 				return Err(Error::ImpossibleOp("Cannot create hardlink across different filesystems".to_string()));
 			}
 			self.resources
 				.insert(dest_resource.as_path().to_path_buf(), dest_resource.clone())
-				.await;
-			self.tracked_files
-				.insert(dest_resource.as_path().to_path_buf(), FileState::Exists)
 				.await;
 			ctx.services.reporter.success(&format!(
 				"Hardlinked {} -> {}",
@@ -388,37 +410,35 @@ impl FileSystemManager {
 	}
 
 	pub async fn write(&self, content: Bytes, to: &Destination, mode: WriteMode, ctx: &ExecutionContext) -> Result<Arc<Resource>, Error> {
-		if let Some(guard) = self.locker.lock_destination(&ctx, to).await? {
+		if let Some(guard) = self.locker.lock_destination(ctx, to).await? {
 			let dest_resource = self.get_or_init_resource(guard.as_path().to_path_buf(), None, &to.host).await?;
 
-			dest_resource.backend.mk_parent(dest_resource.as_path()).await?;
+			dest_resource.backend.mk_parent(dest_resource.as_path(), ctx).await?;
 
-			if !ctx.settings.dry_run {
-				let final_content = match mode {
-					WriteMode::Append => {
-						let existing_content = dest_resource.get_bytes().await?;
-						[existing_content.as_ref(), content.as_ref()].concat().into()
-					}
-					WriteMode::Prepend => {
-						let existing_content = dest_resource.get_bytes().await?;
-						[content.as_ref(), existing_content.as_ref()].concat().into()
-					}
-					WriteMode::Replace => content,
-				};
+			let final_content = match mode {
+				WriteMode::Append => {
+					let existing_content = dest_resource.get_bytes(ctx).await?;
+					[existing_content.as_ref(), content.as_ref()].concat().into()
+				}
+				WriteMode::Prepend => {
+					let existing_content = dest_resource.get_bytes(ctx).await?;
+					[content.as_ref(), existing_content.as_ref()].concat().into()
+				}
+				WriteMode::Replace => content,
+			};
 
-				dest_resource.backend.write(dest_resource.as_path(), &final_content).await?;
-				dest_resource
-					.bytes
-					.set(final_content.into())
-					.expect("bytes should not be initialized");
-				self.resources
-					.insert(dest_resource.as_path().to_path_buf(), dest_resource.clone())
-					.await;
-			}
-
-			self.tracked_files
-				.insert(dest_resource.as_path().to_path_buf(), FileState::Exists)
+			dest_resource
+				.backend
+				.write(dest_resource.as_path(), &final_content, ctx)
+				.await?;
+			dest_resource
+				.bytes
+				.set(final_content.into())
+				.expect("bytes should not be initialized");
+			self.resources
+				.insert(dest_resource.as_path().to_path_buf(), dest_resource.clone())
 				.await;
+
 			ctx.services
 				.reporter
 				.success(&format!("Written to {}", dest_resource.as_path().shorten(5).display()));
@@ -429,27 +449,22 @@ impl FileSystemManager {
 	}
 
 	pub async fn symlink(&self, from: &Arc<Resource>, to: &Destination, ctx: &ExecutionContext) -> Result<Arc<Resource>, Error> {
-		if let Some(guard) = self.locker.lock_destination(&ctx, to).await? {
+		if let Some(guard) = self.locker.lock_destination(ctx, to).await? {
 			let dest_resource = self.get_or_init_resource(guard.as_path().to_path_buf(), None, &to.host).await?;
 
 			let from_provider = &from.backend;
 			let to_provider = &dest_resource.backend;
 
 			if from_provider == to_provider {
-				if !ctx.settings.dry_run {
-					let backup = Backup::new(&from.host, &ctx).await?;
-					backup.persist(&ctx).await?;
-					from_provider.symlink(from.as_path(), dest_resource.as_path()).await?;
-					self.resources
-						.insert(dest_resource.as_path().to_path_buf(), dest_resource.clone())
-						.await;
-				}
+				let backup = Backup::new(ctx).await?;
+				backup.persist(ctx).await?;
+				from_provider.symlink(from.as_path(), dest_resource.as_path(), ctx).await?;
+				self.resources
+					.insert(dest_resource.as_path().to_path_buf(), dest_resource.clone())
+					.await;
 			} else {
 				return Err(Error::ImpossibleOp("Cannot create symlink across different filesystems".to_string()));
 			}
-			self.tracked_files
-				.insert(dest_resource.as_path().to_path_buf(), FileState::Exists)
-				.await;
 			ctx.services.reporter.success(&format!(
 				"Symlinked {} -> {}",
 				from.as_path().shorten(5).display(),

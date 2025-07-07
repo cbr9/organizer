@@ -4,6 +4,14 @@ pub mod settings;
 
 use std::sync::Arc;
 
+use services::{
+	fs::{connections::Connections, manager::FileSystemManager},
+	history::Journal,
+	reporter::{ui::UserInterface, Reporter},
+	task_manager::TaskManager,
+	Blackboard,
+};
+
 use crate::{
 	context::{
 		scope::ExecutionScope,
@@ -11,6 +19,7 @@ use crate::{
 		settings::RunSettings,
 	},
 	error::Error,
+	templates::compiler::TemplateCompiler,
 };
 
 /// The top-level context object, composed of the three distinct categories of information.
@@ -22,6 +31,30 @@ pub struct ExecutionContext {
 }
 
 impl ExecutionContext {
+	pub async fn new(command_run_settings: RunSettings, connections: Connections, ui: Arc<dyn UserInterface>) -> Result<Self, Error> {
+		let settings_arc = Arc::new(command_run_settings);
+
+		let journal = Arc::new(Journal::new(&settings_arc).await?);
+		let reporter = Reporter::new(ui.clone());
+		let task_manager = TaskManager::new(ui.clone());
+		let template_compiler = TemplateCompiler::new();
+		let fs_manager = FileSystemManager::new(connections, &settings_arc)?;
+		let services_arc = Arc::new(RunServices {
+			blackboard: Blackboard::default(),
+			journal,
+			fs: fs_manager,
+			template_compiler,
+			reporter,
+			task_manager,
+		});
+
+		Ok(ExecutionContext {
+			services: services_arc,
+			scope: ExecutionScope::Blank,
+			settings: settings_arc,
+		})
+	}
+
 	pub fn with_scope(&self, scope: ExecutionScope) -> ExecutionContext {
 		Self {
 			services: self.services.clone(),

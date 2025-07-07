@@ -1,4 +1,7 @@
-use std::{path::PathBuf, sync::Arc};
+use std::{
+	path::{Path, PathBuf},
+	sync::Arc,
+};
 
 use crate::{context::ExecutionContext, error::Error, plugins::storage::StorageProvider, PROJECT_NAME};
 use anyhow::Result;
@@ -28,6 +31,8 @@ impl PartialEq for Backup {
 	}
 }
 
+impl Eq for Backup {}
+
 impl Backup {
 	pub async fn new(ctx: &ExecutionContext) -> Result<Self, Error> {
 		let dir = get_backup_base_dir()?;
@@ -38,7 +43,7 @@ impl Backup {
 			let new_uuid = Uuid::new_v4().to_string();
 			let proposed_path = dir.join(&new_uuid);
 
-			if !backend.try_exists(&proposed_path).await? {
+			if !backend.try_exists(&proposed_path, ctx).await? {
 				break proposed_path;
 			}
 		};
@@ -57,22 +62,22 @@ impl Backup {
 		// Attempt to hardlink
 		if let Err(e) = self
 			.backend
-			.hardlink(from, to)
+			.hardlink(from, to, ctx)
 			.await
 			.inspect(|_| tracing::debug!(backup_path = %self.path.display(), file = %from.display(), "Backup complete"))
 		{
 			// If hardlink fails, try copy and delete
-			eprintln!("Hardlink failed: {}. Falling back to copy and delete.", e);
-			self.backend.copy(from, to).await?;
+			eprintln!("Hardlink failed: {e}. Falling back to copy and delete.");
+			self.backend.copy(from, to, ctx).await?;
 			tracing::debug!(backup_path = %self.path.display(), file = %from.display(), "Backup complete");
 		}
 
 		Ok(())
 	}
 
-	pub async fn restore(&self, to: &PathBuf) -> Result<(), Error> {
+	pub async fn restore(&self, to: &Path, ctx: &ExecutionContext) -> Result<(), Error> {
 		let from = self.path.as_path();
-		self.backend.rename(from, to).await?;
+		self.backend.rename(from, to, ctx).await?;
 		tracing::debug!(backup_path = %self.path.display(), file = %to.display(), "Backup restored");
 		Ok(())
 	}

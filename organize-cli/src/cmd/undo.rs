@@ -35,6 +35,7 @@ impl Cmd for Undo {
 		let settings = RunSettings {
 			dry_run: false,
 			args: HashMap::new(),
+			snapshot: None,
 		};
 		let journal = Journal::new(&settings).await?; // Assumes a simple ::new()
 

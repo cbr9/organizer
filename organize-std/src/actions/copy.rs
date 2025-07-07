@@ -38,11 +38,15 @@ impl ActionBuilder for CopyBuilder {
 impl Action for Copy {
 	async fn commit(&self, ctx: Arc<ExecutionContext>) -> Result<Receipt, Error> {
 		let res = ctx.scope.resource()?;
-		let new = ctx.services.fs.copy(&res, &self.destination, &ctx).await?;
-
-		Ok(Receipt {
-			next: vec![new],
-			..Default::default()
-		})
+		match ctx.services.fs.copy(&res, &self.destination, &ctx).await? {
+			Some((new, undo)) => Ok(Receipt {
+				next: vec![new],
+				undo: vec![undo],
+			}),
+			None => Ok(Receipt {
+				next: vec![res],
+				undo: vec![],
+			}),
+		}
 	}
 }
