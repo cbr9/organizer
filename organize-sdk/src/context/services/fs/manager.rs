@@ -426,6 +426,7 @@ impl FileSystemManager {
 					WriteMode::Replace => content,
 				};
 
+				dest_resource.bytes.set(final_content).expect("bytes should not be initialized");
 				dest_resource.backend.write(dest_resource.as_path(), &final_content).await?;
 				self.resources
 					.insert(dest_resource.as_path().to_path_buf(), dest_resource.clone())

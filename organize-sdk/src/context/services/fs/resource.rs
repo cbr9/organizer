@@ -30,13 +30,13 @@ pub struct Resource {
 	pub backend: Arc<dyn StorageProvider>,
 	pub host: String,
 	#[serde(skip)]
-	mime: OnceCell<String>,
+	pub mime: OnceCell<String>,
 	#[serde(skip)]
-	bytes: OnceCell<Vec<u8>>,
+	pub bytes: OnceCell<Vec<u8>>,
 	#[serde(skip)]
-	hash: OnceCell<String>,
+	pub hash: OnceCell<String>,
 	#[serde(skip)]
-	metadata: OnceCell<Metadata>,
+	pub metadata: OnceCell<Metadata>,
 }
 
 impl AsRef<Path> for Resource {
