@@ -121,13 +121,7 @@ impl FileSystemManager {
 		Ok(())
 	}
 
-	async fn remote_to_local_copy(
-		&self,
-		progress: Arc<ProgressHandle>,
-		from: &Resource,
-		to: &Resource,
-		ctx: &ExecutionContext,
-	) -> Result<String, Error> {
+	async fn remote_to_local_copy(&self, progress: Arc<ProgressHandle>, from: &Resource, to: &Resource, ctx: &ExecutionContext) -> Result<(), Error> {
 		progress
 			.clone()
 			.new_long_step(&format!("Downloading {}", from.as_path().display()), ctx, async {
@@ -144,7 +138,7 @@ impl FileSystemManager {
 			})
 			.await?;
 
-		Ok(format!("Downloaded {} -> {}", from.as_path().display(), to.as_path().display()))
+		Ok(())
 	}
 
 	async fn any_to_remote_copy(
@@ -154,7 +148,7 @@ impl FileSystemManager {
 		to: &Resource,
 		description: String,
 		ctx: &ExecutionContext,
-	) -> Result<String, Error> {
+	) -> Result<(), Error> {
 		task.clone()
 			.new_long_step(&description, ctx, async {
 				let download = from.backend.download(from.as_path()).map(move |chunk: Result<Bytes, Error>| {
@@ -166,10 +160,10 @@ impl FileSystemManager {
 				to.backend.upload(to.as_path(), Box::pin(download)).await
 			})
 			.await?;
-		Ok("Copied".to_string())
+		Ok(())
 	}
 
-	async fn local_to_local_copy(&self, task: Arc<ProgressHandle>, from: &Resource, to: &Resource, ctx: &ExecutionContext) -> Result<String, Error> {
+	async fn local_to_local_copy(&self, task: Arc<ProgressHandle>, from: &Resource, to: &Resource, ctx: &ExecutionContext) -> Result<(), Error> {
 		let file_size = from.backend.metadata(from.as_path()).await?.size.unwrap_or(0);
 
 		if file_size < COPY_THRESHOLD {
@@ -187,8 +181,7 @@ impl FileSystemManager {
 				})
 				.await?;
 		}
-		let message = format!("Copied {} -> {}", from.as_path().shorten(5).display(), to.as_path().shorten(5).display());
-		Ok(message)
+		Ok(())
 	}
 
 	pub async fn r#move(&self, from: &Arc<Resource>, to: &Arc<Resource>, ctx: Arc<ExecutionContext>) -> Result<(), Error> {
@@ -222,16 +215,8 @@ impl FileSystemManager {
 		// 1. Call the `copy` method, which will use the TaskManager to show progress.
 		self.copy(from, to, &ctx).await?;
 
-		self.resources.insert(to.as_path().to_path_buf(), to.clone()).await;
-		self.tracked_files.insert(to.as_path().to_path_buf(), FileState::Exists).await;
-
 		// 2. If the copy was successful, delete the original source file.
-		from.backend.delete(from.as_path()).await?;
-
-		self.resources.remove(from.as_path()).await;
-		self.tracked_files
-			.insert(from.as_path().to_path_buf(), FileState::Deleted)
-			.await;
+		self.delete(from, &ctx).await?;
 
 		Ok(())
 	}
@@ -246,7 +231,7 @@ impl FileSystemManager {
 		let title = from.path.file_name().unwrap_or_default().to_string_lossy().to_string();
 
 		task_manager
-			.with_task(&title, size, ctx, |task| async move {
+			.with_task(&title, size, |task| async move {
 				match (from.backend.kind(), to.backend.kind()) {
 					(Local, Local) => self.local_to_local_copy(task, from, to, ctx).await,
 					(Local, Remote) => {
@@ -264,16 +249,24 @@ impl FileSystemManager {
 
 		self.resources.insert(to.as_path().to_path_buf(), to.clone()).await;
 		self.tracked_files.insert(to.as_path().to_path_buf(), FileState::Exists).await;
+		ctx.services.reporter.success(&format!(
+			"Copied {} -> {}",
+			from.as_path().shorten(5).display(),
+			to.as_path().shorten(5).display()
+		));
 		Ok(())
 	}
 
-	pub async fn delete(&self, path: &Arc<Resource>) -> Result<(), Error> {
+	pub async fn delete(&self, path: &Arc<Resource>, ctx: &ExecutionContext) -> Result<(), Error> {
 		let provider = &path.backend;
 		provider.delete(path.as_path()).await?;
 		self.resources.remove(path.as_path()).await;
 		self.tracked_files
 			.insert(path.as_path().to_path_buf(), FileState::Deleted)
 			.await;
+		ctx.services
+			.reporter
+			.success(&format!("Deleted {}", path.as_path().shorten(5).display(),));
 		Ok(())
 	}
 
@@ -282,7 +275,7 @@ impl FileSystemManager {
 		provider.mk_parent(path.as_path()).await
 	}
 
-	pub async fn hardlink(&self, from: &Arc<Resource>, to: &Arc<Resource>) -> Result<(), Error> {
+	pub async fn hardlink(&self, from: &Arc<Resource>, to: &Arc<Resource>, ctx: &ExecutionContext) -> Result<(), Error> {
 		let from_provider = &from.backend;
 		let to_provider = &to.backend;
 
@@ -293,10 +286,15 @@ impl FileSystemManager {
 		}
 		self.resources.insert(to.as_path().to_path_buf(), to.clone()).await;
 		self.tracked_files.insert(to.as_path().to_path_buf(), FileState::Exists).await;
+		ctx.services.reporter.success(&format!(
+			"Hardlinked {} -> {}",
+			from.as_path().shorten(5).display(),
+			to.as_path().shorten(5).display()
+		));
 		Ok(())
 	}
 
-	pub async fn symlink(&self, from: &Arc<Resource>, to: &Arc<Resource>) -> Result<(), Error> {
+	pub async fn symlink(&self, from: &Arc<Resource>, to: &Arc<Resource>, ctx: &ExecutionContext) -> Result<(), Error> {
 		let from_provider = &from.backend;
 		let to_provider = &to.backend;
 
@@ -307,6 +305,11 @@ impl FileSystemManager {
 		}
 		self.resources.insert(to.as_path().to_path_buf(), to.clone()).await;
 		self.tracked_files.insert(to.as_path().to_path_buf(), FileState::Exists).await;
+		ctx.services.reporter.success(&format!(
+			"Hardlinked {} -> {}",
+			from.as_path().shorten(5).display(),
+			to.as_path().shorten(5).display()
+		));
 		Ok(())
 	}
 }

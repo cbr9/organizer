@@ -60,10 +60,10 @@ impl TaskManager {
 
 	/// The primary public method. It manages the full lifecycle of a multi-step task
 	/// within a scoped, asynchronous closure.
-	pub async fn with_task<F, Fut>(&self, title: &str, length: Option<u64>, ctx: &ExecutionContext, operation: F) -> Result<(), Error>
+	pub async fn with_task<F, Fut>(&self, title: &str, length: Option<u64>, operation: F) -> Result<(), Error>
 	where
 		F: FnOnce(Arc<ProgressHandle>) -> Fut,
-		Fut: Future<Output = Result<String, Error>>,
+		Fut: Future<Output = Result<(), Error>>,
 	{
 		// 1. Setup: TaskManager creates the UI indicator.
 		let bar = self.ui.new_progress_bar(title, length);
@@ -71,9 +71,8 @@ impl TaskManager {
 
 		let task = Arc::new(ProgressHandle { bar: bar.clone() });
 
-		let success_message = operation(task).await?;
+		operation(task).await?;
 		bar.finish();
-		ctx.services.reporter.success(&success_message);
 		Ok(())
 	}
 }
