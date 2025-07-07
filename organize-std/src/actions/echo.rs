@@ -39,8 +39,9 @@ impl Action for Echo {
 			.render(&ctx)
 			.await
 			.inspect(|message| ctx.services.reporter.info(message))?;
+				let resource = ctx.scope.resource()?;
 		Ok(Receipt {
-			next: vec![ctx.scope.resource()?],
+			next: vec![(resource.path.clone(), resource.host.clone())],
 			..Default::default()
 		})
 	}

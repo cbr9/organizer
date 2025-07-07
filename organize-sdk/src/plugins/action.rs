@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use clap::ValueEnum;
 use dialoguer::{theme::ColorfulTheme, Input as RenameInput, Select};
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, ffi::OsStr, fmt::Debug, path::Path, sync::Arc};
+use std::{ffi::OsStr, fmt::Debug, path::Path, sync::Arc};
 use strum::{Display, EnumIter, IntoEnumIterator};
 
 use anyhow::Result;
@@ -18,28 +18,12 @@ use crate::{
 	resource::Resource,
 };
 
-#[derive(Debug, Serialize, Deserialize, Clone, Display)]
-#[serde(rename_all = "lowercase")]
-pub enum Input {
-	Processed(Arc<Resource>),
-	Skipped(Arc<Resource>),
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone, Display)]
-#[serde(rename_all = "lowercase")]
-pub enum Output {
-	Created(Arc<Resource>),
-	Deleted(Arc<Resource>),
-	Modified(Arc<Resource>),
-}
+type Host = String;
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct Receipt {
-	pub inputs: Vec<Input>,
-	pub outputs: Vec<Output>,
-	pub next: Vec<Arc<Resource>>,
+	pub next: Vec<(PathBuf, Host)>,
 	pub undo: Vec<Box<dyn Undo>>,
-	pub metadata: HashMap<String, serde_json::Value>,
 }
 
 impl From<String> for Receipt {

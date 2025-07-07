@@ -222,8 +222,16 @@ impl FileSystemManager {
 		// 1. Call the `copy` method, which will use the TaskManager to show progress.
 		self.copy(from, to, &ctx).await?;
 
+		self.resources.insert(to.as_path().to_path_buf(), to.clone()).await;
+		self.tracked_files.insert(to.as_path().to_path_buf(), FileState::Exists).await;
+
 		// 2. If the copy was successful, delete the original source file.
 		from.backend.delete(from.as_path()).await?;
+
+		self.resources.remove(from.as_path()).await;
+		self.tracked_files
+			.insert(from.as_path().to_path_buf(), FileState::Deleted)
+			.await;
 
 		Ok(())
 	}
@@ -252,12 +260,21 @@ impl FileSystemManager {
 					(Remote, Local) => self.remote_to_local_copy(task, from, to, ctx).await,
 				}
 			})
-			.await
+			.await?;
+
+		self.resources.insert(to.as_path().to_path_buf(), to.clone()).await;
+		self.tracked_files.insert(to.as_path().to_path_buf(), FileState::Exists).await;
+		Ok(())
 	}
 
 	pub async fn delete(&self, path: &Arc<Resource>) -> Result<(), Error> {
 		let provider = &path.backend;
-		provider.delete(path.as_path()).await
+		provider.delete(path.as_path()).await?;
+		self.resources.remove(path.as_path()).await;
+		self.tracked_files
+			.insert(path.as_path().to_path_buf(), FileState::Deleted)
+			.await;
+		Ok(())
 	}
 
 	pub async fn mkdir(&self, path: &Arc<Resource>) -> Result<(), Error> {
@@ -270,10 +287,13 @@ impl FileSystemManager {
 		let to_provider = &to.backend;
 
 		if from_provider == to_provider {
-			from_provider.hardlink(from.as_path(), to.as_path()).await
+			from_provider.hardlink(from.as_path(), to.as_path()).await?;
 		} else {
-			Err(Error::ImpossibleOp("Cannot create hardlink across different filesystems".to_string()))
+			return Err(Error::ImpossibleOp("Cannot create hardlink across different filesystems".to_string()));
 		}
+		self.resources.insert(to.as_path().to_path_buf(), to.clone()).await;
+		self.tracked_files.insert(to.as_path().to_path_buf(), FileState::Exists).await;
+		Ok(())
 	}
 
 	pub async fn symlink(&self, from: &Arc<Resource>, to: &Arc<Resource>) -> Result<(), Error> {
@@ -281,9 +301,12 @@ impl FileSystemManager {
 		let to_provider = &to.backend;
 
 		if from_provider == to_provider {
-			from_provider.symlink(from.as_path(), to.as_path()).await
+			from_provider.symlink(from.as_path(), to.as_path()).await?;
 		} else {
-			Err(Error::ImpossibleOp("Cannot create symlink across different filesystems".to_string()))
+			return Err(Error::ImpossibleOp("Cannot create symlink across different filesystems".to_string()));
 		}
+		self.resources.insert(to.as_path().to_path_buf(), to.clone()).await;
+		self.tracked_files.insert(to.as_path().to_path_buf(), FileState::Exists).await;
+		Ok(())
 	}
 }

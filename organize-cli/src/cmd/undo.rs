@@ -5,7 +5,7 @@ use async_trait::async_trait;
 use clap::Parser;
 use organize_sdk::{
 	context::{services::history::Journal, settings::RunSettings},
-	plugins::action::{Input, UndoConflict, UndoError, UndoSettings},
+	plugins::action::{UndoConflict, UndoError, UndoSettings},
 };
 
 use super::Cmd;
@@ -32,7 +32,10 @@ pub struct Undo {
 #[async_trait]
 impl Cmd for Undo {
 	async fn run(self) -> Result<()> {
-		let settings = RunSettings { dry_run: false, args: HashMap::new() };
+		let settings = RunSettings {
+			dry_run: false,
+			args: HashMap::new(),
+		};
 		let journal = Journal::new(&settings).await?; // Assumes a simple ::new()
 
 		let settings = UndoSettings {
@@ -67,22 +70,10 @@ impl Cmd for Undo {
 							if let Some(source) = e.source().and_then(|s| s.downcast_ref::<UndoError>())
 								&& matches!(source, UndoError::Abort)
 							{
-								let inputs = transaction
-									.receipt
-									.inputs
-									.iter()
-									.map(|input: &Input| match input {
-										Input::Processed(resource) => resource.as_path().to_string_lossy().to_string(),
-										Input::Skipped(resource) => resource.as_path().to_string_lossy().to_string(),
-									})
-									.collect::<Vec<String>>()
-									.join("\n -");
-
 								eprintln!(
-									"There was a conflict undoing transaction {}.\nOne of the following files may already exist: \n - {}\nAborting \
-									 undo process. Run in interactive mode or choose a default conflict resolution strategy. You can also move the \
-									 file manually.",
-									transaction.id, inputs
+									"There was a conflict undoing transaction {}.\nAborting undo process. Run in interactive mode or choose a \
+									 default conflict resolution strategy. You can also move the file manually.",
+									transaction.id
 								);
 								return Ok(());
 							}

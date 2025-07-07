@@ -8,7 +8,7 @@ use organize_sdk::{
 		ExecutionContext,
 	},
 	error::Error,
-	plugins::action::{Action, ActionBuilder, Input, Output, Receipt},
+	plugins::action::{Action, ActionBuilder, Receipt},
 	stdx::path::PathBufExt,
 };
 use serde::{Deserialize, Serialize};
@@ -52,9 +52,7 @@ impl Action for Copy {
 		}
 
 		let receipt = Receipt {
-			inputs: vec![Input::Processed(res.clone())],
-			outputs: vec![Output::Created(dest.clone())],
-			next: vec![dest.clone()],
+			next: vec![(dest.as_path().to_path_buf(), dest.host.clone())],
 			..Default::default()
 		};
 
