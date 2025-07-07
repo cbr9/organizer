@@ -1,19 +1,36 @@
-// Whitespace is handled inside expressions but is significant in literals.
-// We will trim inside the Rust code where needed.
-WHITESPACE = _{ " " | "\t" | "\r" | "\n" }
+// This defines the top-level structure of a template
+template = { SOI ~ (literal | moustache)* ~ EOI }
 
-// An identifier is a letter followed by alphanumeric characters or underscores.
-identifier = @{ ('a'..'z' | 'A'..'Z') ~ ('a'..'z' | 'A'..'Z' | '0'..'9' | "_")* }
+// A literal is any character that is not part of a moustache expression
+literal = @{ (!"{{" ~ ANY)+ }
 
-// A variable is one or more identifiers separated by dots.
+// A moustache expression is enclosed in {{ ... }}
+moustache = { "{{" ~ expression ~ "}}" }
+
+// An expression can be a function call or a variable
+expression = { function_call | variable }
+
+// A function call has an identifier and a list of arguments in parentheses
+function_call = { identifier ~ "(" ~ (argument ~ ("," ~ argument)*)? ~ ")" }
+
+// An argument is currently just a string literal
+argument = { expression | literal_string }
+
+// A variable is a dot-separated chain of identifiers
 variable = { identifier ~ ("." ~ identifier)* }
 
-// A delimited expression, e.g., "{{ file.name }}"
-moustache = { "{{" ~ WHITESPACE* ~ variable ~ WHITESPACE* ~ "}}" }
+// A literal string can be single or double quoted.
+literal_string = { single_quoted_string | double_quoted_string }
 
-// A literal is any sequence of characters that is NOT an opening delimiter.
-// The `+` ensures we match one or more characters.
-literal = @{ (!( "{{" | "}}" ) ~ ANY)+ }
+single_quoted_string = { "'" ~ single_quoted_inner ~ "'" }
+single_quoted_inner  = @{ (!"'" ~ ANY)* }
 
-// The top-level rule for the entire template string.
-template = { SOI ~ (literal | moustache)* ~ EOI }
+// The rule for a double-quoted string. It captures the inner content.
+double_quoted_string = { "\"" ~ double_quoted_inner ~ "\"" }
+double_quoted_inner  = @{ (!"\"" ~ ANY)* }
+
+// An identifier is a valid variable or function name
+identifier = @{ (ASCII_ALPHANUMERIC | "_")+ }
+
+// Whitespace is ignored between tokens within moustaches
+WHITESPACE = _{ " " | "\t" | "\r" | "\n" }

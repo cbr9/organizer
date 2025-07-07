@@ -1,4 +1,4 @@
-use std::{fmt::Debug, io::Error};
+use std::{fmt::Debug, io::Error, sync::Arc};
 
 /// Represents the visual style for the final state of a progress indicator.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -11,10 +11,7 @@ pub enum IndicatorStyle {
 /// An abstract, generic contract for all user-facing interactions.
 pub trait UserInterface: Send + Sync {
 	// --- Progress Indicator Management ---
-	fn create_progress_indicator(&self, title: &str, length: Option<u64>) -> u64;
-	fn increment_progress_indicator(&self, id: u64, delta: u64);
-	fn update_progress_indicator(&self, id: u64, description: &str);
-	fn remove_progress_indicator(&self, id: u64, style: IndicatorStyle, final_message: &str);
+	fn new_progress_bar(&self, title: &str, length: Option<u64>) -> Arc<dyn ProgressBarHandle>;
 
 	// --- User Input ---
 	fn input(&self, prompt_text: &str) -> Result<String, Error>;
@@ -26,4 +23,13 @@ pub trait UserInterface: Send + Sync {
 	fn success(&self, message: &str);
 	fn warning(&self, message: &str);
 	fn error(&self, message: &str, hint: Option<&str>);
+}
+
+pub trait ProgressBarHandle: Send + Sync {
+	/// Increments the progress bar by `delta`.
+	fn increment(&self, delta: u64);
+	/// Updates the description message of the progress bar.
+	fn set_message(&self, message: String);
+	/// Finishes (removes) the progress bar.
+	fn finish(&self);
 }

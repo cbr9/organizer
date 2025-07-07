@@ -7,16 +7,15 @@ username = "andres_cabero"
 [[stage]]
 search = "/Users/H0UB8WV/Downloads"
 
-# [[stage]]
-# select = "first"
-# n = 3
-
 [[stage]]
 action = "copy"
 folder = "/Users/H0UB8WV/Downloads/"
 filename = "{{file.stem}}-1.{{file.extension}}"
 
 
+# [[stage]]
+# action = "echo"
+# message = "{{ input() }}"
 
 
 # [[stage]]
@@ -24,5 +23,5 @@ filename = "{{file.stem}}-1.{{file.extension}}"
 # check = "C:/Users/H0UB8WV/source/repos/organizer/test_data/empty_file.txt"
 
 # [[stage]]
-# action = "echo"
+# action = "echo" 
 # message = "C:/Users/H0UB8WV/source/repos/organizer/test_data/empty_file.txt is empty!"

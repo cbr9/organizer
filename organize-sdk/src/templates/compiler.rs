@@ -2,19 +2,24 @@ use crate::{
 	error::Error,
 	templates::{
 		accessor::Accessor,
-		registry::SchemaRegistry,
+		registry::VariableRegistry,
 		template::{Template, TemplatePart},
 	},
 };
 use anyhow::Result;
 
-use super::parser::{Expression, Segment, AST};
+use super::{
+	accessor::LiteralAccessor,
+	parser::{Expression, Segment, AST},
+	registry::FunctionRegistry,
+};
 
 /// The central compiler for the template system.
 /// It uses a SchemaRegistry to validate variables and a full parser to build the template.
 #[derive(Debug, Clone)]
 pub struct TemplateCompiler {
-	schema: SchemaRegistry,
+	variables: VariableRegistry,
+	functions: FunctionRegistry,
 }
 
 impl Default for TemplateCompiler {
@@ -28,7 +33,8 @@ impl TemplateCompiler {
 	/// all registered static variable providers.
 	pub fn new() -> Self {
 		Self {
-			schema: SchemaRegistry::new(),
+			variables: VariableRegistry::new(),
+			functions: FunctionRegistry::new(),
 		}
 	}
 
@@ -60,12 +66,21 @@ impl TemplateCompiler {
 
 	/// Builds a type-safe accessor from a parsed expression AST node.
 	/// This is the bridge between your parser and the execution engine.
-	fn build_accessor(&self, expr: Expression) -> Result<Box<dyn Accessor>, Error> {
+	pub fn build_accessor(&self, expr: Expression) -> Result<Box<dyn Accessor>, Error> {
 		match expr {
 			Expression::Variable(parts) => {
-				// We use the existing SchemaRegistry to validate the path and get the accessor.
 				let parts_str: Vec<&str> = parts.iter().map(AsRef::as_ref).collect();
-				self.schema.parse_property_chain(&parts_str)
+				self.variables.parse_property_chain(&parts_str)
+			}
+			Expression::Literal(value) => Ok(Box::new(LiteralAccessor { value })),
+			Expression::FunctionCall { name, args } => {
+				let builder = self
+					.functions
+					.get(&name)
+					.ok_or_else(|| Error::TemplateError(super::engine::TemplateError::UnknownVariable(format!("Unknown function '{}'", name))))?;
+
+				// Delegate the argument parsing and compilation to the function's own builder
+				builder.build(self, args)
 			}
 		}
 	}

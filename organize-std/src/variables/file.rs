@@ -1,5 +1,7 @@
 use std::sync::Arc;
 
+use anyhow::Result;
+use async_trait::async_trait;
 use organize_sdk::{
 	context::ExecutionContext,
 	templates::{
@@ -9,8 +11,6 @@ use organize_sdk::{
 		variable::{StatelessVariable, VariableInventory},
 	},
 };
-use anyhow::Result;
-use async_trait::async_trait;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FileProvider;
@@ -34,8 +34,12 @@ struct Name;
 impl Accessor for Name {
 	async fn get(&self, ctx: &ExecutionContext) -> Result<Value> {
 		let resource = ctx.scope.resource()?;
-		let value = resource.path.file_name().map(|name| name.to_string_lossy().to_string());
-		Ok(Value::OptionString(value))
+		let value = resource
+			.path
+			.file_name()
+			.map(|name| name.to_string_lossy().to_string())
+			.unwrap_or("<UNDEFINED>".to_string());
+		Ok(Value::String(value))
 	}
 }
 

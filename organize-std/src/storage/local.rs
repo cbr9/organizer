@@ -11,7 +11,6 @@ use futures::{
 	future::BoxFuture,
 	stream::{self, BoxStream},
 	StreamExt,
-	TryStreamExt,
 };
 use organize_sdk::{
 	context::ExecutionContext,
@@ -62,15 +61,11 @@ impl StorageProvider for LocalFileSystem {
 		Ok(dirs::home_dir().context("unable to find home directory")?)
 	}
 
-	async fn mkdir(&self, path: &Path) -> Result<(), Error> {
-		if path.is_file() {
-			if let Some(parent) = path.parent() {
-				if !tokio::fs::try_exists(parent).await.unwrap_or(false) {
-					tokio::fs::create_dir_all(parent).await?;
-				}
+	async fn mk_parent(&self, path: &Path) -> Result<(), Error> {
+		if let Some(parent) = path.parent() {
+			if !tokio::fs::try_exists(parent).await.unwrap_or(false) {
+				tokio::fs::create_dir_all(parent).await?;
 			}
-		} else {
-			tokio::fs::create_dir_all(path).await?;
 		}
 		Ok(())
 	}
@@ -79,36 +74,8 @@ impl StorageProvider for LocalFileSystem {
 		tokio::fs::rename(from, to).await.map_err(|e| Error::Io(e))
 	}
 
-	// TODO: what is this?
 	async fn copy(&self, from: &Path, to: &Path) -> Result<(), Error> {
-		self.mkdir(to).await?;
-
-		let mut dirs = Vec::new();
-		let mut files = Vec::new();
-		for entry in WalkDir::new(from).into_iter().filter_map(|e| e.ok()) {
-			if entry.path().is_dir() {
-				dirs.push(entry.path().to_path_buf());
-			} else {
-				files.push(entry.path().to_path_buf());
-			}
-		}
-
-		for dir in dirs {
-			let relative_path = dir.strip_prefix(from).unwrap();
-			let dest_path = to.join(relative_path);
-			tokio::fs::create_dir_all(&dest_path).await?;
-		}
-
-		let copy_futures = files.into_iter().map(|file| {
-			let relative_path = file.strip_prefix(from).unwrap().to_path_buf();
-			let dest_path = to.join(relative_path);
-			async move { tokio::fs::copy(file, dest_path).await.map(|_| ()).map_err(Error::from) }
-		});
-
-		stream::iter(copy_futures)
-			.buffer_unordered(num_cpus::get())
-			.try_collect::<()>()
-			.await?;
+		tokio::fs::copy(from, to).await?;
 
 		Ok(())
 	}
@@ -147,12 +114,12 @@ impl StorageProvider for LocalFileSystem {
 	}
 
 	async fn hardlink(&self, from: &Path, to: &Path) -> Result<(), Error> {
-		self.mkdir(to).await?;
+		self.mk_parent(to).await?;
 		tokio::fs::hard_link(from, to).await.map_err(Error::from)
 	}
 
 	async fn symlink(&self, from: &Path, to: &Path) -> Result<(), Error> {
-		self.mkdir(to).await?;
+		self.mk_parent(to).await?;
 		#[cfg(unix)]
 		{
 			tokio::fs::symlink(from, to).await.map_err(Error::from)

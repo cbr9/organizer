@@ -38,7 +38,7 @@ impl Action for Echo {
 		self.message
 			.render(&ctx)
 			.await
-			.inspect(|message| tracing::info!("{}", message))?;
+			.inspect(|message| ctx.services.reporter.info(message))?;
 		Ok(Receipt {
 			next: vec![ctx.scope.resource()?],
 			..Default::default()

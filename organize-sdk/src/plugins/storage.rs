@@ -63,7 +63,7 @@ pub trait StorageProvider: DynEq + DynClone + Sync + Send + Debug {
 	async fn read(&self, path: &Path) -> Result<Vec<u8>, Error>;
 	async fn write(&self, path: &Path, content: &[u8]) -> Result<(), Error>;
 	async fn discover(&self, location: &Location, ctx: &ExecutionContext) -> Result<Vec<Arc<Resource>>, Error>;
-	async fn mkdir(&self, path: &Path) -> Result<(), Error>;
+	async fn mk_parent(&self, path: &Path) -> Result<(), Error>;
 	async fn rename(&self, from: &Path, to: &Path) -> Result<(), Error>;
 	async fn copy(&self, from: &Path, to: &Path) -> Result<(), Error>;
 	async fn delete(&self, path: &Path) -> Result<(), Error>;

@@ -6,6 +6,8 @@ use thiserror::Error;
 #[derive(Debug, PartialEq, Clone, Eq)]
 pub enum Expression {
 	Variable(Vec<String>),
+	Literal(String), // For arguments
+	FunctionCall { name: String, args: Vec<Expression> },
 }
 
 #[derive(Debug, PartialEq, Clone, Eq)]
@@ -33,28 +35,40 @@ pub enum ParseError {
 #[grammar = "templates/grammar.pest"]
 struct PestParser;
 
-fn build_expression_ast(pair: Pair<Rule>) -> Expression {
+fn build_ast_from_expression(pair: Pair<Rule>) -> Expression {
 	match pair.as_rule() {
+		// Handle wrapper rules by descending into their inner content.
+		Rule::expression | Rule::argument => build_ast_from_expression(pair.into_inner().next().unwrap()),
+
 		Rule::variable => {
 			let parts = pair.into_inner().map(|p| p.as_str().to_string()).collect();
 			Expression::Variable(parts)
 		}
-		_ => unreachable!("build_expression_ast expects an expression rule, found {:?}", pair.as_rule()),
+		Rule::function_call => {
+			let mut inner = pair.into_inner();
+			let name = inner.next().unwrap().as_str().to_string();
+			let args = inner.map(build_ast_from_expression).collect();
+			Expression::FunctionCall { name, args }
+		}
+		// A literal_string is a choice, so we descend into the actual quoted string rule.
+		Rule::literal_string => build_ast_from_expression(pair.into_inner().next().unwrap()),
+
+		// The rules for the quoted strings themselves. Here we extract the content.
+		Rule::single_quoted_string | Rule::double_quoted_string => {
+			// The inner pair is the content between the quotes.
+			// It's optional to handle empty strings like "" or ''.
+			let content = pair.into_inner().next().map(|p| p.as_str()).unwrap_or("");
+			Expression::Literal(content.to_string())
+		}
+		rule => unreachable!("build_ast_from_expression was called with an unexpected rule: {:?}", rule),
 	}
 }
 
 impl AST {
-	/// Parses the entire template string using the pest grammar.
-	/// This method now delegates all parsing to pest, which handles the
-	/// entire structure of the template, including literals and delimiters.
 	pub fn parse(s: &str) -> Result<Self, ParseError> {
-		// If the input is empty, return an empty AST.
 		if s.is_empty() {
 			return Ok(AST { segments: vec![] });
 		}
-
-		// Parse the entire string with the top-level `template` rule.
-		// This gives us an iterator directly over `literal` and `delimited_expression` pairs.
 		let pairs = PestParser::parse(Rule::template, s)?.next().unwrap().into_inner();
 		let mut segments = Vec::new();
 
@@ -64,13 +78,12 @@ impl AST {
 					segments.push(Segment::Literal(pair.as_str().to_string()));
 				}
 				Rule::moustache => {
-					// Go inside `{{...}}` to get the actual `expression`.
 					let inner_expr_pair = pair.into_inner().next().unwrap();
-					let expression = build_expression_ast(inner_expr_pair);
+					let expression = build_ast_from_expression(inner_expr_pair);
 					segments.push(Segment::Expression(expression));
 				}
-				Rule::EOI => (), // End-of-input is expected, do nothing.
-				_ => unreachable!("Unexpected top-level rule: {:?}", pair.as_rule()),
+				Rule::EOI => (),
+				rule => unreachable!("Unexpected top-level rule: {:?}", rule),
 			}
 		}
 

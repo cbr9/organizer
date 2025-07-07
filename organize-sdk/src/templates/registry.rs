@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 
+use crate::templates::function::{FunctionInventory, TemplateFunctionBuilder};
+
 use crate::{
 	error::Error,
 	templates::{
@@ -14,18 +16,18 @@ use crate::{
 /// It discovers all variable providers at startup and uses their schemas
 /// to parse and validate property chains.
 #[derive(Clone, Debug)]
-pub struct SchemaRegistry {
+pub struct VariableRegistry {
 	/// A map of all discovered static schemas for fast lookups by name.
 	root_properties: HashMap<&'static str, Property>,
 }
 
-impl Default for SchemaRegistry {
+impl Default for VariableRegistry {
 	fn default() -> Self {
 		Self::new()
 	}
 }
 
-impl SchemaRegistry {
+impl VariableRegistry {
 	/// Creates a new registry by discovering all registered `Variable` providers
 	/// via the `inventory` crate.
 	pub fn new() -> Self {
@@ -101,5 +103,30 @@ impl SchemaRegistry {
 				parts.join(".")
 			)))),
 		}
+	}
+}
+
+#[derive(Debug, Clone)]
+pub struct FunctionRegistry {
+	functions: HashMap<&'static str, &'static (dyn TemplateFunctionBuilder + Sync)>,
+}
+
+impl Default for FunctionRegistry {
+	fn default() -> Self {
+		Self::new()
+	}
+}
+
+impl FunctionRegistry {
+	pub fn new() -> Self {
+		let functions = inventory::iter::<FunctionInventory>
+			.into_iter()
+			.map(|inv| (inv.provider.name(), inv.provider))
+			.collect();
+		Self { functions }
+	}
+
+	pub fn get(&self, name: &str) -> Option<&&(dyn TemplateFunctionBuilder + Sync)> {
+		self.functions.get(name)
 	}
 }

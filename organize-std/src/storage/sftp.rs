@@ -275,7 +275,7 @@ impl StorageProvider for Sftp {
 		Ok(files)
 	}
 
-	async fn mkdir(&self, path: &Path) -> Result<(), Error> {
+	async fn mk_parent(&self, path: &Path) -> Result<(), Error> {
 		let session = self.pool().await?.get().await.map_err(|e| Error::Other(e.into()))?;
 		session.create_dir(path.to_string_lossy()).await?;
 		Ok(())

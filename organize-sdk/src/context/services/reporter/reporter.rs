@@ -4,7 +4,7 @@ use std::sync::Arc;
 /// A service for handling simple, stateless, one-off user-facing messages and logging.
 #[derive(Clone)]
 pub struct Reporter {
-	ui: Arc<dyn UserInterface>,
+	pub ui: Arc<dyn UserInterface>,
 }
 
 impl Reporter {
