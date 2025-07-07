@@ -1,4 +1,3 @@
-use anyhow::anyhow;
 use futures::future;
 
 use crate::{
@@ -12,7 +11,6 @@ use crate::{
 	error::Error,
 	plugins::{action::Receipt, partitioner::Partitioner, sorter::Sorter},
 	resource::Resource,
-	stdx::path::PathBufExt,
 };
 use glob::Pattern;
 use std::{
@@ -300,19 +298,7 @@ impl Pipeline {
 								let batch_ctx = ctx.with_scope(scope);
 								let ctx = Arc::new(batch_ctx);
 								let receipt = action.commit(ctx.clone()).await?;
-								for (path, host) in receipt.next {
-									let res = ctx
-										.services
-										.fs
-										.resources
-										.try_get_with(path.clone(), async {
-											let backend = ctx.services.fs.get_provider(&host)?;
-											Ok(path.as_resource(&ctx, None, host, backend).await)
-										})
-										.await
-										.map_err(|e: Arc<Error>| Error::Other(anyhow!("could not get resource provider in batch action: {}", e)))?;
-									current_batch_next_files.push(res)
-								}
+								current_batch_next_files.extend(receipt.next);
 							}
 							ExecutionModel::Single => {
 								let mut futs = Vec::new();
@@ -329,19 +315,7 @@ impl Pipeline {
 								}
 								let receipts: Vec<Receipt> = future::try_join_all(futs).await?;
 								for receipt in receipts {
-									for (path, host) in receipt.next {
-										let res = ctx
-											.services
-											.fs
-											.resources
-											.try_get_with(path.clone(), async {
-												let backend = ctx.services.fs.get_provider(&host)?;
-												Ok(path.as_resource(ctx, None, host, backend).await)
-											})
-											.await
-											.map_err(|e: Arc<Error>| Error::Other(anyhow!("could not get resource provider in single action: {}", e)))?;
-										current_batch_next_files.push(res)
-									}
+									current_batch_next_files.extend(receipt.next);
 								}
 							}
 						}

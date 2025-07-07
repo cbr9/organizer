@@ -18,11 +18,9 @@ use crate::{
 	resource::Resource,
 };
 
-type Host = String;
-
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct Receipt {
-	pub next: Vec<(PathBuf, Host)>,
+	pub next: Vec<Arc<Resource>>,
 	pub undo: Vec<Box<dyn Undo>>,
 }
 

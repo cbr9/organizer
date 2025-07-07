@@ -9,7 +9,6 @@ use organize_sdk::{
 	},
 	error::Error,
 	plugins::action::{Action, ActionBuilder, Receipt},
-	stdx::path::PathBufExt,
 };
 use serde::{Deserialize, Serialize};
 
@@ -39,23 +38,11 @@ impl ActionBuilder for CopyBuilder {
 impl Action for Copy {
 	async fn commit(&self, ctx: Arc<ExecutionContext>) -> Result<Receipt, Error> {
 		let res = ctx.scope.resource()?;
-		let backend = ctx.services.fs.get_provider(&self.destination.host)?;
-		let dest = self
-			.destination
-			.resolve(&ctx)
-			.await?
-			.as_resource(&ctx, None, self.destination.host.clone(), backend)
-			.await;
+		let new = ctx.services.fs.copy(&res, &self.destination, &ctx).await?;
 
-		if !ctx.settings.dry_run {
-			ctx.services.fs.copy(&res, &dest, &ctx).await?;
-		}
-
-		let receipt = Receipt {
-			next: vec![(dest.as_path().to_path_buf(), dest.host.clone())],
+		Ok(Receipt {
+			next: vec![new],
 			..Default::default()
-		};
-
-		Ok(receipt)
+		})
 	}
 }

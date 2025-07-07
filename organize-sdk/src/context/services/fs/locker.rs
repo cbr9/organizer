@@ -5,7 +5,27 @@ use crate::{
 };
 use anyhow::Result;
 use dashmap::DashSet;
-use std::{future::Future, path::PathBuf, sync::Arc};
+use std::{ops::Deref, path::PathBuf, sync::Arc};
+
+#[derive(Debug)]
+pub struct LockGuard {
+	path: PathBuf,
+	active_paths: Arc<DashSet<PathBuf>>,
+}
+
+impl Deref for LockGuard {
+	type Target = PathBuf;
+
+	fn deref(&self) -> &Self::Target {
+		&self.path
+	}
+}
+
+impl Drop for LockGuard {
+	fn drop(&mut self) {
+		self.active_paths.remove(&self.path);
+	}
+}
 
 #[derive(Debug, Clone, Default)]
 pub struct Locker {
@@ -13,23 +33,13 @@ pub struct Locker {
 }
 
 impl Locker {
-	pub async fn with_locked_destination<F, Fut, T>(
-		&self,
-		ctx: &ExecutionContext,
-		destination: &Destination,
-		strategy: &ConflictResolution,
-		action: F,
-	) -> Result<Option<T>, Error>
-	where
-		F: FnOnce(PathBuf) -> Fut,
-		Fut: Future<Output = Result<T, Error>>,
-	{
+	pub async fn lock_destination(&self, ctx: &ExecutionContext, destination: &Destination) -> Result<Option<LockGuard>, Error> {
 		let mut path = destination.resolve(ctx).await?;
 		let mut n = 1;
 
 		let reserved = loop {
 			if self.active_paths.contains(&path) {
-				match strategy {
+				match destination.resolution_strategy {
 					ConflictResolution::Skip | ConflictResolution::Overwrite => return Ok(None),
 					ConflictResolution::Rename => {
 						let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or_default();
@@ -53,7 +63,7 @@ impl Locker {
 			};
 
 			if exists {
-				match strategy {
+				match destination.resolution_strategy {
 					ConflictResolution::Skip => return Ok(None),
 					ConflictResolution::Overwrite => {
 						if !self.active_paths.insert(path.to_path_buf()) {
@@ -82,13 +92,13 @@ impl Locker {
 			break Some(path);
 		};
 
-		if let Some(target) = reserved {
-			ctx.services.fs.ensure_parent_dir_exists(&target).await?;
-			let result = action(target.clone()).await?;
-
-			self.active_paths.remove(&target.to_path_buf());
-
-			Ok(Some(result))
+		if let Some(path) = reserved {
+			ctx.services.fs.ensure_parent_dir_exists(&path).await?;
+			let guard = LockGuard {
+				path,
+				active_paths: self.active_paths.clone(),
+			};
+			Ok(Some(guard))
 		} else {
 			Ok(None)
 		}

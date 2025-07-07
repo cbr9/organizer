@@ -3,14 +3,14 @@ use crate::{
 		services::{fs::locker::Locker, task_manager::ProgressHandle},
 		ExecutionContext,
 	},
-	engine::rule::RuleBuilder,
+	engine::{rule::RuleBuilder, ConflictResolution},
 	error::Error,
 	plugins::storage::{BackendType, StorageProvider},
 	resource::{FileState, Resource},
-	stdx::path::PathExt,
+	stdx::path::{PathBufExt, PathExt},
 	templates::template::{Template, TemplateString},
 };
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use bytes::Bytes;
 use futures::{self, StreamExt, TryStreamExt};
 use moka::future::Cache;
@@ -36,6 +36,8 @@ pub struct DestinationBuilder {
 	pub filename: Option<TemplateString>,
 	#[serde(default = "default_host")]
 	pub host: TemplateString,
+	#[serde(default, rename = "if_exists")]
+	resolution_strategy: ConflictResolution,
 }
 impl DestinationBuilder {
 	/// Compiles the raw DestinationBuilder into an executable Destination.
@@ -47,7 +49,12 @@ impl DestinationBuilder {
 			.map(|f| ctx.services.template_compiler.compile_template(&f))
 			.transpose()?; // This elegantly handles the Option<Result<T, E>>
 		let host = ctx.services.template_compiler.compile_template(&self.host)?.render(ctx).await?;
-		Ok(Destination { folder, filename, host })
+		Ok(Destination {
+			folder,
+			filename,
+			host,
+			resolution_strategy: self.resolution_strategy.clone(),
+		})
 	}
 }
 
@@ -56,6 +63,7 @@ pub struct Destination {
 	pub folder: Template,
 	pub filename: Option<Template>,
 	pub host: String,
+	pub resolution_strategy: ConflictResolution,
 }
 
 impl Destination {
@@ -184,17 +192,24 @@ impl FileSystemManager {
 		Ok(())
 	}
 
-	pub async fn r#move(&self, from: &Arc<Resource>, to: &Arc<Resource>, ctx: Arc<ExecutionContext>) -> Result<(), Error> {
+	pub async fn r#move(&self, from: &Arc<Resource>, to: &Destination, ctx: Arc<ExecutionContext>) -> Result<(), Error> {
+		let to_resource = to
+			.resolve(&ctx)
+			.await?
+			.as_resource(&ctx, None, to.host.clone(), self.get_provider(&to.host)?)
+			.await;
 		// A native move/rename is only possible if the two resources are on the same filesystem backend.
-		if &from.backend == &to.backend {
-			let rename_result = from.backend.rename(from.as_path(), to.as_path()).await;
+		if &from.backend == &to_resource.backend {
+			let rename_result = from.backend.rename(from.as_path(), to_resource.as_path()).await;
 
 			match rename_result {
 				Ok(()) => {
 					// The fast, native rename succeeded. We are done.
-					ctx.services
-						.reporter
-						.success(&format!("Moved {} -> {}", from.path.shorten(5).display(), to.path.shorten(5).display()));
+					ctx.services.reporter.success(&format!(
+						"Moved {} -> {}",
+						from.path.shorten(5).display(),
+						to_resource.path.shorten(5).display()
+					));
 					return Ok(());
 				}
 				Err(e) if e.is_cross_device() => {
@@ -221,40 +236,58 @@ impl FileSystemManager {
 		Ok(())
 	}
 
-	pub async fn copy(&self, from: &Arc<Resource>, to: &Arc<Resource>, ctx: &ExecutionContext) -> Result<(), Error> {
+	pub async fn copy(&self, from: &Arc<Resource>, to: &Destination, ctx: &ExecutionContext) -> Result<Arc<Resource>, Error> {
 		use BackendType::*;
 		let task_manager = ctx.services.task_manager.clone();
 
-		to.backend.mk_parent(to.as_path()).await?;
-		let size = from.backend.metadata(from.as_path()).await?.size;
+		if let Some(guard) = self.locker.lock_destination(&ctx, to).await? {
+			let backend = self.get_provider(&to.host)?;
+			let dest_resource = guard
+				.as_path()
+				.to_path_buf()
+				.as_resource(ctx, None, to.host.clone(), backend)
+				.await;
 
-		let title = from.path.file_name().unwrap_or_default().to_string_lossy().to_string();
+			dest_resource.backend.mk_parent(dest_resource.as_path()).await?;
+			let size = from.backend.metadata(from.as_path()).await?.size;
 
-		task_manager
-			.with_task(&title, size, |task| async move {
-				match (from.backend.kind(), to.backend.kind()) {
-					(Local, Local) => self.local_to_local_copy(task, from, to, ctx).await,
-					(Local, Remote) => {
-						let description = format!("Uploading {}", from.as_path().display());
-						self.any_to_remote_copy(task, from, to, description, ctx).await
+			let title = from.path.file_name().unwrap_or_default().to_string_lossy().to_string();
+
+			task_manager
+				.with_task(&title, size, |task| async {
+					if !ctx.settings.dry_run {
+						match (from.backend.kind(), dest_resource.backend.kind()) {
+							(Local, Local) => self.local_to_local_copy(task, from, &dest_resource, ctx).await?,
+							(Local, Remote) => {
+								let description = format!("Uploading {}", from.as_path().display());
+								self.any_to_remote_copy(task, from, &dest_resource, description, ctx).await?;
+							}
+							(Remote, Remote) => {
+								let description = format!("Transferring {}", from.as_path().display());
+								self.any_to_remote_copy(task, from, &dest_resource, description, ctx).await?;
+							}
+							(Remote, Local) => self.remote_to_local_copy(task, from, &dest_resource, ctx).await?,
+						}
 					}
-					(Remote, Remote) => {
-						let description = format!("Transferring {}", from.as_path().display());
-						self.any_to_remote_copy(task, from, to, description, ctx).await
-					}
-					(Remote, Local) => self.remote_to_local_copy(task, from, to, ctx).await,
-				}
-			})
-			.await?;
+					Ok(())
+				})
+				.await?;
 
-		self.resources.insert(to.as_path().to_path_buf(), to.clone()).await;
-		self.tracked_files.insert(to.as_path().to_path_buf(), FileState::Exists).await;
-		ctx.services.reporter.success(&format!(
-			"Copied {} -> {}",
-			from.as_path().shorten(5).display(),
-			to.as_path().shorten(5).display()
-		));
-		Ok(())
+			self.resources
+				.insert(dest_resource.as_path().to_path_buf(), dest_resource.clone())
+				.await;
+			self.tracked_files
+				.insert(dest_resource.as_path().to_path_buf(), FileState::Exists)
+				.await;
+			ctx.services.reporter.success(&format!(
+				"Copied {} -> {}",
+				from.as_path().shorten(5).display(),
+				dest_resource.as_path().shorten(5).display()
+			));
+			Ok(dest_resource)
+		} else {
+			Err(Error::Other(anyhow!("could not acquire lock")))
+		}
 	}
 
 	pub async fn delete(&self, path: &Arc<Resource>, ctx: &ExecutionContext) -> Result<(), Error> {
@@ -275,41 +308,67 @@ impl FileSystemManager {
 		provider.mk_parent(path.as_path()).await
 	}
 
-	pub async fn hardlink(&self, from: &Arc<Resource>, to: &Arc<Resource>, ctx: &ExecutionContext) -> Result<(), Error> {
-		let from_provider = &from.backend;
-		let to_provider = &to.backend;
+	pub async fn hardlink(&self, from: &Arc<Resource>, to: &Destination, ctx: &ExecutionContext) -> Result<Arc<Resource>, Error> {
+		if let Some(guard) = self.locker.lock_destination(&ctx, to).await? {
+			let backend = self.get_provider(&to.host)?;
+			let dest_resource = guard
+				.as_path()
+				.to_path_buf()
+				.as_resource(ctx, None, to.host.clone(), backend)
+				.await;
 
-		if from_provider == to_provider {
-			from_provider.hardlink(from.as_path(), to.as_path()).await?;
+			let from_provider = &from.backend;
+			let to_provider = &dest_resource.backend;
+
+			if from_provider == to_provider {
+				if !ctx.settings.dry_run {
+					from_provider.hardlink(from.as_path(), dest_resource.as_path()).await?;
+				}
+			} else {
+				return Err(Error::ImpossibleOp("Cannot create hardlink across different filesystems".to_string()));
+			}
+			self.resources.insert(dest_resource.as_path().to_path_buf(), dest_resource.clone()).await;
+			self.tracked_files.insert(dest_resource.as_path().to_path_buf(), FileState::Exists).await;
+			ctx.services.reporter.success(&format!(
+				"Hardlinked {} -> {}",
+				from.as_path().shorten(5).display(),
+				dest_resource.as_path().shorten(5).display()
+			));
+			Ok(dest_resource)
 		} else {
-			return Err(Error::ImpossibleOp("Cannot create hardlink across different filesystems".to_string()));
+			Err(Error::Other(anyhow!("could not acquire lock")))
 		}
-		self.resources.insert(to.as_path().to_path_buf(), to.clone()).await;
-		self.tracked_files.insert(to.as_path().to_path_buf(), FileState::Exists).await;
-		ctx.services.reporter.success(&format!(
-			"Hardlinked {} -> {}",
-			from.as_path().shorten(5).display(),
-			to.as_path().shorten(5).display()
-		));
-		Ok(())
 	}
 
-	pub async fn symlink(&self, from: &Arc<Resource>, to: &Arc<Resource>, ctx: &ExecutionContext) -> Result<(), Error> {
-		let from_provider = &from.backend;
-		let to_provider = &to.backend;
+		pub async fn symlink(&self, from: &Arc<Resource>, to: &Destination, ctx: &ExecutionContext) -> Result<Arc<Resource>, Error> {
+		if let Some(guard) = self.locker.lock_destination(&ctx, to).await? {
+			let backend = self.get_provider(&to.host)?;
+			let dest_resource = guard
+				.as_path()
+				.to_path_buf()
+				.as_resource(ctx, None, to.host.clone(), backend)
+				.await;
 
-		if from_provider == to_provider {
-			from_provider.symlink(from.as_path(), to.as_path()).await?;
+			let from_provider = &from.backend;
+			let to_provider = &dest_resource.backend;
+
+			if from_provider == to_provider {
+				if !ctx.settings.dry_run {
+					from_provider.symlink(from.as_path(), dest_resource.as_path()).await?;
+				}
+			} else {
+				return Err(Error::ImpossibleOp("Cannot create symlink across different filesystems".to_string()));
+			}
+			self.resources.insert(dest_resource.as_path().to_path_buf(), dest_resource.clone()).await;
+			self.tracked_files.insert(dest_resource.as_path().to_path_buf(), FileState::Exists).await;
+			ctx.services.reporter.success(&format!(
+				"Symlinked {} -> {}",
+				from.as_path().shorten(5).display(),
+				dest_resource.as_path().shorten(5).display()
+			));
+			Ok(dest_resource)
 		} else {
-			return Err(Error::ImpossibleOp("Cannot create symlink across different filesystems".to_string()));
+			Err(Error::Other(anyhow!("could not acquire lock")))
 		}
-		self.resources.insert(to.as_path().to_path_buf(), to.clone()).await;
-		self.tracked_files.insert(to.as_path().to_path_buf(), FileState::Exists).await;
-		ctx.services.reporter.success(&format!(
-			"Hardlinked {} -> {}",
-			from.as_path().shorten(5).display(),
-			to.as_path().shorten(5).display()
-		));
-		Ok(())
 	}
 }
