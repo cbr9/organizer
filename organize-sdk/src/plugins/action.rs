@@ -169,5 +169,10 @@ pub trait Action: DynEq + DynClone + Sync + Send + Debug {
 	fn execution_model(&self) -> ExecutionModel {
 		ExecutionModel::default()
 	}
+	/// Indicates whether this action needs access to the input file's content (bytes)
+	/// during its operation. This can be used for static analysis (e.g., in snapshot creation)
+	fn needs_content(&self) -> bool {
+		false
+	}
 	async fn commit(&self, _ctx: Arc<ExecutionContext>) -> Result<Receipt, Error>;
 }

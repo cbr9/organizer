@@ -26,6 +26,12 @@ pub trait Filter: DynClone + DynEq + Debug + Send + Sync {
 		ExecutionModel::Single
 	}
 
+	/// Indicates whether this filter needs access to the input file's content (bytes)
+	/// during its operation. This can be used for static analysis (e.g., in snapshot creation)
+	fn needs_content(&self) -> bool {
+		false
+	}
+
 	/// Takes the execution context, which contains the appropriate scope,
 	/// and returns a Result containing the list of files that passed.
 	async fn filter(&self, check: Option<&PathBuf>, ctx: &ExecutionContext) -> Result<Vec<Arc<Resource>>, Error>;

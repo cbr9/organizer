@@ -1,15 +1,9 @@
-[connections.aws-frankfurt]
-type = "sftp"
-address = "127.0.0.1"
-port = 10002
-username = "andres_cabero"
-
 [[stage]]
-search = "/Users/H0UB8WV/Downloads"
+search = "/Users/cabero/Downloads"
 
 [[stage]]
 action = "copy"
-folder = "/Users/H0UB8WV/Downloads/"
+folder = "/Users/cabero/Downloads/"
 filename = "{{file.stem}}-1.{{file.extension}}"
 
 

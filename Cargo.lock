@@ -2091,6 +2091,7 @@ dependencies = [
  "console 0.16.0",
  "dashmap",
  "dialoguer",
+ "dirs",
  "indicatif",
  "lazy_static",
  "notify",
@@ -2098,11 +2099,13 @@ dependencies = [
  "organize-std",
  "path-clean",
  "serde_json",
+ "sha2",
  "tokio",
  "toml",
  "tracing",
  "tracing-appender",
  "tracing-subscriber",
+ "uuid",
 ]
 
 [[package]]
@@ -2179,6 +2182,7 @@ dependencies = [
  "tokio-util",
  "tracing",
  "typetag",
+ "uuid",
  "walkdir",
 ]
 

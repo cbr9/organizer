@@ -18,15 +18,16 @@ use std::{
 	time::SystemTime,
 };
 use tokio::{fs, sync::OnceCell};
+use uuid::Uuid;
 
 use anyhow::{Context, Result};
 use futures::{future::BoxFuture, stream::BoxStream, TryStreamExt};
 // Represents a file within the VFS
 #[derive(Debug, Clone)]
 pub struct VfsFile {
-	pub content: Option<Vec<u8>>, // Simulated file content (can be empty for just existence)
-	pub metadata: Metadata,       // Simulated metadata (size, timestamps, etc.)
+	pub metadata: Metadata, // Simulated metadata (size, timestamps, etc.)
 	pub host: String,
+	pub content_source: Option<PathBuf>,
 }
 
 // Represents a directory within the VFS
@@ -60,9 +61,8 @@ pub struct VfsEntryConfig {
 	/// The type of entry: "file" or "dir". Defaults to "file".
 	#[serde(default)]
 	pub entry_type: VfsEntryType,
-	/// Optional content for files. Can be a simple string.
-	/// For binary content, you'd typically expect Base64 encoding.
-	pub content: Option<String>,
+
+	pub content_source: Option<PathBuf>,
 	/// Optional size for files. If provided, overrides size derived from `content`.
 	pub size: Option<u64>,
 	pub host: String,
@@ -76,7 +76,7 @@ pub struct VirtualFileSystem {
 
 	#[serde(default)] // Allows this field to be omitted in configuration (will default to empty Vec)
 	pub initial_vfs_state: Vec<VfsEntryConfig>,
-	pub snapshot: Option<PathBuf>,
+	pub snapshot: PathBuf,
 }
 
 impl PartialEq for VirtualFileSystem {
@@ -193,90 +193,61 @@ impl VirtualFileSystem {
 
 	/// Private helper to lazily load and populate the VFS root (DashMap).
 	/// This method is called by all other StorageProvider methods that need the VFS.
-	fn _get_populated_vfs_root<'a>(&'a self, ctx: &'a ExecutionContext) -> BoxFuture<'a, Result<&'a DashMap<PathBuf, VfsEntry>, Error>> {
-		Box::pin(async move {
-			self.vfs_root
-				.get_or_try_init(|| async {
-					let map = DashMap::new(); // Create the DashMap instance inside the closure
-					let current_time = SystemTime::now();
+	async fn _get_populated_vfs_root(&self, ctx: &ExecutionContext) -> Result<&DashMap<PathBuf, VfsEntry>, Error> {
+		self.vfs_root
+			.get_or_try_init(|| async {
+				let map = DashMap::new();
+				let current_time = SystemTime::now();
 
-					// --- Determine the VFS entries to load (from snapshot or inline config) ---
-					let vfs_entries_to_load: Vec<VfsEntryConfig> = if let Some(ref path) = self.snapshot {
-						// If a snapshot file is specified, read and deserialize it.
-						if !path.exists() {
-							let desc = format!("{} does not exist", path.display());
-							ctx.services.reporter.error(&desc, None);
-							return Err(Error::Io(std::io::Error::new(std::io::ErrorKind::NotFound, desc)));
-						}
-						tracing::info!("Loading VFS state from snapshot file: {}", path.display());
-						let content = fs::read_to_string(path)
-							.await
-							.map_err(Error::Io)
-							.context(format!("Failed to read VFS snapshot file: {}", path.display()))?;
-						serde_json::from_str(&content)
-							.map_err(Error::Json)
-							.context(format!("Invalid VFS snapshot JSON format in file: {}", path.display()))?
-					} else {
-						// Otherwise, use the inline `initial_vfs_state` from the config.
-						// This `self.initial_vfs_state` is already populated by serde during deserialization.
-						self.initial_vfs_state.clone()
+				// --- Determine the VFS entries to load (from snapshot or inline config) ---
+				let vfs_entries_to_load: Vec<VfsEntryConfig> = {
+					let snapshot = self.snapshot.join("snapshot.json");
+					// If a snapshot file is specified, read and deserialize it.
+					if !snapshot.exists() {
+						let desc = format!("{} does not exist", snapshot.display());
+						ctx.services.reporter.error(&desc, None);
+						return Err(Error::Io(std::io::Error::new(std::io::ErrorKind::NotFound, desc)));
+					}
+					tracing::info!("Loading VFS state from snapshot file: {}", snapshot.display());
+					let content = fs::read_to_string(&snapshot)
+						.await
+						.map_err(Error::Io)
+						.context(format!("Failed to read VFS snapshot file: {}", snapshot.display()))?;
+					serde_json::from_str(&content)
+						.map_err(Error::Json)
+						.context(format!("Invalid VFS snapshot JSON format in file: {}", snapshot.display()))?
+				};
+
+				// Populate the DashMap from `merged_entries`
+				for config_entry in vfs_entries_to_load {
+					self.ensure_vfs_parent_dirs_exist(&config_entry.path, ctx).await?;
+
+					let metadata = Metadata {
+						size: config_entry.size,
+						modified: Some(current_time),
+						created: Some(current_time),
+						is_dir: config_entry.entry_type == VfsEntryType::Dir,
+						is_file: config_entry.entry_type == VfsEntryType::File,
+						extra: HashMap::new(),
 					};
 
-					if vfs_entries_to_load.is_empty() {
-						ctx.services.reporter.warning(
-							"The virtual file system is empty. To provide an initial state specify a VFS snapshot file via the `--vfs-snapshot` \
-							 command-line argument. You can create this snapshot with the `snapshot` command (e.g. organize snapshot --rule <RULE> \
-							 -o ./snapshot.json)",
-						);
-					}
-
-					for config_entry in vfs_entries_to_load {
-						let dummy_fs_for_helpers = VirtualFileSystem {
-							vfs_root: OnceCell::new_with(Some(map.clone())), // Pass the Arc<DashMap> to dummy for helper calls
-							initial_vfs_state: Vec::new(),
-							snapshot: None,
-							simulated_host: config_entry.host.clone(),
-						};
-						dummy_fs_for_helpers
-							.ensure_vfs_parent_dirs_exist(&config_entry.path, ctx)
-							.await?;
-
-						let metadata = Metadata {
-							size: config_entry.size,
-							modified: Some(current_time),
-							created: Some(current_time),
-							is_dir: config_entry.entry_type == VfsEntryType::Dir,
-							is_file: config_entry.entry_type == VfsEntryType::File,
-							extra: HashMap::new(), // Populate `extra` if VfsEntryConfig had an extra field
-						};
-
-						let vfs_entry = match config_entry.entry_type {
-							VfsEntryType::File => {
-								let content_bytes = if let Some(ref encoded_content) = config_entry.content {
-									BASE64_STANDARD_NO_PAD
-										.decode(encoded_content)
-										.map_err(|e| Error::Config(format!("Invalid Base64 content for {}: {}", config_entry.path.display(), e)))?
-								} else {
-									Vec::new() // No content specified in config, so empty bytes
-								};
-								VfsEntry::File(VfsFile {
-									content: Some(content_bytes),
-									metadata,
-									host: config_entry.host,
-								})
-							}
-							VfsEntryType::Dir => VfsEntry::Dir(VfsDir {
-								children: HashMap::new(),
-								metadata,
-								host: config_entry.host,
-							}),
-						};
-						map.insert(config_entry.path.normalize(), vfs_entry); // Insert into the DashMap
-					}
-					Ok(map) // Return the populated DashMap (wrapped in Arc)
-				})
-				.await
-		})
+					let vfs_entry = match config_entry.entry_type {
+						VfsEntryType::File => VfsEntry::File(VfsFile {
+							content_source: config_entry.content_source,
+							metadata,
+							host: config_entry.host.clone(),
+						}),
+						VfsEntryType::Dir => VfsEntry::Dir(VfsDir {
+							children: HashMap::new(),
+							metadata,
+							host: config_entry.host.clone(),
+						}),
+					};
+					map.insert(config_entry.path.normalize(), vfs_entry);
+				}
+				Ok(map)
+			})
+			.await
 	}
 
 	async fn get_vfs_entry(&self, path: &Path, ctx: &ExecutionContext) -> Option<VfsEntry> {
@@ -308,37 +279,52 @@ impl VirtualFileSystem {
 		vfs_map.remove(path);
 	}
 
-	/// Appends content to a VFS file. If the file does not exist, it creates it.
 	async fn append_to_vfs_file(&self, path: &Path, content: &[u8], ctx: &ExecutionContext) -> Result<(), Error> {
-		let vfs_map = self._get_populated_vfs_root(ctx).await?; // This ensures VFS is loaded.
-		self.ensure_vfs_parent_dirs_exist(path, ctx).await?; // This helper will also ensure VFS is loaded.
+		let vfs_map = self._get_populated_vfs_root(ctx).await?;
+		let normalized_path = path.normalize();
+		self.ensure_vfs_parent_dirs_exist(&normalized_path, ctx).await?;
 
 		let now = SystemTime::now();
 
-		// Try to get a mutable reference to the existing entry from the loaded map
-		if let Some(mut entry_ref) = vfs_map.get_mut(path) {
+		// Try to get a mutable reference to the existing entry
+		if let Some(mut entry_ref) = vfs_map.get_mut(&normalized_path) {
 			match *entry_ref.value_mut() {
 				VfsEntry::File(ref mut file) => {
-					if let Some(ref mut existing_content) = file.content {
-						existing_content.extend_from_slice(content);
-					} else {
-						// If file existed but content was None, now it has content
-						file.content = Some(content.to_vec());
-					}
-					file.metadata.size = Some(file.content.as_ref().map_or(0, |c| c.len()) as u64);
+					// Read existing content from its companion file
+					let current_content_vec = match &file.content_source {
+						Some(source_path) => fs::read(source_path).await.map_err(Error::from)?,
+						None => Vec::new(), // File exists but has no content
+					};
+					let mut combined_content = current_content_vec;
+					combined_content.extend_from_slice(content);
+
+					// Write to a new companion file for the updated content
+					let unique_filename = Uuid::new_v4().to_string();
+					let new_companion_path = self.snapshot.join("content").join(&unique_filename);
+					fs::write(&new_companion_path, &combined_content).await.map_err(Error::from)?;
+
+					file.content_source = Some(new_companion_path); // Update VfsFile to point to new companion
+					file.metadata.size = Some(combined_content.len() as u64);
 					file.metadata.modified = Some(now);
+
+					fs::remove_file(path).await.map_err(Error::from)?;
 				}
 				VfsEntry::Dir(_) => {
 					return Err(Error::Io(std::io::Error::new(
 						std::io::ErrorKind::IsADirectory,
-						format!("Path is a directory: {}", path.display()),
+						format!("Path is a directory: {}", normalized_path.display()),
 					)));
 				}
 			}
 		} else {
-			// File does not exist, create a new one in the VFS map
+			// File does not exist, create a new one
+			let new_content_vec = content.to_vec();
+			let unique_filename = Uuid::new_v4().to_string();
+			let new_companion_path = self.snapshot.join("content").join(&unique_filename);
+			fs::write(&new_companion_path, &new_content_vec).await.map_err(Error::from)?;
+
 			let new_metadata = Metadata {
-				size: Some(content.len() as u64),
+				size: Some(new_content_vec.len() as u64),
 				modified: Some(now),
 				created: Some(now),
 				is_dir: false,
@@ -346,12 +332,12 @@ impl VirtualFileSystem {
 				extra: HashMap::new(),
 			};
 
-			let vfs_file = VfsFile {
-				content: Some(content.to_vec()),
+			let new_vfs_file = VfsFile {
+				content_source: Some(new_companion_path),
 				metadata: new_metadata,
 				host: self.simulated_host.clone(),
 			};
-			vfs_map.insert(path.to_path_buf(), VfsEntry::File(vfs_file)); // Use the loaded map
+			self.insert_vfs_entry(normalized_path, VfsEntry::File(new_vfs_file), ctx).await;
 		}
 
 		Ok(())
@@ -677,16 +663,20 @@ impl StorageProvider for VirtualFileSystem {
 	}
 
 	async fn delete(&self, path: &Path, ctx: &ExecutionContext) -> Result<(), Error> {
-		if self.get_vfs_entry(path, ctx).await.is_none() {
-			return Err(Error::Io(std::io::Error::new(
-				std::io::ErrorKind::NotFound,
-				format!("File could not be found: {}", path.display()),
-			)));
-		}
+		let vfs_map = self._get_populated_vfs_root(ctx).await?;
+		let normalized_path = path.normalize();
 
-		// 2. Remove the entry from the VFS.
-		self.remove_vfs_entry(path, ctx).await;
+		let entry = match self.get_vfs_entry(&normalized_path, ctx).await {
+			Some(entry) => entry,
+			None => {
+				return Err(Error::Io(std::io::Error::new(
+					std::io::ErrorKind::NotFound,
+					format!("File could not be found: {}", normalized_path.display()),
+				)));
+			}
+		};
 
+		self.remove_vfs_entry(&normalized_path, ctx).await;
 		Ok(())
 	}
 

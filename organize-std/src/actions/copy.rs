@@ -70,4 +70,8 @@ impl Action for Copy {
 			}),
 		}
 	}
+
+	fn needs_content(&self) -> bool {
+		true
+	}
 }
