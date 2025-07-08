@@ -46,12 +46,6 @@ impl<T: AsRef<Path> + Sync + Send> PathExt for T {
 			}
 		}
 
-		// 3. Ensure the path is absolute within the VFS context (add leading '/' if missing)
-		// This makes all VFS paths start with a '/' consistently.
-		if !normalized_str.starts_with('/') {
-			normalized_str = format!("/{normalized_str}");
-		}
-
 		// 4. Use path-clean to simplify and canonicalize components (e.g., "/a/./b" -> "/a/b", "/a/b/../c" -> "/a/c")
 		PathBuf::from(normalized_str)
 	}
