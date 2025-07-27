@@ -52,6 +52,7 @@
           packages = with pkgs; [
             toolchain
             rust-analyzer-nightly
+            ra-multiplex
             nixd
             sqlx-cli
             pkg-config
