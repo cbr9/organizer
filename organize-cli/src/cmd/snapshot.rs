@@ -140,12 +140,10 @@ impl Cmd for Snapshot {
 					});
 
 					if let Ok(metadata) = metadata {
-						if self.include_content {
-							if metadata.is_file {
-								let bytes = resource.get_bytes(&ctx).await?;
-								size_from_content = Some(bytes.len() as u64);
-								content_string = Some(general_purpose::STANDARD_NO_PAD.encode(&bytes));
-							}
+						if self.include_content && metadata.is_file {
+							let bytes = resource.get_bytes(&ctx).await?;
+							size_from_content = Some(bytes.len() as u64);
+							content_string = Some(general_purpose::STANDARD_NO_PAD.encode(bytes));
 						}
 
 						let entry_type = if metadata.is_dir { VfsEntryType::Dir } else { VfsEntryType::File };

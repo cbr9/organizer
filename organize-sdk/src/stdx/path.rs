@@ -1,4 +1,3 @@
-#[cfg(target_family = "windows")]
 use std::path::Path;
 use std::{
 	ffi::OsStr,
@@ -92,7 +91,7 @@ impl<T: AsRef<Path> + Sync + Send> PathExt for T {
 
 	#[cfg(target_family = "unix")]
 	fn is_hidden(&self) -> Result<bool, Self::HiddenError> {
-		match self.file_name() {
+		match self.as_ref().file_name() {
 			None => Ok(false),
 			Some(filename) => Ok(filename.to_string_lossy().starts_with('.')),
 		}

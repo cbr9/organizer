@@ -53,8 +53,8 @@ impl DestinationBuilder {
 	pub async fn build(&self, ctx: &ExecutionContext) -> Result<Destination, Error> {
 		let folder = ctx.services.template_compiler.compile_template(&self.folder)?;
 		let filename = self
-			.filename
 			.clone()
+			.filename
 			.map(|f| ctx.services.template_compiler.compile_template(&f))
 			.transpose()?; // This elegantly handles the Option<Result<T, E>>
 		let host = ctx.services.template_compiler.compile_template(&self.host)?.render(ctx).await?;
@@ -258,7 +258,7 @@ impl FileSystemManager {
 		let to_path = to.resolve(&ctx).await?;
 		let to_resource = self.get_or_init_resource(to_path, None, &to.host).await?;
 		// A native move/rename is only possible if the two resources are on the same filesystem backend.
-		if &from.backend == &to_resource.backend {
+		if from.backend.as_ref() == to_resource.backend.as_ref() {
 			let rename_result: Result<(), Error> = if !ctx.settings.dry_run {
 				let backup = Backup::new(&ctx).await?;
 				backup.persist(&ctx).await?;

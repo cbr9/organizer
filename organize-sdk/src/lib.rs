@@ -1,4 +1,3 @@
-#![feature(file_lock)]
 #![feature(path_add_extension)]
 #![feature(lock_value_accessors)]
 
